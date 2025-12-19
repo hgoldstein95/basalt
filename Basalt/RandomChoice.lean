@@ -1,9 +1,13 @@
+/-- A typeclass for monads that support sampling random `Nat`s
+    in the interval `[lo, hi]` -/
 class RandomChoice (m : Type → Type) where
   choose : (lo hi : Nat) → (h : lo ≤ hi) → m Nat
 
+/-- Picks between two (thunked) generators, each with probability 0.5 -/
 def RandomChoice.pick [Monad m] [RandomChoice m] (x y : Unit → m α) := do
   if (← choose 0 1 (by simp)) == 0 then x () else y ()
 
+/-- Biased coin-flip with success probability `r` -/
 def RandomChoice.coin [Monad m] [RandomChoice m] (r : Rat) : m Bool := do
   if (← choose 0 r.den (by simp)) < r.num then pure true else pure false
 
