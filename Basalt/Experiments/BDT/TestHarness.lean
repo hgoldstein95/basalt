@@ -104,29 +104,15 @@ structure PropertySpec where
 /-- All properties to test -/
 def allProperties : List PropertySpec := [
   { name := "insert-find"
-  , test := fun impl tree => do
-      let key ← RandomChoice.choose 0 100 (by omega)
-      let val ← RandomChoice.choose 0 100 (by omega)
-      return prop_insert_find tree key val impl.insert BST.find },
+  , test := fun impl tree => prop_insert_find tree impl.insert BST.find },
   { name := "insert-insert"
-  , test := fun impl tree => do
-      let key ← RandomChoice.choose 0 100 (by omega)
-      let val1 ← RandomChoice.choose 0 100 (by omega)
-      let val2 ← RandomChoice.choose 0 100 (by omega)
-      return prop_insert_insert tree key val1 val2 impl.insert BST.find },
+  , test := fun impl tree => prop_insert_insert tree impl.insert BST.find },
   { name := "delete-find"
-  , test := fun impl tree => do
-      let key ← RandomChoice.choose 0 100 (by omega)
-      return prop_delete_find tree key impl.delete BST.find },
+  , test := fun impl tree => prop_delete_find tree impl.delete BST.find },
   { name := "insert-size"
-  , test := fun impl tree => do
-      let key ← RandomChoice.choose 0 100 (by omega)
-      let val ← RandomChoice.choose 0 100 (by omega)
-      return prop_insert_size tree key val impl.insert BST.size },
+  , test := fun impl tree => prop_insert_size tree impl.insert BST.size },
   { name := "delete-size"
-  , test := fun impl tree => do
-      let key ← RandomChoice.choose 0 100 (by omega)
-      return prop_delete_size tree key impl.delete BST.size }
+  , test := fun impl tree => prop_delete_size tree impl.delete BST.size }
 ]
 
 /-- Result of testing one property -/
