@@ -11,6 +11,15 @@ def RandomChoice.pick [Monad m] [RandomChoice m] (x y : Unit → m α) : m α :=
 def RandomChoice.coin [Monad m] [RandomChoice m] (r : Rat) : m Bool := do
   if (← choose 0 r.den (by simp)) < r.num then pure true else pure false
 
+/-- Samples an element randomly from the input list `xs` -/
+def RandomChoice.elements
+  [Monad m]
+  [RandomChoice m]
+  [Inhabited α]
+  (xs : List α) : m α := do
+  let idx ← RandomChoice.choose 0 xs.length (by simp)
+  pure xs[idx]!
+
 /-- Picks a generator from a list of generators -/
 def RandomChoice.oneOf
   {m : Type → Type}
@@ -22,7 +31,11 @@ def RandomChoice.oneOf
   let idx ← RandomChoice.choose 0 gs.length (by simp)
   gs[idx]! ()
 
+
 open Lean.Order in
+
+/-- Proof that if the two arguments to `pick` are monotone, then
+    the resultant generator is also monotone  -/
 @[partial_fixpoint_monotone]
 theorem RandomChoice.monotone_pick
     [∀ α, PartialOrder (m α)]

@@ -13,7 +13,7 @@ namespace STLCExample
 inductive Ty where
   | Nat : Ty
   | Fun: Ty → Ty → Ty
-  deriving BEq, DecidableEq
+  deriving BEq, Inhabited
 
 /-- Pretty-printer for `Ty`s -/
 def typeToString (ty : Ty) : String :=
@@ -36,14 +36,14 @@ inductive Expr where
   | Var: Nat → Expr
   | App: Expr → Expr → Expr
   | Abs: Ty → Expr → Expr
-  deriving BEq
+  deriving BEq, Inhabited
 
 /-- Pretty-printer for `Expr`s -/
 def exprToString (e : Expr) : String :=
   match e with
   | .Const n => s!"Const {n}"
   | .Add e1 e2 => s!"({exprToString e1} + {exprToString e2})"
-  | .Var id => s!"Id {id}"
+  | .Var id => s!"Var {id}"
   | .App e1 e2 => s!"({exprToString e1} {exprToString e2})"
   | .Abs τ e2 => s!"(λ _ : {typeToString τ}. {exprToString e2})"
 
@@ -68,17 +68,43 @@ partial_fixpoint
 -- We open the `NatList` namesapce just so we can use `Nat.arbitrary` below
 open NatListExample
 
--- TODO:
--- * add sub-generators for Abs, Add, Var
--- * parameterize the generator by Ctx
-def Expr.genExpr : Gen Expr :=
-  pick
-    (fun () => .Const <$> Nat.arbitrary)
-    (fun () => do
-       let e1 ← Expr.genExpr
-       let e2 ← Expr.genExpr
-       return .App e1 e2)
-partial_fixpoint
 
+mutual
+
+  /-- Helper: generates structurally simple expressions based on type.
+      NB: we have to define this generator explicitly using `do`-notation,
+      since `monotone_bind` is defined in terms of `>>=`
+      (i.e. we can't use `<$>` to make this generator more succinct). -/
+  def Expr.genOne (Γ : Ctx) (ty : Ty) : Gen Expr :=
+    match ty with
+    | Ty.Nat =>
+      pick
+        (fun () => do
+          let n ← Nat.arbitrary
+          pure (.Const n))
+        (fun () => do
+          let e1 ← Expr.genExpr Γ .Nat
+          let e2 ← Expr.genExpr Γ .Nat
+          return .Add e1 e2)
+    | .Fun t1 t2 => do
+        let body ← Expr.genOne (t1 :: Γ) t2
+        pure (.Abs t1 body)
+    partial_fixpoint
+
+  /-- `genExpr Γ τ` generates random `Expr`s `e` such that `Γ ⊢ e : τ` -/
+  def Expr.genExpr (Γ : Ctx) (τ : Ty) : Gen Expr :=
+    pick
+      (fun () => genOne Γ τ)
+      (fun () => pick
+          (fun () => do
+            let vars := List.filter (fun i => Γ[i]! == τ) (List.range Γ.length)
+            RandomChoice.elements (.Var <$> vars))
+          (fun () => do
+            let t1 ← Ty.genTy
+            let e1 ← Expr.genExpr Γ (.Fun t1 τ)
+            let e2 ← Expr.genExpr Γ t1
+            return .App e1 e2))
+  partial_fixpoint
+end
 
 end STLCExample
