@@ -99,20 +99,32 @@ def allImpls : List BSTImpl := [
 /-- Property specification for testing -/
 structure PropertySpec where
   name : String
-  test : BSTImpl → BST Nat Nat → Gen Bool
+  test : BDTParams → BSTImpl → BST Nat Nat → Gen Bool
 
 /-- All properties to test -/
 def allProperties : List PropertySpec := [
   { name := "insert-find"
-  , test := fun impl tree => prop_insert_find tree impl.insert BST.find },
+  , test := fun _params impl tree => prop_insert_find tree impl.insert BST.find },
   { name := "insert-insert"
-  , test := fun impl tree => prop_insert_insert tree impl.insert BST.find },
+  , test := fun _params impl tree => prop_insert_insert tree impl.insert BST.find },
   { name := "delete-find"
-  , test := fun impl tree => prop_delete_find tree impl.delete BST.find },
+  , test := fun _params impl tree => prop_delete_find tree impl.delete BST.find },
   { name := "insert-size"
-  , test := fun impl tree => prop_insert_size tree impl.insert BST.size },
+  , test := fun _params impl tree => prop_insert_size tree impl.insert BST.size },
   { name := "delete-size"
-  , test := fun impl tree => prop_delete_size tree impl.delete BST.size }
+  , test := fun _params impl tree => prop_delete_size tree impl.delete BST.size },
+  { name := "insert-valid"
+  , test := fun _params impl tree => prop_insert_valid tree impl.insert BST.valid },
+  { name := "delete-valid"
+  , test := fun _params impl tree => prop_delete_valid tree impl.delete BST.valid },
+  { name := "toList-sorted"
+  , test := fun _params _impl tree => prop_toList_sorted tree BST.toList },
+  { name := "union-contains"
+  , test := fun params impl tree => prop_union_contains tree params impl.union BST.find },
+  { name := "union-left-priority"
+  , test := fun params impl tree => prop_union_left_priority tree params impl.union BST.find },
+  { name := "union-valid"
+  , test := fun params impl tree => prop_union_valid tree params impl.union BST.valid }
 ]
 
 /-- Result of testing one property -/
@@ -139,7 +151,7 @@ def testProperties (params : BDTParams) (impl : BSTImpl) (maxTests : Nat := 1000
     IO.println s!"Testing {prop.name}..."
     let testGen : Gen Bool := do
       let tree ← genBST params
-      prop.test impl tree
+      prop.test params impl tree
     let stats ← runUntilFailure testGen maxTests
     results := { propertyName := prop.name, stats := stats } :: results
   return results.reverse
