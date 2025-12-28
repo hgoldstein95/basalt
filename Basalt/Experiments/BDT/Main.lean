@@ -14,19 +14,6 @@ def runQuickCmd (p : Parsed) : IO UInt32 := do
   analyzeSweep results
   return 0
 
-/-- Run full sweep with 144 configurations -/
-def runFullCmd (p : Parsed) : IO UInt32 := do
-  let maxTests := p.flag? "max-tests" |>.map (·.as! Nat) |>.getD 1000
-  let output := p.flag? "output" |>.map (·.as! String) |>.getD "bdt_full_sweep_results.csv"
-
-  IO.println s!"Running full sweep (144 configurations, {maxTests} tests each)..."
-  IO.println "WARNING: This will take a long time!"
-  let results ← runFullSweep maxTests
-  analyzeSweep results
-  exportToCSV results output
-  IO.println s!"Results exported to {output}"
-  return 0
-
 /-- Run with default parameters -/
 def runDefaultCmd (p : Parsed) : IO UInt32 := do
   let maxTests := p.flag? "max-tests" |>.map (·.as! Nat) |>.getD 1000
@@ -85,16 +72,6 @@ def quickCmd : Cmd := `[Cli|
     "max-tests" : Nat; "Maximum number of tests per property (default: 100)"
 ]
 
-/-- Full sweep subcommand -/
-def fullCmd : Cmd := `[Cli|
-  full VIA runFullCmd;
-  "Run a full sweep with 144 hyperparameter configurations."
-
-  FLAGS:
-    "max-tests" : Nat; "Maximum number of tests per property (default: 1000)"
-    o, output : String; "Output CSV file path (default: bdt_full_sweep_results.csv)"
-]
-
 /-- Default parameters subcommand -/
 def defaultCmd : Cmd := `[Cli|
   default VIA runDefaultCmd;
@@ -134,7 +111,6 @@ Hyperparameters:
 
   SUBCOMMANDS:
     quickCmd;
-    fullCmd;
     defaultCmd;
     customCmd
 

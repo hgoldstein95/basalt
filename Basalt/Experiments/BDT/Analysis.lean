@@ -69,23 +69,6 @@ def printExperimentSummary (summary : ExperimentSummary) : IO Unit := do
   for (implName, bugCount) in summary.bugsFoundPerImpl do
     IO.println s!"  {implName}: {bugCount}"
 
-/-- Compare two experiment summaries -/
-def compareExperiments (exp1 exp2 : ExperimentSummary) : IO Unit := do
-  IO.println "\n=== Experiment Comparison ==="
-  IO.println s!"Experiment 1: {exp1.totalBugsFound} bugs found"
-  IO.println s!"Experiment 2: {exp2.totalBugsFound} bugs found"
-
-  if exp1.totalBugsFound > exp2.totalBugsFound then
-    IO.println "→ Experiment 1 found more bugs!"
-  else if exp2.totalBugsFound > exp1.totalBugsFound then
-    IO.println "→ Experiment 2 found more bugs!"
-  else
-    IO.println "→ Both found the same number of bugs"
-    if exp1.avgTestsToFindBug < exp2.avgTestsToFindBug then
-      IO.println "→ Experiment 1 found them faster!"
-    else
-      IO.println "→ Experiment 2 found them faster!"
-
 /-- Find the best hyperparameter configuration from a sweep -/
 def findBestConfig (results : List ExperimentResult) : Option ExperimentSummary :=
   let summaries := results.map summarizeExperiment

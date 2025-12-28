@@ -9,38 +9,6 @@ structure ExperimentResult where
   results : List ImplTestResult
   deriving Repr
 
-/-- Generate a grid of hyperparameter values to test -/
-def generateParamGrid : List BDTParams :=
-  let alpha0Values := [0.5, 1.0, 2.0, 4.0]
-  let t0Values := [0.5, 1.0, 2.0]
-  let t2Values := [0.5, 1.0, 2.0]
-  let decayValues := [0.3, 0.5, 0.7, 0.9]
-
-  alpha0Values >>= fun alpha0 =>
-    t0Values >>= fun t0 =>
-      t2Values >>= fun t2 =>
-        decayValues.map fun decay =>
-          { alpha0, t0, t2, decay }
-
-/-- Run experiments for all hyperparameter configurations -/
-def runFullSweep (maxTests : Nat := 1000) : IO (List ExperimentResult) := do
-  let grid := generateParamGrid
-  IO.println s!"Running {grid.length} experiments..."
-
-  let mut allResults := []
-  for _h : i in [:grid.length] do
-    let params := grid[i]!
-    let sep := String.pushn "" '=' 60
-    IO.println s!"\n{sep}"
-    IO.println s!"Experiment {i+1}/{grid.length}"
-    IO.println s!"Parameters: α₀={params.alpha0}, t₀={params.t0}, t₂={params.t2}, d={params.decay}"
-    IO.println s!"{sep}"
-
-    let results ← testAllImplementations params maxTests
-    allResults := { params, results } :: allResults
-
-  return allResults.reverse
-
 /-- Run a small experiment with just a few parameter settings -/
 def runQuickSweep (maxTests : Nat := 100) : IO (List ExperimentResult) := do
   let quickGrid : List BDTParams := [
