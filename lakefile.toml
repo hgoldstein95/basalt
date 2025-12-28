@@ -9,6 +9,10 @@ name = "Basalt"
 name = "basalt"
 root = "Main"
 
+[[lean_exe]]
+name = "bdt_experiments"
+root = "Basalt.Experiments.BDT.Main"
+
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
