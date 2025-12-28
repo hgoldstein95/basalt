@@ -31,8 +31,21 @@ def RandomChoice.oneOf
   let idx ← RandomChoice.choose 0 gs.length (by simp)
   gs[idx]! ()
 
+def RandomChoice.oneOf'
+  {m : Type → Type}
+  {α : Type}
+  [Monad m]
+  [RandomChoice m]
+  [Inhabited (m α)]
+  (gs : List (Unit → m α)) (default : Unit → m α) : m α :=
+  match gs with
+  | [] => default ()
+  | [g] => pick g default
+  | _ => List.foldl (fun acc g => pick g (fun () => acc)) (default ()) gs
 
-open Lean.Order in
+
+
+open Lean.Order
 
 /-- Proof that if the two arguments to `pick` are monotone, then
     the resultant generator is also monotone  -/
