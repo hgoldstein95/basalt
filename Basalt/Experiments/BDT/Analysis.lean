@@ -12,14 +12,7 @@ structure ImplSummary where
 
 /-- Compute summary for a single implementation's test results -/
 def summarizeImplResult (result : ImplTestResult) : ImplSummary :=
-  let stats := [
-    result.insertFindStats,
-    result.insertInsertStats,
-    result.deleteFindStats,
-    result.insertSizeStats,
-    result.deleteSizeStats
-  ]
-
+  let stats := result.propertyResults.map (·.stats)
   let bugsFound := stats.filter (·.bugFound) |>.length
   let totalTests := stats.map (·.testsUntilFailure) |>.sum
   let avgTests := (totalTests.toFloat / stats.length.toFloat)
@@ -44,8 +37,7 @@ def summarizeExperiment (exp : ExperimentResult) : ExperimentSummary :=
   let bugsPerImpl := summaries.map (fun s => (s.implName, s.totalBugsFound))
 
   let bugStats : List TestStats := exp.results >>= fun r =>
-    [r.insertFindStats, r.insertInsertStats, r.deleteFindStats,
-     r.insertSizeStats, r.deleteSizeStats].filter (·.bugFound)
+    (r.propertyResults.map (·.stats)).filter (·.bugFound)
 
   let avgTests := if bugStats.isEmpty then 0.0
     else ((bugStats.map (·.testsUntilFailure.toFloat)).sum) / bugStats.length.toFloat

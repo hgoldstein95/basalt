@@ -96,58 +96,74 @@ def allImpls : List BSTImpl := [
   , union := HowToSpecifyIt.BST8.union }
 ]
 
+/-- Property specification for testing -/
+structure PropertySpec where
+  name : String
+  test : BSTImpl → BST Nat Nat → Gen Bool
+
+/-- All properties to test -/
+def allProperties : List PropertySpec := [
+  { name := "insert-find"
+  , test := fun impl tree => do
+      let key ← RandomChoice.choose 0 100 (by omega)
+      let val ← RandomChoice.choose 0 100 (by omega)
+      return prop_insert_find tree key val impl.insert BST.find },
+  { name := "insert-insert"
+  , test := fun impl tree => do
+      let key ← RandomChoice.choose 0 100 (by omega)
+      let val1 ← RandomChoice.choose 0 100 (by omega)
+      let val2 ← RandomChoice.choose 0 100 (by omega)
+      return prop_insert_insert tree key val1 val2 impl.insert BST.find },
+  { name := "delete-find"
+  , test := fun impl tree => do
+      let key ← RandomChoice.choose 0 100 (by omega)
+      return prop_delete_find tree key impl.delete BST.find },
+  { name := "insert-size"
+  , test := fun impl tree => do
+      let key ← RandomChoice.choose 0 100 (by omega)
+      let val ← RandomChoice.choose 0 100 (by omega)
+      return prop_insert_size tree key val impl.insert BST.size },
+  { name := "delete-size"
+  , test := fun impl tree => do
+      let key ← RandomChoice.choose 0 100 (by omega)
+      return prop_delete_size tree key impl.delete BST.size }
+]
+
+/-- Result of testing one property -/
+structure PropertyTestResult where
+  propertyName : String
+  stats : TestStats
+  deriving Repr
+
 /-- Result of testing one implementation -/
 structure ImplTestResult where
   implName : String
-  insertFindStats : TestStats
-  insertInsertStats : TestStats
-  deleteFindStats : TestStats
-  insertSizeStats : TestStats
-  deleteSizeStats : TestStats
+  propertyResults : List PropertyTestResult
   deriving Repr
+
+/-- Helper to get stats for a specific property by name -/
+def ImplTestResult.getPropertyStats (result : ImplTestResult) (name : String) : Option TestStats :=
+  result.propertyResults.find? (·.propertyName == name) |>.map (·.stats)
+
+/-- Test all properties for a single implementation -/
+def testProperties (params : BDTParams) (impl : BSTImpl) (maxTests : Nat := 1000)
+    : IO (List PropertyTestResult) := do
+  let mut results := []
+  for prop in allProperties do
+    IO.println s!"Testing {prop.name}..."
+    let testGen : Gen Bool := do
+      let tree ← genBST params
+      prop.test impl tree
+    let stats ← runUntilFailure testGen maxTests
+    results := { propertyName := prop.name, stats := stats } :: results
+  return results.reverse
 
 /-- Test a single BST implementation against all properties -/
 def testImplementation (params : BDTParams) (impl : BSTImpl)
     (maxTests : Nat := 1000) : IO ImplTestResult := do
   IO.println s!"\n=== Testing {impl.name} ==="
-
-  -- Test insert-find property
-  let insertFindStats ← testProperty params "insert-find" (fun tree => do
-    let key ← RandomChoice.choose 0 100 (by omega)
-    let val ← RandomChoice.choose 0 100 (by omega)
-    return prop_insert_find tree key val impl.insert BST.find) maxTests
-
-  -- Test insert-insert property
-  let insertInsertStats ← testProperty params "insert-insert" (fun tree => do
-    let key ← RandomChoice.choose 0 100 (by omega)
-    let val1 ← RandomChoice.choose 0 100 (by omega)
-    let val2 ← RandomChoice.choose 0 100 (by omega)
-    return prop_insert_insert tree key val1 val2 impl.insert BST.find) maxTests
-
-  -- Test delete-find property
-  let deleteFindStats ← testProperty params "delete-find" (fun tree => do
-    let key ← RandomChoice.choose 0 100 (by omega)
-    return prop_delete_find tree key impl.delete BST.find) maxTests
-
-  -- Test insert-size property
-  let insertSizeStats ← testProperty params "insert-size" (fun tree => do
-    let key ← RandomChoice.choose 0 100 (by omega)
-    let val ← RandomChoice.choose 0 100 (by omega)
-    return prop_insert_size tree key val impl.insert BST.size) maxTests
-
-  -- Test delete-size property
-  let deleteSizeStats ← testProperty params "delete-size" (fun tree => do
-    let key ← RandomChoice.choose 0 100 (by omega)
-    return prop_delete_size tree key impl.delete BST.size) maxTests
-
-  return {
-    implName := impl.name
-    insertFindStats := insertFindStats
-    insertInsertStats := insertInsertStats
-    deleteFindStats := deleteFindStats
-    insertSizeStats := insertSizeStats
-    deleteSizeStats := deleteSizeStats
-  }
+  let propertyResults ← testProperties params impl maxTests
+  return { implName := impl.name, propertyResults := propertyResults }
 
 /-- Test all implementations with given parameters -/
 def testAllImplementations (params : BDTParams) (maxTests : Nat := 1000)
