@@ -114,7 +114,7 @@ def analyzeSweep (results : List ExperimentResult) : IO Unit := do
   IO.println s!"Total Experiments Run: {summaries.length}\n"
 
   -- Print each experiment summary
-  for h : i in [:summaries.length] do
+  for _h : i in [:summaries.length] do
     let summary := summaries[i]!
     IO.println s!"Experiment {i+1}:"
     printExperimentSummary summary

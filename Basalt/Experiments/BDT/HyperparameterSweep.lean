@@ -28,7 +28,7 @@ def runFullSweep (maxTests : Nat := 1000) : IO (List ExperimentResult) := do
   IO.println s!"Running {grid.length} experiments..."
 
   let mut allResults := []
-  for h : i in [:grid.length] do
+  for _h : i in [:grid.length] do
     let params := grid[i]!
     let sep := String.pushn "" '=' 60
     IO.println s!"\n{sep}"
@@ -53,7 +53,7 @@ def runQuickSweep (maxTests : Nat := 100) : IO (List ExperimentResult) := do
   IO.println s!"Running {quickGrid.length} quick experiments..."
 
   let mut allResults := []
-  for h : i in [:quickGrid.length] do
+  for _h : i in [:quickGrid.length] do
     let params := quickGrid[i]!
     let sep := String.pushn "" '=' 60
     IO.println s!"\n{sep}"
