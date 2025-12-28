@@ -19,16 +19,15 @@ structure BDTParams where
   decay : Float
   deriving Repr, Inhabited
 
-/-- Default BDT parameters (reasonable starting point) -/
+/-- Default BDT parameters -/
 def BDTParams.default : BDTParams :=
   { alpha0 := 2.0
   , t0 := 1.0
   , t2 := 1.0
   , decay := 0.5 }
 
-/-- Generate a random BST using Boltzmann Decay Tuning
+/-- Generates a random BST using Boltzmann Decay Tuning
 
-    This follows the approach from the paper:
     - Thread alpha through the generation process
     - Use weights t_k * alpha^k for constructors of arity k
     - Decay alpha by the decay factor at each recursive step
