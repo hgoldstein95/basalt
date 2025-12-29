@@ -111,7 +111,6 @@ def benchmark_config(
     config: BDTConfig,
     max_tests: int,
     runs: int,
-    warmup: int,
 ) -> BenchmarkResult:
     """
     Benchmark a single configuration using hyperfine.
@@ -120,7 +119,6 @@ def benchmark_config(
         config: Hyperparameter configuration
         max_tests: Maximum tests per property
         runs: Number of benchmark runs
-        warmup: Number of warmup runs
 
     Returns:
         BenchmarkResult with timing and bug detection metrics
@@ -155,8 +153,6 @@ def benchmark_config(
         "hyperfine",
         "--runs",
         str(runs),
-        "--warmup",
-        str(warmup),
         "--style",
         "none",  # Suppress hyperfine output (results are checked separately)
         "--export-json",
@@ -164,7 +160,7 @@ def benchmark_config(
         f"cd .. && {cmd_str}",
     ]
 
-    tqdm.write(f"Running hyperfine with {runs} runs (warmup: {warmup})...")
+    tqdm.write(f"Running hyperfine with {runs} runs...")
     subprocess.run(hyperfine_cmd, check=True)
 
     # Parse hyperfine results
@@ -238,7 +234,8 @@ def print_results_table(results: List[BenchmarkResult]):
 
 
 def export_csv(
-    results: List[BenchmarkResult], filename: str = "../benchmark_results/benchmark_results.csv"
+    results: List[BenchmarkResult],
+    filename: str = "../benchmark_results/benchmark_results.csv",
 ):
     """Export results to CSV."""
 
@@ -294,14 +291,8 @@ def main():
     parser.add_argument(
         "--runs",
         type=int,
-        default=10,
-        help="Number of benchmark runs for hyperfine",
-    )
-    parser.add_argument(
-        "--warmup",
-        type=int,
         default=1,
-        help="Number of warmup runs for hyperfine",
+        help="No. of benchmark runs for Hyperfine",
     )
     args = parser.parse_args()
 
@@ -316,14 +307,13 @@ def main():
     print("BDT Benchmark Configuration:")
     print(f"  Max tests per property: {args.max_tests}")
     print(f"  Benchmark runs: {args.runs}")
-    print(f"  Warmup runs: {args.warmup}")
 
     # Run benchmarks
     results = []
     for config in tqdm(
         QUICK_CONFIGS, desc="Benchmarking configurations", unit="config"
     ):
-        result = benchmark_config(config, args.max_tests, args.runs, args.warmup)
+        result = benchmark_config(config, args.max_tests, args.runs)
         results.append(result)
 
     # Print and export results
