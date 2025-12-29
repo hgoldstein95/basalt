@@ -96,7 +96,7 @@ This creates plots at `../benchmark_results/benchmark_plots.png`
 
 ## Properties Tested
 
-The framework tests 11 BST properties:
+The 11 BST properties from *How To Specify It* are as follows:
 
 ### Basic Operations
 1. **insert-find**: After inserting a key, `find` should return its value
@@ -114,19 +114,6 @@ The framework tests 11 BST properties:
 9. **union-contains**: Union contains all keys from both trees
 10. **union-left-priority**: Union prefers left tree for duplicate keys
 11. **union-valid**: Union of valid BSTs produces valid BST
-
-## Buggy Implementations
-
-Tests run against all 8 buggy BST implementations from the "How to Specify It" case study:
-
-- **BST1**: `insert` discards the tree
-- **BST2**: `insert` creates duplicates
-- **BST3**: `insert` doesn't update existing keys
-- **BST4**: `delete` doesn't rebuild tree structure
-- **BST5**: `delete` has reversed comparisons
-- **BST6**: `union` assumes key ordering
-- **BST7**: `union` makes wrong ordering assumptions
-- **BST8**: `union` has priority bug for duplicates
 
 ## Output Format
 ```bash
