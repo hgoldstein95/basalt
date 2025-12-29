@@ -62,7 +62,7 @@ def check_hyperfine() -> bool:
         return False
 
 
-def run_single_experiment(config: BDTConfig, max_tests: int = 100) -> tuple[int, float]:
+def run_single_experiment(config: BDTConfig, max_tests: int) -> tuple[int, float]:
     """
     Run a single BDT experiment and extract metrics.
 
@@ -90,6 +90,7 @@ def run_single_experiment(config: BDTConfig, max_tests: int = 100) -> tuple[int,
         capture_output=True,
         text=True,
         check=True,
+        cwd="..",  # Run from project root
     )
 
     # Parse output for metrics
@@ -108,9 +109,9 @@ def run_single_experiment(config: BDTConfig, max_tests: int = 100) -> tuple[int,
 
 def benchmark_config(
     config: BDTConfig,
-    max_tests: int = 100,
-    runs: int = 10,
-    warmup: int = 1,
+    max_tests: int,
+    runs: int,
+    warmup: int,
 ) -> BenchmarkResult:
     """
     Benchmark a single configuration using hyperfine.
@@ -148,9 +149,10 @@ def benchmark_config(
     ]
 
     # Run hyperfine for measuring wall-clock time
+    # Need to run from parent directory since lake must be run from project root
+    cmd_str = " ".join(cmd)
     hyperfine_cmd = [
         "hyperfine",
-        "--shell=none",  # Disable shell startup to avoid noise in measurements
         "--runs",
         str(runs),
         "--warmup",
@@ -159,7 +161,7 @@ def benchmark_config(
         "none",  # Suppress hyperfine output (results are checked separately)
         "--export-json",
         "/tmp/hyperfine_result.json",
-        " ".join(cmd),
+        f"cd .. && {cmd_str}",
     ]
 
     tqdm.write(f"Running hyperfine with {runs} runs (warmup: {warmup})...")
@@ -286,7 +288,7 @@ def main():
     parser.add_argument(
         "--max-tests",
         type=int,
-        default=100,
+        default=1000,
         help="Maximum number of tests per property",
     )
     parser.add_argument(

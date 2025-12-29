@@ -50,7 +50,7 @@ def plot_results(results: List[BenchmarkResult], filename: str = "../benchmark_r
 
     # Create a 2x2 subplot figure
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10))
-    fig.suptitle("BDT Hyperparameter Benchmark Results", fontsize=16, fontweight="bold")
+    fig.suptitle("BDT Experiments for \"How to Specify It\" BST Case Study", fontsize=16, fontweight="bold")
 
     # 1. Mean execution time with error bars
     x_pos = np.arange(len(configs))

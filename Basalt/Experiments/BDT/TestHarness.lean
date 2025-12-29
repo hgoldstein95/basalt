@@ -127,29 +127,19 @@ structure ImplTestResult where
 /-- Test all properties for a single implementation -/
 def testProperties (params : BDTParams) (impl : BSTImpl) (maxTests : Nat := 1000)
     : IO (List PropertyTestResult) := do
-  let mut results := []
-  for prop in allProperties do
+  allProperties.mapM fun prop => do
     let testGen : Gen Bool := do
       let tree ← genBST params
       prop.test params impl tree
     let stats ← runUntilFailure testGen maxTests
-    results := { propertyName := prop.name, stats := stats } :: results
-  return results.reverse
-
-/-- Test a single BST implementation against all properties -/
-def testImplementation (params : BDTParams) (impl : BSTImpl)
-    (maxTests : Nat := 1000) : IO ImplTestResult := do
-  let propertyResults ← testProperties params impl maxTests
-  return { implName := impl.name, propertyResults := propertyResults }
+    return { propertyName := prop.name, stats }
 
 /-- Test all implementations with given parameters -/
 def testAllImplementations (params : BDTParams) (maxTests : Nat := 1000)
     : IO (List ImplTestResult) := do
-  let mut results := []
-  for impl in allImpls do
-    let result ← testImplementation params impl maxTests
-    results := result :: results
-  return results.reverse
+  allImpls.mapM fun impl => do
+    let propertyResults ← testProperties params impl maxTests
+    return { implName := impl.name, propertyResults }
 
 /-- Result from a single hyperparameter configuration -/
 structure ExperimentResult where
