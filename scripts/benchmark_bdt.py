@@ -185,54 +185,6 @@ def benchmark_config(
     )
 
 
-def print_results_table(results: List[BenchmarkResult]):
-    """Prints a formatted table of benchmark results."""
-    print("\n" + "=" * 80)
-    print("BENCHMARK RESULTS")
-    print("=" * 80)
-
-    # Header
-    print(
-        f"\n{'Configuration':<20} {'Mean Time (s)':<15} {'±StdDev':<12} "
-        f"{'Bugs Found':<12} {'Avg Tests':<12}"
-    )
-    print("-" * 80)
-
-    # Data rows
-    for r in results:
-        print(
-            f"{r.config.name:<20} {r.mean_time_s:.3f}s{'':<10} "
-            f"±{r.stddev_time_s:.3f}s{'':<5} "
-            f"{r.total_bugs_found:<12} {r.avg_tests_to_find_bug:.2f}"
-        )
-
-    # Summary statistics
-    print("\n" + "=" * 80)
-    print("SUMMARY")
-    print("=" * 80)
-
-    mean_time_avg = sum(r.mean_time_s for r in results) / len(results)
-    total_bugs_avg = sum(r.total_bugs_found for r in results) / len(results)
-    avg_tests_avg = sum(r.avg_tests_to_find_bug for r in results) / len(results)
-
-    print(f"Average mean time:       {mean_time_avg:.3f}s")
-    print(f"Average bugs found:      {total_bugs_avg:.2f}")
-    print(f"Average tests to bug:    {avg_tests_avg:.2f}")
-
-    # Best configuration by bugs found
-    best_bugs = max(results, key=lambda r: r.total_bugs_found)
-    print(
-        f"\nBest for bug detection:  {best_bugs.config.name} "
-        f"({best_bugs.total_bugs_found} bugs)"
-    )
-
-    # Fastest configuration
-    fastest = min(results, key=lambda r: r.mean_time_s)
-    print(
-        f"Fastest configuration:   {fastest.config.name} ({fastest.mean_time_s:.3f}s)"
-    )
-
-
 def export_csv(
     results: List[BenchmarkResult],
     filename: str = "../benchmark_results/benchmark_results.csv",
@@ -291,7 +243,7 @@ def main():
     parser.add_argument(
         "--runs",
         type=int,
-        default=1,
+        default=5,
         help="No. of benchmark runs for Hyperfine",
     )
     args = parser.parse_args()
@@ -316,8 +268,6 @@ def main():
         result = benchmark_config(config, args.max_tests, args.runs)
         results.append(result)
 
-    # Print and export results
-    print_results_table(results)
     export_csv(results)
 
 
