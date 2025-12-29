@@ -29,9 +29,9 @@ def summarizeExperiment (exp : ExperimentResult) : ExperimentSummary :=
   , bugsFoundPerImpl := bugsPerImpl
   , avgTestsToFindBug := avgTests }
 
-/-- Print a formatted summary of a single experiment -/
+/-- Prints a formatted summary of a single experiment -/
 def printExperimentSummary (summary : ExperimentSummary) : IO Unit := do
-  IO.println "\n--- Experiment Summary ---"
+  IO.println "--- Experiment Summary ---"
   IO.println s!"Parameters:"
   IO.println s!"  α₀ = {summary.params.alpha0}"
   IO.println s!"  t₀ = {summary.params.t0}"

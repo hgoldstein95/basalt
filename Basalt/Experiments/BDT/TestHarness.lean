@@ -129,7 +129,6 @@ def testProperties (params : BDTParams) (impl : BSTImpl) (maxTests : Nat := 1000
     : IO (List PropertyTestResult) := do
   let mut results := []
   for prop in allProperties do
-    IO.println s!"Testing {prop.name}..."
     let testGen : Gen Bool := do
       let tree ← genBST params
       prop.test params impl tree
@@ -140,7 +139,6 @@ def testProperties (params : BDTParams) (impl : BSTImpl) (maxTests : Nat := 1000
 /-- Test a single BST implementation against all properties -/
 def testImplementation (params : BDTParams) (impl : BSTImpl)
     (maxTests : Nat := 1000) : IO ImplTestResult := do
-  IO.println s!"\n=== Testing {impl.name} ==="
   let propertyResults ← testProperties params impl maxTests
   return { implName := impl.name, propertyResults := propertyResults }
 
@@ -163,9 +161,6 @@ structure ExperimentResult where
 def runSingleExperiment (alpha0 t0 t2 decay : Float) (maxTests : Nat := 1000)
     : IO ExperimentResult := do
   let params : BDTParams := { alpha0, t0, t2, decay }
-  IO.println s!"Running single experiment with parameters:"
-  IO.println s!"  α₀={params.alpha0}, t₀={params.t0}, t₂={params.t2}, d={params.decay}"
-
   let results ← testAllImplementations params maxTests
   return { params, results }
 

@@ -36,8 +36,6 @@ def runCmd (p : Parsed) : IO UInt32 := do
   let t2 ← parseFloat t2Str
   let decay ← parseFloat decayStr
 
-  IO.println "Running BDT experiment..."
-  IO.println s!"Parameters: α₀={alpha0}, t₀={t0}, t₂={t2}, d={decay}"
   let result ← runSingleExperiment alpha0 t0 t2 decay maxTests
   let summary := summarizeExperiment result
   printExperimentSummary summary
@@ -48,8 +46,7 @@ def bdtCmd : Cmd := `[Cli|
   bdt_experiments VIA runCmd; ["0.1.0"]
   "Boltzmann Decay Tuning experiments for BST bug detection.
 
-This tool measures the impact of BDT hyperparameters on property-based testing
-effectiveness. It tests 9 BST implementations (1 correct + 8 buggy) against 11
+This script tests 9 BST implementations (1 correct + 8 buggy) against 11
 properties to measure bug-catching ability.
 
 Hyperparameters:
