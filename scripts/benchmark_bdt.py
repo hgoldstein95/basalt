@@ -124,12 +124,13 @@ def benchmark_config(
     Returns:
         BenchmarkResult with timing and bug detection metrics
     """
-    tqdm.write(f"\nBenchmarking: {config.name}")
+    tqdm.write(f"Benchmarking: {config.name}")
     tqdm.write(
         f"Parameters: α₀={config.alpha0}, t₀={config.t0}, t₂={config.t2}, d={config.decay}"
     )
 
-    # Build the command
+    # Command for running the Lean Basalt executable with the specified
+    # parameter values
     cmd = [
         "lake",
         "exe",
@@ -146,11 +147,10 @@ def benchmark_config(
         str(max_tests),
     ]
 
-    # Run hyperfine for timing
+    # Run hyperfine for measuring wall-clock time
     hyperfine_cmd = [
         "hyperfine",
-        # Disable shell startup to avoid noise in measurements
-        "--shell=none",
+        "--shell=none",  # Disable shell startup to avoid noise in measurements
         "--runs",
         str(runs),
         "--warmup",
@@ -235,7 +235,9 @@ def print_results_table(results: List[BenchmarkResult]):
     )
 
 
-def export_csv(results: List[BenchmarkResult], filename: str = "benchmark_results.csv"):
+def export_csv(
+    results: List[BenchmarkResult], filename: str = "../benchmark_results/benchmark_results.csv"
+):
     """Export results to CSV."""
 
     with open(filename, "w", newline="") as f:
@@ -312,7 +314,7 @@ def main():
     print("BDT Benchmark Configuration:")
     print(f"  Max tests per property: {args.max_tests}")
     print(f"  Benchmark runs: {args.runs}")
-    print(f"  Warmup runs: {args.warmup}\n")
+    print(f"  Warmup runs: {args.warmup}")
 
     # Run benchmarks
     results = []

@@ -12,9 +12,9 @@ import numpy as np
 from benchmark_bdt import BDTConfig, BenchmarkResult
 
 
-def parse_csv(filename: str = "benchmark_results.csv") -> List[BenchmarkResult]:
+def parse_csv(filename: str = "../benchmark_results/benchmark_results.csv") -> List[BenchmarkResult]:
     """
-    Parses benchmark results from CSV file, 
+    Parses benchmark results from CSV file,
     returning a list of `BenchmarkResult`s
     """
     results = []
@@ -40,7 +40,7 @@ def parse_csv(filename: str = "benchmark_results.csv") -> List[BenchmarkResult]:
     return results
 
 
-def plot_results(results: List[BenchmarkResult], filename: str = "benchmark_plots.png"):
+def plot_results(results: List[BenchmarkResult], filename: str = "../benchmark_results/benchmark_plots.png"):
     """Plots benchmark results."""
     configs = [r.config.name for r in results]
     mean_times = [r.mean_time_s for r in results]
@@ -118,13 +118,13 @@ def main():
     parser.add_argument(
         "--input",
         type=str,
-        default="benchmark_results.csv",
+        default="../benchmark_results/benchmark_results.csv",
         help="Input CSV file with benchmark results",
     )
     parser.add_argument(
         "--output",
         type=str,
-        default="benchmark_plots.png",
+        default="../benchmark_results/benchmark_plots.png",
         help="Output PNG file for plots",
     )
     args = parser.parse_args()

@@ -1,6 +1,7 @@
 # BDT Hyperparameter Experiments
 
-We examine the impact of four hyperparameters on the BST example:
+We examine the impact of four hyperparameters on the 11 BST properties & 8 buggy BST implementations 
+from *How to Specify It*:
 
 1. **α₀ (alpha0)**: Initial "energy" level
    - Controls starting size tendency
@@ -22,7 +23,7 @@ We examine the impact of four hyperparameters on the BST example:
 ## Usage
 
 To add new properties:
-1. Define property in `Properties.lean` (should be a monadic function `Gen Bool`)
+1. Define property in `Properties.lean` (should be a monadic function with return type `Gen Bool`)
 2. Add entry to `allProperties` list in `TestHarness.lean`
 3. The test harness will automatically include it in all runs
 
@@ -30,17 +31,6 @@ To test different hyperparameter ranges:
 1. Modify the `QUICK_CONFIGS` list in `benchmark_bdt.py`
 2. Or run individual experiments with custom parameters via the CLI
 
-## File Structure
-
-```
-BDT/
-├── BSTGenerator.lean       # BDT-based BST generator
-├── Properties.lean          # BST property specifications
-├── TestHarness.lean        # Testing infrastructure
-├── HyperparameterSweep.lean # Experiment runners
-├── Analysis.lean           # Results analysis tools
-├── Main.lean               # CLI entry point
-```
 
 ## Running Experiments
 
@@ -83,18 +73,26 @@ $ lake exe bdt_experiments --alpha0 2.0 --t0 1.0 --t2 1.0 --decay 0.9
 
 ### Benchmarking Multiple Configurations
 
-Use the Python benchmarking script to test multiple configurations and generate visualizations:
+Use the Python benchmarking script to test multiple configurations:
 
 ```bash
-$ python benchmark_bdt.py --max-tests 100 --runs 10 --warmup 1
+$ cd scripts
+$ uv run benchmark_bdt.py --max-tests 100 --runs 10 --warmup 1
 ```
 
 This will:
 - Run all quick sweep configurations (4 presets)
 - Measure execution time with hyperfine
 - Extract bug detection metrics
-- Generate plots comparing configurations
-- Export results to CSV
+- Export results to `../benchmark_results/benchmark_results.csv`
+
+To generate visualizations from the results:
+
+```bash
+$ uv run plot_results.py
+```
+
+This creates plots at `../benchmark_results/benchmark_plots.png`
 
 ## Properties Tested
 
@@ -131,14 +129,6 @@ Tests run against all 8 buggy BST implementations from the "How to Specify It" c
 - **BST8**: `union` has priority bug for duplicates
 
 ## Output Format
-
-Each experiment reports:
-- **Total bugs found**: Across all implementations and properties
-- **Bugs per implementation**: How many bugs detected in each implementation
-- **Average tests to find bug**: Efficiency metric
-- **Best configuration**: Hyperparameters that found the most bugs
-
-Example output:
 ```bash
 --- Experiment Summary ---
 Parameters:
