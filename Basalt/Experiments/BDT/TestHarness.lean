@@ -18,19 +18,19 @@ open BST
 
 /-- Statistics from a test run -/
 structure TestStats where
-  /-- Number of tests run before finding a bug (or max if no bug found) -/
+  /-- No. of tests run before finding a bug (or `maxTests` if no bug found) -/
   testsUntilFailure : Nat
   /-- Whether a bug was found -/
   bugFound : Bool
   deriving Repr
 
-/-- Run a property test multiple times and return when it first fails -/
+/-- Runs a property-based test for `maxTests`, terminating when it first fails -/
 def runUntilFailure (prop : Gen Bool) (maxTests : Nat := 1000) : IO TestStats := do
   let mut testsRun := 0
   for _ in [0:maxTests] do
     testsRun := testsRun + 1
-    let result ← Gen.runIO prop
-    if !result then
+    let testResult ← Gen.runIO prop
+    if !testResult then
       return { testsUntilFailure := testsRun, bugFound := true }
   return { testsUntilFailure := testsRun, bugFound := false }
 
@@ -89,21 +89,21 @@ structure PropertySpec where
 /-- All properties to test -/
 def allProperties : List PropertySpec := [
   { name := "insert-find"
-  , test := fun _params impl tree => prop_insert_find tree impl.insert BST.find },
+  , test := fun _ impl tree => prop_insert_find tree impl.insert BST.find },
   { name := "insert-insert"
-  , test := fun _params impl tree => prop_insert_insert tree impl.insert BST.find },
+  , test := fun _ impl tree => prop_insert_insert tree impl.insert BST.find },
   { name := "delete-find"
-  , test := fun _params impl tree => prop_delete_find tree impl.delete BST.find },
+  , test := fun _ impl tree => prop_delete_find tree impl.delete BST.find },
   { name := "insert-size"
-  , test := fun _params impl tree => prop_insert_size tree impl.insert BST.size },
+  , test := fun _ impl tree => prop_insert_size tree impl.insert BST.size },
   { name := "delete-size"
-  , test := fun _params impl tree => prop_delete_size tree impl.delete BST.size },
+  , test := fun _ impl tree => prop_delete_size tree impl.delete BST.size },
   { name := "insert-valid"
-  , test := fun _params impl tree => prop_insert_valid tree impl.insert BST.valid },
+  , test := fun _ impl tree => prop_insert_valid tree impl.insert BST.valid },
   { name := "delete-valid"
-  , test := fun _params impl tree => prop_delete_valid tree impl.delete BST.valid },
+  , test := fun _ impl tree => prop_delete_valid tree impl.delete BST.valid },
   { name := "toList-sorted"
-  , test := fun _params _impl tree => prop_toList_sorted tree BST.toList },
+  , test := fun _ _impl tree => prop_toList_sorted tree BST.toList },
   { name := "union-contains"
   , test := fun params impl tree => prop_union_contains tree params impl.union BST.find },
   { name := "union-left-priority"
@@ -112,13 +112,13 @@ def allProperties : List PropertySpec := [
   , test := fun params impl tree => prop_union_valid tree params impl.union BST.valid }
 ]
 
-/-- Result of testing one property -/
+/-- Result of testing one specific property on a particular BST implementation -/
 structure PropertyTestResult where
   propertyName : String
   stats : TestStats
   deriving Repr
 
-/-- Result of testing one implementation -/
+/-- Result of testing *all* 11 properties on one BST implementation -/
 structure ImplTestResult where
   implName : String
   propertyResults : List PropertyTestResult
@@ -127,7 +127,7 @@ structure ImplTestResult where
 /-- Test all properties for a single implementation -/
 def testProperties (params : BDTParams) (impl : BSTImpl) (maxTests : Nat := 1000)
     : IO (List PropertyTestResult) := do
-  allProperties.mapM fun prop => do
+  allProperties.mapM $ fun prop => do
     let testGen : Gen Bool := do
       let tree ← genBST params
       prop.test params impl tree
@@ -137,7 +137,7 @@ def testProperties (params : BDTParams) (impl : BSTImpl) (maxTests : Nat := 1000
 /-- Test all implementations with given parameters -/
 def testAllImplementations (params : BDTParams) (maxTests : Nat := 1000)
     : IO (List ImplTestResult) := do
-  allImpls.mapM fun impl => do
+  allImpls.mapM $ fun impl => do
     let propertyResults ← testProperties params impl maxTests
     return { implName := impl.name, propertyResults }
 

@@ -58,7 +58,7 @@ def bdtCmd : Cmd := `[Cli|
 This script tests 9 BST implementations (1 correct + 8 buggy) against 11
 properties to measure bug-catching ability.
 
-Hyperparameters:
+Hyperparameters (specify these as decimals, but these ought to be expressible as Rationals):
   α₀ (alpha0): Initial energy level
   t₀ (t0):     Weight for leaves (arity-0 constructors)
   t₂ (t2):     Weight for nodes (arity-2 constructors)
@@ -69,7 +69,7 @@ Hyperparameters:
     "t0" : String;         "Weight for arity-0 constructors (leaves) (required)"
     "t2" : String;         "Weight for arity-2 constructors (nodes) (required)"
     "decay" : String;      "Decay factor d (required)"
-    "max-tests" : Nat;    "Maximum number of tests per property (default: 1000)"
+    "max-tests" : Nat;    "Max no. of trials per property (default: 1000)"
 
   EXTENSIONS:
     author "Ernest Ng, Harrison Goldstein"
