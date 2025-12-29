@@ -16,12 +16,6 @@ namespace BDTExperiments
 
 open BST
 
-/-- Result of running a single test -/
-inductive TestResult where
-  | Pass : TestResult
-  | Fail : TestResult
-  deriving BEq, Repr
-
 /-- Statistics from a test run -/
 structure TestStats where
   /-- Number of tests run before finding a bug (or max if no bug found) -/
@@ -39,15 +33,6 @@ def runUntilFailure (prop : Gen Bool) (maxTests : Nat := 1000) : IO TestStats :=
     if !result then
       return { testsUntilFailure := testsRun, bugFound := true }
   return { testsUntilFailure := testsRun, bugFound := false }
-
-/-- Test a single implementation against a single property -/
-def testProperty (params : BDTParams) (propName : String)
-    (prop : BST Nat Nat → Gen Bool) (maxTests : Nat := 1000) : IO TestStats := do
-  IO.println s!"Testing {propName}..."
-  let testGen : Gen Bool := do
-    let tree ← genBST params
-    prop tree
-  runUntilFailure testGen maxTests
 
 /-- Configuration for a BST implementation to test -/
 structure BSTImpl where
@@ -138,10 +123,6 @@ structure ImplTestResult where
   implName : String
   propertyResults : List PropertyTestResult
   deriving Repr
-
-/-- Helper to get stats for a specific property by name -/
-def ImplTestResult.getPropertyStats (result : ImplTestResult) (name : String) : Option TestStats :=
-  result.propertyResults.find? (·.propertyName == name) |>.map (·.stats)
 
 /-- Test all properties for a single implementation -/
 def testProperties (params : BDTParams) (impl : BSTImpl) (maxTests : Nat := 1000)
