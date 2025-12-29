@@ -1,7 +1,7 @@
 [project]
 name = "basalt"
 version = "0.1.0"
-description = "Scripts for benchmarking Boltzmann Decay Tuning of random generators"
+description = "Scripts for benchmarking the impact of Boltzmann Decay Tuning on random generators"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

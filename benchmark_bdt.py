@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 @dataclass
 class BDTConfig:
-    """Hyperparameter configuration for BDT."""
+    """BDT hyperparameter values"""
 
     alpha0: float
     t0: float
@@ -73,7 +73,6 @@ def run_single_experiment(config: BDTConfig, max_tests: int = 100) -> tuple[int,
         "lake",
         "exe",
         "bdt_experiments",
-        "custom",
         "--alpha0",
         str(config.alpha0),
         "--t0",
@@ -135,7 +134,6 @@ def benchmark_config(
         "lake",
         "exe",
         "bdt_experiments",
-        "custom",
         "--alpha0",
         str(config.alpha0),
         "--t0",
