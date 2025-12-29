@@ -1,0 +1,16 @@
+[project]
+name = "basalt"
+version = "0.1.0"
+description = "Scripts for benchmarking Boltzmann Decay Tuning of random generators"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.10.8",
+    "tqdm>=4.67.1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.10",
+    "ty>=0.0.7",
+]
