@@ -148,7 +148,7 @@ structure ExperimentResult where
   deriving Repr
 
 /-- Test a single specific hyperparameter configuration -/
-def runSingleExperiment (alpha0 t0 t2 decay : Float) (maxTests : Nat := 1000)
+def runSingleExperiment (alpha0 t0 t2 decay : Rat) (maxTests : Nat := 1000)
     : IO ExperimentResult := do
   let params : BDTParams := { alpha0, t0, t2, decay }
   let results ← testAllImplementations params maxTests

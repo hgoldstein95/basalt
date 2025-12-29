@@ -10,13 +10,13 @@ open BST
 /-- Hyperparameters for Boltzmann Decay Tuning -/
 structure BDTParams where
   /-- Initial "energy" level -/
-  alpha0 : Float
+  alpha0 : Rat
   /-- Weight for arity-0 constructors (leaves) -/
-  t0 : Float
+  t0 : Rat
   /-- Weight for arity-2 constructors (nodes) -/
-  t2 : Float
+  t2 : Rat
   /-- Decay factor for alpha -/
-  decay : Float
+  decay : Rat
   deriving Repr, Inhabited
 
 /-- Default BDT parameters -/
@@ -26,45 +26,29 @@ def BDTParams.default : BDTParams :=
   , t2 := 1.0
   , decay := 0.5 }
 
-/-- Generates a random BST using Boltzmann Decay Tuning
-
-    - Thread alpha through the generation process
-    - Use weights t_k * alpha^k for constructors of arity k
-    - Decay alpha by the decay factor at each recursive step
--/
+/-- Generates a random BST using Boltzmann Decay Tuning (BDT) -/
 partial def genBSTWithBDT (params : BDTParams) (lo hi : Nat) : Gen (BST Nat Nat) :=
-  let rec go (alpha : Float) (lo hi : Nat) : Gen (BST Nat Nat) := do
+  let rec go (α : Rat) (lo hi : Nat) : Gen (BST Nat Nat) := do
     if h : lo > hi then
-      -- No valid keys in range, must return leaf
       pure Leaf
     else
-      -- Calculate weights for leaf (arity 0) and node (arity 2)
       let leafWeight := params.t0
-      let nodeWeight := params.t2 * alpha * alpha
+      let nodeWeight := params.t2 * α * α
 
-      -- Simple weighted choice using randomness
-      -- Generate a random float between 0 and totalWeight, then check if it's < leafWeight
-      let totalWeight := leafWeight + nodeWeight
-      if totalWeight <= 0 then
-        pure Leaf  -- Defensive: if weights are invalid, return leaf
-      else
-        -- Generate random value in [0, totalWeight) conceptually
-        -- We'll use choose to pick between 0 and 1000, then scale
-        let randomVal ← choose 0 1000 (by omega)
-        let threshold := ((leafWeight / totalWeight) * 1000).toUInt64.toNat
-
-        if randomVal < threshold then
-          pure Leaf
-        else do
-          -- Choose a key in the valid range
-          have hle : lo ≤ hi := Nat.le_of_not_gt h
-          let k ← choose lo hi hle
-          -- Generate left and right subtrees with decayed alpha
-          let newAlpha := alpha * params.decay
-          let left ← if k > lo then go newAlpha lo (k - 1) else pure Leaf
-          let right ← if k < hi then go newAlpha (k + 1) hi else pure Leaf
-          -- Return the node with k as both key and value
-          pure (Branch left k k right)
+      let bias := leafWeight / (leafWeight + nodeWeight)
+      if (← RandomChoice.coin bias) then
+        pure Leaf
+      else do
+        -- We use `Nat.le_of_not_gt` to avoid the overhead of calling `omega`
+        -- from influencing measurements
+        have hle : lo ≤ hi := Nat.le_of_not_gt h
+        let k ← choose lo hi hle
+        -- Generate left and right subtrees with decayed α
+        let α' := α * params.decay
+        let left ← if k > lo then go α' lo (k - 1) else pure Leaf
+        let right ← if k < hi then go α' (k + 1) hi else pure Leaf
+        -- Return the node with `k` as both the key & value (for simplicity)
+        pure (Branch left k k right)
 
   go params.alpha0 lo hi
 

@@ -1,3 +1,4 @@
+import Batteries.Data.Rat.Float
 import Cli
 import Basalt.Experiments.BDT.Analysis
 
@@ -5,7 +6,7 @@ open Cli
 
 namespace BDTExperiments
 
-/-- Parse a string to float with error handling -/
+/-- Parse a string to float, throwing an exception if this fails -/
 def parseFloat (s : String) : IO Float := do
   -- Simple float parser: handles formats like "2.5", "0.3", "10"
   let parts := s.splitOn "."
@@ -23,6 +24,14 @@ def parseFloat (s : String) : IO Float := do
     | _, _ => throw (IO.userError s!"Invalid float value: {s}")
   | _ => throw (IO.userError s!"Invalid float value: {s}")
 
+
+/-- Parses a string as a `Rat`, throwing an exception if this fails -/
+def parseRational (s : String) : IO Rat := do
+  let f ← parseFloat s
+  match Float.toRat? f with
+  | some r => pure r
+  | none => throw (IO.userError s!"Unable to convert float {f} to a rational number")
+
 /-- Run BDT experiments with specified hyperparameters -/
 def runCmd (p : Parsed) : IO UInt32 := do
   let alpha0Str := p.flag! "alpha0" |>.as! String
@@ -31,10 +40,10 @@ def runCmd (p : Parsed) : IO UInt32 := do
   let decayStr := p.flag! "decay" |>.as! String
   let maxTests := p.flag? "max-tests" |>.map (·.as! Nat) |>.getD 1000
 
-  let alpha0 ← parseFloat alpha0Str
-  let t0 ← parseFloat t0Str
-  let t2 ← parseFloat t2Str
-  let decay ← parseFloat decayStr
+  let alpha0 ← parseRational alpha0Str
+  let t0 ←  parseRational t0Str
+  let t2 ← parseRational t2Str
+  let decay ← parseRational decayStr
 
   let result ← runSingleExperiment alpha0 t0 t2 decay maxTests
   let summary := summarizeExperiment result
