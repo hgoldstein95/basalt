@@ -1,4 +1,4 @@
-import Basalt.Experiments.BDT.HyperparameterSweep
+import Basalt.Experiments.BDT.TestHarness
 
 namespace BDTExperiments
 

@@ -172,4 +172,20 @@ def testAllImplementations (params : BDTParams) (maxTests : Nat := 1000)
     results := result :: results
   return results.reverse
 
+/-- Result from a single hyperparameter configuration -/
+structure ExperimentResult where
+  params : BDTParams
+  results : List ImplTestResult
+  deriving Repr
+
+/-- Test a single specific hyperparameter configuration -/
+def runSingleExperiment (alpha0 t0 t2 decay : Float) (maxTests : Nat := 1000)
+    : IO ExperimentResult := do
+  let params : BDTParams := { alpha0, t0, t2, decay }
+  IO.println s!"Running single experiment with parameters:"
+  IO.println s!"  α₀={params.alpha0}, t₀={params.t0}, t₂={params.t2}, d={params.decay}"
+
+  let results ← testAllImplementations params maxTests
+  return { params, results }
+
 end BDTExperiments
