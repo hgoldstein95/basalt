@@ -2,7 +2,7 @@ import Basalt.Examples.STLCMutants.STLC
 
 namespace STLCMutants.STLC8
 
-open Expr Typ
+open Expr Ty
 
 /-- Bug 8: subst_abs_no_incr - doesn't increment n in Abs case -/
 def shift (d : Int) : Expr → Expr :=

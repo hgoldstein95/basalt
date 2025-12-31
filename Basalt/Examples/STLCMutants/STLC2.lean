@@ -2,7 +2,7 @@ import Basalt.Examples.STLCMutants.STLC
 
 namespace STLCMutants.STLC2
 
-open Expr Typ
+open Expr Ty
 
 /-- Bug 2: shift_var_all - shifts all variables without checking cutoff -/
 def shift (d : Int) : Expr → Expr :=

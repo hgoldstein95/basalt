@@ -2,7 +2,7 @@ import Basalt.Examples.STLCMutants.STLC
 
 namespace STLCMutants.STLC3
 
-open Expr Typ
+open Expr Ty
 
 /-- Bug 3: shift_var_leq - uses <= instead of < for cutoff check -/
 def shift (d : Int) : Expr → Expr :=

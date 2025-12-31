@@ -2,7 +2,7 @@ import Basalt.Examples.STLCMutants.STLC
 
 namespace STLCMutants.STLC6
 
-open Expr Typ
+open Expr Ty
 
 /-- Bug 6: subst_var_none - doesn't substitute any variables -/
 def shift (d : Int) : Expr → Expr :=

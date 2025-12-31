@@ -2,7 +2,7 @@ import Basalt.Examples.STLCMutants.STLC
 
 namespace STLCMutants
 
-open Expr Typ
+open Expr Ty
 
 /-- Shift free variables in an expression by `d`, starting from cutoff `c` -/
 def shift (d : Int) : Expr → Expr :=

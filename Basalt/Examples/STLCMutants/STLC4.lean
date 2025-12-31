@@ -2,7 +2,7 @@ import Basalt.Examples.STLCMutants.STLC
 
 namespace STLCMutants.STLC4
 
-open Expr Typ
+open Expr Ty
 
 /-- Bug 4: shift_abs_no_incr - doesn't increment cutoff in Abs case -/
 def shift (d : Int) : Expr → Expr :=

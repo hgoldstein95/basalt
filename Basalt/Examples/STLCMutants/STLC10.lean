@@ -2,7 +2,7 @@ import Basalt.Examples.STLCMutants.STLC
 
 namespace STLCMutants.STLC10
 
-open Expr Typ
+open Expr Ty
 
 /-- Bug 10: substTop_no_shift_back - doesn't shift back after substitution -/
 def shift (d : Int) : Expr → Expr :=

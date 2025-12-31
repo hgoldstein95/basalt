@@ -5,7 +5,8 @@ inductive Ty where
   | TBool : Ty
   | TFun : Ty → Ty → Ty
   deriving BEq, Inhabited, Repr
-namespace Typ
+
+namespace Ty
 
 def toString : Ty → String
   | .TBool => "Bool"
@@ -14,7 +15,7 @@ def toString : Ty → String
 instance : ToString Ty where
   toString := toString
 
-end Typ
+end Ty
 
 /-- Expressions in the simply-typed lambda calculus -/
 inductive Expr where
@@ -51,22 +52,23 @@ def isNF : Expr → Bool
   | Expr.App e1 e2 => isNF e1 && isNF e2
 
 /-- Get the type of an expression in a given context -/
-def getTy : Ctx → Expr → Option Ty
-  | ctx, Expr.Var n =>
+def getTy (ctx : Ctx) (e : Expr) : Option Ty :=
+  match e with
+  | .Var n =>
     if n < ctx.length then
       some ctx[n]!
-    else
-      none
-  | _, Expr.Bool _ => some Ty.TBool
-  | ctx, Expr.Abs t e =>
-    match getTy (t :: ctx) e with
-    | some t' => some (Ty.TFun t t')
-    | none => none
-  | ctx, Expr.App e1 e2 =>
-    match getTy ctx e1, getTy ctx e2 with
-    | some (Ty.TFun t11 t12), some t2 =>
-      if t11 == t2 then some t12 else none
-    | _, _ => none
+    else none
+  | .Bool _ => some Ty.TBool
+  | .Abs t e => do
+    let t' ← getTy (t :: ctx) e
+    return (Ty.TFun t t')
+  | .App e1 e2 => do
+    match (← getTy ctx e1) with
+    | .TFun t11 t12 => do
+      let t2 ← getTy ctx e2
+      if t11 == t2 then return t12 else none
+    | _ => none
+
 
 /-- Type check an expression against a given type -/
 def typeCheck (ctx : Ctx) (e : Expr) (t : Ty) : Bool :=
