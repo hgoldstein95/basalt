@@ -27,33 +27,39 @@ def BDTParams.default : BDTParams :=
   , decay := 0.5 }
 
 /-- Generates a random BST using Boltzmann Decay Tuning (BDT) -/
-partial def genBSTWithBDT (params : BDTParams) (lo hi : Nat) : Gen (BST Nat Nat) :=
-  let rec go (α : Rat) (lo hi : Nat) : Gen (BST Nat Nat) := do
-    if h : lo > hi then
+def genBSTWithBDT (α t0 t2 d : Rat) (lo hi : Nat) : Gen (BST Nat Nat) := do
+  if h : lo > hi then
+    pure .Leaf
+  else
+    let leafWeight := t0
+    let nodeWeight := t2 * α * α
+    let bias := leafWeight / (leafWeight + nodeWeight)
+    if (← RandomChoice.coin bias) then
       pure Leaf
-    else
-      let leafWeight := params.t0
-      let nodeWeight := params.t2 * α * α
-
-      let bias := leafWeight / (leafWeight + nodeWeight)
-      if (← RandomChoice.coin bias) then
-        pure Leaf
-      else do
-        -- We use `Nat.le_of_not_gt` to avoid the overhead of calling `omega`
-        -- from influencing measurements
-        have hle : lo ≤ hi := Nat.le_of_not_gt h
-        let k ← choose lo hi hle
-        -- Generate left and right subtrees with decayed α
-        let α' := α * params.decay
-        let left ← if k > lo then go α' lo (k - 1) else pure Leaf
-        let right ← if k < hi then go α' (k + 1) hi else pure Leaf
-        -- Return the node with `k` as both the key & value (for simplicity)
-        pure (Branch left k k right)
-
-  go params.alpha0 lo hi
+    else do
+      -- We use `Nat.le_of_not_gt` to avoid the overhead of
+      -- calling `omega` from influencing benchmarks
+      have hle : lo ≤ hi := Nat.le_of_not_gt h
+      let k ← choose lo hi hle
+      -- Generate left and right subtrees with decayed α
+      let α' := α * d
+      let left ←
+        if k > lo then
+          genBSTWithBDT α' t0 t2 d lo (k - 1)
+        else
+          pure Leaf
+      let right ←
+        if k < hi then
+          genBSTWithBDT α' t0 t2 d (k + 1) hi
+        else
+          pure Leaf
+      -- For simplicity, we use `k` as both the key & value for the node
+      pure (.Branch left k k right)
+  partial_fixpoint
 
 /-- Generate a random BST with keys in range [0, maxKey] -/
 def genBST (params : BDTParams) (maxKey : Nat := 100) : Gen (BST Nat Nat) :=
-  genBSTWithBDT params 0 maxKey
+  let { alpha0 := α, t0, t2, decay := d } := params
+  genBSTWithBDT α t0 t2 d 0 maxKey
 
 end BDTExperiments
