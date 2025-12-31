@@ -1,18 +1,17 @@
 import Basalt
 
 /-- Types in the simply-typed lambda calculus -/
-inductive Typ where
-  | TBool : Typ
-  | TFun : Typ → Typ → Typ
+inductive Ty where
+  | TBool : Ty
+  | TFun : Ty → Ty → Ty
   deriving BEq, Inhabited, Repr
-
 namespace Typ
 
-def toString : Typ → String
-  | TBool => "Bool"
-  | TFun t1 t2 => s!"({toString t1} → {toString t2})"
+def toString : Ty → String
+  | .TBool => "Bool"
+  | .TFun t1 t2 => s!"({toString t1} → {toString t2})"
 
-instance : ToString Typ where
+instance : ToString Ty where
   toString := toString
 
 end Typ
@@ -21,7 +20,7 @@ end Typ
 inductive Expr where
   | Var : Nat → Expr
   | Bool : Bool → Expr
-  | Abs : Typ → Expr → Expr
+  | Abs : Ty → Expr → Expr
   | App : Expr → Expr → Expr
   deriving BEq, Inhabited, Repr
 
@@ -39,7 +38,7 @@ instance : ToString Expr where
 end Expr
 
 /-- Typing context (list of types) -/
-abbrev Ctx := List Typ
+abbrev Ctx := List Ty
 
 namespace STLC
 
@@ -52,26 +51,26 @@ def isNF : Expr → Bool
   | Expr.App e1 e2 => isNF e1 && isNF e2
 
 /-- Get the type of an expression in a given context -/
-def getTyp : Ctx → Expr → Option Typ
+def getTy : Ctx → Expr → Option Ty
   | ctx, Expr.Var n =>
     if n < ctx.length then
       some ctx[n]!
     else
       none
-  | _, Expr.Bool _ => some Typ.TBool
+  | _, Expr.Bool _ => some Ty.TBool
   | ctx, Expr.Abs t e =>
-    match getTyp (t :: ctx) e with
-    | some t' => some (Typ.TFun t t')
+    match getTy (t :: ctx) e with
+    | some t' => some (Ty.TFun t t')
     | none => none
   | ctx, Expr.App e1 e2 =>
-    match getTyp ctx e1, getTyp ctx e2 with
-    | some (Typ.TFun t11 t12), some t2 =>
+    match getTy ctx e1, getTy ctx e2 with
+    | some (Ty.TFun t11 t12), some t2 =>
       if t11 == t2 then some t12 else none
     | _, _ => none
 
 /-- Type check an expression against a given type -/
-def typeCheck (ctx : Ctx) (e : Expr) (t : Typ) : Bool :=
-  match getTyp ctx e with
+def typeCheck (ctx : Ctx) (e : Expr) (t : Ty) : Bool :=
+  match getTy ctx e with
   | some t' => t == t'
   | none => false
 

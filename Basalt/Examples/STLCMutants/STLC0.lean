@@ -4,7 +4,7 @@ namespace STLCMutants
 
 open Expr Typ
 
-/-- Shift free variables in an expression by d, starting from cutoff c -/
+/-- Shift free variables in an expression by `d`, starting from cutoff `c` -/
 def shift (d : Int) : Expr → Expr :=
   let rec go (c : Nat) : Expr → Expr
     | Var n =>
@@ -17,7 +17,7 @@ def shift (d : Int) : Expr → Expr :=
     | App e1 e2 => App (go c e1) (go c e2)
   go 0
 
-/-- Substitute expression s for variable n in expression e: [n -> s]e -/
+/-- Substitute expression `s` for variable `n` in expression `e`: `[n -> s]e` -/
 def subst (n : Nat) (s : Expr) : Expr → Expr
   | Var m =>
     if m == n then s else Var m
@@ -30,7 +30,7 @@ def substTop (s : Expr) (e : Expr) : Expr :=
   shift (-1) (subst 0 (shift 1 s) e)
 
 /-- Parallel reduction step (reduces all redexes in parallel) -/
-partial def pstep : Expr → Option Expr
+def pstep : Expr → Option Expr
   | Abs t e => Abs t <$> pstep e
   | App (Abs _ e1) e2 =>
     let e1' := (pstep e1).getD e1
@@ -46,7 +46,7 @@ partial def pstep : Expr → Option Expr
   | _ => none
 
 /-- Multi-step reduction with fuel -/
-partial def multistep (fuel : Nat) (step : Expr → Option Expr) (e : Expr) : Option Expr :=
+def multistep (fuel : Nat) (step : Expr → Option Expr) (e : Expr) : Option Expr :=
   match fuel with
   | 0 => none
   | fuel' + 1 =>

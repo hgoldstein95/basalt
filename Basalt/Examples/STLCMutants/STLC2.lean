@@ -22,7 +22,7 @@ def subst (n : Nat) (s : Expr) : Expr → Expr
 def substTop (s : Expr) (e : Expr) : Expr :=
   shift (-1) (subst 0 (shift 1 s) e)
 
-partial def pstep : Expr → Option Expr
+def pstep : Expr → Option Expr
   | Abs t e => Abs t <$> pstep e
   | App (Abs _ e1) e2 =>
     let e1' := (pstep e1).getD e1
@@ -37,7 +37,7 @@ partial def pstep : Expr → Option Expr
       some (App e1' e2')
   | _ => none
 
-partial def multistep (fuel : Nat) (step : Expr → Option Expr) (e : Expr) : Option Expr :=
+def multistep (fuel : Nat) (step : Expr → Option Expr) (e : Expr) : Option Expr :=
   match fuel with
   | 0 => none
   | fuel' + 1 =>
