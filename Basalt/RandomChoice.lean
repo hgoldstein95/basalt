@@ -11,14 +11,19 @@ def RandomChoice.pick [Monad m] [RandomChoice m] (x y : Unit → m α) : m α :=
 def RandomChoice.coin [Monad m] [RandomChoice m] (r : Rat) : m Bool := do
   if (← choose 0 r.den (by simp)) < r.num then pure true else pure false
 
-/-- Samples an element randomly from the input list `xs` -/
+/-- Samples an element randomly from the input list `xs`, or return
+    a `default` element if `xs` is empty -/
 def RandomChoice.elements
   [Monad m]
   [RandomChoice m]
   [Inhabited α]
-  (xs : List α) : m α := do
-  let idx ← RandomChoice.choose 0 xs.length (by simp)
-  pure xs[idx]!
+  (xs : List α)
+  (default : α) : m α :=
+  match xs with
+  | [] => pure default
+  | _ => do
+    let idx ← RandomChoice.choose 0 xs.length (by simp)
+    pure xs[idx]!
 
 open Lean.Order
 

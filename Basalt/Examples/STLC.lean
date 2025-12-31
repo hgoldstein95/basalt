@@ -75,8 +75,8 @@ mutual
       NB: we have to define this generator explicitly using `do`-notation,
       since `monotone_bind` is defined in terms of `>>=`
       (i.e. we can't use `<$>` to make this generator more succinct). -/
-  def Expr.genOne (Γ : Ctx) (ty : Ty) : Gen Expr :=
-    match ty with
+  def Expr.genOne (Γ : Ctx) (τ : Ty) : Gen Expr :=
+    match τ with
     | Ty.Nat =>
       pick
         (fun () => do
@@ -97,8 +97,10 @@ mutual
       (fun () => genOne Γ τ)
       (fun () => pick
           (fun () => do
+            -- Generate a random variable in the context
             let vars := List.filter (fun i => Γ[i]! == τ) (List.range Γ.length)
-            RandomChoice.elements (.Var <$> vars))
+            let default ← .Const <$> Nat.arbitrary
+            RandomChoice.elements (.Var <$> vars) default)
           (fun () => do
             let t1 ← Ty.genTy
             let e1 ← Expr.genExpr Γ (.Fun t1 τ)
@@ -106,5 +108,9 @@ mutual
             return .App e1 e2))
   partial_fixpoint
 end
+
+#guard_msgs in
+#eval (for _ in [0:2] do
+  IO.println <| repr (← Gen.runIO (Expr.genExpr [] .Nat)) : IO Unit)
 
 end STLCExample
