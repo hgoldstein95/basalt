@@ -1,6 +1,6 @@
 name = "basalt"
 version = "0.1.0"
-defaultTargets = ["basalt"]
+defaultTargets = ["basalt", "bdt_experiments"]
 
 [[lean_lib]]
 name = "Basalt"
@@ -8,6 +8,10 @@ name = "Basalt"
 [[lean_exe]]
 name = "basalt"
 root = "Main"
+
+[[lean_exe]]
+name = "bdt_experiments"
+root = "Basalt.Experiments.BDT.Main"
 
 [[require]]
 name = "mathlib"

@@ -1,1 +1,7 @@
+/.lake
+*.pdf
+*.csv
+*.png
+__pycache__/
 **/.lake
+CLAUDE.md

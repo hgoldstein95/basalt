@@ -1,0 +1,127 @@
+import Basalt
+import Basalt.Experiments.BDT.BST.Generator
+import Basalt.Experiments.BDT.BST.Properties
+import Basalt.Experiments.BDT.TestHarness
+import Basalt.Examples.HowToSpecifyIt.BST
+import Basalt.Examples.HowToSpecifyIt.BST0
+import Basalt.Examples.HowToSpecifyIt.BST1
+import Basalt.Examples.HowToSpecifyIt.BST2
+import Basalt.Examples.HowToSpecifyIt.BST3
+import Basalt.Examples.HowToSpecifyIt.BST4
+import Basalt.Examples.HowToSpecifyIt.BST5
+import Basalt.Examples.HowToSpecifyIt.BST6
+import Basalt.Examples.HowToSpecifyIt.BST7
+import Basalt.Examples.HowToSpecifyIt.BST8
+
+namespace BDTExperiments
+
+open BST
+
+/-- Configuration for a BST implementation to test -/
+structure BSTImpl where
+  name : String
+  insert : Nat → Nat → BST Nat Nat → BST Nat Nat
+  delete : Nat → BST Nat Nat → BST Nat Nat
+  union : BST Nat Nat → BST Nat Nat → BST Nat Nat
+
+/-- All BST implementations (correct and buggy) -/
+def allImpls : List BSTImpl := [
+  { name := "BST0 (correct)"
+  , insert := HowToSpecifyIt.insert
+  , delete := HowToSpecifyIt.delete
+  , union := HowToSpecifyIt.union },
+  { name := "BST1 (insert discards tree)"
+  , insert := HowToSpecifyIt.BST1.insert
+  , delete := HowToSpecifyIt.BST1.delete
+  , union := HowToSpecifyIt.BST1.union },
+  { name := "BST2 (insert creates duplicates)"
+  , insert := HowToSpecifyIt.BST2.insert
+  , delete := HowToSpecifyIt.BST2.delete
+  , union := HowToSpecifyIt.BST2.union },
+  { name := "BST3 (insert doesn't update)"
+  , insert := HowToSpecifyIt.BST3.insert
+  , delete := HowToSpecifyIt.BST3.delete
+  , union := HowToSpecifyIt.BST3.union },
+  { name := "BST4 (delete doesn't rebuild)"
+  , insert := HowToSpecifyIt.BST4.insert
+  , delete := HowToSpecifyIt.BST4.delete
+  , union := HowToSpecifyIt.BST4.union },
+  { name := "BST5 (delete reversed comparisons)"
+  , insert := HowToSpecifyIt.BST5.insert
+  , delete := HowToSpecifyIt.BST5.delete
+  , union := HowToSpecifyIt.BST5.union },
+  { name := "BST6 (union assumes ordering)"
+  , insert := HowToSpecifyIt.BST6.insert
+  , delete := HowToSpecifyIt.BST6.delete
+  , union := HowToSpecifyIt.BST6.union },
+  { name := "BST7 (union wrong assumption)"
+  , insert := HowToSpecifyIt.BST7.insert
+  , delete := HowToSpecifyIt.BST7.delete
+  , union := HowToSpecifyIt.BST7.union },
+  { name := "BST8 (union priority bug)"
+  , insert := HowToSpecifyIt.BST8.insert
+  , delete := HowToSpecifyIt.BST8.delete
+  , union := HowToSpecifyIt.BST8.union }
+]
+
+/-- All properties to test -/
+def allProperties : List (PropertySpec BSTImpl (BST Nat Nat)) := [
+  { name := "insert-find"
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      let val ← genTestNat
+      return prop_insert_find tree key val impl.insert BST.find },
+  { name := "insert-insert"
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      let val1 ← genTestNat
+      let val2 ← genTestNat
+      return prop_insert_insert tree key val1 val2 impl.insert BST.find },
+  { name := "delete-find"
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      return prop_delete_find tree key impl.delete BST.find },
+  { name := "insert-size"
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      let val ← genTestNat
+      return prop_insert_size tree key val impl.insert BST.size },
+  { name := "delete-size"
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      return prop_delete_size tree key impl.delete BST.size },
+  { name := "insert-valid"
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      let val ← genTestNat
+      return prop_insert_valid tree key val impl.insert BST.valid },
+  { name := "delete-valid"
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      return prop_delete_valid tree key impl.delete BST.valid },
+  { name := "toList-sorted"
+  , test := fun _ _impl tree => do
+      return prop_toList_sorted tree BST.toList },
+  { name := "union-contains"
+  , test := fun params impl tree => do
+      let tree2 ← genBST params
+      let key ← genTestNat
+      return prop_union_contains tree tree2 key impl.union BST.find },
+  { name := "union-left-priority"
+  , test := fun params impl tree => do
+      let tree2 ← genBST params
+      let key ← genTestNat
+      return prop_union_left_priority tree tree2 key impl.union BST.find },
+  { name := "union-valid"
+  , test := fun params impl tree => do
+      let tree2 ← genBST params
+      return prop_union_valid tree tree2 impl.union BST.valid }
+]
+
+/-- Test a single specific hyperparameter configuration -/
+def runBSTExperiment (params : BDTParams) (maxTests : Nat := 1000)
+    : IO ExperimentResult := do
+  let results ← testAllImplementations params allImpls (fun p => genBST p) allProperties (·.name) maxTests
+  return { params, results }
+
+end BDTExperiments
