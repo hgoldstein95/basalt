@@ -69,8 +69,7 @@ def getTy (ctx : Ctx) (e : Expr) : Option Ty :=
       if t11 == t2 then return t12 else none
     | _ => none
 
-
-/-- Type check an expression against a given type -/
+/-- Type checks an expression against a given type -/
 def typeCheck (ctx : Ctx) (e : Expr) (t : Ty) : Bool :=
   match getTy ctx e with
   | some t' => t == t'
