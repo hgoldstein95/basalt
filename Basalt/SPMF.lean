@@ -1,12 +1,16 @@
 import Mathlib.Topology.Instances.ENNReal.Lemmas
 import Mathlib.MeasureTheory.Measure.Dirac
-
 import Basalt.RandomChoice
 
-open Lean.Order RandomChoice
+open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
-open NNReal ENNReal MeasureTheory
+/-!
+# Sub-Probability Mass Functions
 
+This file defines a type of sub-probability mass functions, similar to `PMF` from Mathlib.
+-/
+
+/-- A sub-probability mass function is similar to a PMF, but the total mass may be less than 1. -/
 def SPMF.{u} (α : Type u) : Type u := {μ : α → ℝ≥0∞ // (∑' a, μ a) ≤ 1}
 
 namespace SPMF
@@ -61,9 +65,11 @@ theorem apply_lt_top (p : SPMF α) (a : α) : p a < ∞ :=
   lt_of_le_of_ne le_top (p.apply_ne_top a)
 
 open Classical in
+/-- A dirac distribution; all of the mass is on `a`. -/
 noncomputable def pure (a : α) : SPMF α :=
   ⟨fun a' => if a' = a then 1 else 0, by simp⟩
 
+/-- The standard Giry monad approach to PMF composition. -/
 noncomputable def bind (p : SPMF α) (f : α → SPMF β) : SPMF β := by
   refine ⟨fun b => ∑' a, p a * f a b, ?pf⟩
   have p_prop := p.tsum_coe
@@ -75,16 +81,19 @@ noncomputable instance : Monad SPMF where
   pure a := pure a
   bind p f := p.bind f
 
+/-- This order captures a notion of "definedness." If `p ≤ q`, then any value that has mass in `p`
+has at least as much mass in `q`. -/
 instance : Lean.Order.PartialOrder (SPMF α) where
   rel p q := ∀ a, p a ≤ q a
   rel_refl := by grind
   rel_trans := by grind
   rel_antisymm h₁ h₂ := by ext; grind
 
+/-- The supremum of a chain is the SPMF where each point is maximally defined. -/
 noncomputable def csupFun {α : Type u} (c : Set (SPMF α)) : α → ℝ≥0∞ :=
   fun a => ⨆ f ∈ c, f a
 
--- NOTE: This proof came from Claude, and I'm not sure I 100% understand why it needs to be so
+-- TODO: This proof came from Claude, and I'm not sure I 100% understand why it needs to be so
 -- complicated. I'm planning on coming back to try to understand it better later.
 theorem csupFun_sum_le_one
   {c : Set (SPMF α)}
@@ -158,6 +167,7 @@ instance : MonoBind SPMF where
     intro a
     exact mul_le_mul_right (h a b) _
 
+/-- The bottom element is minimally defined; the mass sums to 0. -/
 instance : Inhabited (SPMF α) where
   default := Bot.bot
 
@@ -265,22 +275,21 @@ theorem support_pick
     | inr hy =>
       refine ⟨1, ⟨Nat.zero_le _, le_refl _⟩, ?_⟩
       simpa using hy
-
-end SPMF
-
 /-- The total mass of an SPMF. Always ≤ 1 by definition. -/
-noncomputable def SPMF.mass (p : SPMF α) : ℝ≥0∞ := ∑' a, p a
+noncomputable def mass (p : SPMF α) : ℝ≥0∞ := ∑' a, p a
 
-theorem SPMF.mass_eq_zero_of_support_empty {p : SPMF α} (h : p.support = ∅) : p.mass = 0 := by
+theorem mass_eq_zero_of_support_empty {p : SPMF α} (h : p.support = ∅) : p.mass = 0 := by
   unfold mass
   rw [ENNReal.tsum_eq_zero]
   intro a
   rw [apply_eq_zero_iff]
   exact Set.eq_empty_iff_forall_notMem.mp h a
 
-def IsPMF (p : SPMF α) : Prop := p.mass = 1
+/-- An SPMF is a PMF if the mass sums to exactly 1.
 
-namespace SPMF
+We conjecture that, this means that the probability of non-termination is vanishingly small, and
+therefore that the generator almost-surely terminates. -/
+def IsPMF (p : SPMF α) : Prop := p.mass = 1
 
 theorem pick_apply {x y : SPMF α} (a : α) :
     (pick (fun () => x) (fun () => y)) a = (1/2 : ℝ≥0∞) * x a + (1/2 : ℝ≥0∞) * y a := by
@@ -361,8 +370,6 @@ theorem mass_pure (a : α) : (Pure.pure a : SPMF α).mass = 1 := by
 
 theorem IsPMF_pure (a : α) : IsPMF (Pure.pure a : SPMF α) := mass_pure a
 
-/-- Mass is preserved when binding with pure composed with any function.
-    This is useful for proving mass preservation in recursive generators. -/
 theorem mass_bind_pure {x : SPMF α} {f : α → β} :
     (x >>= fun a => Pure.pure (f a)).mass = x.mass := by
   classical
@@ -384,14 +391,11 @@ theorem mass_bind_pure {x : SPMF α} {f : α → β} :
     · simp_all
     · rfl
 
-/-- Binding with pure composed with any function produces a PMF if the input is a PMF. -/
 theorem IsPMF_bind_pure {x : SPMF α} {f : α → β} (hx : IsPMF x) :
     IsPMF (x >>= fun a => Pure.pure (f a)) := by
   unfold IsPMF
   rw [mass_bind_pure, hx]
 
-/-- If each branch has constant mass, then bind scales by that constant.
-    This is useful when binding with `fun a => y` for constant `y`. -/
 theorem mass_bind_const {x : SPMF α} {y : SPMF β} :
     (x >>= fun _ => y).mass = x.mass * y.mass := by
   unfold mass
@@ -400,7 +404,6 @@ theorem mass_bind_const {x : SPMF α} {y : SPMF β} :
   simp_rw [ENNReal.tsum_mul_left]
   rw [← ENNReal.tsum_mul_right]
 
-/-- If each branch has the same mass as some fixed SPMF, bind with a PMF preserves that mass. -/
 theorem mass_bind_of_const_mass {x : SPMF α} {f : α → SPMF β} {c : ℝ≥0∞}
     (hx : IsPMF x) (hf : ∀ a, (f a).mass = c) :
     (x >>= f).mass = c := by
@@ -429,8 +432,6 @@ theorem IsPMF_bind {x : SPMF α} {f : α → SPMF β} (hx : IsPMF x) (hf : ∀ a
   unfold IsPMF
   rw [mass_bind hf, hx]
 
-/-- If the mass of an SPMF satisfies the equation `m = 1/2 + 1/2 * m`, then `m = 1`.
-    This is the key lemma for proving IsPMF for generators of the form `pick (pure a) rec`. -/
 theorem mass_eq_one_of_half_plus_half_self {p : SPMF α}
     (h : p.mass = 1/2 + 1/2 * p.mass) : p.mass = 1 := by
   have hle : p.mass ≤ 1 := p.tsum_coe
@@ -462,8 +463,6 @@ theorem mass_eq_one_of_half_plus_half_self {p : SPMF α}
   rw [hlhs] at hsub
   exact hsub
 
-/-- A generator defined as `pick (pure a) body` is a PMF if `body` has the same mass
-    as the full generator. This captures the pattern of recursive generators. -/
 theorem IsPMF_pick_pure_of_mass_eq {a : α} {body : SPMF α} {full : SPMF α}
     (h_eq : full = pick (fun () => Pure.pure a) (fun () => body))
     (h_mass : body.mass = full.mass) : IsPMF full := by
