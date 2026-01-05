@@ -109,6 +109,10 @@ def genVar (vars : List Nat) : Gen Expr := do
       | .TBool =>
         -- Try to generate a variable if context has one of this type
         let vars := List.filter (fun i => Γ[i]! == τ) (List.range Γ.length)
+
+        -- TODO: is this right? I wonder if we should just have different
+        -- weights for `Var` & `Bool` instead of conflating `t0` for
+        -- both of them (i.e. perform a weighted choice here instead of `pick`)
         if !vars.isEmpty then
           pick
             (fun () => genVar vars)
