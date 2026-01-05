@@ -1,6 +1,6 @@
 import Basalt
 import Basalt.Examples.HowToSpecifyIt.BST
-import Basalt.Experiments.BDT.BSTGenerator
+import Basalt.Experiments.BDT.BST.Generator
 
 namespace BDTExperiments
 
@@ -9,7 +9,7 @@ open BST
 /-- Generate a random Nat in range [0, 100] -/
 def genTestNat : Gen Nat := RandomChoice.choose 0 100 (by omega)
 
-/-- Boolean implication: A → B is equivalent to ¬A ∨ B -/
+/-- Boolean implication: `A ==> B` is equivalent to `¬A ∨ B` -/
 def boolImplies (a b : Bool) : Bool := !a || b
 
 /-- After inserting a key-value pair, find should return that value -/

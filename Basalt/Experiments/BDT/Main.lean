@@ -1,6 +1,7 @@
 import Batteries.Data.Rat.Float
 import Cli
 import Basalt.Experiments.BDT.Analysis
+import Basalt.Experiments.BDT.BST.TestHarness
 
 open Cli
 
@@ -52,7 +53,7 @@ def runCmd (p : Parsed) : IO UInt32 := do
   let t2 ← parseRational t2Str
   let decay ← parseRational decayStr
 
-  let result ← runSingleExperiment alpha0 t0 t1 t2 decay maxTests
+  let result ← runBSTExperiment { alpha0, t0, t1, t2, decay } maxTests
   let summary := summarizeExperiment result
   printExperimentSummary summary
   return 0
@@ -66,11 +67,11 @@ This script tests 9 BST implementations (1 correct + 8 buggy) against 11
 properties to measure bug-catching ability.
 
 Hyperparameters (specify these as decimals, but these ought to be expressible as Rationals):
-  α₀ (alpha0): Initial energy level
+  alpha0: Initial energy level
   t0: Weight for arity-0 constructors
   t1: Weight for arity-0 constructors
   t2: Weight forarity-2 constructors
-  d (decay): Decay factor"
+  decay: Decay factor"
 
   FLAGS:
     "alpha0" : String;     "Initial energy level α₀ (required)"

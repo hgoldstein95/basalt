@@ -1,4 +1,5 @@
 import Basalt.Experiments.BDT.TestHarness
+import Basalt.Experiments.BDT.Hyperparameters
 
 namespace BDTExperiments
 
