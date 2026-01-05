@@ -58,9 +58,7 @@ end
 
 end NaiveSTLCGenerator
 
-/-- BDT-parameterized generator for STLC types
-
-  Parameters:
+/-- BDT generator for STLC terms, where:
   - α: current energy level
   - t0: weight for arity-0 constructors (TBool)
   - t2: weight for arity-2 constructors (TFun)
@@ -159,15 +157,8 @@ def genVar (vars : List Nat) : Gen Expr := do
     partial_fixpoint
 
 
-/-- Generate a well-typed STLC expression using BDT parameters
-
-  Generates expressions in an empty context with TBool type by default.
--/
-def genSTLCExpr (params : BDTParams) (τ : Ty := .TBool) : Gen Expr :=
-  let { alpha0 := α, t0, t1, t2, decay := d } := params
-  Expr.genExprWithBDT α t0 t1 t2 d [] τ
-
-/-- Generate a well-typed STLC expression with a specific context -/
-def genSTLCExprWithCtx (params : BDTParams) (Γ : Ctx) (τ : Ty) : Gen Expr :=
+/-- Generates a well-typed expression `e` such that `Γ ⊢ e : τ`
+    using the BDT STLC generator -/
+def genSTLCExpr (params : BDTParams) (Γ : Ctx) (τ : Ty) : Gen Expr :=
   let { alpha0 := α, t0, t1, t2, decay := d } := params
   Expr.genExprWithBDT α t0 t1 t2 d Γ τ
