@@ -1,30 +1,12 @@
 import Basalt
 import Basalt.Examples.HowToSpecifyIt.BST
+import Basalt.Experiments.BDT.Hyperparameters
 
 open RandomChoice
 
 namespace BDTExperiments
 
 open BST
-
-/-- Hyperparameters for Boltzmann Decay Tuning -/
-structure BDTParams where
-  /-- Initial "energy" level -/
-  alpha0 : Rat
-  /-- Weight for arity-0 constructors (leaves) -/
-  t0 : Rat
-  /-- Weight for arity-2 constructors (nodes) -/
-  t2 : Rat
-  /-- Decay factor for alpha -/
-  decay : Rat
-  deriving Repr, Inhabited
-
-/-- Default BDT parameters -/
-def BDTParams.default : BDTParams :=
-  { alpha0 := 2.0
-  , t0 := 1.0
-  , t2 := 1.0
-  , decay := 0.5 }
 
 /-- Generates a random BST using Boltzmann Decay Tuning (BDT) -/
 def genBSTWithBDT (α t0 t2 d : Rat) (lo hi : Nat) : Gen (BST Nat Nat) := do
@@ -59,7 +41,7 @@ def genBSTWithBDT (α t0 t2 d : Rat) (lo hi : Nat) : Gen (BST Nat Nat) := do
 
 /-- Generate a random BST with keys in range [0, maxKey] -/
 def genBST (params : BDTParams) (maxKey : Nat := 100) : Gen (BST Nat Nat) :=
-  let { alpha0 := α, t0, t2, decay := d } := params
+  let { alpha0 := α, t0, t2, decay := d, t1 := _t1 } := params
   genBSTWithBDT α t0 t2 d 0 maxKey
 
 end BDTExperiments

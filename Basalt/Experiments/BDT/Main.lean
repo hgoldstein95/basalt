@@ -32,20 +32,27 @@ def parseRational (s : String) : IO Rat := do
   | some r => pure r
   | none => throw (IO.userError s!"Unable to convert float {f} to a rational number")
 
+/-- Extracts the parsed string value for a CLI flag (identified by its `flagName`),
+    returning a `default` value if the flag isn't passed -/
+def getFlagStrWithDefault (p : Parsed) (flagName : String) (default : String) : String :=
+  p.flag? flagName |>.map (·.as! String) |>.getD default
+
 /-- Run BDT experiments with specified hyperparameters -/
 def runCmd (p : Parsed) : IO UInt32 := do
   let alpha0Str := p.flag! "alpha0" |>.as! String
-  let t0Str := p.flag! "t0" |>.as! String
-  let t2Str := p.flag! "t2" |>.as! String
+  let t0Str := getFlagStrWithDefault p "t0" "0.0"
+  let t1Str := getFlagStrWithDefault p "t1" "0.0"
+  let t2Str := getFlagStrWithDefault p "t2" "0.0"
   let decayStr := p.flag! "decay" |>.as! String
   let maxTests := p.flag? "max-tests" |>.map (·.as! Nat) |>.getD 1000
 
   let alpha0 ← parseRational alpha0Str
   let t0 ←  parseRational t0Str
+  let t1 ← parseRational t1Str
   let t2 ← parseRational t2Str
   let decay ← parseRational decayStr
 
-  let result ← runSingleExperiment alpha0 t0 t2 decay maxTests
+  let result ← runSingleExperiment alpha0 t0 t1 t2 decay maxTests
   let summary := summarizeExperiment result
   printExperimentSummary summary
   return 0
@@ -60,14 +67,16 @@ properties to measure bug-catching ability.
 
 Hyperparameters (specify these as decimals, but these ought to be expressible as Rationals):
   α₀ (alpha0): Initial energy level
-  t₀ (t0):     Weight for leaves (arity-0 constructors)
-  t₂ (t2):     Weight for nodes (arity-2 constructors)
-  d (decay):   Decay factor"
+  t0: Weight for arity-0 constructors
+  t1: Weight for arity-0 constructors
+  t2: Weight forarity-2 constructors
+  d (decay): Decay factor"
 
   FLAGS:
     "alpha0" : String;     "Initial energy level α₀ (required)"
-    "t0" : String;         "Weight for arity-0 constructors (leaves) (required)"
-    "t2" : String;         "Weight for arity-2 constructors (nodes) (required)"
+    "t0" : String;         "Weight for arity-0 constructors (optional, default: 0.0)"
+    "t1" : String;         "Weight for arity-1 constructors (optional, default: 0.0)"
+    "t2" : String;         "Weight for arity-2 constructors (optional, default: 0.0)"
     "decay" : String;      "Decay factor d (required)"
     "max-tests" : Nat;    "Max no. of trials per property (default: 1000)"
 
