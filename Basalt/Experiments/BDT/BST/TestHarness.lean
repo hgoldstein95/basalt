@@ -67,27 +67,55 @@ def allImpls : List BSTImpl := [
 /-- All properties to test -/
 def allProperties : List (PropertySpec BSTImpl (BST Nat Nat)) := [
   { name := "insert-find"
-  , test := fun _ impl tree => prop_insert_find tree impl.insert BST.find },
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      let val ← genTestNat
+      return prop_insert_find tree key val impl.insert BST.find },
   { name := "insert-insert"
-  , test := fun _ impl tree => prop_insert_insert tree impl.insert BST.find },
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      let val1 ← genTestNat
+      let val2 ← genTestNat
+      return prop_insert_insert tree key val1 val2 impl.insert BST.find },
   { name := "delete-find"
-  , test := fun _ impl tree => prop_delete_find tree impl.delete BST.find },
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      return prop_delete_find tree key impl.delete BST.find },
   { name := "insert-size"
-  , test := fun _ impl tree => prop_insert_size tree impl.insert BST.size },
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      let val ← genTestNat
+      return prop_insert_size tree key val impl.insert BST.size },
   { name := "delete-size"
-  , test := fun _ impl tree => prop_delete_size tree impl.delete BST.size },
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      return prop_delete_size tree key impl.delete BST.size },
   { name := "insert-valid"
-  , test := fun _ impl tree => prop_insert_valid tree impl.insert BST.valid },
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      let val ← genTestNat
+      return prop_insert_valid tree key val impl.insert BST.valid },
   { name := "delete-valid"
-  , test := fun _ impl tree => prop_delete_valid tree impl.delete BST.valid },
+  , test := fun _ impl tree => do
+      let key ← genTestNat
+      return prop_delete_valid tree key impl.delete BST.valid },
   { name := "toList-sorted"
-  , test := fun _ _impl tree => prop_toList_sorted tree BST.toList },
+  , test := fun _ _impl tree => do
+      return prop_toList_sorted tree BST.toList },
   { name := "union-contains"
-  , test := fun params impl tree => prop_union_contains tree params impl.union BST.find },
+  , test := fun params impl tree => do
+      let tree2 ← genBST params
+      let key ← genTestNat
+      return prop_union_contains tree tree2 key impl.union BST.find },
   { name := "union-left-priority"
-  , test := fun params impl tree => prop_union_left_priority tree params impl.union BST.find },
+  , test := fun params impl tree => do
+      let tree2 ← genBST params
+      let key ← genTestNat
+      return prop_union_left_priority tree tree2 key impl.union BST.find },
   { name := "union-valid"
-  , test := fun params impl tree => prop_union_valid tree params impl.union BST.valid }
+  , test := fun params impl tree => do
+      let tree2 ← genBST params
+      return prop_union_valid tree tree2 impl.union BST.valid }
 ]
 
 /-- Test a single specific hyperparameter configuration -/
