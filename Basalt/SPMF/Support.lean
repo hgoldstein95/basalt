@@ -98,6 +98,23 @@ theorem support_map
   grind
 
 @[simp]
+theorem mem_support_map_iff
+    {x : SPMF α}
+    {f : α → β} :
+    b ∈ (f <$> x).support ↔ ∃ a ∈ x.support, b = f a := by
+  simp [support_map]
+
+theorem mem_support_dite_iff {p : Prop} [Decidable p]
+    {t : p → SPMF α} {e : ¬p → SPMF α} :
+    a ∈ (dite p t e).support ↔ (∃ h : p, a ∈ (t h).support) ∨ (∃ h : ¬p, a ∈ (e h).support) := by
+  by_cases hp : p <;> simp_all
+
+theorem mem_support_ite_iff {p : Prop} [Decidable p]
+    {t e : SPMF α} :
+    a ∈ (ite p t e).support ↔ (p ∧ a ∈ t.support) ∨ (¬p ∧ a ∈ e.support) := by
+  by_cases hp : p <;> simp_all
+
+@[simp]
 theorem support_choose :
     (choose lo hi h : SPMF _).support = {a | lo ≤ a ∧ a ≤ hi} := by
   ext a
