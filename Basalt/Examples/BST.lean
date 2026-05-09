@@ -89,15 +89,13 @@ theorem Tree.genBST_cost :
     intro genBST_rec ih lo hi
     simp [IsBounded_iff] at *
     intro t n hn
-    split at hn
-    · simp_all
-    · grind only [
-        pick,
-        size,
-        SPMF.Cost.mem_support_bind_iff,
-        SPMF.Cost.mem_support_choose_iff,
-        SPMF.Cost.mem_support_pure_iff
-      ]
+    grind only [
+      pick,
+      size,
+      SPMF.Cost.mem_support_bind_iff,
+      SPMF.Cost.mem_support_choose_iff,
+      SPMF.Cost.mem_support_pure_iff
+    ]
 
 instance {lo hi : Nat} : LawfulGenerator (Tree.genBST lo hi) (Tree.isBST lo hi) (fun t => 3 * t.size + 1) where
   support_iff := Tree.genBST_support

@@ -104,11 +104,13 @@ theorem mem_support_map_iff
     b ∈ (f <$> x).support ↔ ∃ a ∈ x.support, b = f a := by
   simp [support_map]
 
+@[simp]
 theorem mem_support_dite_iff {p : Prop} [Decidable p]
     {t : p → SPMF α} {e : ¬p → SPMF α} :
     a ∈ (dite p t e).support ↔ (∃ h : p, a ∈ (t h).support) ∨ (∃ h : ¬p, a ∈ (e h).support) := by
   by_cases hp : p <;> simp_all
 
+@[simp]
 theorem mem_support_ite_iff {p : Prop} [Decidable p]
     {t e : SPMF α} :
     a ∈ (ite p t e).support ↔ (p ∧ a ∈ t.support) ∨ (¬p ∧ a ∈ e.support) := by
