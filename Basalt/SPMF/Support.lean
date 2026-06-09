@@ -167,7 +167,8 @@ theorem mem_support_pick_iff
 
 @[simp]
 theorem support_oneOf
-    {gs : List (Unit → SPMF α)} (hne : gs ≠ []) :
+    {gs : List (Unit → SPMF α)}
+    (hne : gs ≠ []) :
     support (oneOf gs) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
   simp only [oneOf, support_bind, support_map, support_choose]
   ext a
@@ -202,6 +203,13 @@ theorem support_oneOf
       subst heq
       assumption
 
+@[simp]
+theorem mem_support_oneOf_iff
+    {gs : List (Unit → SPMF α)}
+    (hne : gs ≠ []) :
+    a ∈ support (oneOf gs) ↔ ∃ g ∈ gs, a ∈ (g ()).support := by
+  rw [support_oneOf hne]
+  simp only [Set.mem_setOf_eq]
 
 theorem bind_congr_support
     {x : SPMF α}
