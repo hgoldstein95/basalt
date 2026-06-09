@@ -153,6 +153,7 @@ theorem mem_support_pick_iff
     a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
   simp
 
+/-- The support of `oneOf gs` is exactly the union of all generators in `gs` -/
 @[simp]
 theorem support_oneOf
     {gs : List (Unit → SPMF α)}
@@ -191,6 +192,8 @@ theorem support_oneOf
       subst heq
       assumption
 
+/-- Any element in the support of `oneOf gs` is in the support of some
+    generator in `gs` -/
 @[simp]
 theorem mem_support_oneOf_iff
     {gs : List (Unit → SPMF α)}
