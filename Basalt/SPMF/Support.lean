@@ -214,6 +214,93 @@ theorem mem_support_oneOf_iff
   rw [support_oneOf hne]
   simp only [Set.mem_setOf_eq]
 
+
+/-- If `n < sum (fst <$> gs)`, then `frequencyAux default gs n` picks a sub-generator
+    from `gs` that has non-zero weight `w` -/
+private theorem frequencyAux_mem
+    {gs : List (Nat × (Unit → SPMF α))}
+    {n : Nat}
+    (h : n < List.sum (List.map Prod.fst gs)) :
+    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ (frequencyAux default gs n).snd = g () := by
+  induction gs generalizing n with
+  | nil => contradiction
+  | cons hd tl ih =>
+    unfold frequencyAux
+    obtain ⟨ w, g ⟩ := hd
+    split
+    . -- n < w
+      exists w, g
+      constructor
+      . -- (w, g) ∈ (w, g) :: tl
+        apply List.mem_cons_self
+      . -- 0 < w ∧ ((w, g).2 ()) = g ()
+        constructor
+        . omega
+        . rfl
+    · -- n >= w
+      -- Assert that the remaining weight `(n - w)` is less than the sum
+      -- of the weights in the tail of the list
+      have h_remaining_weight : n - w < List.sum (List.map Prod.fst tl) := by
+        dsimp only [List.map_cons, List.sum_cons] at h
+        omega
+      obtain ⟨w, g, hwg_mem, hwg_pos, hwg_eq⟩ := ih h_remaining_weight
+      exists w, g
+      constructor
+      . apply List.mem_cons_of_mem
+        assumption
+      . constructor <;> assumption
+
+/-- If a weighted generator `(w, g) ∈ gs` where the weight `w` is non-zero,
+    then `frequencyAux default gs n` produces `(w, g)` if `n < sum (fst <$> gs)` -/
+private theorem frequencyAux_reaches
+    {gs : List (Nat × (Unit → SPMF α))}
+    {wg : Nat × (Unit → SPMF α)}
+    (hmem : wg ∈ gs)
+    (hnonzero : 0 < wg.1) :
+    ∃ n, n < List.sum (List.map Prod.fst gs) ∧
+      (frequencyAux default gs n).snd = wg.2 () := by
+  induction gs with
+  | nil => contradiction
+  | cons hd tl ih =>
+    rcases List.mem_cons.mp hmem with rfl | h_tl
+    · -- hd = ⟨ w, g ⟩
+      refine ⟨0, ?_, ?_⟩
+      · dsimp only [List.map_cons, List.sum_cons]
+        omega
+      · unfold frequencyAux
+        simp [hnonzero]
+    · -- ⟨ w, g ⟩ ∈ tl
+      obtain ⟨n, hn_lt, hn_eq⟩ := ih h_tl
+      refine ⟨hd.1 + n, ?_, ?_⟩
+      · simp [List.map_cons, List.sum_cons] at hn_lt ⊢; omega
+      · unfold frequencyAux
+        have : ¬ (hd.1 + n < hd.1) := by omega
+        simp [this]
+        convert hn_eq using 2
+
+@[simp]
+theorem support_frequency
+    {gs : List (Nat × (Unit → SPMF α))}
+    (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
+    support (frequency gs h_pos) = {a | ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support} := by
+  simp only [frequency, support_bind, support_map, support_choose]
+  ext a
+  simp only [Set.mem_setOf_eq]
+  constructor
+  · intro h
+    obtain ⟨i, h_idx, ha⟩ := h
+    obtain ⟨n, ⟨_, h_upperbound⟩, hi⟩ := h_idx
+    subst hi
+    have h_lt : n.down < List.sum (List.map Prod.fst gs) := by omega
+    obtain ⟨w, g, hwg_mem, hwg_pos, hwg_eq⟩ := frequencyAux_mem h_lt
+    rw [hwg_eq] at ha
+    exact ⟨w, g, hwg_mem, hwg_pos, ha⟩
+  · intro ⟨w, g, hwg_mem, hwt, ha⟩
+    obtain ⟨n, hn_lt, hn_eq⟩ := frequencyAux_reaches hwg_mem hwt
+    refine ⟨n, ⟨⟨n⟩, ⟨Nat.zero_le _, ?_⟩, rfl⟩, ?_⟩
+    · show n ≤ (List.map Prod.fst gs).sum - 1; omega
+    · rw [hn_eq]; exact ha
+
 theorem bind_congr_support
     {x : SPMF α}
     (h : ∀ a ∈ x.support, f a = g a) :
