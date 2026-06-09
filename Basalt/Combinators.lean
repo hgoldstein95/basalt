@@ -1,6 +1,32 @@
 import Basalt.Gen
 import Basalt.RandomChoice
 
+/-!
+# Generator Combinators
+
+This file defines combinators for composing generators: `oneOf` (uniform random selection) and
+`frequency` (weighted random selection).
+
+## Monotonicity and `partial_fixpoint`
+
+Recursive generators use `partial_fixpoint` to define coinductive computations. The
+`partial_fixpoint` tactic requires an automatic proof that the generator body is monotone with
+respect to the CCPO ordering. Lean's core ships `@[partial_fixpoint_monotone]` lemmas for standard
+monadic operations (`bind`, `map`, `pure`, `ite`, etc.), and Basalt adds `monotone_pick` in
+`RandomChoice.lean`.
+
+To use `oneOf` or `frequency` inside a `partial_fixpoint` definition, corresponding
+`@[partial_fixpoint_monotone]` lemmas are needed so the tactic can automatically discharge the
+monotonicity obligation. Without them, `partial_fixpoint` will fail with a monotonicity error.
+
+## Main Definitions
+
+- `oneOf` — Picks one of the generators in a list uniformly at random.
+- `frequency` — Picks a generator from a weighted list according to the given weights.
+- `frequencyAux` — (private) Helper that walks the weight list to select a generator for a given
+  random index.
+-/
+
 open List
 
 /-- Picks one of the generators in `gs` at random. -/
@@ -34,5 +60,3 @@ def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   (frequencyAux default gs n).snd
 
 
--- TODO: figure out how we should implement `frequency` (port the helper functions from `Plausible.Gen`?
--- since we want to these generators to be generic over `Gen` and not specifically `Plausible.Gen`)

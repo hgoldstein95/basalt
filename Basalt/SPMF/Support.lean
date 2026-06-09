@@ -173,7 +173,7 @@ theorem support_oneOf
     support (oneOf gs) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
   simp only [oneOf, support_bind, support_map, support_choose]
   ext a
-  simp only [Set.mem_setOf_eq]
+  dsimp only [Set.mem_setOf_eq]
   constructor
   . -- ∃ i ∈ [0, gs.length -1], a ∈ (gs[i]! ()).support → ∃ g ∈ gs, a ∈ (g ()).support
     intro h
@@ -252,54 +252,82 @@ private theorem frequencyAux_mem
 
 /-- If a weighted generator `(w, g) ∈ gs` where the weight `w` is non-zero,
     then `frequencyAux default gs n` produces `(w, g)` if `n < sum (fst <$> gs)` -/
-private theorem frequencyAux_reaches
+private theorem frequencyAux_n_exists
     {gs : List (Nat × (Unit → SPMF α))}
-    {wg : Nat × (Unit → SPMF α)}
-    (hmem : wg ∈ gs)
-    (hnonzero : 0 < wg.1) :
+    {w : Nat}
+    {g : Unit → SPMF α}
+    (hmem : (w, g) ∈ gs)
+    (hnonzero : 0 < w) :
     ∃ n, n < List.sum (List.map Prod.fst gs) ∧
-      (frequencyAux default gs n).snd = wg.2 () := by
+      (frequencyAux default gs n).snd = g () := by
   induction gs with
   | nil => contradiction
   | cons hd tl ih =>
     rcases List.mem_cons.mp hmem with rfl | h_tl
-    · -- hd = ⟨ w, g ⟩
+    · -- hd = (w, g)
       refine ⟨0, ?_, ?_⟩
       · dsimp only [List.map_cons, List.sum_cons]
         omega
       · unfold frequencyAux
         simp [hnonzero]
-    · -- ⟨ w, g ⟩ ∈ tl
-      obtain ⟨n, hn_lt, hn_eq⟩ := ih h_tl
-      refine ⟨hd.1 + n, ?_, ?_⟩
-      · simp [List.map_cons, List.sum_cons] at hn_lt ⊢; omega
-      · unfold frequencyAux
-        have : ¬ (hd.1 + n < hd.1) := by omega
-        simp [this]
-        convert hn_eq using 2
+    · -- (w, g) ∈ tl
+      obtain ⟨n, _, _⟩ := ih h_tl
+      obtain ⟨ w', _ ⟩ := hd
+      refine ⟨w' + n, ?_, ?_⟩
+      · -- w' + n < sum (fst <$> gs)
+        dsimp only [List.map_cons, List.sum_cons]
+        omega
+      · -- (frequencyAux default gs (w' + n)).snd = g ()
+        -- We need to unfold the body of `frequencyAux` to reason about
+        -- which branch of the `if`-expression is taken
+        unfold frequencyAux
+        have hcontra : ¬ (w' + n < w') := by omega
+        simp [hcontra]
+        assumption
 
+-- TODO: investigate the proof below
+
+/-- If the sum of weights in `gs` is non-zero, then the support of `frequency gs`
+    is exactly the union of the support of the generators in `gs` with non-zero weights -/
 @[simp]
 theorem support_frequency
     {gs : List (Nat × (Unit → SPMF α))}
     (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
     support (frequency gs h_pos) = {a | ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support} := by
-  simp only [frequency, support_bind, support_map, support_choose]
   ext a
-  simp only [Set.mem_setOf_eq]
+  dsimp only [Set.mem_setOf_eq]
   constructor
-  · intro h
+  · -- a ∈ support (frequency gs h_pos) -> ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support
+    intro h
+    simp only [frequency, support_bind, support_map, support_choose] at h
     obtain ⟨i, h_idx, ha⟩ := h
-    obtain ⟨n, ⟨_, h_upperbound⟩, hi⟩ := h_idx
-    subst hi
-    have h_lt : n.down < List.sum (List.map Prod.fst gs) := by omega
-    obtain ⟨w, g, hwg_mem, hwg_pos, hwg_eq⟩ := frequencyAux_mem h_lt
-    rw [hwg_eq] at ha
-    exact ⟨w, g, hwg_mem, hwg_pos, ha⟩
-  · intro ⟨w, g, hwg_mem, hwt, ha⟩
-    obtain ⟨n, hn_lt, hn_eq⟩ := frequencyAux_reaches hwg_mem hwt
-    refine ⟨n, ⟨⟨n⟩, ⟨Nat.zero_le _, ?_⟩, rfl⟩, ?_⟩
-    · show n ≤ (List.map Prod.fst gs).sum - 1; omega
-    · rw [hn_eq]; exact ha
+    obtain ⟨n, ⟨_, _⟩, hi⟩ := h_idx
+    have h_lt : i < List.sum (List.map Prod.fst gs) := by omega
+    obtain ⟨w, g, _, _, heq⟩ := frequencyAux_mem h_lt
+    rw [heq] at ha
+    refine ⟨w, g, ?_, ?_, ?_⟩ <;> assumption
+  · -- ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support -> a ∈ support (frequency gs h_pos)
+    simp only [frequency, support_bind, support_map, support_choose]
+    intro ⟨w, g, hwg_mem, hwt, ha⟩
+    obtain ⟨n, hn_lt, hn_eq⟩ := frequencyAux_n_exists hwg_mem hwt
+    dsimp only [Set.mem_setOf_eq]
+    apply Exists.intro n
+    constructor
+    · -- ∃ a, (0 ≤ a.down ∧ a.down ≤ total - 1) ∧ n = a.down
+      apply Exists.intro (ULift.up n)
+      constructor
+      · -- 0 ≤ n ∧ n ≤ total - 1
+        constructor
+        · -- 0 ≤ n
+          omega
+        · -- n ≤ total - 1
+          show n ≤ (List.map Prod.fst gs).sum - 1
+          omega
+      · -- n = (ULift.up n).down
+        rfl
+    · -- a ∈ (frequencyAux default gs n).snd.support
+      rw [hn_eq]
+      assumption
 
 theorem bind_congr_support
     {x : SPMF α}
