@@ -95,4 +95,12 @@ theorem genCharList_cost :
       SPMF.Cost.mem_support_pure_iff
     ]
 
+theorem String.arbitrary_cost :
+    IsBounded String.arbitrary (fun s => 2 * s.length + (Char.toNat <$> s.toList).sum + 1) := by
+  open Lean.Order in
+  delta String.arbitrary
+  simp [IsBounded_iff]
+  intro s cost h
+  sorry
+
 end ArbString
