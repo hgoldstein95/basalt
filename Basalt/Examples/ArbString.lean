@@ -22,10 +22,10 @@ theorem genCharList_support :
     cs ∈ SPMF.support genCharList ↔ ∀ c ∈ cs, c.isAlphanum = true := by
   induction cs with
   | nil =>
-    rw [genCharList]
+    unfold genCharList
     simp
   | cons c cs ih =>
-    rw [genCharList]
+    unfold genCharList
     simp [Char.arbitrary_support, ih]
 
 theorem String.arbitrary_support :
@@ -37,7 +37,12 @@ theorem String.arbitrary_support :
     subst heq
     simpa using hcs
   · intro h
-    exact ⟨s.toList, genCharList_support.mpr h, by simp⟩
+    let cs := s.toList
+    exists cs
+    constructor
+    . apply genCharList_support.mpr
+      assumption
+    . rw [String.ofList_toList]
 
 -- This proof is largely the same as `List.arbitrary_terminates`,
 -- except with calls to `List.arbitrary` / `Nat.arbitrary` replaced with
