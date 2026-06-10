@@ -28,6 +28,7 @@ private theorem indexToChar_isAlphanum :
 private theorem isAlphanum_exists_index :
     ∀ c : Char, c.isAlphanum = true → ∃ n, n ≤ 61 ∧ indexToChar n = c := by native_decide
 
+/-- All alphanumeric characters are generable by `Char.arbitrary` -/
 theorem Char.arbitrary_support :
     c ∈ SPMF.support Char.arbitrary ↔ c.isAlphanum = true := by
   constructor
@@ -45,7 +46,21 @@ theorem Char.arbitrary_support :
 
 theorem Char.arbitrary_terminates : SPMF.IsPMF Char.arbitrary := by
   unfold Char.arbitrary
-  exact SPMF.IsPMF_bind_pure (SPMF.IsPMF_choose 0 61 (by omega))
+  apply SPMF.IsPMF_bind_pure
+  apply SPMF.IsPMF_choose
+
+-- `Char.arbitrary` makes just one call to `RandomChoice.choose`,
+-- so `fun _ => 1` suffices as the cost function
+theorem Char.arbitrary_cost :
+    IsBounded Char.arbitrary (fun _ => (1 : Nat)) := by
+  rw [IsBounded_iff]
+  intro ⟨c, cost⟩ h
+  rw [Char.arbitrary] at h
+  simp [SPMF.Cost.mem_support_bind_iff, SPMF.Cost.mem_support_choose_iff,
+          SPMF.Cost.mem_support_pure_iff] at h
+  obtain ⟨ n, ⟨ _, h_eq ⟩, _ ⟩ := h
+  subst h_eq
+  rfl
 
 #guard_msgs(drop info) in
 #eval (for _ in [0:20] do
