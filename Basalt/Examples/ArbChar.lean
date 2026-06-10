@@ -49,18 +49,17 @@ theorem Char.arbitrary_terminates : SPMF.IsPMF Char.arbitrary := by
   apply SPMF.IsPMF_bind_pure
   apply SPMF.IsPMF_choose
 
--- `Char.arbitrary` makes just one call to `RandomChoice.choose`,
--- so `fun _ => 1` suffices as the cost function
+-- Proof is similar to `Nat.arbitrary_cost`
 theorem Char.arbitrary_cost :
-    IsBounded Char.arbitrary (fun _ => (1 : Nat)) := by
+    IsBounded Char.arbitrary (fun c => c.toNat + 1) := by
   rw [IsBounded_iff]
   intro ⟨c, cost⟩ h
   rw [Char.arbitrary] at h
   simp [SPMF.Cost.mem_support_bind_iff, SPMF.Cost.mem_support_choose_iff,
           SPMF.Cost.mem_support_pure_iff] at h
-  obtain ⟨ n, ⟨ _, h_eq ⟩, _ ⟩ := h
-  subst h_eq
-  rfl
+  obtain ⟨ n, ⟨ hle, heq ⟩, hcn ⟩ := h
+  subst heq
+  simp only [le_add_iff_nonneg_left, zero_le]
 
 #guard_msgs(drop info) in
 #eval (for _ in [0:20] do
