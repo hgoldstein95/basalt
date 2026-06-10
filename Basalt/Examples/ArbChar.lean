@@ -57,7 +57,7 @@ theorem Char.arbitrary_cost :
   rw [Char.arbitrary] at h
   simp [SPMF.Cost.mem_support_bind_iff, SPMF.Cost.mem_support_choose_iff,
           SPMF.Cost.mem_support_pure_iff] at h
-  obtain ⟨ n, ⟨ hle, heq ⟩, hcn ⟩ := h
+  obtain ⟨ n, ⟨ _, heq ⟩, _ ⟩ := h
   subst heq
   simp only [le_add_iff_nonneg_left, zero_le]
 

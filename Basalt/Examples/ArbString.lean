@@ -65,7 +65,7 @@ theorem genCharList_terminates : SPMF.IsPMF genCharList := by
     simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
     gcongr
     apply SPMF.mass_bind_ge_of_isPMF Char.arbitrary_terminates
-    intro x
+    intro c
     rw [SPMF.mass_bind_pure]
     exact SPMF.mass_ge_iInf _ ()
 
@@ -73,5 +73,26 @@ theorem String.arbitrary_terminates : SPMF.IsPMF String.arbitrary := by
   unfold String.arbitrary SPMF.IsPMF
   rw [SPMF.mass_map]
   apply genCharList_terminates
+
+-- Proof is similar to `List.arbitrary_cost`
+theorem genCharList_cost :
+    IsBounded genCharList (fun cs => 2 * cs.length + (Char.toNat <$> cs).sum + 1) := by
+  open Lean.Order in
+  delta genCharList
+  apply fix_induct (motive := fun (g : SPMF.Cost (List Char)) =>
+    IsBounded g (fun cs => 2 * cs.length + (Char.toNat <$> cs).sum + 1)) _ ?admissible ?step
+  case admissible =>
+    apply admissible_IsBounded
+  case step =>
+    intro arbitrary_rec ih
+    simp [IsBounded_iff] at *
+    have := IsBounded_iff.mp Char.arbitrary_cost
+    intro xs c hxs
+    grind [
+      pick,
+      SPMF.Cost.mem_support_bind_iff,
+      SPMF.Cost.mem_support_choose_iff,
+      SPMF.Cost.mem_support_pure_iff
+    ]
 
 end ArbString
