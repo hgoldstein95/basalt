@@ -28,7 +28,6 @@ theorem genCharList_support :
     rw [genCharList]
     simp [Char.arbitrary_support, ih]
 
-
 theorem String.arbitrary_support :
     s ∈ SPMF.support String.arbitrary ↔ (∀ c ∈ s.toList, c.isAlphanum = true) := by
   simp only [String.arbitrary, SPMF.mem_support_map_iff]
@@ -40,10 +39,34 @@ theorem String.arbitrary_support :
   · intro h
     exact ⟨s.toList, genCharList_support.mpr h, by simp⟩
 
+-- This proof is largely the same as `List.arbitrary_terminates`,
+-- except with calls to `List.arbitrary` / `Nat.arbitrary` replaced with
+-- `genCharList` / `Char.arbitrary` respectively
 theorem genCharList_terminates : SPMF.IsPMF genCharList := by
-  unfold genCharList
-  apply SPMF.IsPMF_pick
-  . apply SPMF.IsPMF_pure
-  . sorry
+  refine (SPMF.IsPMF_of_mass_fixpoint
+    (g := fun () => (genCharList : SPMF (List Char)))
+    (F := fun c => 1 / 2 + 1 / 2 * c)
+    ?bounds ?mass) ()
+  case bounds =>
+    intro c hle hge
+    dsimp at hge
+    apply ENNReal.eq_one_of_fixed_ineq' hle hge
+    intro hmono
+    rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
+    norm_num at hmono; linarith
+  case mass =>
+    intro () h
+    conv_lhs => rw [genCharList]
+    simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
+    gcongr
+    apply SPMF.mass_bind_ge_of_isPMF Char.arbitrary_terminates
+    intro x
+    rw [SPMF.mass_bind_pure]
+    exact SPMF.mass_ge_iInf _ ()
+
+theorem String.arbitrary_terminates : SPMF.IsPMF String.arbitrary := by
+  unfold String.arbitrary SPMF.IsPMF
+  rw [SPMF.mass_map]
+  apply genCharList_terminates
 
 end ArbString
