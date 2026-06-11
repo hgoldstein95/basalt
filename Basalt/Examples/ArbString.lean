@@ -6,6 +6,7 @@ open RandomChoice ArbChar
 
 namespace ArbString
 
+/-- Helper function: generates a random list of alphanumeric characters -/
 def genCharList [Gen G] : G (List Char) :=
   pick
     (fun _ => pure [])
@@ -15,6 +16,7 @@ def genCharList [Gen G] : G (List Char) :=
       return x :: xs)
 partial_fixpoint
 
+/-- Generates a random alphanumeric string -/
 def String.arbitrary [Gen G] : G String :=
   String.ofList <$> genCharList
 
@@ -97,10 +99,19 @@ theorem genCharList_cost :
 
 theorem String.arbitrary_cost :
     IsBounded String.arbitrary (fun s => 2 * s.length + (Char.toNat <$> s.toList).sum + 1) := by
-  open Lean.Order in
-  delta String.arbitrary
+  unfold String.arbitrary
   simp [IsBounded_iff]
   intro s cost h
-  sorry
+  simp [Functor.map] at h
+  obtain ⟨cs, hcs, rfl⟩ := h
+  have hcost : cost ≤ 2 * cs.length + (Char.toNat <$> cs).sum + 1 := by
+    apply IsBounded_iff.mp genCharList_cost (cs, cost) hcs
+  simp at hcost
+  simp [String.length_ofList]
+  assumption
+
+#guard_msgs(drop info) in
+#eval (for _ in [0:10] do
+  IO.println <| repr (← String.arbitrary) : IO Unit)
 
 end ArbString
