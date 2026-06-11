@@ -44,14 +44,16 @@ theorem Char.arbitrary_support :
     obtain ⟨n, hhi, hc⟩ := isAlphanum_exists_index c h
     exact ⟨n, hhi, hc.symm⟩
 
+/-- `Char.arbitrary` almost surely terminates -/
 theorem Char.arbitrary_terminates : SPMF.IsPMF Char.arbitrary := by
   unfold Char.arbitrary
   apply SPMF.IsPMF_bind_pure
   apply SPMF.IsPMF_choose
 
--- Proof is similar to `Nat.arbitrary_cost`
+-- Proof is similar to `Nat.arbitrary_cost`, but `Char.arbitrary` makes only
+-- one random choice, so `fun _ => 1` suffices as the cost function
 theorem Char.arbitrary_cost :
-    IsBounded Char.arbitrary (fun c => c.toNat + 1) := by
+    IsBounded Char.arbitrary (fun _ => 1) := by
   rw [IsBounded_iff]
   intro ⟨c, cost⟩ h
   rw [Char.arbitrary] at h
@@ -59,7 +61,8 @@ theorem Char.arbitrary_cost :
           SPMF.Cost.mem_support_pure_iff] at h
   obtain ⟨ n, ⟨ _, heq ⟩, _ ⟩ := h
   subst heq
-  simp only [le_add_iff_nonneg_left, zero_le]
+  dsimp
+  constructor
 
 #guard_msgs(drop info) in
 #eval (for _ in [0:20] do

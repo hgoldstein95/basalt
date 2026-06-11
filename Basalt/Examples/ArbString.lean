@@ -20,6 +20,7 @@ partial_fixpoint
 def String.arbitrary [Gen G] : G String :=
   String.ofList <$> genCharList
 
+/-- `genCharList`'s support is exactly the set of alphanumeric characters -/
 theorem genCharList_support :
     cs ∈ SPMF.support genCharList ↔ ∀ c ∈ cs, c.isAlphanum = true := by
   induction cs with
@@ -30,6 +31,7 @@ theorem genCharList_support :
     unfold genCharList
     simp [Char.arbitrary_support, ih]
 
+/-- `String.arbitrary`'s support is exactly the set of alphanumeric characters -/
 theorem String.arbitrary_support :
     s ∈ SPMF.support String.arbitrary ↔ (∀ c ∈ s.toList, c.isAlphanum = true) := by
   simp only [String.arbitrary, SPMF.mem_support_map_iff]
@@ -71,23 +73,28 @@ theorem genCharList_terminates : SPMF.IsPMF genCharList := by
     rw [SPMF.mass_bind_pure]
     exact SPMF.mass_ge_iInf _ ()
 
+/-- `String.arbitrary` almost surely terminates -/
 theorem String.arbitrary_terminates : SPMF.IsPMF String.arbitrary := by
   unfold String.arbitrary SPMF.IsPMF
   rw [SPMF.mass_map]
   apply genCharList_terminates
 
--- Proof is similar to `List.arbitrary_cost`
+-- Proof is similar to `List.arbitrary_cost`, except here the cost function
+-- is just the no. of calls to `pick` + `Char.arbitrary` (`2 * cs.length`),
+-- along with one final call to `pick` to produce the end of the list
 theorem genCharList_cost :
-    IsBounded genCharList (fun cs => 2 * cs.length + (Char.toNat <$> cs).sum + 1) := by
+    IsBounded genCharList (fun cs => 2 * cs.length + 1) := by
   open Lean.Order in
   delta genCharList
+  -- Apply fixpoint induction
   apply fix_induct (motive := fun (g : SPMF.Cost (List Char)) =>
-    IsBounded g (fun cs => 2 * cs.length + (Char.toNat <$> cs).sum + 1)) _ ?admissible ?step
+    IsBounded g (fun cs => 2 * cs.length + 1)) _ ?admissible ?step
   case admissible =>
     apply admissible_IsBounded
   case step =>
     intro arbitrary_rec ih
     simp [IsBounded_iff] at *
+    -- ∀ (c, cost) ∈ SPMF.support Char.arbitrary, cost ≤ 1
     have := IsBounded_iff.mp Char.arbitrary_cost
     intro xs c hxs
     grind [
@@ -98,13 +105,13 @@ theorem genCharList_cost :
     ]
 
 theorem String.arbitrary_cost :
-    IsBounded String.arbitrary (fun s => 2 * s.length + (Char.toNat <$> s.toList).sum + 1) := by
+    IsBounded String.arbitrary (fun s => 2 * s.length + 1) := by
   unfold String.arbitrary
   simp [IsBounded_iff]
   intro s cost h
   simp [Functor.map] at h
   obtain ⟨cs, hcs, rfl⟩ := h
-  have hcost : cost ≤ 2 * cs.length + (Char.toNat <$> cs).sum + 1 := by
+  have hcost : cost ≤ 2 * cs.length + 1 := by
     apply IsBounded_iff.mp genCharList_cost (cs, cost) hcs
   simp at hcost
   simp [String.length_ofList]
