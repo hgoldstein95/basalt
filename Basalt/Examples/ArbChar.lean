@@ -36,13 +36,18 @@ theorem Char.arbitrary_support :
     intro h
     rw [Char.arbitrary] at h
     simp at h
-    exact h.elim (fun n ⟨hhi, hc⟩ => hc ▸ indexToChar_isAlphanum n hhi)
+    obtain ⟨n, hle, rfl⟩ := h
+    apply indexToChar_isAlphanum
+    assumption
   · -- c.isAlphanum = true -> c ∈ SPMF.support Char.arbitrary
     intro h
     rw [Char.arbitrary]
     simp
     obtain ⟨n, hhi, hc⟩ := isAlphanum_exists_index c h
-    exact ⟨n, hhi, hc.symm⟩
+    exists n
+    constructor
+    . assumption
+    . apply hc.symm
 
 /-- `Char.arbitrary` almost surely terminates -/
 theorem Char.arbitrary_terminates : SPMF.IsPMF Char.arbitrary := by
