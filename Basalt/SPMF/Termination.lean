@@ -221,6 +221,21 @@ theorem IsPMF_bind {x : SPMF α} {f : α → SPMF β} (hx : IsPMF x) (hf : ∀ a
   unfold IsPMF
   rw [mass_bind hf, hx]
 
+/-- `Map`-ping a function `f` over an SPMF `x` results in an SPMF -/
+theorem IsPMF_map {x : SPMF α} {f : α → β} (hx : IsPMF x) :
+    IsPMF (f <$> x) := by
+  unfold IsPMF
+  rw [mass_map]
+  assumption
+
+/-- The combinator `elements` is an SPMF -/
+theorem IsPMF_elements [Inhabited α] (xs : List α) :
+    IsPMF (elements xs) := by
+  unfold elements
+  apply IsPMF_bind_pure
+  apply IsPMF_map
+  apply IsPMF_choose
+
 private lemma weighted_avg_mono_ennreal {t p x : ℝ≥0∞}
     (htp : t ≥ p) (hx_le_one : x ≤ 1) (ht_le_one : t ≤ 1) (hp_le_one : p ≤ 1) :
     t + (1 - t) * x ≥ p + (1 - p) * x := by
