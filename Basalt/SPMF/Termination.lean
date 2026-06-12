@@ -228,6 +228,19 @@ theorem IsPMF_map {x : SPMF α} {f : α → β} (hx : IsPMF x) :
   rw [mass_map]
   assumption
 
+/-- For a SPMF `x` and a function `f` that returns an SPMF, if `∀ a ∈ x.support`, `f a` is also an SPMF<
+    then `x >>= f` is also an SPMF. This is a weaker version of `IsPMF_bind` that only quantifies `a` in `x.support`
+    (instead of quantifying over all possible `a`), which obviates the need to reason about `a ∉ x.support`. -/
+theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β} (hx : IsPMF x) (hf : ∀ a ∈ x.support, IsPMF (f a)) :
+    IsPMF (x >>= f) := by
+  unfold IsPMF
+  rw [mass_bind]
+  . assumption
+  . intro a
+    apply hf
+    sorry -- STUCK: not sure how to prove that `a ∈ x.support`
+
+
 /-- The combinator `elements` is an SPMF -/
 theorem IsPMF_elements [Inhabited α] (xs : List α) :
     IsPMF (elements xs) := by
@@ -235,6 +248,26 @@ theorem IsPMF_elements [Inhabited α] (xs : List α) :
   apply IsPMF_bind_pure
   apply IsPMF_map
   apply IsPMF_choose
+
+/-- If all generators in the list `gs` are SPMFs, then `oneOf gs` is also an SPMF -/
+theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ g ∈ gs, IsPMF (g ())) :
+    IsPMF (oneOf gs) := by
+  unfold oneOf
+  apply IsPMF_bind_of_support
+  . apply IsPMF_map
+    apply IsPMF_choose
+  . intro i hle
+    simp at hle
+    have h_lt : i < gs.length := by
+      rw [Nat.lt_iff_add_one_le]
+      refine Nat.add_le_of_le_sub ?_ hle
+      apply Nat.one_le_iff_ne_zero.mpr
+      apply Nat.ne_zero_iff_zero_lt.mpr
+      apply List.length_pos_iff.mpr
+      assumption
+    rw [getElem!_pos gs i h_lt]
+    apply hgs
+    apply List.getElem_mem
 
 private lemma weighted_avg_mono_ennreal {t p x : ℝ≥0∞}
     (htp : t ≥ p) (hx_le_one : x ≤ 1) (ht_le_one : t ≤ 1) (hp_le_one : p ≤ 1) :
