@@ -337,8 +337,6 @@ private theorem frequencyAux_n_exists
         simp [hcontra]
         assumption
 
--- TODO: investigate the proof below
-
 /-- If the sum of weights in `gs` is non-zero, then the support of `frequency gs`
     is exactly the union of the support of the generators in `gs` with non-zero weights -/
 @[simp]
