@@ -228,18 +228,36 @@ theorem IsPMF_map {x : SPMF α} {f : α → β} (hx : IsPMF x) :
   rw [mass_map]
   assumption
 
-/-- For a SPMF `x` and a function `f` that returns an SPMF, if `∀ a ∈ x.support`, `f a` is also an SPMF<
-    then `x >>= f` is also an SPMF. This is a weaker version of `IsPMF_bind` that only quantifies `a` in `x.support`
-    (instead of quantifying over all possible `a`), which obviates the need to reason about `a ∉ x.support`. -/
-theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β} (hx : IsPMF x) (hf : ∀ a ∈ x.support, IsPMF (f a)) :
+/-- For a SPMF `x` and a function `f` that returns an SPMF, if `∀ a ∈ x.support`, `f a` is also an SPMF,
+    then `x >>= f` is also an SPMF. This lemma is a weaker version of `IsPMF_bind` that only quantifies
+    `a` in `x.support` (instead of quantifying over all possible `a : α`),
+    i.e. this lemma obviates the need to reason about `a ∉ x.support`.
+    This helper lemma is used in `IsPMF_oneOf`. -/
+theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β}
+    (hx : IsPMF x) (hf : ∀ a ∈ x.support, IsPMF (f a)) :
     IsPMF (x >>= f) := by
-  unfold IsPMF
-  rw [mass_bind]
-  . assumption
-  . intro a
-    apply hf
-    sorry -- STUCK: not sure how to prove that `a ∈ x.support`
-
+  unfold IsPMF mass at *
+  simp only [Bind.bind, bind, DFunLike.coe]
+  -- Swap the order of the sums
+  rw [ENNReal.tsum_comm]
+  calc ∑' a, ∑' b, x a * f a b
+    _ = ∑' a, x a * (∑' b, f a b) := by
+      simp_rw [ENNReal.tsum_mul_left]
+    _ = ∑' a, x a * 1 := by
+        -- To show that the sums are equal,
+        -- it suffices to show that they're equal point-wise
+        apply tsum_congr
+        intro a
+        by_cases ha : a ∈ x.support
+        · -- a ∈ x.support
+          rw [hf a ha]
+        · -- a ∉ x.support
+          have h_zero_mass : x a = 0 := by
+            apply (apply_eq_zero_iff x a).mpr
+            assumption
+          simp [h_zero_mass]
+    _ = ∑' a, x a := by simp
+    _ = 1 := by assumption
 
 /-- The combinator `elements` is an SPMF -/
 theorem IsPMF_elements [Inhabited α] (xs : List α) :
