@@ -48,6 +48,11 @@ A general `monotone_oneOf` theorem for arbitrary-length lists is difficult for t
 
 open List
 
+/-- Generates an element of the list `xs` at random -/
+def elements [Gen G] [Inhabited α] (xs : List α) : G α := do
+  let i ← ULift.down <$> RandomChoice.choose 0 (xs.length - 1) (by omega)
+  return xs[i]!
+
 /-- Picks one of the generators in `gs` at random. -/
 def oneOf [Gen G] (gs : List (Unit → G α)) : G α := do
   let i ← ULift.down <$> RandomChoice.choose 0 (gs.length - 1) (by omega)

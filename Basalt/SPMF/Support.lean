@@ -153,6 +153,47 @@ theorem mem_support_pick_iff
     a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
   simp
 
+/-- The support of `elements xs` is exactly the set of all elements in `xs` -/
+@[simp]
+theorem support_elements
+  [Inhabited α]
+  {xs : List α}
+  (hne : xs ≠ []) :
+  support (elements xs) = { x | x ∈ xs } := by
+simp [elements, support_choose, support_map]
+ext a
+dsimp only [Set.mem_setOf_eq]
+constructor
+. -- (∃ i ≤ xs.length - 1, a = xs[i]?.getD default) → a ∈ xs
+  intro h
+  obtain ⟨ i, hle, heq ⟩ := h
+  have h_lt : i < xs.length := by
+    rw [Nat.lt_iff_add_one_le]
+    refine Nat.add_le_of_le_sub ?_ hle
+    apply Nat.one_le_iff_ne_zero.mpr
+    apply Nat.ne_zero_iff_zero_lt.mpr
+    apply List.length_pos_iff.mpr
+    assumption
+  rw [← List.getElem!_eq_getElem?_getD] at heq
+  rw [List.mem_iff_getElem?]
+  refine ⟨ i, ?_ ⟩
+  rw [List.getElem?_eq_some_iff]
+  apply Exists.intro h_lt
+  rw [heq]
+  apply Eq.symm
+  apply getElem!_pos
+. -- a ∈ xs → ∃ i ≤ xs.length - 1, a = xs[i]?.getD default
+  intro hmem
+  obtain ⟨ i, hlt, heq ⟩ := List.mem_iff_getElem.mp hmem
+  exists i
+  constructor
+  . omega
+  . have hidx : xs[i]? = some a := by
+      rw [← heq]
+      apply List.getElem?_eq_getElem hlt
+    rw [hidx]
+    dsimp
+
 /-- The support of `oneOf gs` is exactly the union of all generators in `gs` -/
 @[simp]
 theorem support_oneOf
