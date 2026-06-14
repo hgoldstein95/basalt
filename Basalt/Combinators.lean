@@ -38,7 +38,8 @@ def frequencyAux [Gen G] (default : G α) (xs : List (Nat × (Unit → G α))) (
       frequencyAux default xs (n - k)
 
 /-- `frequency` picks a generator from the list `gs` according to the weights in `gs`.
-    If `gs` is empty, the `default` generator is returned.  -/
+    This combinators also takes an additional hypothesis that the sum of the weights
+    in the list is non-zero (this is discharged via `omega` by default). -/
 def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   (_h : 0 < List.sum (List.map Prod.fst gs) := by omega) : G α := do
   let total := List.sum $ List.map Prod.fst gs
