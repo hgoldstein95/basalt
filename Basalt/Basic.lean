@@ -10,6 +10,7 @@ import Basalt.PlausibleGen
 import Basalt.SPMF
 import Basalt.SPMF.Cost
 import Basalt.Classes
+import Basalt.Helpers
 import Basalt.Combinators
 
 /-!
