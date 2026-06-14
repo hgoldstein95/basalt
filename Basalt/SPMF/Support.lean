@@ -255,51 +255,51 @@ theorem mem_support_oneOf_iff
   simp only [Set.mem_setOf_eq]
 
 
-/-- If `n < sum (fst <$> gs)`, then `frequencyAux default gs n` picks a sub-generator
+/-- If `n < sum (fst <$> gs)`, then `frequencyAux gs n h` picks a sub-generator
     from `gs` that has non-zero weight `w` -/
 private theorem frequencyAux_mem
     {gs : List (Nat × (Unit → SPMF α))}
     {n : Nat}
-    (h : n < List.sum (List.map Prod.fst gs)) :
-    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ (frequencyAux default gs n).snd = g () := by
+    (h : n < (List.map Prod.fst gs).sum) :
+    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ frequencyAux gs n h = g () := by
   induction gs generalizing n with
-  | nil => contradiction
+  | nil => simp at h
   | cons hd tl ih =>
     unfold frequencyAux
     obtain ⟨ w, g ⟩ := hd
     split
-    . -- n < w
+    · -- n < w
       exists w, g
       constructor
       . -- (w, g) ∈ (w, g) :: tl
-        apply List.mem_cons_self
-      . -- 0 < w ∧ ((w, g).2 ()) = g ()
+        apply List.Mem.head
+      . -- 0 < w ∧ fst (w, g) () = g ()
         constructor
         . omega
         . rfl
     · -- n >= w
-      -- Assert that the remaining weight `(n - w)` is less than the sum
-      -- of the weights in the tail of the list
       have h_remaining_weight : n - w < List.sum (List.map Prod.fst tl) := by
         dsimp only [List.map_cons, List.sum_cons] at h
         omega
-      obtain ⟨w, g, hwg_mem, hwg_pos, hwg_eq⟩ := ih h_remaining_weight
-      exists w, g
+      obtain ⟨w', g', hwg_mem, hwg_pos, hwg_eq⟩ := ih h_remaining_weight
+      exists w', g'
       constructor
-      . apply List.mem_cons_of_mem
+      . -- (w', g') ∈ (w, g) :: tl
+        apply List.mem_cons_of_mem
         assumption
-      . constructor <;> assumption
+      . -- 0 < w' ∧ frequencyAux tl (n - w) = g'
+        constructor <;> assumption
 
 /-- If a weighted generator `(w, g) ∈ gs` where the weight `w` is non-zero,
-    then `frequencyAux default gs n` produces `(w, g)` if `n < sum (fst <$> gs)` -/
+    then there exists `n` with a proof `h : n < sum (fst <$> gs)` such that
+    `frequencyAux gs n h = g ()` -/
 private theorem frequencyAux_n_exists
     {gs : List (Nat × (Unit → SPMF α))}
     {w : Nat}
     {g : Unit → SPMF α}
     (hmem : (w, g) ∈ gs)
     (hnonzero : 0 < w) :
-    ∃ n, n < List.sum (List.map Prod.fst gs) ∧
-      (frequencyAux default gs n).snd = g () := by
+    ∃ n, ∃ h : n < List.sum (List.map Prod.fst gs), frequencyAux gs n h = g () := by
   induction gs with
   | nil => contradiction
   | cons hd tl ih =>
@@ -311,18 +311,18 @@ private theorem frequencyAux_n_exists
       · unfold frequencyAux
         simp [hnonzero]
     · -- (w, g) ∈ tl
-      obtain ⟨n, _, _⟩ := ih h_tl
+      obtain ⟨n, h_n, h_eq⟩ := ih h_tl
       obtain ⟨ w', _ ⟩ := hd
       refine ⟨w' + n, ?_, ?_⟩
-      · -- w' + n < sum (fst <$> gs)
+      · -- w' + n < (fst <$> gs).sum
         dsimp only [List.map_cons, List.sum_cons]
         omega
-      · -- (frequencyAux default gs (w' + n)).snd = g ()
-        -- We need to unfold the body of `frequencyAux` to reason about
-        -- which branch of the `if`-expression is taken
+      · -- frequencyAux gs n h = g ()
         unfold frequencyAux
         have hcontra : ¬ (w' + n < w') := by omega
-        simp [hcontra]
+        simp only [hcontra]
+        simp only [show w' + n - w' = n from by omega]
+        dsimp
         assumption
 
 /-- If the sum of weights in `gs` is non-zero, then the support of `frequency gs`
@@ -337,34 +337,33 @@ theorem support_frequency
   constructor
   · -- a ∈ support (frequency gs h_pos) -> ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support
     intro h
-    simp only [frequency, support_bind, support_map, support_choose] at h
-    obtain ⟨i, h_idx, ha⟩ := h
-    obtain ⟨n, ⟨_, _⟩, hi⟩ := h_idx
-    have h_lt : i < List.sum (List.map Prod.fst gs) := by omega
-    obtain ⟨w, g, _, _, heq⟩ := frequencyAux_mem h_lt
-    rw [heq] at ha
-    refine ⟨w, g, ?_, ?_, ?_⟩ <;> assumption
+    simp only [frequency, support_bind, support_map, support_choose, mem_support_dite_iff] at h
+    obtain ⟨i, h_idx, (⟨hlt, hsupp⟩ | ⟨hn, _⟩)⟩ := h
+    · -- i < sum of weights ∧ a ∈ frequencyAux.support
+      obtain ⟨w, g, hwg, hwg_pos, heq⟩ := frequencyAux_mem hlt
+      rw [heq] at hsupp
+      exists w, g
+    ·  -- ¬(i < sum of weights) ∧ a ∈ default.support
+      -- Contradiction: We have `i ≤ total - 1` and also `¬(i < total)` as hypotheses
+      obtain ⟨n, ⟨_, h_upper⟩, hi⟩ := h_idx
+      rw [← hi] at *
+      contradiction
   · -- ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support -> a ∈ support (frequency gs h_pos)
-    simp only [frequency, support_bind, support_map, support_choose]
+    simp only [frequency, support_bind, support_map, support_choose, mem_support_dite_iff]
     intro ⟨w, g, hwg_mem, hwt, ha⟩
-    obtain ⟨n, hn_lt, hn_eq⟩ := frequencyAux_n_exists hwg_mem hwt
-    dsimp only [Set.mem_setOf_eq]
-    apply Exists.intro n
-    constructor
-    · -- ∃ a, (0 ≤ a.down ∧ a.down ≤ total - 1) ∧ n = a.down
-      apply Exists.intro (ULift.up n)
-      constructor
-      · -- 0 ≤ n ∧ n ≤ total - 1
-        constructor
-        · -- 0 ≤ n
-          omega
-        · -- n ≤ total - 1
-          show n ≤ (List.map Prod.fst gs).sum - 1
-          omega
-      · -- n = (ULift.up n).down
-        rfl
-    · -- a ∈ (frequencyAux default gs n).snd.support
-      rw [hn_eq]
+    obtain ⟨n, hlt, heq⟩ := frequencyAux_n_exists hwg_mem hwt
+    refine ⟨n, ?_, ?_⟩
+    . dsimp
+      refine ⟨ ULift.up n, ?_, ?_ ⟩
+      . -- 0 ≤ n ∧ n ≤ (fst <$> gs).sum - 1
+        dsimp
+        omega
+      . rfl
+    . -- Goal: `a ∈ frequencyAux.support ∨ a ∈ default.support`
+      -- (We pick the left branch)
+      left
+      exists hlt
+      rw [heq]
       assumption
 
 theorem bind_congr_support

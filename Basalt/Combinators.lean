@@ -47,6 +47,4 @@ def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   (_h : 0 < List.sum (List.map Prod.fst gs) := by omega) : G α := do
   let total := List.sum $ List.map Prod.fst gs
   let n ← ULift.down <$> RandomChoice.choose 0 (total - 1) (by omega)
-  -- Note: `n % total = n`, since `n` is returned from `RandomChoice.0 (total - 1)`,
-  -- so we know that `n < total`
-  frequencyAux gs (n % total) (by apply Nat.mod_lt; assumption)
+  if hn : n < total then frequencyAux gs n hn else default
