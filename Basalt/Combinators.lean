@@ -16,6 +16,7 @@ This file defines various generator combinators:
 -/
 
 open List
+open Helpers
 
 /-- Generates an element of the list `xs` at random -/
 def elements [Gen G] [Inhabited α] (xs : List α) : G α := do

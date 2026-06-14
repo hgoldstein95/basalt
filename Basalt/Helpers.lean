@@ -2,6 +2,15 @@
 
 import Basalt.Gen
 
+/-!
+# Helpers
+
+This file contains some miscellaneous helper functions.
+
+-/
+
+namespace Helpers
+
 /-- Helper function for the `frequency` combinator:
     `frequencyAux default xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
      This function expects a proof `h : n < sum(xs)`, which makes the empty-list case in
@@ -16,3 +25,5 @@ def frequencyAux [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
       x ()
     else
       frequencyAux xs (n - k) (by dsimp at h; omega)
+
+end Helpers
