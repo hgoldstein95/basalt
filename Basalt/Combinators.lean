@@ -27,15 +27,18 @@ def oneOf [Gen G] (gs : List (Unit → G α)) : G α := do
   gs[i]! ()
 
 /-- `frequencyAux default xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
-    If `xs` is empty, the `default` generator with weight 0 is returned.  -/
-def frequencyAux [Gen G] (default : G α) (xs : List (Nat × (Unit → G α))) (n : Nat) : Nat × G α :=
+     This function expects a proof `h : n < sum(xs)`, which makes the empty-list case in
+     the pattern-match irrefutable, since `n < 0` is `False` (this is discharged
+     immediately by `contradiction`). -/
+def frequencyAux [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
+    (h : n < List.sum (List.map Prod.fst xs)) : G α :=
   match xs with
-  | [] => (0, default)
+  | [] => by contradiction
   | (k, x) :: xs =>
-    if n < k then
-      (k, x ())
+    if hlt : n < k then
+      x ()
     else
-      frequencyAux default xs (n - k)
+      frequencyAux xs (n - k) (by dsimp at h; omega)
 
 /-- `frequency` picks a generator from the list `gs` according to the weights in `gs`.
     This combinators also takes an additional hypothesis that the sum of the weights
@@ -44,4 +47,6 @@ def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   (_h : 0 < List.sum (List.map Prod.fst gs) := by omega) : G α := do
   let total := List.sum $ List.map Prod.fst gs
   let n ← ULift.down <$> RandomChoice.choose 0 (total - 1) (by omega)
-  (frequencyAux default gs n).snd
+  -- Note: `n % total = n`, since `n` is returned from `RandomChoice.0 (total - 1)`,
+  -- so we know that `n < total`
+  frequencyAux gs (n % total) (by apply Nat.mod_lt; assumption)
