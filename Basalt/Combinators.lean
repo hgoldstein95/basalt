@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein & Ernest Ng
+-/
+
 import Basalt.Gen
 import Basalt.Helpers
 import Basalt.RandomChoice
@@ -18,13 +24,15 @@ This file defines various generator combinators:
 open List
 open Helpers
 
-/-- Generates an element of the list `xs` at random -/
-def elements [Gen G] [Inhabited α] (xs : List α) : G α := do
+/-- Generates an element of the list `xs` at random.
+    This combinator takes as input a proof that `xs` is non-empty. -/
+def elements [Gen G] [Inhabited α] (xs : List α) (_hne : xs ≠ []) : G α := do
   let i ← ULift.down <$> RandomChoice.choose 0 (xs.length - 1) (by omega)
   return xs[i]!
 
-/-- Picks one of the generators in `gs` at random. -/
-def oneOf [Gen G] (gs : List (Unit → G α)) : G α := do
+/-- Picks one of the generators in `gs` at random.
+    This combinator takes as input a proof that `xs` is non-empty. -/
+def oneOf [Gen G] (gs : List (Unit → G α)) (_hne : gs ≠ []) : G α := do
   let i ← ULift.down <$> RandomChoice.choose 0 (gs.length - 1) (by omega)
   gs[i]! ()
 

@@ -239,8 +239,8 @@ theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β}
     _ = 1 := by assumption
 
 /-- The combinator `elements` is an SPMF -/
-theorem IsPMF_elements [Inhabited α] (xs : List α) :
-    IsPMF (elements xs) := by
+theorem IsPMF_elements [Inhabited α] (xs : List α) (hne : xs ≠ []) :
+    IsPMF (elements xs hne) := by
   unfold elements
   apply IsPMF_bind_pure
   apply IsPMF_map
@@ -248,7 +248,7 @@ theorem IsPMF_elements [Inhabited α] (xs : List α) :
 
 /-- If all generators in the list `gs` are SPMFs, then `oneOf gs` is also an SPMF -/
 theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ g ∈ gs, IsPMF (g ())) :
-    IsPMF (oneOf gs) := by
+    IsPMF (oneOf gs hne) := by
   unfold oneOf
   apply IsPMF_bind_of_support
   . apply IsPMF_map

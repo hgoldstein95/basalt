@@ -12,7 +12,7 @@ This file contains some miscellaneous helper functions.
 namespace Helpers
 
 /-- Helper function for the `frequency` combinator:
-    `frequencyAux default xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
+    `frequencyAux xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
      This function expects a proof `h : n < sum(xs)`, which makes the empty-list case in
      the pattern-match irrefutable, since `n < 0` is `False` (this is discharged
      immediately by `contradiction`). -/

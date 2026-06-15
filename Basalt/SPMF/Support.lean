@@ -161,7 +161,7 @@ theorem support_elements
     [Inhabited α]
     {xs : List α}
     (hne : xs ≠ []) :
-    support (elements xs) = { x | x ∈ xs } := by
+    support (elements xs hne) = { x | x ∈ xs } := by
   simp [elements, support_choose, support_map]
   ext a
   dsimp only [Set.mem_setOf_eq]
@@ -202,17 +202,15 @@ theorem mem_support_elements_iff
     [Inhabited α]
     {xs : List α}
     (hne : xs ≠ []) :
-    a ∈ support (elements xs) ↔ a ∈ xs := by
-  rw [support_elements]
-  . apply Set.mem_setOf
-  . assumption
+    a ∈ support (elements xs hne) ↔ a ∈ xs := by
+  simp [support_elements]
 
 /-- The support of `oneOf gs` is exactly the union of all generators in `gs` -/
 @[simp]
 theorem support_oneOf
     {gs : List (Unit → SPMF α)}
     (hne : gs ≠ []) :
-    support (oneOf gs) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
+    support (oneOf gs hne) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
   simp only [oneOf, support_bind, support_map, support_choose]
   ext a
   dsimp only [Set.mem_setOf_eq]
@@ -252,9 +250,8 @@ theorem support_oneOf
 theorem mem_support_oneOf_iff
     {gs : List (Unit → SPMF α)}
     (hne : gs ≠ []) :
-    a ∈ support (oneOf gs) ↔ ∃ g ∈ gs, a ∈ (g ()).support := by
-  rw [support_oneOf hne]
-  simp only [Set.mem_setOf_eq]
+    a ∈ support (oneOf gs hne) ↔ ∃ g ∈ gs, a ∈ (g ()).support := by
+  simp [support_oneOf]
 
 
 /-- If `n < sum (fst <$> gs)`, then `frequencyAux gs n h` picks a sub-generator
