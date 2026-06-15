@@ -5,7 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Core
 import Basalt.Combinators
-import Basalt.Helpers
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 open Helpers
