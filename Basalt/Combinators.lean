@@ -44,14 +44,26 @@ end Helpers
 /-- Generates an element of the list `xs` at random.
     This combinator takes as input a proof that `xs` is non-empty. -/
 def elements [Gen G] [Inhabited α] (xs : List α) (_hne : xs ≠ []) : G α := do
-  let i ← ULift.down <$> RandomChoice.choose 0 (xs.length - 1) (by omega)
-  return xs[i]!
+  let ⟨i, ⟨ hge, hle ⟩⟩ ← ULift.down <$> RandomChoice.choose 0 (xs.length - 1) (by omega)
+  -- Obtain a proof that the list indexing is in-bounds
+  have hlen : 0 < xs.length := by
+    apply length_pos_iff.mpr
+    assumption
+  have hlt : i < xs.length := by omega
+  return xs[i]'hlt
 
 /-- Picks one of the generators in `gs` at random.
     This combinator takes as input a proof that `xs` is non-empty. -/
-def oneOf [Gen G] (gs : List (Unit → G α)) (_hne : gs ≠ []) : G α := do
-  let i ← ULift.down <$> RandomChoice.choose 0 (gs.length - 1) (by omega)
-  gs[i]! ()
+def oneOf [Gen G] (gs : List (Unit → G α)) (hne : gs ≠ []) : G α := do
+  let ⟨i, ⟨ hge, hle ⟩⟩ ← ULift.down <$> RandomChoice.choose 0 (gs.length - 1) (by omega)
+  -- Obtain a proof that the list indexing is in-bounds
+  have hlen : 0 < gs.length := by
+    apply length_pos_iff.mpr
+    assumption
+  have hlt : i < gs.length := by omega
+  -- This let-definition is necessary, as Lean has trouble parsing `gs[i]'hlt ()`
+  let thunked_gen := gs[i]'hlt
+  thunked_gen ()
 
 /-- `frequency` picks a generator from the list `gs` according to the weights in `gs`.
     This combinators also takes an additional hypothesis that the sum of the weights

@@ -160,7 +160,7 @@ theorem support_elements
     {xs : List α}
     (hne : xs ≠ []) :
     support (elements xs hne) = { x | x ∈ xs } := by
-  simp [elements, support_choose, support_map]
+  simp [elements, support_choose]
   ext a
   dsimp only [Set.mem_setOf_eq]
   constructor
@@ -174,7 +174,6 @@ theorem support_elements
       apply Nat.ne_zero_iff_zero_lt.mpr
       apply List.length_pos_iff.mpr
       assumption
-    rw [← List.getElem!_eq_getElem?_getD] at heq
     rw [List.mem_iff_getElem?]
     refine ⟨ i, ?_ ⟩
     rw [List.getElem?_eq_some_iff]
@@ -191,8 +190,8 @@ theorem support_elements
     . have hidx : xs[i]? = some a := by
         rw [← heq]
         apply List.getElem?_eq_getElem hlt
-      rw [hidx]
-      dsimp
+      apply Nat.le_sub_one_of_lt
+      assumption
 
 /-- `a` is in the support of `elements xs` if and only if `a ∈ xs` -/
 @[simp]
@@ -215,8 +214,8 @@ theorem support_oneOf
   constructor
   . -- ∃ i ∈ [0, gs.length -1], a ∈ (gs[i]! ()).support → ∃ g ∈ gs, a ∈ (g ()).support
     intro h
-    obtain ⟨ i, h_idx, ha ⟩ := h
-    obtain ⟨ n, ⟨ h_lowerbound, h_upperbound ⟩, hi ⟩ := h_idx
+    obtain ⟨ ⟨i, ⟨ hi_gt, hi_lt⟩⟩, h_idx, ha ⟩ := h
+    obtain ⟨ ⟨ n, ⟨ hgt, hlt ⟩⟩, ⟨ h_lowerbound, h_upperbound ⟩, hi ⟩ := h_idx
     have h_pos : 0 < gs.length := by
       rw [List.length_pos_iff]
       assumption
@@ -226,19 +225,22 @@ theorem support_oneOf
       apply List.getElem_mem
     . -- Goal: `a ∈ (gs[i] ()).support`
       -- To do this, rewrite `gs[i]!` in terms of `gs[i]`
-      rw [getElem!_pos gs i h_lt] at ha
+      dsimp at ha
       assumption
   . -- ∃ g ∈ gs, a ∈ (g ()).support → ∃ i ∈ [0, gs.length - 1], a ∈ (gs[i]! ()).support
     intros h
     obtain ⟨ g, hg, ha ⟩ := h
     obtain ⟨ i, hi, heq ⟩ := List.mem_iff_getElem.mp hg
-    refine ⟨ i, ?_, ?_ ⟩
+    have hge : 0 ≤ i := by
+      apply Nat.zero_le
+    have hle : i ≤ gs.length - 1 := by
+      apply Nat.le_sub_one_of_lt
+      assumption
+    refine ⟨ ⟨i, hge, hle ⟩, ?_, ?_ ⟩
     . -- 0 ≤ i ≤ gs.length - 1
-      exists ⟨ i ⟩
-      dsimp
-      omega
+      exists ⟨ i, ⟨hge, hle⟩ ⟩
     . -- a ∈ (gs[i]! ()).support
-      rw [getElem!_pos gs i hi]
+      dsimp
       subst heq
       assumption
 
