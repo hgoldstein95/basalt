@@ -1,13 +1,9 @@
 name = "basalt"
 version = "0.1.0"
-defaultTargets = ["basalt"]
+defaultTargets = ["Basalt"]
 
 [[lean_lib]]
 name = "Basalt"
-
-[[lean_exe]]
-name = "basalt"
-root = "Main"
 
 [[require]]
 name = "mathlib"
