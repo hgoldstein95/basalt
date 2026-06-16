@@ -41,8 +41,6 @@ def frequencyAux [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
 
 end Helpers
 
-open Helpers
-
 /-- Generates an element of the list `xs` at random.
     This combinator takes as input a proof that `xs` is non-empty. -/
 def elements [Gen G] [Inhabited α] (xs : List α) (_hne : xs ≠ []) : G α := do
@@ -62,4 +60,4 @@ def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   (_h : 0 < List.sum (List.map Prod.fst gs) := by omega) : G α := do
   let total := List.sum $ List.map Prod.fst gs
   let n ← ULift.down <$> RandomChoice.choose 0 (total - 1) (by omega)
-  if hn : n < total then frequencyAux gs n hn else default
+  if hn : n < total then Helpers.frequencyAux gs n hn else default

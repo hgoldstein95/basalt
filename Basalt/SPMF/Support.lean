@@ -7,7 +7,6 @@ import Basalt.SPMF.Core
 import Basalt.Combinators
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
-open Helpers
 
 /-!
 # SPMF Support
@@ -259,11 +258,11 @@ private theorem frequencyAux_mem
     {gs : List (Nat × (Unit → SPMF α))}
     {n : Nat}
     (h : n < (List.map Prod.fst gs).sum) :
-    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ frequencyAux gs n h = g () := by
+    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ Helpers.frequencyAux gs n h = g () := by
   induction gs generalizing n with
   | nil => simp at h
   | cons hd tl ih =>
-    unfold frequencyAux
+    unfold Helpers.frequencyAux
     obtain ⟨ w, g ⟩ := hd
     split
     · -- n < w
@@ -297,7 +296,7 @@ private theorem frequencyAux_n_exists
     {g : Unit → SPMF α}
     (hmem : (w, g) ∈ gs)
     (hnonzero : 0 < w) :
-    ∃ n, ∃ h : n < List.sum (List.map Prod.fst gs), frequencyAux gs n h = g () := by
+    ∃ n, ∃ h : n < List.sum (List.map Prod.fst gs), Helpers.frequencyAux gs n h = g () := by
   induction gs with
   | nil => contradiction
   | cons hd tl ih =>
@@ -306,7 +305,7 @@ private theorem frequencyAux_n_exists
       refine ⟨0, ?_, ?_⟩
       · dsimp only [List.map_cons, List.sum_cons]
         omega
-      · unfold frequencyAux
+      · unfold Helpers.frequencyAux
         simp [hnonzero]
     · -- (w, g) ∈ tl
       obtain ⟨n, h_n, h_eq⟩ := ih h_tl
@@ -316,7 +315,7 @@ private theorem frequencyAux_n_exists
         dsimp only [List.map_cons, List.sum_cons]
         omega
       · -- frequencyAux gs n h = g ()
-        unfold frequencyAux
+        unfold Helpers.frequencyAux
         have hcontra : ¬ (w' + n < w') := by omega
         simp only [hcontra]
         simp only [show w' + n - w' = n from by omega]

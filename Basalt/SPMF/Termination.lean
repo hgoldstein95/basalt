@@ -6,7 +6,6 @@ Authors: Harrison Goldstein
 import Basalt.SPMF.Support
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
-open Helpers
 
 /-!
 # SPMF Mass and Termination
