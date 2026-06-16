@@ -61,39 +61,16 @@ theorem mass_pure (a : α) : (Pure.pure a : SPMF α).mass = 1 := by
     simp [ha']
 
 @[simp]
-theorem mass_choose (lo hi : Nat) (h : lo ≤ hi) : (choose lo hi h : SPMF (ULift Nat)).mass = 1 := by
+theorem mass_choose (lo hi : Nat) (h : lo ≤ hi) :
+    (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})).mass = 1 := by
   unfold mass
-  apply le_antisymm
-  · exact (choose lo hi h : SPMF (ULift Nat)).tsum_coe
-  · let n : ℕ := hi - lo + 1
-    have hn : n ≠ 0 := Nat.add_one_ne_zero _
-    have hsupp : ∀ (a : Nat), a ∉ Finset.Icc lo hi →
-        (if lo ≤ a ∧ a ≤ hi then (1 : ℝ≥0∞) / n else 0) = 0 := by
-      intro a ha
-      simp only [Finset.mem_Icc, not_and, not_le] at ha
-      by_cases hlo : lo ≤ a
-      · have := ha hlo; simp [hlo, Nat.not_le.mpr this]
-      · simp [hlo]
-    have card_eq : (Finset.Icc lo hi).card = n := by
-      simp only [Nat.card_Icc]
-      omega
-    have eq1 : (1 : ℝ≥0∞) = ∑' a, (choose lo hi h : SPMF (ULift Nat)) a := by
-      calc (1 : ℝ≥0∞)
-        _ = (n : ℝ≥0∞) * (1 / (n : ℝ≥0∞)) := by
-            rw [ENNReal.mul_div_cancel (Nat.cast_ne_zero.mpr hn) (ENNReal.natCast_ne_top n)]
-        _ = (Finset.Icc lo hi).card • (1 / (n : ℝ≥0∞)) := by
-            simp only [nsmul_eq_mul, card_eq]
-        _ = ∑ _a ∈ Finset.Icc lo hi, (1 : ℝ≥0∞) / (n : ℝ≥0∞) :=
-            (Finset.sum_const _).symm
-        _ = ∑ a ∈ Finset.Icc lo hi, if lo ≤ a ∧ a ≤ hi then (1 : ℝ≥0∞) / n else 0 :=
-            Finset.sum_congr rfl (fun x hx => by simp [Finset.mem_Icc.mp hx])
-        _ = ∑' a : Nat, if lo ≤ a ∧ a ≤ hi then (1 : ℝ≥0∞) / n else 0 :=
-            (tsum_eq_sum hsupp).symm
-        _ = ∑' a : ULift Nat, if lo ≤ a.down ∧ a.down ≤ hi then (1 : ℝ≥0∞) / n else 0 :=
-            (Equiv.tsum_eq Equiv.ulift
-              (fun a => if lo ≤ a ∧ a ≤ hi then (1 : ℝ≥0∞) / n else 0)).symm
-        _ = ∑' a, (choose lo hi h : SPMF (ULift Nat)) a := rfl
-    exact le_of_eq eq1
+  let n : ℕ := hi - lo + 1
+  have hn : n ≠ 0 := Nat.add_one_ne_zero _
+  calc ∑' a, (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) a
+    _ = ∑' (_ : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}), (1 / (n : ℝ≥0∞)) := rfl
+    _ = (Finset.Icc lo hi).card * (1 / (n : ℝ≥0∞)) := tsum_subtype_Icc_const lo hi _
+    _ = (n : ℝ≥0∞) * (1 / (n : ℝ≥0∞)) := by rw [card_Icc_eq lo hi h]
+    _ = 1 := ENNReal.mul_div_cancel (Nat.cast_ne_zero.mpr hn) (ENNReal.natCast_ne_top n)
 
 @[simp]
 theorem mass_bind_pure {x : SPMF α} {f : α → β} :
@@ -208,7 +185,8 @@ theorem IsPMF_pick {x y : SPMF α} (hx : IsPMF x) (hy : IsPMF y) : IsPMF (pick (
 
 theorem IsPMF_pure (a : α) : IsPMF (Pure.pure a : SPMF α) := mass_pure a
 
-theorem IsPMF_choose (lo hi : Nat) (h : lo ≤ hi) : IsPMF (choose lo hi h : SPMF (ULift Nat)) :=
+theorem IsPMF_choose (lo hi : Nat) (h : lo ≤ hi) :
+    IsPMF (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) :=
   mass_choose lo hi h
 
 theorem IsPMF_bind_pure {x : SPMF α} {f : α → β} (hx : IsPMF x) :

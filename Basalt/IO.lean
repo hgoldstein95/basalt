@@ -20,4 +20,6 @@ This file establishes the infrastructure necessary to make a `Gen` instance for 
 
 /-- `IO` is an instance of `RandomChoice` via `IO.rand`. -/
 instance : RandomChoice IO where
-  choose lo hi _ := ULift.up <$> IO.rand lo hi
+  choose lo hi h := do
+    let r ← IO.rand lo hi
+    pure (ULift.up ⟨min hi (max lo r), by omega⟩)

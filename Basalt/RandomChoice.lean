@@ -13,15 +13,15 @@ This file defines a type class and associated operations for random choices.
 
 class RandomChoice (m : Type u → Type v) where
   /-- An inclusive choice over a nonempty range of natural numbers. -/
-  choose : (lo hi : Nat) → (h : lo ≤ hi) → m (ULift Nat)
+  choose : (lo hi : Nat) → (h : lo ≤ hi) → m (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})
 
 /-- A uniform binary choice. -/
 def RandomChoice.pick [Monad m] [RandomChoice m] (x y : Unit → m α) := do
-  if ULift.down (← choose 0 1 (by simp)) == 0 then x () else y ()
+  if (ULift.down (← choose 0 1 (by simp))).val == 0 then x () else y ()
 
 /-- A weighted binary choice. -/
 def RandomChoice.coin [Monad m] [RandomChoice m] (r : Rat) : m Bool := do
-  if ULift.down (← choose 0 r.den (by simp)) < r.num then pure true else pure false
+  if (ULift.down (← choose 0 r.den (by simp))).val < r.num then pure true else pure false
 
 /-- The `pick` combinator is `monotone` if its arguments are.
 

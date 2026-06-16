@@ -152,30 +152,27 @@ instance : MonoBind SPMF where
 instance : Inhabited (SPMF α) where
   default := Bot.bot
 
+theorem tsum_subtype_Icc_const (lo hi : Nat) (c : ℝ≥0∞) :
+    ∑' (_ : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}), c = (Finset.Icc lo hi).card * c := by
+  have e : ULift {x : Nat // lo ≤ x ∧ x ≤ hi} ≃ ↥(Finset.Icc lo hi) :=
+    Equiv.ulift.trans (Equiv.subtypeEquivRight (fun a => (Finset.mem_Icc).symm))
+  calc ∑' (_ : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}), c
+      = ∑' (_ : ↥(Finset.Icc lo hi)), c := Equiv.tsum_eq e (fun _ => c)
+    _ = ∑ _ ∈ Finset.Icc lo hi, c := Finset.tsum_subtype (Finset.Icc lo hi) (fun _ => c)
+    _ = (Finset.Icc lo hi).card * c := by rw [Finset.sum_const, nsmul_eq_mul]
+
+theorem card_Icc_eq (lo hi : Nat) (h : lo ≤ hi) :
+    (Finset.Icc lo hi).card = hi - lo + 1 := by
+  rw [Nat.card_Icc]; omega
+
 noncomputable instance : RandomChoice SPMF where
   choose lo hi h := by
     let n : ℕ := hi - lo + 1
-    refine ⟨fun a => if lo ≤ a.down ∧ a.down ≤ hi then 1 / n else 0, ?pf⟩
+    refine ⟨fun _ => 1 / n, ?pf⟩
     have hn : n ≠ 0 := Nat.add_one_ne_zero _
-    have hsupp : ∀ (a : Nat), a ∉ Finset.Icc lo hi →
-        (if lo ≤ a ∧ a ≤ hi then (1 : ℝ≥0∞) / n else 0) = 0 := by
-      intro a ha
-      simp only [Finset.mem_Icc, not_and, not_le] at ha
-      by_cases hlo : lo ≤ a <;> grind
-    calc ∑' a : ULift Nat, if lo ≤ a.down ∧ a.down ≤ hi then (1 : ℝ≥0∞) / n else 0
-      _ = ∑' a : Nat, if lo ≤ a ∧ a ≤ hi then (1 : ℝ≥0∞) / n else 0 :=
-          Equiv.tsum_eq Equiv.ulift (fun a => if lo ≤ a ∧ a ≤ hi then (1 : ℝ≥0∞) / n else 0)
-      _ = ∑ a ∈ Finset.Icc lo hi, if lo ≤ a ∧ a ≤ hi then (1 : ℝ≥0∞) / n else 0 :=
-          tsum_eq_sum hsupp
-      _ = ∑ _a ∈ Finset.Icc lo hi, (1 : ℝ≥0∞) / n :=
-          Finset.sum_congr rfl (fun x hx => by simp [Finset.mem_Icc.mp hx])
-      _ = (Finset.Icc lo hi).card • (1 / n : ℝ≥0∞) :=
-          Finset.sum_const _
-      _ = n * (1 / n) := by
-          simp only [Nat.card_Icc, nsmul_eq_mul]
-          congr 1
-          have heq : hi + 1 - lo = hi - lo + 1 := by omega
-          exact congrArg Nat.cast heq
+    calc ∑' (_ : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}), (1 / n : ℝ≥0∞)
+      _ = (Finset.Icc lo hi).card * (1 / n : ℝ≥0∞) := tsum_subtype_Icc_const lo hi _
+      _ = (n : ℝ≥0∞) * (1 / n) := by rw [card_Icc_eq lo hi h]
       _ = 1 := ENNReal.mul_div_cancel (Nat.cast_ne_zero.mpr hn) (ENNReal.natCast_ne_top n)
       _ ≤ 1 := le_rfl
 
@@ -187,24 +184,26 @@ private lemma pick_apply {α : Type u} {x y : SPMF α} (a : α) :
     (pick (fun () => x) (fun () => y)) a =
     (1/2 : ℝ≥0∞) * x a + (1/2 : ℝ≥0∞) * y a := by
   simp only [pick, Bind.bind, bind]
-  show ∑' (n : ULift Nat), (choose 0 1 pick._proof_1 : SPMF (ULift Nat)) n *
-       (if (n.down == 0) = true then x else y : SPMF α) a = _
-  have h_supp : ∀ n : ULift Nat, n ∉ ({⟨0⟩, ⟨1⟩} : Finset (ULift Nat)) →
-      (choose 0 1 pick._proof_1 : SPMF (ULift Nat)) n *
-      (if (n.down == 0) = true then x else y : SPMF α) a = 0 := by
-    intro ⟨n⟩ hn
-    simp only [Finset.mem_insert, Finset.mem_singleton] at hn
-    push Not at hn
-    have hn' : ¬(0 ≤ n ∧ n ≤ 1) := by
-      have h0 : n ≠ 0 := fun h => hn.1 (by subst h; rfl)
-      have h1 : n ≠ 1 := fun h => hn.2 (by subst h; rfl)
-      omega
-    have hzero : (choose 0 1 pick._proof_1 : SPMF (ULift Nat : Type u)) ⟨n⟩ = 0 := by
-      change (if 0 ≤ n ∧ n ≤ 1 then (1 : ℝ≥0∞) / 2 else 0) = 0
-      exact if_neg hn'
-    simp only
-    exact mul_eq_zero_of_left hzero ((if (n == 0) = true then x else y) a)
-  rw [tsum_eq_sum h_supp, Finset.sum_pair (by decide : (⟨0⟩ : ULift Nat) ≠ ⟨1⟩)]
+  show ∑' (n : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1}),
+       (choose 0 1 pick._proof_1 : SPMF (ULift {x : Nat // 0 ≤ x ∧ x ≤ 1})) n *
+       (if (n.down.val == 0) = true then x else y : SPMF α) a = _
+  let e0 : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1} := ⟨⟨0, by omega⟩⟩
+  let e1 : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1} := ⟨⟨1, by omega⟩⟩
+  have hne : e0 ≠ e1 := by
+    intro heq
+    have : (0 : Nat) = 1 := congrArg (fun z => z.down.val) heq
+    omega
+  have h_supp : ∀ n : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1}, n ∉ ({e0, e1} : Finset _) →
+      (choose 0 1 pick._proof_1 : SPMF (ULift {x : Nat // 0 ≤ x ∧ x ≤ 1})) n *
+      (if (n.down.val == 0) = true then x else y : SPMF α) a = 0 := by
+    intro n hn
+    exfalso
+    apply hn
+    simp only [Finset.mem_insert, Finset.mem_singleton]
+    rcases Nat.le_one_iff_eq_zero_or_eq_one.mp n.down.property.2 with h0 | h1
+    · exact Or.inl (ULift.down_injective (Subtype.ext h0))
+    · exact Or.inr (ULift.down_injective (Subtype.ext h1))
+  rw [tsum_eq_sum h_supp, Finset.sum_pair hne]
   rfl
 
 private lemma bot_apply (a : α) : Bot.bot (α := SPMF α) a = 0 := rfl

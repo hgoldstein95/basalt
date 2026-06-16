@@ -129,7 +129,8 @@ end CCPO
 
 noncomputable instance instRandomChoice : RandomChoice SPMF.Cost where
   choose lo hi h := by
-    exact SPMF.bind (choose lo hi h : SPMF (ULift Nat)) fun n => SPMF.pure (n, 1)
+    exact SPMF.bind (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi}))
+      fun n => SPMF.pure (n, 1)
 
 /-- Charge does nothing but cost `n` ticks. -/
 noncomputable def charge (n : Nat) : SPMF.Cost Unit := SPMF.pure ((), n)
@@ -287,7 +288,9 @@ theorem noCharge_charge : noCharge (charge n) = Pure.pure () := by
 
 @[simp]
 theorem noCharge_choose :
-    noCharge (choose lo hi h) = SPMF.bind (choose lo hi h : SPMF.Cost (ULift Nat)) fun (a, _) => SPMF.pure (a, 0) := by
+    noCharge (choose lo hi h) =
+      SPMF.bind (choose lo hi h : SPMF.Cost (ULift {x : Nat // lo ≤ x ∧ x ≤ hi}))
+        fun (a, _) => SPMF.pure (a, 0) := by
   simp [noCharge]
 
 section support
@@ -317,18 +320,19 @@ theorem mem_support_bind_iff
 
 @[simp]
 theorem mem_support_choose_iff
-    {lo hi : Nat} {h : lo ≤ hi} {n : ULift Nat} {c : Nat} :
-    (n, c) ∈ (choose lo hi h : SPMF.Cost (ULift Nat)).support ↔ lo ≤ n.down ∧ n.down ≤ hi ∧ c = 1 := by
-  have : (choose lo hi h : SPMF.Cost (ULift Nat)) =
-      SPMF.bind (choose lo hi h : SPMF (ULift Nat)) fun k => (SPMF.pure (k, 1) : SPMF _) := rfl
+    {lo hi : Nat} {h : lo ≤ hi} {n : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}} {c : Nat} :
+    (n, c) ∈ (choose lo hi h : SPMF.Cost (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})).support ↔ c = 1 := by
+  have : (choose lo hi h : SPMF.Cost (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) =
+      SPMF.bind (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi}))
+        fun k => (SPMF.pure (k, 1) : SPMF _) := rfl
   rw [this]
-  simp only [SPMF.mem_support_bind_iff, SPMF.support_choose, Set.mem_setOf_eq,
-             SPMF.mem_support_pure_iff, Prod.mk.injEq]
+  simp only [SPMF.mem_support_bind_iff, SPMF.mem_support_choose_iff,
+             SPMF.mem_support_pure_iff, Prod.mk.injEq, true_and]
   constructor
-  · rintro ⟨k, ⟨h1, h2⟩, rfl, rfl⟩
-    exact ⟨h1, h2, rfl⟩
-  · rintro ⟨h1, h2, rfl⟩
-    exact ⟨n, ⟨h1, h2⟩, rfl, rfl⟩
+  · rintro ⟨k, rfl, rfl⟩
+    rfl
+  · rintro rfl
+    exact ⟨n, rfl, rfl⟩
 
 end support
 
@@ -384,7 +388,10 @@ theorem IsBounded_pure : IsBounded (pure a) (fun _ => 0) := by
   simp +arith [IsBounded, noCharge, charge, pure, bind, SPMF.pure_bind]
 
 theorem IsBounded_choose : IsBounded (choose lo hi h) (fun _ => 1) := by
-  simp +arith [IsBounded, noCharge, charge, pure, bind, SPMF.pure_bind, choose, SPMF.bind_assoc]
+  rw [IsBounded_iff]
+  rintro ⟨n, c⟩ hmem
+  simp only [mem_support_choose_iff] at hmem
+  omega
 
 theorem IsBounded_bind
     {cx : α → Nat}
@@ -416,14 +423,13 @@ theorem IsBounded_pick
     (hy : IsBounded (fy ()) cy) :
     IsBounded (pick fx fy) (fun a => 1 + max (cx a) (cy a)) := by
   unfold pick
-  apply IsBounded_bind (cx := fun _ => 1) (cf := fun k a => if k == 0 then cx a else cy a)
+  apply IsBounded_bind (cx := fun _ => 1)
+      (cf := fun k a => if k.down.val == 0 then cx a else cy a)
       IsBounded_choose
   · intro k
     split_ifs
     · exact hx
-    · solve_by_elim
-    . solve_by_elim
-    . assumption
+    · exact hy
   · intro ⟨k, _⟩ _ ⟨a, _⟩ _
     simp only
     split_ifs <;> omega

@@ -28,9 +28,9 @@ def Tree.genBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
       (fun () => pure leaf)
       (fun () => do
         let x ← choose lo hi (by omega)
-        let l ← Tree.genBST lo (x.down - 1)
-        let r ← Tree.genBST (x.down + 1) hi
-        return node l x.down r)
+        let l ← Tree.genBST lo (x.down.val - 1)
+        let r ← Tree.genBST (x.down.val + 1) hi
+        return node l x.down.val r)
 partial_fixpoint
 
 /-- `genBST` produces the correct set of inputs. -/
@@ -72,10 +72,10 @@ theorem Tree.genBST_terminates : SPMF.IsPMF (Tree.genBST lo hi) := by
       rw [sq]
       apply SPMF.mass_bind_ge_of_isPMF (SPMF.IsPMF_choose lo hi hlt)
       intro x
-      apply SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo, x.down - 1))
+      apply SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo, x.down.val - 1))
       intro l
       simp only [SPMF.mass_bind_pure]
-      exact SPMF.mass_ge_iInf _ (x.down + 1, hi)
+      exact SPMF.mass_ge_iInf _ (x.down.val + 1, hi)
 
 /-- `genBST` makes a linear number of choices in the size of the tree it generates (no backtracking choices). -/
 theorem Tree.genBST_cost :

@@ -27,7 +27,7 @@ def Tree.dropRandomLeaf [Gen G] : Tree α → G (Tree α)
   | node l x leaf => (node · x leaf) <$> Tree.dropRandomLeaf l
   | node leaf x r => (node leaf x ·) <$> Tree.dropRandomLeaf r
   | node l x r => do
-    if (← choose 0 1 (by simp)) == 0 then
+    if (← choose 0 1 (by simp)).down.val == 0 then
       (node · x r) <$> Tree.dropRandomLeaf l
     else
       (node l x ·) <$> Tree.dropRandomLeaf r
@@ -54,6 +54,7 @@ example {t t' : Tree Nat} :
     | .leaf, .node _ _ _ => fun_cases Tree.isBST lo hi t' <;> simp_all
     | .node ll lx lr, .node rl rx rr =>
       simp_all
-      obtain ⟨n, ⟨_, hn⟩, hmem'⟩ := hmem
+      obtain ⟨n, _, hmem'⟩ := hmem
+      rcases hmem' with ⟨_, hmem'⟩ | ⟨_, hmem'⟩
       · fun_cases Tree.isBST lo hi t' <;> simp_all
       · fun_cases Tree.isBST lo hi t' <;> simp_all

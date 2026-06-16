@@ -31,7 +31,7 @@ instance : Monad ParserGen := inferInstanceAs (Monad (StateT (List Nat) Option))
 instance : RandomChoice ParserGen where
   choose lo hi _ := fun
     | [] => none
-    | c :: cs => if lo ≤ c ∧ c ≤ hi then some (c, cs) else none
+    | c :: cs => if hc : lo ≤ c ∧ c ≤ hi then some (⟨⟨c, hc⟩⟩, cs) else none
 
 instance : CCPO (ParserGen α) := inferInstanceAs (CCPO (StateT (List Nat) Option α))
 
@@ -157,14 +157,16 @@ theorem bind_reflects {x : ParserGen α} {f : α → ParserGen β} {rf : α → 
         exact ((hf a').2 b right cs₂).mpr hright_mem
 
 theorem choose_reflects :
-    Reflects (choose lo hi h) (fun a => if lo ≤ a ∧ a ≤ hi then [[a]] else []) := by
+    Reflects (choose lo hi h) (fun a => [[a.down.val]]) := by
   constructor
   . exact choose_WellBehaved
   . intros a' cs₁ cs₂
     simp [StateT.run, choose, StateT.run]
     cases cs₁
     . split <;> simp_all
-    . simp_all
+    . rcases a' with ⟨⟨v, hv⟩⟩
+      simp only [List.cons_append]
+      split <;> simp_all <;> omega
 
 def reflectPure [BEq α] [LawfulBEq α] : {r : Reflector α // Reflects (pure a) r} :=
   Subtype.mk (fun a' => if a == a' then [[]] else []) pure_reflects
@@ -182,8 +184,8 @@ def reflectBind {x : ParserGen α} {f : α → ParserGen β}
       [cs₁ ++ cs₂]) <| by
     exact bind_reflects inv hinv hx.property (fun a => (hf a).property)
 
-def reflectChoose : {r : Reflector Nat // Reflects (choose lo hi h) r} :=
-  Subtype.mk (fun a => if lo ≤ a ∧ a ≤ hi then [[a]] else []) choose_reflects
+def reflectChoose : {r : Reflector (ULift {x : Nat // lo ≤ x ∧ x ≤ hi}) // Reflects (choose lo hi h) r} :=
+  Subtype.mk (fun a => [[a.down.val]]) choose_reflects
 
 section simple_example
 
@@ -194,7 +196,7 @@ to get choices `[0]` or `[1]` respectively.
 
 def genOneOrTwo [Gen G] : G Nat := do
   let b ← choose 0 1 (by simp)
-  if b == 0 then
+  if b.down.val == 0 then
     pure 1
   else
     pure 2
@@ -202,20 +204,14 @@ def genOneOrTwo [Gen G] : G Nat := do
 def reflectOneOrTwo : {r : Reflector Nat // Reflects genOneOrTwo r} := by
   unfold genOneOrTwo
   -- Unlike with normal reflectives, we provide this inverse in a _proof_ not in the generator.
-  apply reflectBind (inv := fun | 1 => some 0 | 2 => some 1 | _ => none)
+  apply reflectBind (inv := fun | 1 => some ⟨⟨0, by omega⟩⟩ | 2 => some ⟨⟨1, by omega⟩⟩ | _ => none)
   -- We also need to prove that the inverse is actually an inverse.
   case hinv =>
     intro a b cs cs' cs'' h₁ h₂
-    simp_all [StateT.run, pure]
-    by_cases heq : a = 0
-    . simp [heq, StateT.pure] at h₂
-      rw [← h₂.1]
-      grind
-    . simp [heq, StateT.pure] at h₂
-      rw [← h₂.1]
-      simp
-      simp [choose] at h₁
-      cases cs <;> grind
+    obtain ⟨⟨v, hv⟩⟩ := a
+    have hv1 : v = 0 ∨ v = 1 := by omega
+    rcases hv1 with rfl | rfl <;>
+      simp_all [StateT.run, pure, StateT.pure] <;> grind
   -- After that, the rest of the proof is trivial.
   . apply reflectChoose
   . intro a
@@ -224,7 +220,7 @@ def reflectOneOrTwo : {r : Reflector Nat // Reflects genOneOrTwo r} := by
     . apply reflectPure
 
 def genNat [Gen G] : G Nat := do
-  if (← choose 0 1 (by simp)) == 0 then
+  if (← choose 0 1 (by simp)).down.val == 0 then
     pure 0
   else
     let n ← genNat
@@ -246,7 +242,7 @@ well-founded recursion cannot be used, `reflectNat` does not take any (non-fixed
 #guard_msgs in
 def reflectNat : {r : Reflector Nat // Reflects genNat r} := by
   rw [genNat]
-  apply reflectBind (inv := fun | .zero => some 0 | .succ _ => some 1)
+  apply reflectBind (inv := fun | .zero => some ⟨⟨0, by omega⟩⟩ | .succ _ => some ⟨⟨1, by omega⟩⟩)
   case hinv => sorry
   . apply reflectChoose
   . intro a

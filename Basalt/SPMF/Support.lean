@@ -118,23 +118,15 @@ theorem mem_support_ite_iff {p : Prop} [Decidable p]
 
 @[simp]
 theorem support_choose :
-    (choose lo hi h : SPMF (ULift Nat)).support = {a | lo ≤ ULift.down a ∧ ULift.down a ≤ hi} := by
+    (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})).support = Set.univ := by
   ext a
-  rw [support, Function.mem_support, Set.mem_setOf_eq]
-  simp only [RandomChoice.choose, DFunLike.coe]
-  constructor
-  · intro ha
-    by_contra hc
-    push Not at hc
-    apply ha
-    by_cases hlo : lo ≤ a <;> grind
-  · intro ⟨hlo, hhi⟩
-    simp only [hlo, hhi, and_self, ↓reduceIte, ne_eq, one_div]
-    exact ENNReal.inv_ne_zero.mpr (ENNReal.natCast_ne_top _)
+  simp only [mem_support_iff, Set.mem_univ, iff_true]
+  change (1 : ℝ≥0∞) / ((hi - lo + 1 : ℕ)) ≠ 0
+  simp
 
 @[simp]
 theorem mem_support_choose_iff :
-    a ∈ (choose lo hi h : SPMF (ULift Nat)).support ↔ lo ≤ a.down ∧ a.down ≤ hi := by
+    a ∈ (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})).support ↔ True := by
   simp [support_choose]
 
 @[simp]
@@ -143,20 +135,16 @@ theorem support_pick
     (pick (fun () => x) (fun () => y)).support = x.support ∪ y.support := by
   simp only [pick, support_bind, support_choose]
   ext a
-  simp only [Set.mem_setOf_eq, Set.mem_union]
+  simp only [Set.mem_univ, true_and, Set.mem_setOf_eq, Set.mem_union]
   constructor
-  · intro ⟨n, ⟨_, hn1⟩, ha⟩
-    rcases Nat.le_one_iff_eq_zero_or_eq_one.mp hn1
-    · left; grind
-    · right; grind
+  · rintro ⟨n, ha⟩
+    rcases Nat.le_one_iff_eq_zero_or_eq_one.mp n.down.property.2 with h0 | h1
+    · left; simpa [h0] using ha
+    · right; simpa [h1] using ha
   · intro h
     cases h with
-    | inl hx =>
-      refine ⟨0, ⟨Nat.zero_le _, Nat.zero_le _⟩, ?_⟩
-      simpa using hx
-    | inr hy =>
-      refine ⟨1, ⟨Nat.zero_le _, le_refl _⟩, ?_⟩
-      simpa using hy
+    | inl hx => exact ⟨⟨⟨0, by omega⟩⟩, by simpa using hx⟩
+    | inr hy => exact ⟨⟨⟨1, by omega⟩⟩, by simpa using hy⟩
 
 @[simp]
 theorem mem_support_pick_iff

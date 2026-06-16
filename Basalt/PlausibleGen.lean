@@ -47,9 +47,9 @@ instance : MonoBind (Except Plausible.GenError) where
 /-! ### RandomChoice for Plausible.Gen -/
 
 instance : RandomChoice Plausible.Gen where
-  choose lo hi _ := do
-    let ⟨val, _⟩ ← Plausible.Gen.choose Nat lo hi (by omega)
-    ULift.up <$> pure val
+  choose lo hi h := do
+    let v ← Plausible.Gen.choose Nat lo hi h
+    pure (ULift.up v)
 
 /-- Plausible's `Gen` is an instance of Basalt's `Gen` typeclass. -/
 instance : Gen Plausible.Gen where

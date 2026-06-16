@@ -19,7 +19,7 @@ private def indexToChar (n : Nat) : Char :=
 /-- Generates a random alphanumeric character -/
 def Char.arbitrary [Gen G] : G Char := do
   let n ← choose 0 61 (by omega)
-  pure (indexToChar n.down)
+  pure (indexToChar n.down.val)
 
 private theorem indexToChar_isAlphanum :
     ∀ n, n ≤ 61 → (indexToChar n).isAlphanum = true := by decide
@@ -60,14 +60,11 @@ theorem Char.arbitrary_terminates : SPMF.IsPMF Char.arbitrary := by
 theorem Char.arbitrary_cost :
     IsBounded Char.arbitrary (fun _ => 1) := by
   rw [IsBounded_iff]
-  intro ⟨c, cost⟩ h
+  rintro ⟨c, cost⟩ h
   rw [Char.arbitrary] at h
   simp [SPMF.Cost.mem_support_bind_iff, SPMF.Cost.mem_support_choose_iff,
           SPMF.Cost.mem_support_pure_iff] at h
-  obtain ⟨ n, ⟨ _, heq ⟩, _ ⟩ := h
-  subst heq
-  dsimp
-  constructor
+  omega
 
 #guard_msgs(drop info) in
 #eval (for _ in [0:20] do
