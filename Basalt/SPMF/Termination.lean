@@ -240,10 +240,13 @@ theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β}
 /-- The combinator `elements` is an SPMF -/
 theorem IsPMF_elements [Inhabited α] (xs : List α) (hne : xs ≠ []) :
     IsPMF (elements xs hne) := by
-  unfold elements
-  apply IsPMF_bind_pure
+  simp only [elements]
+  apply IsPMF_bind
   apply IsPMF_map
   apply IsPMF_choose
+  intro ⟨ i, ⟨ hge, hle ⟩⟩
+  apply IsPMF_pure
+
 
 /-- If all generators in the list `gs` are SPMFs, then `oneOf gs` is also an SPMF -/
 theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ g ∈ gs, IsPMF (g ())) :
@@ -252,8 +255,8 @@ theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ 
   apply IsPMF_bind_of_support
   . apply IsPMF_map
     apply IsPMF_choose
-  . intro i hle
-    simp at hle
+  . intro ⟨ i, hge, hle ⟩ helem
+    simp at helem
     have h_lt : i < gs.length := by
       rw [Nat.lt_iff_add_one_le]
       refine Nat.add_le_of_le_sub ?_ hle
@@ -261,7 +264,7 @@ theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ 
       apply Nat.ne_zero_iff_zero_lt.mpr
       apply List.length_pos_iff.mpr
       assumption
-    rw [getElem!_pos gs i h_lt]
+    dsimp
     apply hgs
     apply List.getElem_mem
 
