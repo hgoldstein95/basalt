@@ -43,7 +43,7 @@ end Helpers
 
 /-- Generates an element of the list `xs` at random.
     This combinator takes as input a proof that `xs` is non-empty. -/
-def elements [Gen G] [Inhabited α] (xs : List α) (_hne : xs ≠ []) : G α := do
+def elements [Gen G] (xs : List α) (hne : xs ≠ []) : G α := do
   let ⟨i, ⟨ hge, hle ⟩⟩ ← ULift.down <$> RandomChoice.choose 0 (xs.length - 1) (by omega)
   -- Obtain a proof that the list indexing is in-bounds
   have hlen : 0 < xs.length := by

@@ -156,42 +156,37 @@ theorem mem_support_pick_iff
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]
 theorem support_elements
-    [Inhabited α]
     {xs : List α}
     (hne : xs ≠ []) :
     support (elements xs hne) = { x | x ∈ xs } := by
-  simp [elements, support_choose]
+  simp only [elements, support_bind, support_map, support_choose]
   ext a
   dsimp only [Set.mem_setOf_eq]
   constructor
   . -- (∃ i ≤ xs.length - 1, a = xs[i]?.getD default) → a ∈ xs
     intro h
-    obtain ⟨ i, hle, heq ⟩ := h
-    have h_lt : i < xs.length := by
-      rw [Nat.lt_iff_add_one_le]
-      refine Nat.add_le_of_le_sub ?_ hle
-      apply Nat.one_le_iff_ne_zero.mpr
-      apply Nat.ne_zero_iff_zero_lt.mpr
-      apply List.length_pos_iff.mpr
+    obtain ⟨ ⟨i, ⟨ hi_gt, hi_lt⟩⟩, h_idx, ha ⟩ := h
+    obtain ⟨ ⟨ n, ⟨ hgt, hlt ⟩⟩, ⟨ h_lowerbound, h_upperbound ⟩, hi ⟩ := h_idx
+    have h_pos : 0 < xs.length := by
+      rw [List.length_pos_iff]
       assumption
-    rw [List.mem_iff_getElem?]
-    refine ⟨ i, ?_ ⟩
-    rw [List.getElem?_eq_some_iff]
-    apply Exists.intro h_lt
-    rw [heq]
-    apply Eq.symm
-    apply getElem!_pos
+    have h_lt : i < xs.length := by omega
+    dsimp at ha
+    simp [Pure.pure] at ha
+    apply List.mem_of_getElem (id (Eq.symm ha))
   . -- a ∈ xs → ∃ i ≤ xs.length - 1, a = xs[i]?.getD default
     intro hmem
     obtain ⟨ i, hlt, heq ⟩ := List.mem_iff_getElem.mp hmem
-    exists i
+    have hle : i ≤ xs.length - 1 := by omega
+    exists ⟨ i, ⟨by omega, hle⟩⟩
     constructor
-    . omega
+    . exists ⟨ i, ⟨by omega, hle⟩⟩
     . have hidx : xs[i]? = some a := by
         rw [← heq]
         apply List.getElem?_eq_getElem hlt
-      apply Nat.le_sub_one_of_lt
-      assumption
+      dsimp
+      simp [Pure.pure]
+      apply (Eq.symm heq)
 
 /-- `a` is in the support of `elements xs` if and only if `a ∈ xs` -/
 @[simp]
@@ -351,12 +346,12 @@ theorem support_frequency
     simp only [frequency, support_bind, support_map, support_choose, mem_support_dite_iff]
     intro ⟨w, g, hwg_mem, hwt, ha⟩
     obtain ⟨n, hlt, heq⟩ := frequencyAux_n_exists hwg_mem hwt
-    refine ⟨n, ?_, ?_⟩
+    have hle : n ≤ (List.map Prod.fst gs).sum - 1 := by omega
+    refine ⟨⟨ n, ⟨ by omega, hle ⟩ ⟩, ?_, ?_⟩
     . dsimp
-      refine ⟨ ULift.up n, ?_, ?_ ⟩
+      refine ⟨ ⟨ n, ⟨ by omega, hle ⟩ ⟩, ?_, ?_ ⟩
       . -- 0 ≤ n ∧ n ≤ (fst <$> gs).sum - 1
-        dsimp
-        omega
+        apply Set.mem_univ
       . rfl
     . -- Goal: `a ∈ frequencyAux.support ∨ a ∈ default.support`
       -- (We pick the left branch)
