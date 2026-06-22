@@ -25,7 +25,7 @@ instance instBot : Bot (SPMF α) where
 
 instance instFunLike : FunLike (SPMF α) α ℝ≥0∞ where
   coe p a := p.1 a
-  coe_injective _ _ h := Subtype.ext h
+  coe_injective' _ _ h := Subtype.ext h
 
 @[ext]
 protected theorem ext {p q : SPMF α} (h : ∀ x, p x = q x) : p = q :=

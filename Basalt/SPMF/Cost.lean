@@ -120,12 +120,10 @@ instance instMonoBind : MonoBind SPMF.Cost where
     apply ENNReal.tsum_le_tsum
     intro ⟨a, n₁⟩
     gcongr ?_ * ?_
-    · rfl
-    · apply ENNReal.tsum_le_tsum
-      intro i
-      gcongr ?_ * ?_
-      apply h
-      rfl
+    apply ENNReal.tsum_le_tsum
+    intro i
+    gcongr ?_ * ?_
+    apply h
 
 end CCPO
 
