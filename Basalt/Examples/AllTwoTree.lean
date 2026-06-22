@@ -48,7 +48,6 @@ theorem genTree_terminates : SPMF.IsPMF genTree := by
     nlinarith [sq_nonneg c.toReal]
   case mass =>
     intro i hc_le
-    dsimp only
     conv_lhs => rw [genTree]
     simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
     gcongr
