@@ -58,7 +58,6 @@ theorem genCharList_terminates : SPMF.IsPMF genCharList := by
     ?bounds ?mass) ()
   case bounds =>
     intro c hle hge
-    dsimp at hge
     apply ENNReal.eq_one_of_fixed_ineq' hle hge
     intro hmono
     rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
@@ -113,7 +112,6 @@ theorem String.arbitrary_cost :
   obtain ⟨cs, hcs, rfl⟩ := h
   have hcost : cost ≤ 2 * cs.length + 1 := by
     apply IsBounded_iff.mp genCharList_cost (cs, cost) hcs
-  simp at hcost
   simp [String.length_ofList]
   assumption
 
