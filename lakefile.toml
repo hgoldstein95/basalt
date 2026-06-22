@@ -11,4 +11,4 @@ name = "Examples"
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-rev = "v4.29.0"
+rev = "v4.29.1"
