@@ -91,8 +91,6 @@ def oneOf [Gen G] (gs : List (Unit → G α)) : G α := do
 -- We only need to add the list order.
 
 
-
-
 instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     PartialOrder (List α) where
   rel l1 l2 :=
@@ -120,7 +118,9 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     obtain ⟨_, helem21⟩ := h21
     apply List.ext_getElem hlen
     intro i hi1 hi2
-    exact PartialOrder.rel_antisymm (helem12 i hi1 hi2) (helem21 i hi2 hi1)
+    apply PartialOrder.rel_antisymm
+    . apply helem12
+    . apply helem21
 
 -- Lets the tactic decompose a list literal `[e₁, e₂, …]` = `e₁ :: (e₂ :: …)`
 -- into one element at a time; the empty-list base case is handled by the
@@ -159,22 +159,23 @@ theorem List.monotone_cons
 --   · Out-of-bounds: both sides reduce to `default` via `getElem!_neg`.
 theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) :
     oneOf l1 ⊑ oneOf l2 := by
-  obtain ⟨hlen, helem⟩ := h
+  obtain ⟨hlen_eq, hle⟩ := h
   -- `simp only [oneOf, hlen]` unfolds oneOf and rewrites l1.length → l2.length.
   -- We use simp rather than `unfold` + `rw` because the `choose` call contains a
   -- proof term `⋯ : 0 ≤ l1.length - 1` that depends on l1.length; `rw` would
   -- produce an ill-typed motive, whereas simp handles proof terms in Prop via
   -- proof irrelevance.
-  simp only [oneOf, hlen]
+  simp only [oneOf, hlen_eq]
   -- After simp, both sides have `choose 0 (l2.length - 1) _` as the prefix;
   -- only the continuations differ.
   apply MonoBind.bind_mono_right
   intro i
   by_cases hi : i < l2.length
-  · -- In-bounds: reduce getElem! to getElem, then apply element-wise order at ().
-    rw [getElem!_pos l1 i (hlen ▸ hi), getElem!_pos l2 i hi]
-    exact helem i (hlen ▸ hi) hi ()
-  · -- Out-of-bounds: both sides reduce to `default ()`.
+  · -- i < l2.length
+    rw [getElem!_pos l1 i (by omega), getElem!_pos l2 i hi]
+    apply hle
+  · -- ¬ (i > l2.length)
+    -- this is out-of-bounds, so both sides become `default ()`.
     rw [getElem!_neg l1 i (by omega), getElem!_neg l2 i hi]
     exact PartialOrder.rel_refl
 
@@ -183,9 +184,13 @@ theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) :
 -- having already established `monotone gens` via `List.monotone_cons`.
 @[partial_fixpoint_monotone]
 theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
-    (gens : γ → List (Unit → G α)) (hmono : monotone gens) :
-    monotone (fun x => oneOf (gens x)) :=
-  fun x y hxy => oneOf_le (hmono x y hxy)
+    (gs : γ → List (Unit → G α)) (hmono : monotone gs) :
+    monotone (fun x => oneOf (gs x)) := by
+  intro x y hxy
+  unfold monotone at hmono
+  apply oneOf_le
+  apply hmono
+  assumption
 
 -- ============================================================
 -- § 5  End-to-end: `partial_fixpoint` now succeeds
