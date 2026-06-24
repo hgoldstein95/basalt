@@ -73,3 +73,117 @@ def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   let total := List.sum $ List.map Prod.fst gs
   let n ← ULift.down <$> RandomChoice.choose 0 (total - 1) (by omega)
   if hn : n < total then Helpers.frequencyAux gs n hn else default
+
+instance List.instPartialOrder {α : Type u} [PartialOrder α] :
+    PartialOrder (List α) where
+  rel l1 l2 :=
+    l1.length = l2.length ∧
+    ∀ (i : Nat) (h1 : i < l1.length) (h2 : i < l2.length), l1[i] ⊑ l2[i]
+  rel_refl := by
+    intro xs
+    constructor
+    . rfl
+    . intro i _ _
+      apply PartialOrder.rel_refl
+  rel_trans := by
+    intro xs ys zs h12 h23
+    obtain ⟨heq1, hle1⟩ := h12
+    obtain ⟨heq2, hle2⟩ := h23
+    constructor
+    . apply Eq.trans <;> assumption
+    . intro i h1 h2
+      apply PartialOrder.rel_trans
+      . apply hle1
+        omega
+      . apply hle2
+  rel_antisymm h12 h21 := by
+    obtain ⟨hlen, helem12⟩ := h12
+    obtain ⟨_, helem21⟩ := h21
+    apply List.ext_getElem hlen
+    intro i hi1 hi2
+    apply PartialOrder.rel_antisymm
+    . apply helem12
+    . apply helem21
+
+-- Lets the tactic decompose a list literal `[e₁, e₂, …]` = `e₁ :: (e₂ :: …)`
+-- into one element at a time; the empty-list base case is handled by the
+-- tactic's existing constant-expression rule.
+@[partial_fixpoint_monotone]
+theorem List.monotone_cons
+    {α : Type u} {γ : Sort w} [PartialOrder α] [PartialOrder γ]
+    (f : γ → α) (fs : γ → List α) (hf : monotone f) (hfs : monotone fs) :
+    monotone (fun x => f x :: fs x) := by
+  intro x y hxy
+  have hle : fs x ⊑ fs y := hfs x y hxy
+  have heq : (fs x).length = (fs y).length := hle.1
+  dsimp
+  constructor
+  . -- (f x :: fs x).length = (f y :: fs y).length
+    simpa using heq
+  . -- (f x :: fs x)[i] ⊑ (f y :: fs y)[i]
+    intro i h1 h2
+    cases i with
+    | zero =>
+      apply hf
+      assumption
+    | succ i' =>
+      dsimp
+      have all_elts_le := (hfs x y hxy).2
+      apply all_elts_le
+
+private theorem oneOf_choose_irrelevant [Gen G] (l : List (Unit → G α))
+    (n₁ n₂ : Nat) (h₁ : 0 ≤ n₁) (h₂ : 0 ≤ n₂) (hlen : n₁ = n₂)
+    (hlt₁ : ∀ i, i ≤ n₁ → i < l.length)
+    (hlt₂ : ∀ i, i ≤ n₂ → i < l.length) :
+    (do let ⟨i, _, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 n₁ h₁
+        let g := l[i]'(hlt₁ i hle_i)
+        g ()) =
+    (do let ⟨i, _, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 n₂ h₂
+        let g := l[i]'(hlt₂ i hle_i)
+        g ()) := by
+  subst hlen; rfl
+
+theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) (h1 : l1 ≠ []) (h2 : l2 ≠ []) :
+    oneOf l1 h1 ⊑ oneOf l2 h2 := by
+  obtain ⟨hlen_eq, hle⟩ := h
+  have h1len : 0 < l1.length := List.length_pos_iff.mpr h1
+  have h2len : 0 < l2.length := List.length_pos_iff.mpr h2
+  simp only [oneOf]
+  apply PartialOrder.rel_trans (y := do
+      let ⟨i, hge, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 (l1.length - 1) (by omega)
+      let g := l2[i]'(by omega)
+      g ())
+  case a =>
+    apply MonoBind.bind_mono_right
+    intro ⟨i, hge, hle_i⟩
+    exact (hle i (by omega) (by omega)) ()
+  case a =>
+    dsimp only []
+    have hlen_sub : l1.length - 1 = l2.length - 1 := by omega
+    have heq : oneOf l2 h2 = oneOf l2 h2 := rfl
+    simp only [oneOf, hlen_sub] at heq
+    sorry
+
+-- Single general `@[partial_fixpoint_monotone]` lemma.
+-- The tactic sees `fun x => oneOf (gens x)` and uses this lemma,
+-- having already established `monotone gens` via `List.monotone_cons`.
+@[partial_fixpoint_monotone]
+theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
+    (gs : γ → List (Unit → G α)) (hne : ∀ x, gs x ≠ []) (hmono : monotone gs) :
+    monotone (fun x => oneOf (gs x) (hne x)) := by
+  intro x y hxy
+  unfold monotone at hmono
+  apply oneOf_le
+  apply hmono
+  assumption
+
+-- ============================================================
+-- § 5  End-to-end: `partial_fixpoint` now succeeds
+-- ============================================================
+
+def myGen [Gen G] : Unit → G Nat := fun _ =>
+  let gs := [fun _ => pure 0, fun _ => do let n ← myGen (); pure (n + 1)]
+  have hne : gs ≠ [] := by
+    apply cons_ne_nil
+  oneOf gs hne
+partial_fixpoint
