@@ -1,24 +1,11 @@
 import Basalt
 import Batteries.Data.Char
 import Basalt.Examples.ArbChar
+import Basalt.Examples.ArbString.Def
 
 open RandomChoice ArbChar
 
 namespace ArbString
-
-/-- Helper function: generates a random list of alphanumeric characters -/
-def genCharList [Gen G] : G (List Char) :=
-  pick
-    (fun _ => pure [])
-    (fun () => do
-      let x ← Char.arbitrary
-      let xs ← genCharList
-      return x :: xs)
-partial_fixpoint
-
-/-- Generates a random alphanumeric string -/
-def String.arbitrary [Gen G] : G String :=
-  String.ofList <$> genCharList
 
 /-- `genCharList`'s support is exactly the set of alphanumeric characters -/
 theorem genCharList_support :
@@ -58,7 +45,6 @@ theorem genCharList_terminates : SPMF.IsPMF genCharList := by
     ?bounds ?mass) ()
   case bounds =>
     intro c hle hge
-    dsimp at hge
     apply ENNReal.eq_one_of_fixed_ineq' hle hge
     intro hmono
     rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
@@ -113,7 +99,6 @@ theorem String.arbitrary_cost :
   obtain ⟨cs, hcs, rfl⟩ := h
   have hcost : cost ≤ 2 * cs.length + 1 := by
     apply IsBounded_iff.mp genCharList_cost (cs, cost) hcs
-  simp at hcost
   simp [String.length_ofList]
   assumption
 

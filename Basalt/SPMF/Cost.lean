@@ -147,7 +147,8 @@ private lemma map_fst_tsum {α β : Type} (c : SPMF (α × β)) (p : SPMF α)
   have key := congr_fun (congrArg Subtype.val h) a
   simp only [Functor.map, SPMF.bind, DFunLike.coe, Function.comp_apply, SPMF.pure] at key
   rw [ENNReal.tsum_prod', tsum_eq_single a (by intro a₁ ha₁; simp [if_neg (Ne.symm ha₁)])] at key
-  simpa using key
+  simp_all
+  assumption
 
 private lemma map_snd_tsum {α β : Type} (c : SPMF (α × β)) (p : SPMF β)
     (h : (·.2) <$> c = p) (b : β) : ∑' a : α, c (a, b) = p b := by
@@ -157,7 +158,8 @@ private lemma map_snd_tsum {α β : Type} (c : SPMF (α × β)) (p : SPMF β)
   conv_lhs at key =>
     arg 1; ext a₁
     rw [tsum_eq_single b (by intro a₂ ha₂; simp [if_neg (Ne.symm ha₂)])]
-  simpa using key
+  simp_all
+  assumption
 
 instance : Preorder (SPMF.Cost α) where
   le_refl x := by

@@ -185,7 +185,7 @@ private lemma pick_apply {α : Type u} {x y : SPMF α} (a : α) :
     (1/2 : ℝ≥0∞) * x a + (1/2 : ℝ≥0∞) * y a := by
   simp only [pick, Bind.bind, bind]
   show ∑' (n : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1}),
-       (choose 0 1 pick._proof_1 : SPMF (ULift {x : Nat // 0 ≤ x ∧ x ≤ 1})) n *
+       (choose 0 1 (by simp) : SPMF (ULift {x : Nat // 0 ≤ x ∧ x ≤ 1})) n *
        (if (n.down.val == 0) = true then x else y : SPMF α) a = _
   let e0 : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1} := ⟨⟨0, by omega⟩⟩
   let e1 : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1} := ⟨⟨1, by omega⟩⟩
@@ -194,7 +194,7 @@ private lemma pick_apply {α : Type u} {x y : SPMF α} (a : α) :
     have : (0 : Nat) = 1 := congrArg (fun z => z.down.val) heq
     omega
   have h_supp : ∀ n : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1}, n ∉ ({e0, e1} : Finset _) →
-      (choose 0 1 pick._proof_1 : SPMF (ULift {x : Nat // 0 ≤ x ∧ x ≤ 1})) n *
+      (choose 0 1 (by simp) : SPMF (ULift {x : Nat // 0 ≤ x ∧ x ≤ 1})) n *
       (if (n.down.val == 0) = true then x else y : SPMF α) a = 0 := by
     intro n hn
     exfalso
@@ -258,7 +258,7 @@ instance instLawfulMonadSPMF : LawfulMonad SPMF where
   seqRight_eq := by
     intros
     simp only [SeqRight.seqRight, Seq.seq, Functor.map]
-    unfold Function.comp Function.const id
+    unfold Function.comp Function.const
     rw [bind_assoc]
     simp [pure_bind, bind_pure]
   pure_seq := by
