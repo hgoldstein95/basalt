@@ -1,17 +1,16 @@
 import Basalt.Gen
+import Basalt.Combinators
 
 open RandomChoice
 
 namespace ArbChar
 
-def indexToChar (n : Nat) : Char :=
-  if n < 10 then Char.ofNat (n + 48)
-  else if n < 36 then Char.ofNat (n - 10 + 65)
-  else Char.ofNat (n - 36 + 97)
+/-- The 62 alphanumeric characters. -/
+def alphanumChars : List Char :=
+  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toList
 
 /-- Generates a random alphanumeric character -/
-def Char.arbitrary [Gen G] : G Char := do
-  let n ← choose 0 61 (by omega)
-  pure (indexToChar n.down.val)
+def Char.arbitrary [Gen G] : G Char :=
+  elements alphanumChars (by decide)
 
 end ArbChar
