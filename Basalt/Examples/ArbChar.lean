@@ -1,25 +1,10 @@
 import Basalt
 import Batteries.Data.Char
+import Basalt.Examples.ArbChar.Def
 
 open RandomChoice
 
 namespace ArbChar
-
--- The space of Unicode values that correspond to alphanumeric chars
--- consist of 3 disjoint intervals (48–57, 65–90, 97–122),
--- so we can't just generate an arbitrary `Nat` and then pass it to `Char.ofNat`.
--- Instead, we define this helper function, which we call in `Char.arbitrary` below
--- so that we can just generate a `Nat` in the interval [0, 61], which simplifes
--- the proofs below.
-private def indexToChar (n : Nat) : Char :=
-  if n < 10 then Char.ofNat (n + 48)
-  else if n < 36 then Char.ofNat (n - 10 + 65)
-  else Char.ofNat (n - 36 + 97)
-
-/-- Generates a random alphanumeric character -/
-def Char.arbitrary [Gen G] : G Char := do
-  let n ← choose 0 61 (by omega)
-  pure (indexToChar n.down.val)
 
 private theorem indexToChar_isAlphanum :
     ∀ n, n ≤ 61 → (indexToChar n).isAlphanum = true := by decide
