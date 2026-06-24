@@ -1,24 +1,11 @@
 import Basalt
 import Batteries.Data.Char
 import Basalt.Examples.ArbChar
+import Basalt.Examples.ArbString.Def
 
 open RandomChoice ArbChar
 
 namespace ArbString
-
-/-- Helper function: generates a random list of alphanumeric characters -/
-def genCharList [Gen G] : G (List Char) :=
-  pick
-    (fun _ => pure [])
-    (fun () => do
-      let x ← Char.arbitrary
-      let xs ← genCharList
-      return x :: xs)
-partial_fixpoint
-
-/-- Generates a random alphanumeric string -/
-def String.arbitrary [Gen G] : G String :=
-  String.ofList <$> genCharList
 
 /-- `genCharList`'s support is exactly the set of alphanumeric characters -/
 theorem genCharList_support :
