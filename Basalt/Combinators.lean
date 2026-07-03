@@ -39,12 +39,11 @@ def frequencyAux [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
     else
       frequencyAux xs (n - k) (by dsimp at h; omega)
 
-/-- Implementation of the `oneOf` combinator, with the upper bound of the random
-    index draw exposed as a parameter `n` (`oneOf` instantiates it with
-    `gs.length - 1`). Keeping the bound a variable is what allows
-    `oneOfAux_congr` to transport equalities about the bound by `subst`, which
-    the monotonicity proof `oneOf_le` relies on
-    (see `docs/oneOf_le_proof_notes.md`). -/
+/-- Implementation of the `oneOf` combinator, parameterized by an upper bound `n`
+    of the random index. (`oneOf` instantiates `n` with `gs.length - 1`).
+    Making the upper bound a parameter allows us to use the `oneOfAux_congr` lemma below
+    to propogate equalities about the bound via `subst`, which
+    is used in the monotonicity proof for `oneOf` (`oneOf_le`). -/
 def oneOfAux [Gen G] (l : List (Unit → G α)) (n : Nat)
     (hlt : ∀ i, i ≤ n → i < l.length) : G α := do
   let ⟨i, _, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
@@ -66,9 +65,10 @@ def elements [Gen G] (xs : List α) (hne : xs ≠ []) : G α := do
 /-- Picks one of the generators in `gs` at random.
     This combinator takes as input a proof that `gs` is non-empty. -/
 def oneOf [Gen G] (gs : List (Unit → G α)) (hne : gs ≠ []) : G α :=
-  Helpers.oneOfAux gs (gs.length - 1) fun i hi => by
+  Helpers.oneOfAux gs (gs.length - 1) (by
+    intro i hi
     have hlen : 0 < gs.length := length_pos_iff.mpr hne
-    omega
+    omega)
 
 /-- `frequency` picks a generator from the list `gs` according to the weights in `gs`.
     This combinators also takes an additional hypothesis that the sum of the weights
@@ -79,6 +79,9 @@ def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   let n ← ULift.down <$> RandomChoice.choose 0 (total - 1) (by omega)
   if hn : n < total then Helpers.frequencyAux gs n hn else default
 
+/-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
+    - `l1.length = l2.length`
+    - `l1[i] ⊑ l2[i]` for all list elements (here we are comparing them using the `PartialOrder` on `α`) -/
 instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     PartialOrder (List α) where
   rel l1 l2 :=
@@ -136,7 +139,8 @@ theorem List.monotone_cons
       have all_elts_le := (hfs x y hxy).2
       apply all_elts_le
 
-/-- Reflexivity of `⊑` up to propositional equality. -/
+/-- If two terms `a, b` are propositionally equal (i.e. `a = b`),
+    then `a ⊑ b`, i.e. `⊑` is reflexive up to propositional equality. -/
 private theorem rel_of_eq {β : Sort u} [PartialOrder β] {a b : β} (h : a = b) : a ⊑ b := by
   subst h
   exact PartialOrder.rel_refl
@@ -153,29 +157,29 @@ private theorem oneOfAux_congr [Gen G] (l : List (Unit → G α)) (n₁ n₂ : N
     Helpers.oneOfAux l n₁ hlt₁ = Helpers.oneOfAux l n₂ hlt₂ := by
   subst hn
   rfl
-
-/-- Monotonicity of `oneOf`: pointwise-ordered generator lists yield ordered
-    generators. The proof goes through the intermediate `Helpers.oneOfAux l2`
-    drawn with `l1`'s bound: the first leg compares continuations under the
-    same `choose` call via `MonoBind.bind_mono_right`, and the second leg is a
-    propositional equality (`oneOfAux_congr`), since the two `choose` calls
-    differ only in a bound that the length equality identifies. -/
+/-- Monotonicity of `oneOf`: if lists `l1, l2` are both non-empty (`h1, h2`) and `l1 ⊑ l2`,
+    then `oneOf l1 h1 ⊑ oneOf l2 h2` -/
 theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) (h1 : l1 ≠ []) (h2 : l2 ≠ []) :
     oneOf l1 h1 ⊑ oneOf l2 h2 := by
   obtain ⟨hlen_eq, hle⟩ := h
   have h1len : 0 < l1.length := List.length_pos_iff.mpr h1
   have h2len : 0 < l2.length := List.length_pos_iff.mpr h2
+  -- Use transitivity of ⊑
   apply PartialOrder.rel_trans
-    (y := Helpers.oneOfAux l2 (l1.length - 1) (fun i hi => by omega))
-  case a =>
+    (y := Helpers.oneOfAux l2 (l1.length - 1) (by omega))
+  . -- oneOf l1 h1 ⊑ oneOfAux l2 (l1.length - 1)
     simp only [oneOf, Helpers.oneOfAux]
+    -- Both sides of the ⊑ bind the result of `RandomChoice.choose`, so we
+    -- only need to reason about the rest of the `do` block
     apply MonoBind.bind_mono_right
     intro ⟨i, hge, hle_i⟩
-    exact (hle i (by omega) (by omega)) ()
-  case a =>
+    apply hle
+  . -- oneOfAux l2 (l1.length - 1) ⊑ oneOf l2 h2
     simp only [oneOf]
-    exact rel_of_eq (oneOfAux_congr l2 (l1.length - 1) (l2.length - 1) (by omega)
-      (fun i hi => by omega) (fun i hi => by omega))
+    -- Turn ⊑ in the goal into an ordinary equality =,
+    -- then use the fact that oneOfAux is congruent
+    apply rel_of_eq
+    apply oneOfAux_congr <;> omega
 
 -- Single general `@[partial_fixpoint_monotone]` lemma.
 -- The tactic sees `fun x => oneOf (gens x)` and uses this lemma,
