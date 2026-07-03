@@ -203,7 +203,7 @@ theorem support_oneOf
     {gs : List (Unit → SPMF α)}
     (hne : gs ≠ []) :
     support (oneOf gs hne) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
-  simp only [oneOf, support_bind, support_map, support_choose]
+  simp only [oneOf, Helpers.oneOfAux, support_bind, support_map, support_choose]
   ext a
   dsimp only [Set.mem_setOf_eq]
   constructor

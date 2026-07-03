@@ -39,6 +39,17 @@ def frequencyAux [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
     else
       frequencyAux xs (n - k) (by dsimp at h; omega)
 
+/-- Implementation of the `oneOf` combinator, with the upper bound of the random
+    index draw exposed as a parameter `n` (`oneOf` instantiates it with
+    `gs.length - 1`). Keeping the bound a variable is what allows
+    `oneOfAux_congr` to transport equalities about the bound by `subst`, which
+    the monotonicity proof `oneOf_le` relies on
+    (see `docs/oneOf_le_proof_notes.md`). -/
+def oneOfAux [Gen G] (l : List (Unit → G α)) (n : Nat)
+    (hlt : ∀ i, i ≤ n → i < l.length) : G α := do
+  let ⟨i, _, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
+  (l[i]'(hlt i hle_i)) ()
+
 end Helpers
 
 /-- Generates an element of the list `xs` at random.
@@ -53,17 +64,11 @@ def elements [Gen G] (xs : List α) (hne : xs ≠ []) : G α := do
   return xs[i]'hlt
 
 /-- Picks one of the generators in `gs` at random.
-    This combinator takes as input a proof that `xs` is non-empty. -/
-def oneOf [Gen G] (gs : List (Unit → G α)) (hne : gs ≠ []) : G α := do
-  let ⟨i, ⟨ hge, hle ⟩⟩ ← ULift.down <$> RandomChoice.choose 0 (gs.length - 1) (by omega)
-  -- Obtain a proof that the list indexing is in-bounds
-  have hlen : 0 < gs.length := by
-    apply length_pos_iff.mpr
-    assumption
-  have hlt : i < gs.length := by omega
-  -- This let-definition is necessary, as Lean has trouble parsing `gs[i]'hlt ()`
-  let thunked_gen := gs[i]'hlt
-  thunked_gen ()
+    This combinator takes as input a proof that `gs` is non-empty. -/
+def oneOf [Gen G] (gs : List (Unit → G α)) (hne : gs ≠ []) : G α :=
+  Helpers.oneOfAux gs (gs.length - 1) fun i hi => by
+    have hlen : 0 < gs.length := length_pos_iff.mpr hne
+    omega
 
 /-- `frequency` picks a generator from the list `gs` according to the weights in `gs`.
     This combinators also takes an additional hypothesis that the sum of the weights
@@ -131,38 +136,46 @@ theorem List.monotone_cons
       have all_elts_le := (hfs x y hxy).2
       apply all_elts_le
 
-private theorem oneOf_choose_irrelevant [Gen G] (l : List (Unit → G α))
-    (n₁ n₂ : Nat) (h₁ : 0 ≤ n₁) (h₂ : 0 ≤ n₂) (hlen : n₁ = n₂)
-    (hlt₁ : ∀ i, i ≤ n₁ → i < l.length)
-    (hlt₂ : ∀ i, i ≤ n₂ → i < l.length) :
-    (do let ⟨i, _, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 n₁ h₁
-        let g := l[i]'(hlt₁ i hle_i)
-        g ()) =
-    (do let ⟨i, _, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 n₂ h₂
-        let g := l[i]'(hlt₂ i hle_i)
-        g ()) := by
-  subst hlen; rfl
+/-- Reflexivity of `⊑` up to propositional equality. -/
+private theorem rel_of_eq {β : Sort u} [PartialOrder β] {a b : β} (h : a = b) : a ⊑ b := by
+  subst h
+  exact PartialOrder.rel_refl
 
+/-- `oneOfAux` is congruent in the choice bound. Because the bound is a
+    variable of `oneOfAux` (rather than the hard-wired `l.length - 1` it gets
+    from `oneOf`), the hypothesis `hn` can be `subst`-ed, transporting across
+    the subtype bound baked into the return type of `RandomChoice.choose`
+    (which no rewrite can do in place). The in-bounds hypotheses are
+    propositions, so proof irrelevance closes the rest. -/
+private theorem oneOfAux_congr [Gen G] (l : List (Unit → G α)) (n₁ n₂ : Nat)
+    (hn : n₁ = n₂)
+    (hlt₁ : ∀ i, i ≤ n₁ → i < l.length) (hlt₂ : ∀ i, i ≤ n₂ → i < l.length) :
+    Helpers.oneOfAux l n₁ hlt₁ = Helpers.oneOfAux l n₂ hlt₂ := by
+  subst hn
+  rfl
+
+/-- Monotonicity of `oneOf`: pointwise-ordered generator lists yield ordered
+    generators. The proof goes through the intermediate `Helpers.oneOfAux l2`
+    drawn with `l1`'s bound: the first leg compares continuations under the
+    same `choose` call via `MonoBind.bind_mono_right`, and the second leg is a
+    propositional equality (`oneOfAux_congr`), since the two `choose` calls
+    differ only in a bound that the length equality identifies. -/
 theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) (h1 : l1 ≠ []) (h2 : l2 ≠ []) :
     oneOf l1 h1 ⊑ oneOf l2 h2 := by
   obtain ⟨hlen_eq, hle⟩ := h
   have h1len : 0 < l1.length := List.length_pos_iff.mpr h1
   have h2len : 0 < l2.length := List.length_pos_iff.mpr h2
-  simp only [oneOf]
-  apply PartialOrder.rel_trans (y := do
-      let ⟨i, hge, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 (l1.length - 1) (by omega)
-      let g := l2[i]'(by omega)
-      g ())
+  apply PartialOrder.rel_trans
+    (y := Helpers.oneOfAux l2 (l1.length - 1) (fun i hi => by omega))
   case a =>
+    simp only [oneOf, Helpers.oneOfAux]
     apply MonoBind.bind_mono_right
     intro ⟨i, hge, hle_i⟩
     exact (hle i (by omega) (by omega)) ()
   case a =>
-    dsimp only []
-    have hlen_sub : l1.length - 1 = l2.length - 1 := by omega
-    have heq : oneOf l2 h2 = oneOf l2 h2 := rfl
-    simp only [oneOf, hlen_sub] at heq
-    sorry
+    simp only [oneOf]
+    exact rel_of_eq (oneOfAux_congr l2 (l1.length - 1) (l2.length - 1) (by omega)
+      (fun i hi => by omega) (fun i hi => by omega))
 
 -- Single general `@[partial_fixpoint_monotone]` lemma.
 -- The tactic sees `fun x => oneOf (gens x)` and uses this lemma,
