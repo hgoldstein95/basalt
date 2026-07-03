@@ -143,7 +143,7 @@ theorem List.monotone_cons
 
 /-- If two terms `a, b` are propositionally equal (i.e. `a = b`),
     then `a ⊑ b`, i.e. `⊑` is reflexive up to propositional equality. -/
-private theorem rel_of_eq {β : Sort u} [PartialOrder β] {a b : β} (h : a = b) : a ⊑ b := by
+private theorem le_of_eq {β : Sort u} [PartialOrder β] {a b : β} (h : a = b) : a ⊑ b := by
   subst h
   exact PartialOrder.rel_refl
 
@@ -180,7 +180,7 @@ theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) (h1 : l1
     -- Turn ⊑ in the goal into an ordinary equality =,
     -- then use the fact that oneOfAux is congruent in the choice of
     -- upper bound for the random index
-    apply rel_of_eq
+    apply le_of_eq
     apply oneOfAux_congr <;> omega
 
 -- Single general `@[partial_fixpoint_monotone]` lemma.
