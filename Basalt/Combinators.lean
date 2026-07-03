@@ -104,14 +104,15 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
       . apply hle1
         omega
       . apply hle2
-  rel_antisymm h12 h21 := by
-    obtain ⟨hlen, helem12⟩ := h12
-    obtain ⟨_, helem21⟩ := h21
+  rel_antisymm := by
+    intro x y hxy hyx
+    obtain ⟨hlen, helem_xy⟩ := hxy
+    obtain ⟨_, helem_yx⟩ := hyx
     apply List.ext_getElem hlen
-    intro i hi1 hi2
+    intro i hx hy
     apply PartialOrder.rel_antisymm
-    . apply helem12
-    . apply helem21
+    . apply helem_xy
+    . apply helem_yx
 
 -- Lets the tactic decompose a list literal `[e₁, e₂, …]` = `e₁ :: (e₂ :: …)`
 -- into one element at a time; the empty-list base case is handled by the
