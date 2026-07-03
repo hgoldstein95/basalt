@@ -116,8 +116,9 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     . apply helem_xy
     . apply helem_yx
 
--- This lemma lets the `monotonicity` tactic decompose a list literal `[e₁, e₂, …]` into `e₁ :: (e₂ :: …)`
--- when all the `eᵢ` are functions
+/- This lemma lets the `monotonicity` tactic (invoked by `partial_fixpoint` under the hood)
+   decompose a list literal `[e₁, e₂, …]` into `e₁ :: (e₂ :: …)`
+   when all the `eᵢ` are functions. -/
 @[partial_fixpoint_monotone]
 theorem List.monotone_cons
     {α : Type u} {γ : Sort w} [PartialOrder α] [PartialOrder γ]
@@ -183,9 +184,10 @@ theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) (h1 : l1
     apply le_of_eq
     apply oneOfAux_congr <;> omega
 
--- Single general `@[partial_fixpoint_monotone]` lemma.
--- The tactic sees `fun x => oneOf (gens x)` and uses this lemma,
--- having already established `monotone gens` via `List.monotone_cons`.
+/-- Single general `@[partial_fixpoint_monotone]` lemma.
+    The `monotonicity` tactic (invoked by `partial_fixpoint` under the hood)
+    sees `fun x => oneOf (gens x)` and uses this lemma,
+    having already established `monotone gens` via `List.monotone_cons`. -/
 @[partial_fixpoint_monotone]
 theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (gs : γ → List (Unit → G α)) (hne : ∀ x, gs x ≠ []) (hmono : monotone gs) :
