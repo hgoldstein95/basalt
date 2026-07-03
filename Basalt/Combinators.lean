@@ -40,7 +40,9 @@ def frequencyAux [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
       frequencyAux xs (n - k) (by dsimp at h; omega)
 
 /-- Implementation of the `oneOf` combinator, parameterized by an upper bound `n`
-    of the random index. (`oneOf` instantiates `n` with `gs.length - 1`).
+    for the random index. The caller is required to supply a proof that `n`
+    is strictly less than the list's length.
+    (`oneOf` instantiates `n` with `gs.length - 1`).
     Making the upper bound a parameter allows us to use the `oneOfAux_congr` lemma below
     to propogate equalities about the bound via `subst`, which
     is used in the monotonicity proof for `oneOf` (`oneOf_le`). -/
@@ -114,9 +116,8 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     . apply helem_xy
     . apply helem_yx
 
--- Lets the tactic decompose a list literal `[e₁, e₂, …]` = `e₁ :: (e₂ :: …)`
--- into one element at a time; the empty-list base case is handled by the
--- tactic's existing constant-expression rule.
+-- This lemma lets the `monotonicity` tactic decompose a list literal `[e₁, e₂, …]` into `e₁ :: (e₂ :: …)`
+-- when all the `eᵢ` are functions
 @[partial_fixpoint_monotone]
 theorem List.monotone_cons
     {α : Type u} {γ : Sort w} [PartialOrder α] [PartialOrder γ]
@@ -146,18 +147,17 @@ private theorem rel_of_eq {β : Sort u} [PartialOrder β] {a b : β} (h : a = b)
   subst h
   exact PartialOrder.rel_refl
 
-/-- `oneOfAux` is congruent in the choice bound. Because the bound is a
-    variable of `oneOfAux` (rather than the hard-wired `l.length - 1` it gets
-    from `oneOf`), the hypothesis `hn` can be `subst`-ed, transporting across
-    the subtype bound baked into the return type of `RandomChoice.choose`
-    (which no rewrite can do in place). The in-bounds hypotheses are
-    propositions, so proof irrelevance closes the rest. -/
+/-- `oneOfAux` is congruent in the upper bound `n` for the random index,
+    i.e. if `n1 = n2`, then `oneOfAux l n1 = oneOfAux l n2`.
+    Since `n` is a parameter to `oneOfAux`, we can `subst` the equality `n1 = n2`
+    in the return type of `RandomChoice.choose`. -/
 private theorem oneOfAux_congr [Gen G] (l : List (Unit → G α)) (n₁ n₂ : Nat)
     (hn : n₁ = n₂)
     (hlt₁ : ∀ i, i ≤ n₁ → i < l.length) (hlt₂ : ∀ i, i ≤ n₂ → i < l.length) :
     Helpers.oneOfAux l n₁ hlt₁ = Helpers.oneOfAux l n₂ hlt₂ := by
   subst hn
   rfl
+
 /-- Monotonicity of `oneOf`: if lists `l1, l2` are both non-empty (`h1, h2`) and `l1 ⊑ l2`,
     then `oneOf l1 h1 ⊑ oneOf l2 h2` -/
 theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) (h1 : l1 ≠ []) (h2 : l2 ≠ []) :
@@ -178,7 +178,8 @@ theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) (h1 : l1
   . -- oneOfAux l2 (l1.length - 1) ⊑ oneOf l2 h2
     simp only [oneOf]
     -- Turn ⊑ in the goal into an ordinary equality =,
-    -- then use the fact that oneOfAux is congruent
+    -- then use the fact that oneOfAux is congruent in the choice of
+    -- upper bound for the random index
     apply rel_of_eq
     apply oneOfAux_congr <;> omega
 
@@ -195,10 +196,7 @@ theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
   apply hmono
   assumption
 
--- ============================================================
--- § 5  End-to-end: `partial_fixpoint` now succeeds
--- ============================================================
-
+-- Example generator definition that uses `oneOf` and `partial_fixpoint`
 def myGen [Gen G] : Unit → G Nat := fun _ =>
   let gs := [fun _ => pure 0, fun _ => do let n ← myGen (); pure (n + 1)]
   have hne : gs ≠ [] := by
