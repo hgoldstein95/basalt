@@ -5,6 +5,7 @@ Authors: Harrison Goldstein & Ernest Ng
 -/
 
 import Basalt.Gen
+import Basalt.IO
 import Basalt.RandomChoice
 
 open Lean.Order
@@ -198,10 +199,15 @@ theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
   apply hmono
   assumption
 
--- Example generator definition that uses `oneOf` and `partial_fixpoint`
+-- Example generator that uses `oneOf` and `partial_fixpoint`
+-- (returns either `2` or some `Nat` greater than 2)
 def myGen [Gen G] : Unit → G Nat := fun _ =>
-  let gs := [fun _ => pure 0, fun _ => do let n ← myGen (); pure (n + 1)]
+  let gs := [fun _ => pure 2, fun _ => do let n ← myGen (); pure (n + 1)]
   have hne : gs ≠ [] := by
     apply cons_ne_nil
   oneOf gs hne
 partial_fixpoint
+
+#guard_msgs(drop info) in
+#eval (for _ in [0:20] do
+  IO.println <| repr (← myGen ()) : IO Unit)
