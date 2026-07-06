@@ -117,14 +117,18 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     . apply helem_xy
     . apply helem_yx
 
--- Same partial order as above, but adapted to work with lists containing weighted elements
--- (w1, g1) ⊑ (w2, g2) ≝  w1 ≤ g1 ∧ g1 ⊑ g2
+-- Same partial order as above, but adapted to work with `List (Nat × α)`, where:
+-- (w1, g1) ⊑ (w2, g2) ≝ w1 = w2 ∧ g1 ⊑ g2
+-- Note that if we instead had w1 ≤ w2, `frequency` would no longer be monotone,
+-- since increasing the weight of one sub-generator passed to `frequency`
+-- would cause the weights of other sub-generators to decrease (as the two lists
+-- `l1, l2` are constrianed to have the same length).
 instance {α : Type u} [PartialOrder α] :
     PartialOrder (List (Nat × α)) where
   rel l1 l2 :=
     l1.length = l2.length ∧
     ∀ (i : Nat) (h1 : i < l1.length) (h2 : i < l2.length),
-      l1[i].1 ≤ l2[i].1 ∧ l1[i].2 ⊑ l2[i].2
+      l1[i].1 = l2[i].1 ∧ l1[i].2 ⊑ l2[i].2
   -- Reflexivity
   rel_refl := by
     intro xs
@@ -164,7 +168,7 @@ instance {α : Type u} [PartialOrder α] :
     obtain ⟨ hyx1, hyx2 ⟩ := helem_yx
     apply Prod.ext_iff.mpr
     constructor
-    . apply Nat.le_antisymm <;> assumption
+    . assumption
     . apply PartialOrder.rel_antisymm <;> assumption
 
 /- This lemma lets the `monotonicity` tactic (invoked by `partial_fixpoint` under the hood)
