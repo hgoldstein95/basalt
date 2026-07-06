@@ -90,12 +90,14 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
   rel l1 l2 :=
     l1.length = l2.length ∧
     ∀ (i : Nat) (h1 : i < l1.length) (h2 : i < l2.length), l1[i] ⊑ l2[i]
+  -- Reflexivity
   rel_refl := by
     intro xs
     constructor
     . rfl
     . intro i _ _
       apply PartialOrder.rel_refl
+  -- Transitivity
   rel_trans := by
     intro xs ys zs h12 h23
     obtain ⟨heq1, hle1⟩ := h12
@@ -107,6 +109,7 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
       . apply hle1
         omega
       . apply hle2
+  -- Antisymmetry
   rel_antisymm := by
     intro x y hxy hyx
     obtain ⟨hlen, helem_xy⟩ := hxy
@@ -198,16 +201,3 @@ theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
   apply oneOf_le
   apply hmono
   assumption
-
--- Example generator that uses `oneOf` and `partial_fixpoint`
--- (returns either `2` or some `Nat` greater than 2)
-def myGen [Gen G] : Unit → G Nat := fun _ =>
-  let gs := [fun _ => pure 2, fun _ => do let n ← myGen (); pure (n + 1)]
-  have hne : gs ≠ [] := by
-    apply cons_ne_nil
-  oneOf gs hne
-partial_fixpoint
-
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← myGen ()) : IO Unit)
