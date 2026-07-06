@@ -242,6 +242,52 @@ private theorem frequencyAux_congr [Gen G] (l : List (Nat × (Unit → G α))) (
   subst hn
   rfl
 
+
+
+/-- Monotonicity of `frequencySelect` traversal: if `l1 ⊑ l2` and the same random index `n` is
+    in range for both lists,
+    then `frequencySelect l1 n ... ⊑ frequencySelect l2 n ...` -/
+private theorem frequencySelect_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} {n : Nat}
+    (hle : l1 ⊑ l2)
+    (h1 : n < List.sum (List.map Prod.fst l1))
+    (h2 : n < List.sum (List.map Prod.fst l2)) :
+    Helpers.frequencySelect l1 n h1 ⊑ Helpers.frequencySelect l2 n h2 := by
+  induction l1 generalizing n l2 with
+  | nil => contradiction
+  | cons hd xs IH =>
+    obtain ⟨k, g⟩ := hd
+    obtain ⟨hlen_eq, hrel⟩ := hle
+    cases l2 with
+    | nil => contradiction
+    | cons hd' ys =>
+      obtain ⟨k', g'⟩ := hd'
+      -- Instantiate `hrel` with 0 to reason about the head of the two lists
+      have hzero := hrel 0 (by simp) (by simp)
+      obtain ⟨hweight, helt⟩ := hzero
+      -- This simplifies `hweight` and `helt` to `k = k'`, `g ⊑ g'`
+      simp [List.getElem_cons_zero] at hweight helt
+      subst hweight
+      -- Case analysis on how the `if`-expression in `frequencySelect` evaluate
+      unfold Helpers.frequencySelect
+      split
+      . -- n < k
+        apply helt
+      . -- ¬ (n < k)
+        have htail : xs ⊑ ys := by
+          constructor
+          . injection hlen_eq
+          . intro i hi1 hi2
+            -- Note that `((k, g) :: xs)[i + 1] = xs[i]`, so
+            -- we can just instantiate `hrel` (the ⊑ relation on lists)
+            -- with `i + 1` and directly apply `hrel`
+            specialize hrel (i + 1)
+            dsimp at hrel
+            apply hrel <;> omega
+        apply IH
+        assumption
+
+
+
 /-- Monotonicity of `oneOf`: if lists `l1, l2` are both non-empty (`h1, h2`) and `l1 ⊑ l2`,
     then `oneOf l1 h1 ⊑ oneOf l2 h2` -/
 theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) (h1 : l1 ≠ []) (h2 : l2 ≠ []) :
