@@ -137,57 +137,35 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     . apply helem_xy
     . apply helem_yx
 
--- Same partial order as above, but adapted to work with `List (Nat × α)`, where:
--- (w1, g1) ⊑ (w2, g2) ≝ w1 = w2 ∧ g1 ⊑ g2
--- Note that if we instead had w1 ≤ w2, `frequency` would no longer be monotone,
--- since increasing the weight of one sub-generator passed to `frequency`
--- would cause the weights of other sub-generators to decrease (as the two lists
--- `l1, l2` are constrianed to have the same length).
-instance {α : Type u} [PartialOrder α] :
-    PartialOrder (List (Nat × α)) where
-  rel l1 l2 :=
-    l1.length = l2.length ∧
-    ∀ (i : Nat) (h1 : i < l1.length) (h2 : i < l2.length),
-      l1[i].1 = l2[i].1 ∧ l1[i].2 ⊑ l2[i].2
+/-- Partial order on `Nat × α` pairs:
+      `(w₁, g₁) ⊑ (w₂, g₂) ≝ w₁ = w₂ ∧ g₁ ⊑ g₂`.
+    The `nat` weight uses the *discrete* order (`=`) and the second element uses `α`'s order.
+    Note that if we instead had w1 ≤ w2, `frequency` would no longer be monotone,
+    since increasing the weight of one sub-generator passed to `frequency`
+    would cause the weights of other sub-generators to decrease (as the two lists
+    `l1, l2` are constrianed to have the same length). -/
+instance {α : Type u} [PartialOrder α] : PartialOrder (Nat × α) where
+  rel p q := p.1 = q.1 ∧ p.2 ⊑ q.2
   -- Reflexivity
   rel_refl := by
-    intro xs
+    intro p
     constructor
     . rfl
-    . intro i _ _
-      constructor
-      . constructor
-      . apply PartialOrder.rel_refl
+    . apply PartialOrder.rel_refl
   -- Transitivity
   rel_trans := by
-    intro xs ys zs h12 h23
-    obtain ⟨heq1, hle1⟩ := h12
-    obtain ⟨heq2, hle2⟩ := h23
+    intro p q r hpq hqr
+    obtain ⟨hw1, hg1⟩ := hpq
+    obtain ⟨hw2, hg2⟩ := hqr
     constructor
-    . apply Eq.trans <;> assumption
-    . intro i h1 h2
-      specialize hle1 i h1 (by omega)
-      obtain ⟨ hle1_weight, hle1_elt ⟩ := hle1
-      specialize hle2 i (by omega) h2
-      obtain ⟨ hle2_weight, hle2_elt ⟩ := hle2
-      constructor
-      . omega
-      . apply PartialOrder.rel_trans
-        . apply hle1_elt
-        . apply hle2_elt
+    . apply hw1.trans; assumption
+    . apply PartialOrder.rel_trans <;> assumption
   -- Antisymmetry
   rel_antisymm := by
-    intro x y hxy hyx
-    obtain ⟨hlen, helem_xy⟩ := hxy
-    obtain ⟨_, helem_yx⟩ := hyx
-    apply List.ext_getElem hlen
-    intro i hx hy
-    specialize helem_xy i hx hy
-    specialize helem_yx i hy hx
-    obtain ⟨hxy1, hxy2⟩ := helem_xy
-    obtain ⟨hyx1, hyx2⟩ := helem_yx
-    apply Prod.ext_iff.mpr
-    constructor
+    intro p q hpq hqp
+    obtain ⟨hw, hg⟩ := hpq
+    obtain ⟨_, hg'⟩ := hqp
+    apply Prod.ext
     . assumption
     . apply PartialOrder.rel_antisymm <;> assumption
 
@@ -340,6 +318,38 @@ theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
   intro x y hxy
   unfold monotone at hmono
   apply oneOf_le
+  apply hmono
+  assumption
+
+/-- Lets the `monotonicity` tactic build a monotone weighted entry `(w, g x)`
+    for a `frequency` list: the weight `w` is a constant and the generator `g`
+    is monotone. Mirrors `List.monotone_cons`, but for the pair that sits at
+    each position of a `frequency` list literal `[(w₁, g₁), …]`. -/
+@[partial_fixpoint_monotone]
+theorem monotone_pair_snd {α : Type u} {γ : Sort w} [PartialOrder α] [PartialOrder γ]
+    (w : Nat) (g : γ → α) (hg : monotone g) :
+    monotone (fun x => (w, g x)) := by
+  intro x y hxy
+  exact ⟨rfl, hg x y hxy⟩
+
+/-- Monotonicity of `frequency`: if `l1 ⊑ l2` (equal weights, pointwise-related
+      generators) and both have positive total weight (`h1, h2`), then
+      `frequency l1 h1 ⊑ frequency l2 h2`. -/
+theorem frequency_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} (h : l1 ⊑ l2)
+    (h1 : 0 < List.sum (List.map Prod.fst l1))
+    (h2 : 0 < List.sum (List.map Prod.fst l2)) :
+    frequency l1 h1 ⊑ frequency l2 h2 := by
+  sorry
+
+/-- Lemma allowing us to use `frequency` in functions marked as `partial_fixpoint`
+    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
+@[partial_fixpoint_monotone]
+theorem monotone_frequency [Gen G] {γ : Sort w} [PartialOrder γ]
+    (gs : γ → List (Nat × (Unit → G α))) (hne : ∀ x, 0 < List.sum (List.map Prod.fst (gs x))) (hmono : monotone gs) :
+    monotone (fun x => frequency (gs x) (hne x)) := by
+  unfold monotone at *
+  intro x y hxy
+  apply frequency_le
   apply hmono
   assumption
 
