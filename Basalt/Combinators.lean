@@ -184,8 +184,8 @@ instance {α : Type u} [PartialOrder α] :
     intro i hx hy
     specialize helem_xy i hx hy
     specialize helem_yx i hy hx
-    obtain ⟨ hxy1, hxy2 ⟩ := helem_xy
-    obtain ⟨ hyx1, hyx2 ⟩ := helem_yx
+    obtain ⟨hxy1, hxy2⟩ := helem_xy
+    obtain ⟨hyx1, hyx2⟩ := helem_yx
     apply Prod.ext_iff.mpr
     constructor
     . assumption
@@ -286,7 +286,23 @@ private theorem frequencySelect_le [Gen G] {l1 l2 : List (Nat × (Unit → G α)
         apply IH
         assumption
 
-
+/-- If two lists `l1, l2 : List (Nat × α)` satisfy `l1 ⊑ l2`, then the sum of their weights
+    must be equal -/
+private theorem sumOfWeights_le {α : Type u} [PartialOrder α] {l1 l2 : List (Nat × α)}
+      (hle : l1 ⊑ l2) :
+      List.sum (List.map Prod.fst l1) = List.sum (List.map Prod.fst l2) := by
+  obtain ⟨hlen, hrel⟩ := hle
+  congr 1
+  -- Need to show `map Prod.fst l1 = map Prod.fst l2`
+  apply List.ext_getElem
+  . repeat rw [List.length_map]
+    assumption
+  . intro i h1 h2
+    rw [List.length_map] at h1 h2
+    specialize hrel i h1 h2
+    obtain ⟨hlen, hle⟩ := hrel
+    simp only [getElem_map]
+    assumption
 
 /-- Monotonicity of `oneOf`: if lists `l1, l2` are both non-empty (`h1, h2`) and `l1 ⊑ l2`,
     then `oneOf l1 h1 ⊑ oneOf l2 h2` -/
