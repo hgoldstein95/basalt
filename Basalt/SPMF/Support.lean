@@ -249,17 +249,17 @@ theorem mem_support_oneOf_iff
   simp [support_oneOf]
 
 
-/-- If `n < sum (fst <$> gs)`, then `frequencyAux gs n h` picks a sub-generator
+/-- If `n < sum (fst <$> gs)`, then `frequencySelect gs n h` picks a sub-generator
     from `gs` that has non-zero weight `w` -/
-private theorem frequencyAux_mem
+private theorem frequencySelect_mem
     {gs : List (Nat × (Unit → SPMF α))}
     {n : Nat}
     (h : n < (List.map Prod.fst gs).sum) :
-    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ Helpers.frequencyAux gs n h = g () := by
+    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ Helpers.frequencySelect gs n h = g () := by
   induction gs generalizing n with
   | nil => simp at h
   | cons hd tl ih =>
-    unfold Helpers.frequencyAux
+    unfold Helpers.frequencySelect
     obtain ⟨ w, g ⟩ := hd
     split
     · -- n < w
@@ -281,19 +281,19 @@ private theorem frequencyAux_mem
       . -- (w', g') ∈ (w, g) :: tl
         apply List.mem_cons_of_mem
         assumption
-      . -- 0 < w' ∧ frequencyAux tl (n - w) = g'
+      . -- 0 < w' ∧ frequencySelect tl (n - w) = g'
         constructor <;> assumption
 
 /-- If a weighted generator `(w, g) ∈ gs` where the weight `w` is non-zero,
     then there exists `n` with a proof `h : n < sum (fst <$> gs)` such that
-    `frequencyAux gs n h = g ()` -/
-private theorem frequencyAux_n_exists
+    `frequencySelect gs n h = g ()` -/
+private theorem frequencySelect_n_exists
     {gs : List (Nat × (Unit → SPMF α))}
     {w : Nat}
     {g : Unit → SPMF α}
     (hmem : (w, g) ∈ gs)
     (hnonzero : 0 < w) :
-    ∃ n, ∃ h : n < List.sum (List.map Prod.fst gs), Helpers.frequencyAux gs n h = g () := by
+    ∃ n, ∃ h : n < List.sum (List.map Prod.fst gs), Helpers.frequencySelect gs n h = g () := by
   induction gs with
   | nil => contradiction
   | cons hd tl ih =>
@@ -302,7 +302,7 @@ private theorem frequencyAux_n_exists
       refine ⟨0, ?_, ?_⟩
       · dsimp only [List.map_cons, List.sum_cons]
         omega
-      · unfold Helpers.frequencyAux
+      · unfold Helpers.frequencySelect
         simp [hnonzero]
     · -- (w, g) ∈ tl
       obtain ⟨n, h_n, h_eq⟩ := ih h_tl
@@ -311,8 +311,8 @@ private theorem frequencyAux_n_exists
       · -- w' + n < (fst <$> gs).sum
         dsimp only [List.map_cons, List.sum_cons]
         omega
-      · -- frequencyAux gs n h = g ()
-        unfold Helpers.frequencyAux
+      · -- frequencySelect gs n h = g ()
+        unfold Helpers.frequencySelect
         have hcontra : ¬ (w' + n < w') := by omega
         simp only [hcontra]
         simp only [show w' + n - w' = n from by omega]
@@ -331,10 +331,11 @@ theorem support_frequency
   constructor
   · -- a ∈ support (frequency gs h_pos) -> ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support
     intro h
-    simp only [frequency, support_bind, support_map, support_choose, mem_support_dite_iff] at h
+    simp only [frequency, Helpers.frequencyAux, support_bind, support_map, support_choose,
+      mem_support_dite_iff] at h
     obtain ⟨i, h_idx, (⟨hlt, hsupp⟩ | ⟨hn, _⟩)⟩ := h
-    · -- i < sum of weights ∧ a ∈ frequencyAux.support
-      obtain ⟨w, g, hwg, hwg_pos, heq⟩ := frequencyAux_mem hlt
+    · -- i < sum of weights ∧ a ∈ frequencySelect.support
+      obtain ⟨w, g, hwg, hwg_pos, heq⟩ := frequencySelect_mem hlt
       rw [heq] at hsupp
       exists w, g
     ·  -- ¬(i < sum of weights) ∧ a ∈ default.support
@@ -343,9 +344,10 @@ theorem support_frequency
       rw [← hi] at *
       contradiction
   · -- ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support -> a ∈ support (frequency gs h_pos)
-    simp only [frequency, support_bind, support_map, support_choose, mem_support_dite_iff]
+    simp only [frequency, Helpers.frequencyAux, support_bind, support_map, support_choose,
+      mem_support_dite_iff]
     intro ⟨w, g, hwg_mem, hwt, ha⟩
-    obtain ⟨n, hlt, heq⟩ := frequencyAux_n_exists hwg_mem hwt
+    obtain ⟨n, hlt, heq⟩ := frequencySelect_n_exists hwg_mem hwt
     have hle : n ≤ (List.map Prod.fst gs).sum - 1 := by omega
     refine ⟨⟨ n, ⟨ by omega, hle ⟩ ⟩, ?_, ?_⟩
     . dsimp
@@ -353,7 +355,7 @@ theorem support_frequency
       . -- 0 ≤ n ∧ n ≤ (fst <$> gs).sum - 1
         apply Set.mem_univ
       . rfl
-    . -- Goal: `a ∈ frequencyAux.support ∨ a ∈ default.support`
+    . -- Goal: `a ∈ frequencySelect.support ∨ a ∈ default.support`
       -- (We pick the left branch)
       left
       exists hlt

@@ -17,7 +17,7 @@ This file defines various generator combinators:
 - `elements`: generates an element from a non-empty list at random
 - `oneOf`: picks from a list of generators uniformly at random selection
 - `frequency`: like `oneOf`, but performs weighted random selection
-- `frequencyAux`: helper function that traverses the list of weights
+- `frequencySelect`: helper function that traverses the list of weights
    to select a generator for a given random index
 -/
 
@@ -26,11 +26,11 @@ open List
 namespace Helpers
 
 /-- Helper function for the `frequency` combinator:
-    `frequencyAux xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
+    `frequencySelect xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
      This function expects a proof `h : n < sum(xs)`, which makes the empty-list case in
      the pattern-match irrefutable, since `n < 0` is `False` (this is discharged
      immediately by `contradiction`). -/
-def frequencyAux [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
+def frequencySelect [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
     (h : n < List.sum (List.map Prod.fst xs)) : G α :=
   match xs with
   | [] => by contradiction
@@ -38,7 +38,7 @@ def frequencyAux [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
     if hlt : n < k then
       x ()
     else
-      frequencyAux xs (n - k) (by dsimp at h; omega)
+      frequencySelect xs (n - k) (by dsimp at h; omega)
 
 /-- Implementation of the `oneOf` combinator, parameterized by an upper bound `n`
     for the random index. The caller is required to supply a proof that `n`
@@ -51,6 +51,28 @@ def oneOfAux [Gen G] (l : List (Unit → G α)) (n : Nat)
     (hlt : ∀ i, i ≤ n → i < l.length) : G α := do
   let ⟨i, _, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
   (l[i]'(hlt i hle_i)) ()
+
+/-- Implementation of the `frequency` combinator, parameterized by the total
+    weight `total`, which serves as the (exclusive) upper bound for the random
+    index. The caller supplies a proof `htotal` that `total` really is the sum of
+    the weights in `gs`. (`frequency` instantiates `total` with
+    `List.sum (List.map Prod.fst gs)`.)
+
+    This helper plays the same role for `frequency` that `oneOfAux` plays for
+    `oneOf`: it is the `do`-block wrapping the random `RandomChoice.choose`, and
+    it delegates the actual generator selection to `frequencySelect` (just as
+    `oneOfAux` delegates to the list indexing `l[i]`).
+
+    Making the bound `total` a parameter lets us use the `frequencyAux_congr`
+    lemma to propagate equalities about the total via `subst`, which is used in
+    the monotonicity proof for `frequency` (`frequency_le`). -/
+def frequencyAux [Gen G] (gs : List (Nat × (Unit → G α))) (total : Nat)
+    (htotal : total = List.sum (List.map Prod.fst gs)) : G α := do
+  let n ← ULift.down <$> RandomChoice.choose 0 (total - 1) (Nat.zero_le _)
+  if hn : n < total then
+    frequencySelect gs n (by omega)
+  else
+    default
 
 end Helpers
 
@@ -77,10 +99,8 @@ def oneOf [Gen G] (gs : List (Unit → G α)) (hne : gs ≠ []) : G α :=
     This combinators also takes an additional hypothesis that the sum of the weights
     in the list is non-zero (this is discharged via `omega` by default). -/
 def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
-  (_h : 0 < List.sum (List.map Prod.fst gs) := by omega) : G α := do
-  let total := List.sum $ List.map Prod.fst gs
-  let n ← ULift.down <$> RandomChoice.choose 0 (total - 1) (by omega)
-  if hn : n < total then Helpers.frequencyAux gs n hn else default
+  (_h : 0 < List.sum (List.map Prod.fst gs) := by omega) : G α :=
+  Helpers.frequencyAux gs (List.sum (List.map Prod.fst gs)) rfl
 
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
     - `l1.length = l2.length`
@@ -211,6 +231,14 @@ private theorem oneOfAux_congr [Gen G] (l : List (Unit → G α)) (n₁ n₂ : N
     (hn : n₁ = n₂)
     (hlt₁ : ∀ i, i ≤ n₁ → i < l.length) (hlt₂ : ∀ i, i ≤ n₂ → i < l.length) :
     Helpers.oneOfAux l n₁ hlt₁ = Helpers.oneOfAux l n₂ hlt₂ := by
+  subst hn
+  rfl
+
+/-- Like `oneOfAux` above, but for `frequencyAux` -/
+private theorem frequencyAux_congr [Gen G] (l : List (Nat × (Unit → G α))) (n1 n2 : Nat)
+    (hn : n1 = n2)
+    (heq1 : n1 = List.sum (List.map Prod.fst l)) (heq2 : n2 = List.sum (List.map Prod.fst l)) :
+    Helpers.frequencyAux l n1 heq1 = Helpers.frequencyAux l n2 heq2 := by
   subst hn
   rfl
 
