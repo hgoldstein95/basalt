@@ -117,6 +117,56 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     . apply helem_xy
     . apply helem_yx
 
+-- Same partial order as above, but adapted to work with lists containing weighted elements
+-- (w1, g1) ⊑ (w2, g2) ≝  w1 ≤ g1 ∧ g1 ⊑ g2
+instance {α : Type u} [PartialOrder α] :
+    PartialOrder (List (Nat × α)) where
+  rel l1 l2 :=
+    l1.length = l2.length ∧
+    ∀ (i : Nat) (h1 : i < l1.length) (h2 : i < l2.length),
+      l1[i].1 ≤ l2[i].1 ∧ l1[i].2 ⊑ l2[i].2
+  -- Reflexivity
+  rel_refl := by
+    intro xs
+    constructor
+    . rfl
+    . intro i _ _
+      constructor
+      . constructor
+      . apply PartialOrder.rel_refl
+  -- Transitivity
+  rel_trans := by
+    intro xs ys zs h12 h23
+    obtain ⟨heq1, hle1⟩ := h12
+    obtain ⟨heq2, hle2⟩ := h23
+    constructor
+    . apply Eq.trans <;> assumption
+    . intro i h1 h2
+      specialize hle1 i h1 (by omega)
+      obtain ⟨ hle1_weight, hle1_elt ⟩ := hle1
+      specialize hle2 i (by omega) h2
+      obtain ⟨ hle2_weight, hle2_elt ⟩ := hle2
+      constructor
+      . omega
+      . apply PartialOrder.rel_trans
+        . apply hle1_elt
+        . apply hle2_elt
+  -- Antisymmetry
+  rel_antisymm := by
+    intro x y hxy hyx
+    obtain ⟨hlen, helem_xy⟩ := hxy
+    obtain ⟨_, helem_yx⟩ := hyx
+    apply List.ext_getElem hlen
+    intro i hx hy
+    specialize helem_xy i hx hy
+    specialize helem_yx i hy hx
+    obtain ⟨ hxy1, hxy2 ⟩ := helem_xy
+    obtain ⟨ hyx1, hyx2 ⟩ := helem_yx
+    apply Prod.ext_iff.mpr
+    constructor
+    . apply Nat.le_antisymm <;> assumption
+    . apply PartialOrder.rel_antisymm <;> assumption
+
 /- This lemma lets the `monotonicity` tactic (invoked by `partial_fixpoint` under the hood)
    decompose a list literal `[e₁, e₂, …]` into `e₁ :: (e₂ :: …)`
    when all the `eᵢ` are functions. -/
