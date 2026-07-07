@@ -286,6 +286,17 @@ theorem IsPMF_vectorOf {g : SPMF α} (hg : IsPMF g) :
       . intro xs
         apply IsPMF_pure
 
+/-- If a generator `g` is an SPMF, then for any `n`, `listOfMaxLength n g` is also an SPMF -/
+theorem IsPMF_listOfMaxLength {g : SPMF α} (hg : IsPMF g) :
+    IsPMF (listOfMaxLength n g) := by
+  unfold listOfMaxLength
+  apply IsPMF_bind
+  . apply IsPMF_map
+    apply IsPMF_choose
+  . intro ⟨x, hge, hle⟩
+    dsimp
+    apply IsPMF_vectorOf
+    assumption
 
 private lemma weighted_avg_mono_ennreal {t p x : ℝ≥0∞}
     (htp : t ≥ p) (hx_le_one : x ≤ 1) (ht_le_one : t ≤ 1) (hp_le_one : p ≤ 1) :
