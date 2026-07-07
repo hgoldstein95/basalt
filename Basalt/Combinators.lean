@@ -110,12 +110,14 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
   rel l1 l2 :=
     l1.length = l2.length ∧
     ∀ (i : Nat) (h1 : i < l1.length) (h2 : i < l2.length), l1[i] ⊑ l2[i]
+  -- Reflexivity
   rel_refl := by
     intro xs
     constructor
     . rfl
     . intro i _ _
       apply PartialOrder.rel_refl
+  -- Transitivity
   rel_trans := by
     intro xs ys zs h12 h23
     obtain ⟨heq1, hle1⟩ := h12
@@ -127,6 +129,7 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
       . apply hle1
         omega
       . apply hle2
+  -- Antisymmetry
   rel_antisymm := by
     intro x y hxy hyx
     obtain ⟨hlen, helem_xy⟩ := hxy
