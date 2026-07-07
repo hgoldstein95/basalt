@@ -1,4 +1,5 @@
 import Basalt
+import Basalt.Combinators
 
 open RandomChoice
 
@@ -31,6 +32,26 @@ def Tree.genBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
         let l ← Tree.genBST lo (x.down.val - 1)
         let r ← Tree.genBST (x.down.val + 1) hi
         return node l x.down.val r)
+partial_fixpoint
+
+/-- A variant of `genBST` which is 5 times more likely to produce non-empty
+    trees compared to leaves (due to the use of the `frequency` combinator).
+    This example demonstrates that we can successfully call `frequency`
+    in functions marked as `partial_fixpoint`.
+
+    Note: the proofs below are for `genBST`, not `genWeightedBST`. -/
+def Tree.genWeightedBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
+  if h : lo > hi then
+    return leaf
+  else
+    frequency [
+      (1, fun _ => pure leaf),
+      (5, fun _ => do
+        let x ← choose lo hi (by omega)
+        let l ← Tree.genWeightedBST lo (x.down.val - 1)
+        let r ← Tree.genWeightedBST (x.down.val + 1) hi
+        return node l x.down.val r)
+    ] (by dsimp; omega)
 partial_fixpoint
 
 /-- `genBST` produces the correct set of inputs. -/
@@ -111,5 +132,11 @@ instance {lo hi : Nat} : LawfulGenerator (Tree.genBST lo hi) (Tree.isBST lo hi) 
 #guard_msgs(drop info) in
 #eval (for _ in [0:20] do
   IO.println <| repr (← Plausible.Gen.run (Tree.genBST (G := Plausible.Gen) 0 10) 10) : IO Unit)
+
+/- `genWeightedBST` can be run in `IO` and indeed generates
+    non-empty trees more frequently than leaves (by inspection) -/
+#guard_msgs(drop info) in
+#eval (for _ in [0:10] do
+  IO.println <| repr (← Tree.genWeightedBST 0 10) : IO Unit)
 
 end BST
