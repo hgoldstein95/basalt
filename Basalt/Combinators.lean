@@ -15,10 +15,11 @@ open Lean.Order
 
 This file defines various generator combinators:
 - `elements`: generates an element from a non-empty list at random
-- `oneOf`: picks from a list of generators uniformly at random selection
+- `oneOf`: picks from a list of generators uniformly at random
 - `frequency`: like `oneOf`, but performs weighted random selection
 - `frequencySelect`: helper function that traverses the list of weights
    to select a generator for a given random index
+- `oneofAux`, `frequencyAux`: internal implementations of the `oneOf` / `frequency` combinators
 -/
 
 open List
@@ -54,16 +55,12 @@ def oneOfAux [Gen G] (l : List (Unit → G α)) (n : Nat)
 
 /-- Implementation of the `frequency` combinator, parameterized by the total
     weight `total`, which serves as the (exclusive) upper bound for the random
-    index. The caller supplies a proof `htotal` that `total` really is the sum of
+    weight `n` sampled via `RandomChoice.choose`.
+    The caller supplies a proof `htotal` that `total` is the sum of
     the weights in `gs`. (`frequency` instantiates `total` with
     `List.sum (List.map Prod.fst gs)`.)
 
-    This helper plays the same role for `frequency` that `oneOfAux` plays for
-    `oneOf`: it is the `do`-block wrapping the random `RandomChoice.choose`, and
-    it delegates the actual generator selection to `frequencySelect` (just as
-    `oneOfAux` delegates to the list indexing `l[i]`).
-
-    Making the bound `total` a parameter lets us use the `frequencyAux_congr`
+    Making `total` a parameter lets us use the `frequencyAux_congr`
     lemma to propagate equalities about the total via `subst`, which is used in
     the monotonicity proof for `frequency` (`frequency_le`). -/
 def frequencyAux [Gen G] (gs : List (Nat × (Unit → G α))) (total : Nat)
@@ -140,13 +137,34 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     . apply helem_xy
     . apply helem_yx
 
-/-- Partial order on `Nat × α` pairs:
-      `(w₁, g₁) ⊑ (w₂, g₂) ≝ w₁ = w₂ ∧ g₁ ⊑ g₂`.
-    The `nat` weight uses the *discrete* order (`=`) and the second element uses `α`'s order.
-    Note that if we instead had w1 ≤ w2, `frequency` would no longer be monotone,
-    since increasing the weight of one sub-generator passed to `frequency`
-    would cause the weights of other sub-generators to decrease (as the two lists
-    `l1, l2` are constrianed to have the same length). -/
+/-- Define a partial order on `Nat × α` where `(w1, g1) ⊑ (w2, g2)` iff `w1 = w2 ∧ g1 ⊑ g2`.
+    (Here we are using the `PartialOrder` on `α` to compare `g1 ⊑ g2`.)
+    This partial order is needed in order to prove monotonicity of the `frequency` combinator.
+
+    Note: we require the two weights `w1 = w2` to be equal (equality on `Nat`s) instead of `≤`.
+    If we instead had `w1 ≤ w2`, `frequency` would no longer be monotone.
+
+    As a counterexample, assume towards a contradiction that we
+    (erroneously) define `(w1, g1) ⊑ (w2, g2)` as `w1 ≤ w2 ∧ g1 ⊑ g2`.
+    Now, consider the case where we want to show `frequency l1 ⊑ frequency l2`,
+    where the weights of the two lists are as follows:
+
+    ```lean
+    l1 = [(1, pure true), (1, pure false)]
+    l2 = [(2, pure true), (1, pure false)]
+    ```
+
+    Note that we increased the weight of the `pure true` sub-generator when we go from `l1` to `l2`,
+    but as a result, the probability of generating `false` decreases!
+
+    P(generating `false` via `frequency l1`) = 1/2
+    P(generating `false` using `frequency l2`) = 1/3
+
+    This violates the ⊑ order on `SPMF α`, since the probability mass of `false` has decreased
+    even though we have `l1 ⊑ l2`!
+
+    As a result, we cannot define `(w1, g1) ⊑ (w2, g2)` as `w1 ≤ w2 ∧ g1 ⊑ g2`,
+    and instead must have `w1 = w2 ∧ g1 ⊑ g2` as the definition of this order. -/
 instance {α : Type u} [PartialOrder α] : PartialOrder (Nat × α) where
   rel p q := p.1 = q.1 ∧ p.2 ⊑ q.2
   -- Reflexivity
@@ -224,10 +242,9 @@ private theorem frequencyAux_congr [Gen G] (l : List (Nat × (Unit → G α))) (
   rfl
 
 
-
-/-- Monotonicity of `frequencySelect` traversal: if `l1 ⊑ l2` and the same random index `n` is
-    in less than each list's sum of weights (`h1, h2`),
-    then `frequencySelect l1 n h1 ⊑ frequencySelect l2 n h2 -/
+/-- Monotonicity of `frequencySelect`: if `l1 ⊑ l2` and the same random weight `n` is
+    in less than each list's sum of weights (`h1`, `h2`),
+    then `frequencySelect l1 n h1 ⊑ frequencySelect l2 n h2` -/
 private theorem frequencySelect_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} {n : Nat}
     (hle : l1 ⊑ l2)
     (h1 : n < List.sum (List.map Prod.fst l1))
@@ -324,10 +341,10 @@ theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
   apply hmono
   assumption
 
-/-- Lets the `monotonicity` tactic build a monotone weighted entry `(w, g x)`
-    for a `frequency` list: the weight `w` is a constant and the generator `g`
-    is monotone. Mirrors `List.monotone_cons`, but for the pair that sits at
-    each position of a `frequency` list literal `[(w₁, g₁), …]`. -/
+/-- This lemma allows the `monotonicity` tactic to reason about pairs of the form
+    `(w, g x)` that appear in the list supplied to the `frequency` combinator.
+    Here, the weight `w` is a constant `Nat` and the generator `g`
+    assumed to be monotone. -/
 @[partial_fixpoint_monotone]
 theorem monotone_pair_snd {α : Type u} {γ : Sort w} [PartialOrder α] [PartialOrder γ]
     (w : Nat) (g : γ → α) (hg : monotone g) :
@@ -336,8 +353,8 @@ theorem monotone_pair_snd {α : Type u} {γ : Sort w} [PartialOrder α] [Partial
   exact ⟨rfl, hg x y hxy⟩
 
 /-- Monotonicity of `frequency`: if `l1 ⊑ l2` (equal weights, pointwise-related
-      generators) and both have positive total weight (`h1, h2`), then
-      `frequency l1 h1 ⊑ frequency l2 h2`. -/
+    generators) and both have positive total weight (`h1, h2`), then
+    `frequency l1 h1 ⊑ frequency l2 h2`. -/
 theorem frequency_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} (h : l1 ⊑ l2)
     (h1 : 0 < List.sum (List.map Prod.fst l1))
     (h2 : 0 < List.sum (List.map Prod.fst l2)) :
@@ -370,7 +387,9 @@ theorem frequency_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} (h : l1 ⊑
     (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
 @[partial_fixpoint_monotone]
 theorem monotone_frequency [Gen G] {γ : Sort w} [PartialOrder γ]
-    (gs : γ → List (Nat × (Unit → G α))) (hne : ∀ x, 0 < List.sum (List.map Prod.fst (gs x))) (hmono : monotone gs) :
+    (gs : γ → List (Nat × (Unit → G α)))
+    (hne : ∀ x, 0 < List.sum (List.map Prod.fst (gs x)))
+    (hmono : monotone gs) :
     monotone (fun x => frequency (gs x) (hne x)) := by
   unfold monotone at *
   intro x y hxy
