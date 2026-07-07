@@ -229,6 +229,21 @@ theorem mem_support_vectorOf_iff
   simp [support_vectorOf]
 
 
+/-- The support of `listOfMaxLength n g` is the set of all lists with length
+    at most `n`, where each element is in `g`'s support -/
+theorem support_listOfMaxLength
+    {n : Nat}
+    {g : SPMF α} :
+    support (listOfMaxLength n g) = { xs | List.length xs ≤ n ∧ ∀ x ∈ xs, x ∈ g.support } := by
+  simp [listOfMaxLength]
+
+@[simp]
+theorem mem_support_listOfMaxLength_iff
+    {n : Nat}
+    {g : SPMF α} :
+    xs ∈ (listOfMaxLength n g).support ↔ xs.length ≤ n ∧ ∀ x ∈ xs, x ∈ g.support := by
+  simp [support_listOfMaxLength]
+
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]
 theorem support_elements

@@ -115,7 +115,7 @@ theorem vectorOf_succ [Gen G] {n : Nat} {g : G α} :
 
 /-- `listOfMaxLength n g` generates a list whose length is unformly distributed
      across `[0, n]`, (i.e. the list may be empty and its maximum possible length
-     is `n`). Each list element is produced by the generator `g`. -/
+     is `n` inclusive). Each list element is produced by the generator `g`. -/
 def listOfMaxLength [Gen G] (n : Nat) (g : G α) : G (List α) := do
   let ⟨k, _⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
   vectorOf k g
