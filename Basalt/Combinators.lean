@@ -339,7 +339,29 @@ theorem frequency_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} (h : l1 ⊑
     (h1 : 0 < List.sum (List.map Prod.fst l1))
     (h2 : 0 < List.sum (List.map Prod.fst l2)) :
     frequency l1 h1 ⊑ frequency l2 h2 := by
-  sorry
+  apply PartialOrder.rel_trans
+    (y := Helpers.frequencyAux l2 (List.sum (List.map Prod.fst l1)) (sumOfWeights_le h))
+  . -- frequency l1 h1 ⊑ frequencyAux (List.sum (Prod.fst <$> l1)) ...
+    simp only [frequency, Helpers.frequencyAux]
+    apply MonoBind.bind_mono_right
+    intro ⟨i, hge, hle_i⟩
+    dsimp at *
+    -- In the goal, we have a dependent `if ... then ... else` on both sides of the ⊑,
+    -- so we case on whether it evaluates to true or false
+    by_cases hi : i < (map Prod.fst l1).sum
+    . -- i < (map Prod.fst l1).sum
+      simp only [dif_pos hi]
+      apply frequencySelect_le
+      assumption
+    . -- ¬ i < (map Prod.fst l1).sum
+      simp only [dif_neg hi]
+      apply PartialOrder.rel_refl
+  . -- frequencyAux (List.sum (Prod.fst <$> l1)) ... ⊑ frequency l2 h2
+    simp only [frequency]
+    apply le_of_eq
+    apply frequencyAux_congr
+    apply sumOfWeights_le
+    assumption
 
 /-- Lemma allowing us to use `frequency` in functions marked as `partial_fixpoint`
     (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
