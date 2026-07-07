@@ -219,6 +219,15 @@ theorem support_vectorOf
             assumption
         . rfl
 
+/-- `xs` is in the support of `vectorOf n g` iff `xs` has length `n`
+    and all elements of `xs` are in `g`'s support -/
+@[simp]
+theorem mem_support_vectorOf_iff
+    {n : Nat}
+    {g : SPMF α} :
+    xs ∈ (vectorOf n g).support ↔ xs.length = n ∧ ∀ x ∈ xs, x ∈ g.support := by
+  simp [support_vectorOf]
+
 
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]
