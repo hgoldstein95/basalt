@@ -99,6 +99,27 @@ def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   (_h : 0 < List.sum (List.map Prod.fst gs) := by omega) : G α :=
   Helpers.frequencyAux gs (List.sum (List.map Prod.fst gs)) rfl
 
+/-- Generates a length-`n` list, where each element is generated
+    by the generator `g` -/
+def vectorOf [Gen G] (n : Nat) (g : G α) : G (List α) :=
+  List.foldr (fun m acc => do
+    let x ← m
+    let xs ← acc
+    pure (x :: xs)) (pure []) (List.replicate n g)
+
+/-- Helper lemma that unfolds one layer of recursion `vectorOf (n + 1) g`.
+    This is needed for the `support_vectorOf` lemma. -/
+theorem vectorOf_succ [Gen G] {n : Nat} {g : G α} :
+    vectorOf (n + 1) g = (do let x ← g; let xs ← vectorOf n g; pure (x :: xs)) :=
+  rfl
+
+/-- `listOfMaxLength n g` generates a list whose length is unformly distributed
+     across `[0, n]`, (i.e. the list may be empty and its maximum possible length
+     is `n`). Each list element is produced by the generator `g`. -/
+def listOfMaxLength [Gen G] (n : Nat) (g : G α) : G (List α) := do
+  let ⟨k, _⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
+  vectorOf k g
+
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
     - `l1.length = l2.length`
     - `l1[i] ⊑ l2[i]` for all list elements (here we are comparing them using the `PartialOrder` on `α`) -/
