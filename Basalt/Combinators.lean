@@ -223,8 +223,8 @@ private theorem frequencyAux_congr [Gen G] (l : List (Nat × (Unit → G α))) (
 
 
 /-- Monotonicity of `frequencySelect` traversal: if `l1 ⊑ l2` and the same random index `n` is
-    in range for both lists,
-    then `frequencySelect l1 n ... ⊑ frequencySelect l2 n ...` -/
+    in less than each list's sum of weights (`h1, h2`),
+    then `frequencySelect l1 n h1 ⊑ frequencySelect l2 n h2 -/
 private theorem frequencySelect_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} {n : Nat}
     (hle : l1 ⊑ l2)
     (h1 : n < List.sum (List.map Prod.fst l1))
@@ -374,16 +374,3 @@ theorem monotone_frequency [Gen G] {γ : Sort w} [PartialOrder γ]
   apply frequency_le
   apply hmono
   assumption
-
--- Example generator that uses `oneOf` and `partial_fixpoint`
--- (returns either `2` or some `Nat` greater than 2)
-def myGen [Gen G] : Unit → G Nat := fun _ =>
-  let gs := [fun _ => pure 2, fun _ => do let n ← myGen (); pure (n + 1)]
-  have hne : gs ≠ [] := by
-    apply cons_ne_nil
-  oneOf gs hne
-partial_fixpoint
-
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← myGen ()) : IO Unit)
