@@ -11,7 +11,7 @@ deriving Repr
 -- a multiple of 2, or a multiple of 3
 -- (This generator tests that we can use `oneOf` in functions marked as `partial_fixpoint`)
 def myGen [Gen G] : G NatOrFloat :=
-  let gs := [
+  oneOf [
     fun _ => RandomChoice.pick
       (fun _ => pure (NatOrFloat.Nat 1))
       (fun _ => pure (NatOrFloat.Float 1.0)),
@@ -26,10 +26,7 @@ def myGen [Gen G] : G NatOrFloat :=
       | .Nat n => pure (.Nat (n * 3))
       | .Float f => pure (.Float (f * 3))
 
-  ]
-  have hne : gs ≠ [] := by
-    apply List.cons_ne_nil
-  oneOf gs hne
+  ] (by simp)
 partial_fixpoint
 
 #guard_msgs(drop info) in
