@@ -418,6 +418,8 @@ theorem monotone_frequency [Gen G] {γ : Sort w} [PartialOrder γ]
   apply hmono
   assumption
 
+/-- Lemma allowing us to use `vectorOf` in functions marked as `partial_fixpoint`
+    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
 @[partial_fixpoint_monotone]
 theorem monotone_vectorOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (n : Nat) (g : γ → G α) (hg : monotone g) :
@@ -439,3 +441,19 @@ theorem monotone_vectorOf [Gen G] {γ : Sort w} [PartialOrder γ]
       assumption
     . dsimp
       apply PartialOrder.rel_refl
+
+/-- Lemma allowing us to use `listOfMaxLength` in functions marked as `partial_fixpoint`
+    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
+@[partial_fixpoint_monotone]
+theorem monotone_listOfMaxLength [Gen G] {γ : Sort w} [PartialOrder γ]
+    (n : Nat) (g : γ → G α) (hg : monotone g) :
+    monotone (fun x => listOfMaxLength n (g x)) := by
+  unfold listOfMaxLength
+  apply monotone_bind
+  . apply monotone_const
+  . dsimp
+    apply monotone_of_monotone_apply
+    intro ⟨x, hge, hle⟩
+    dsimp
+    apply monotone_vectorOf
+    assumption
