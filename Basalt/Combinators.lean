@@ -417,3 +417,25 @@ theorem monotone_frequency [Gen G] {γ : Sort w} [PartialOrder γ]
   apply frequency_le
   apply hmono
   assumption
+
+@[partial_fixpoint_monotone]
+theorem monotone_vectorOf [Gen G] {γ : Sort w} [PartialOrder γ]
+    (n : Nat) (g : γ → G α) (hg : monotone g) :
+    monotone (fun x => vectorOf n (g x)) := by
+  unfold monotone at *
+  induction n with
+  | zero =>
+    intro x y hxy
+    simp [vectorOf]
+    apply PartialOrder.rel_refl
+  | succ n' IH =>
+    intro x y hxy
+    simp [vectorOf_succ]
+    apply monotone_bind <;> try assumption
+    apply monotone_of_monotone_apply
+    intro z
+    apply monotone_bind <;> (unfold monotone; intro x' y' hxy')
+    . apply IH
+      assumption
+    . dsimp
+      apply PartialOrder.rel_refl
