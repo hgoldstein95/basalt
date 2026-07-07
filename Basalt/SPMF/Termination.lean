@@ -251,7 +251,7 @@ theorem IsPMF_elements [Inhabited α] (xs : List α) (hne : xs ≠ []) :
 /-- If all generators in the list `gs` are SPMFs, then `oneOf gs` is also an SPMF -/
 theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ g ∈ gs, IsPMF (g ())) :
     IsPMF (oneOf gs hne) := by
-  unfold oneOf
+  unfold oneOf Helpers.oneOfAux
   apply IsPMF_bind_of_support
   . apply IsPMF_map
     apply IsPMF_choose
