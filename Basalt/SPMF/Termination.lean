@@ -268,6 +268,25 @@ theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ 
     apply hgs
     apply List.getElem_mem
 
+/-- If a generator `g` is an SPMF, then for any `n`, `vectorOf n g` is also an SPMF -/
+theorem IsPMF_vectorOf {g : SPMF α} (hg : IsPMF g) :
+    IsPMF (vectorOf n g) := by
+  induction n with
+  | zero =>
+    simp [vectorOf]
+    apply IsPMF_pure
+  | succ n IH =>
+    -- Unfold one layer of recursion in the body of `vectorOf`
+    rw [vectorOf_succ]
+    apply IsPMF_bind
+    . assumption
+    . intro x
+      apply IsPMF_bind
+      . assumption
+      . intro xs
+        apply IsPMF_pure
+
+
 private lemma weighted_avg_mono_ennreal {t p x : ℝ≥0∞}
     (htp : t ≥ p) (hx_le_one : x ≤ 1) (ht_le_one : t ≤ 1) (hp_le_one : p ≤ 1) :
     t + (1 - t) * x ≥ p + (1 - p) * x := by
