@@ -373,3 +373,34 @@ lemma ENNReal.eq_one_of_fixed_ineq' {c v : ENNReal}
   have hmono := (toReal_le_toReal hv_ne hc_ne).mpr hge
   have hge_one := hf_one hmono
   rw [← ofReal_toReal hc_ne, le_antisymm hle' hge_one, ofReal_one]
+
+namespace SPMF
+
+/-- If a generator `g` is an SPMF, then `listOf g` is also an SPMF.
+
+  Unlike `vectorOf`/`listOfMaxLength`, `listOf` is defined by `partial_fixpoint`,
+  so we prove termination via `IsPMF_of_mass_fixpoint`. Note: this proof
+  is largely the same as `List.arbitrary_terminates` in `Examples/ArbList.lean`. -/
+theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
+    IsPMF (listOf g) := by
+  refine (IsPMF_of_mass_fixpoint
+    (g := fun () => listOf g)
+    (F := fun c => 1 / 2 + 1 / 2 * c)
+    ?bounds ?mass) ()
+  case bounds =>
+    intro c hle hge
+    apply ENNReal.eq_one_of_fixed_ineq' hle hge
+    intro hmono
+    rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
+    norm_num at hmono; linarith
+  case mass =>
+    intro () h
+    conv_lhs => rw [listOf]
+    simp only [mass_pick, mass_pure, mul_one]
+    gcongr
+    apply mass_bind_ge_of_isPMF hg
+    intro x
+    rw [mass_bind_pure]
+    exact mass_ge_iInf _ ()
+
+end SPMF
