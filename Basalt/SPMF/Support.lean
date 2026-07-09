@@ -294,6 +294,13 @@ theorem support_listOf
         apply List.mem_cons_of_mem
         assumption
 
+@[simp]
+theorem mem_support_listOf
+    {xs : List α}
+    {g : SPMF α} :
+    xs ∈ (listOf g).support ↔ xs ∈ {xs | ∀ x ∈ xs, x ∈ g.support} := by
+  simp [support_listOf]
+
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]
 theorem support_elements
