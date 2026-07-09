@@ -442,6 +442,25 @@ theorem IsBounded_mono
   simp_all only [IsBounded_iff]
   grind
 
+-- The `elements` combinator makes only one random choice (the index into the list)
+theorem IsBounded_elements
+    (hne : xs ≠ []) :
+    IsBounded (elements xs hne) (fun _ => 1) := by
+  unfold elements
+  -- After picking the random index, `elements` no longer performs any more random choices,
+  -- so `cf` (the cost function for the continuation after we bind the result of `choose`)
+  -- is just the constant function returning 0
+  apply IsBounded_bind
+    (cx := fun _ => 1)
+    (cf := fun _ _ => 0)
+  . apply IsBounded_map
+    . apply IsBounded_choose
+    . omega
+  . intro ⟨k, ⟨_, hle⟩⟩
+    dsimp
+    apply IsBounded_pure
+  . omega
+
 theorem IsBounded_pick
     {fx fy : Unit → SPMF.Cost α}
     {cx cy : α → Nat}
