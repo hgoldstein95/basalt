@@ -411,6 +411,30 @@ theorem IsBounded_bind
   simp_all
   grind
 
+-- We add this lemma to make it easier to reason about generators that use `<$>`
+theorem IsBounded_map
+    {f : α → β}
+    {cx : α → Nat}
+    {c : β → Nat}
+    (hx : IsBounded x cx)
+    (hg : ∀ p ∈ x.support, cx p.1 ≤ c (f p.1)) :
+    IsBounded (f <$> x) c := by
+  -- For any monad, we have that `f <$> x === x >>= (pure ∘ f)`,
+  -- and we use this equational law to change the shape of our goal
+  -- so that we can prove it in terms of `IsBounded_bind`
+  show IsBounded (x >>= fun a => pure (f a)) c
+  apply IsBounded_bind
+  . assumption
+  · intro a
+    apply IsBounded_pure
+  · intro (a, a_cost) ha ⟨b, b_cost⟩ hq
+    simp only [mem_support_pure_iff] at hq
+    obtain ⟨rfl, rfl⟩ := hq
+    dsimp
+    specialize hg (a, a_cost) ha
+    dsimp at hg
+    assumption
+
 theorem IsBounded_mono
     (hc₁ : IsBounded x c₁)
     (h : ∀ a, c₁ a ≤ c₂ a) :
@@ -435,6 +459,53 @@ theorem IsBounded_pick
   · intro ⟨k, _⟩ _ ⟨a, _⟩ _
     simp only
     split_ifs <;> omega
+
+theorem IsBounded_vectorOf
+    (hx : IsBounded g cost_g) :
+    IsBounded (vectorOf n g) (fun xs => List.sum (cost_g <$> xs)) := by
+  simp_all only [IsBounded_iff]
+  induction n with
+  | zero =>
+    intro (xs, xs_cost) hxs
+    simp [vectorOf] at hxs
+    obtain ⟨h1, h2⟩ := hxs
+    subst h1 h2
+    omega
+  | succ n' IH =>
+    rw [vectorOf_succ]
+    intro (xs, xs_cost) hxs
+    simp only [mem_support_bind_iff, mem_support_pure_iff] at hxs
+    obtain ⟨a, a_cost, ys_cost, ha, ⟨ys, _, _, hys, ⟨rfl, rfl⟩, rfl⟩, rfl⟩ := hxs
+    dsimp
+    have ha_cost : (a, a_cost).2 ≤ cost_g (a, a_cost).1 := by
+      apply hx
+      assumption
+    have hys_cost : (ys, ys_cost).2 ≤ (cost_g <$> (ys, ys_cost).1).sum := by
+      apply IH
+      assumption
+    simp only [Functor.map] at *
+    omega
+
+-- The cost function here is 1 more than the cost of `vectorOf`, because
+-- `listOfMaxLength` needs to randomly choose a length of the list before invoking `vectorOf`
+theorem IsBounded_listOfMaxLength
+    (hx : IsBounded g cost_g) :
+    IsBounded (listOfMaxLength n g) (fun xs => 1 + List.sum (cost_g <$> xs)) := by
+  apply IsBounded_bind
+    (cx := fun _ => 1)                            -- 1 random choice to pick length of list
+    (cf := fun _ xs => List.sum (cost_g <$> xs))  -- Sum all the cost incurred from generating each list element
+  · -- IsBounded (ULift.down <$> choose 0 n ⋯) (fun x => 1)
+    apply IsBounded_map
+    . apply IsBounded_choose
+    . intro (k, k_cost) hk
+      constructor
+  · -- ∀ k, IsBounded (vectorOf k g) (fun xs => (cost_g <$> xs).sum)
+    intro ⟨k, ⟨hge, hle⟩⟩
+    apply IsBounded_vectorOf
+    assumption
+  · omega
+
+
 
 open Lean.Order in
 /-- `IsBounded` is an admissible relation.
