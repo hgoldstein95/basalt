@@ -244,6 +244,56 @@ theorem mem_support_listOfMaxLength_iff
     xs ∈ (listOfMaxLength n g).support ↔ xs.length ≤ n ∧ ∀ x ∈ xs, x ∈ g.support := by
   simp [support_listOfMaxLength]
 
+/-- The support of `listOf g` is the set of all lists where each element
+    is in `g`'s support -/
+theorem support_listOf
+    {g : SPMF α} :
+    support (listOf g) = { xs | ∀ x ∈ xs, x ∈ g.support } := by
+  ext xs
+  induction xs with
+  | nil =>
+    dsimp
+    constructor
+    . intro h x hvacuous
+      contradiction
+    . intro h
+      unfold listOf
+      simp [support_pick]
+  | cons x xs' IH =>
+    constructor
+    . dsimp
+      intro h y hy
+      -- Case on y ∈ x :: xs' (whether y = x or y ∈ xs')
+      cases hy with
+      | head =>
+        -- y = x
+        unfold listOf at h
+        simp [support_pick] at h
+        obtain ⟨h1, _⟩ := h
+        assumption
+      | tail =>
+        -- y ∈ xs'
+        rename_i hy
+        unfold listOf at h
+        simp [support_pick] at h
+        obtain ⟨_, h2⟩ := h
+        rw [IH] at h2
+        apply h2
+        assumption
+    . intro h
+      rw [Set.mem_setOf_eq] at h
+      unfold listOf
+      simp [support_pick]
+      constructor
+      . apply h
+        apply List.mem_cons_self
+      . apply IH.mpr
+        rw [Set.mem_setOf_eq]
+        intro x hx
+        apply h
+        apply List.mem_cons_of_mem
+        assumption
+
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]
 theorem support_elements

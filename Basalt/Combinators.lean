@@ -120,6 +120,20 @@ def listOfMaxLength [Gen G] (n : Nat) (g : G α) : G (List α) := do
   let ⟨k, _⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
   vectorOf k g
 
+/-- Generates a (possibly empty) list with unbounded length
+    where each element is produced using `g`.
+    Note: this produces the empty list 50% of the time, so for production
+    generators, you should consider using other combinators,
+    e.g. `listOfMaxLength`. -/
+def listOf [Gen G] (g : G α) : G (List α) := do
+  RandomChoice.pick
+    (fun () => pure [])
+    (fun () => do
+      let x ← g
+      let xs ← listOf g
+      return x :: xs)
+partial_fixpoint
+
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
     - `l1.length = l2.length`
     - `l1[i] ⊑ l2[i]` for all list elements (here we are comparing them using the `PartialOrder` on `α`) -/
