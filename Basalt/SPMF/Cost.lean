@@ -479,6 +479,7 @@ theorem IsBounded_pick
     simp only
     split_ifs <;> omega
 
+-- The cost incurred by `vectorOf n g` is the sum of the costs of generating each element using `g`
 theorem IsBounded_vectorOf
     (hx : IsBounded g cost_g) :
     IsBounded (vectorOf n g) (fun xs => List.sum (cost_g <$> xs)) := by
