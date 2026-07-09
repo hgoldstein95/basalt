@@ -99,6 +99,41 @@ def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   (_h : 0 < List.sum (List.map Prod.fst gs) := by omega) : G α :=
   Helpers.frequencyAux gs (List.sum (List.map Prod.fst gs)) rfl
 
+/-- Generates a length-`n` list, where each element is generated
+    by the generator `g` -/
+def vectorOf [Gen G] (n : Nat) (g : G α) : G (List α) :=
+  List.foldr (fun m acc => do
+    let x ← m
+    let xs ← acc
+    pure (x :: xs)) (pure []) (List.replicate n g)
+
+/-- Helper lemma that unfolds one layer of recursion in `vectorOf (n + 1) g`.
+    This is needed for the lemmas `support_vectorOf`, `IsPMF_vectorOf`. -/
+theorem vectorOf_succ [Gen G] {n : Nat} {g : G α} :
+    vectorOf (n + 1) g = (do let x ← g; let xs ← vectorOf n g; pure (x :: xs)) :=
+  rfl
+
+/-- `listOfMaxLength n g` generates a list whose length is unformly distributed
+     across `[0, n]`, (i.e. the list may be empty and its maximum possible length
+     is `n` inclusive). Each list element is produced by the generator `g`. -/
+def listOfMaxLength [Gen G] (n : Nat) (g : G α) : G (List α) := do
+  let ⟨k, _⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
+  vectorOf k g
+
+/-- Generates a (possibly empty) list with unbounded length
+    where each element is produced using `g`.
+    Note: this produces the empty list 50% of the time, so for production
+    generators, you should consider using other combinators,
+    e.g. `listOfMaxLength`. -/
+def listOf [Gen G] (g : G α) : G (List α) := do
+  RandomChoice.pick
+    (fun () => pure [])
+    (fun () => do
+      let x ← g
+      let xs ← listOf g
+      return x :: xs)
+partial_fixpoint
+
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
     - `l1.length = l2.length`
     - `l1[i] ⊑ l2[i]` for all list elements (here we are comparing them using the `PartialOrder` on `α`) -/
@@ -396,3 +431,86 @@ theorem monotone_frequency [Gen G] {γ : Sort w} [PartialOrder γ]
   apply frequency_le
   apply hmono
   assumption
+
+/-- Lemma allowing us to use `vectorOf` in functions marked as `partial_fixpoint`
+    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
+@[partial_fixpoint_monotone]
+theorem monotone_vectorOf [Gen G] {γ : Sort w} [PartialOrder γ]
+    (n : Nat) (g : γ → G α) (hg : monotone g) :
+    monotone (fun x => vectorOf n (g x)) := by
+  unfold monotone at *
+  induction n with
+  | zero =>
+    intro x y hxy
+    simp [vectorOf]
+    apply PartialOrder.rel_refl
+  | succ n' IH =>
+    intro x y hxy
+    simp [vectorOf_succ]
+    apply monotone_bind <;> try assumption
+    apply monotone_of_monotone_apply
+    intro z
+    apply monotone_bind <;> (unfold monotone; intro x' y' hxy')
+    . apply IH
+      assumption
+    . dsimp
+      apply PartialOrder.rel_refl
+
+/-- Lemma allowing us to use `listOfMaxLength` in functions marked as `partial_fixpoint`
+    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
+@[partial_fixpoint_monotone]
+theorem monotone_listOfMaxLength [Gen G] {γ : Sort w} [PartialOrder γ]
+    (n : Nat) (g : γ → G α) (hg : monotone g) :
+    monotone (fun x => listOfMaxLength n (g x)) := by
+  unfold listOfMaxLength
+  apply monotone_bind
+  . apply monotone_const
+  . dsimp
+    apply monotone_of_monotone_apply
+    intro ⟨x, hge, hle⟩
+    dsimp
+    apply monotone_vectorOf
+    assumption
+
+/-- Lemma allowing us to use `listOf` in functions marked as `partial_fixpoint`
+    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`).
+
+    Unlike `vectorOf`/`listOfMaxLength`, `listOf` is itself defined by `partial_fixpoint`
+    (`listOf g = fix (F (g))`), so we have to prove `listOf (g x) ⊑ listOf (g y)` via
+    fixpoint induction (`fix_induct`) on the left-hand fixpoint,
+    with the motive being `fun z => z ⊑ listOf (g y)`. -/
+@[partial_fixpoint_monotone]
+theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
+    (g : γ → G α) (hg : monotone g) :
+    monotone (fun x => listOf (g x)) := by
+  unfold monotone
+  intro x y hxy
+  show listOf (g x) ⊑ listOf (g y)
+  -- Convert the RHS to a variable `z` so that we only delta-reduce `listOf` on the LHS
+  generalize hw : listOf (g y) = w
+  delta listOf
+  apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
+  · -- Admissibility: a chain's supremum is ⊑ `w`
+    -- iff every chain element is ⊑ `w`
+    intro c hc hall
+    apply Lean.Order.csup_le <;> assumption
+  · -- Induction step: assuming `z ⊑ w` (where `w = listOf (g y)`),
+    -- one unfolding of the `listOf`'s body is still ⊑ `w`.
+    intro z hz
+    subst hw
+    unfold listOf
+    -- Both sides of the ⊑ are now in terms of `pick` only
+    simp only [RandomChoice.pick]
+    -- Both sides now in terms of `bind` and `choose` only
+    apply MonoBind.bind_mono_right
+    intro n
+    -- Case on which branch `pick` selects
+    split
+    · -- Non-recursive branch: both sides return the empty list
+      apply PartialOrder.rel_refl
+    · -- Recursive branch: `bind (g x) … ⊑ bind (g y) …`
+      apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
+      apply MonoBind.bind_mono_right
+      intro a
+      apply MonoBind.bind_mono_left
+      assumption
