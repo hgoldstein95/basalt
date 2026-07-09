@@ -377,10 +377,12 @@ lemma ENNReal.eq_one_of_fixed_ineq' {c v : ENNReal}
 namespace SPMF
 
 /-- If a generator `g` is an SPMF, then `listOf g` is also an SPMF.
-
   Unlike `vectorOf`/`listOfMaxLength`, `listOf` is defined by `partial_fixpoint`,
   so we prove termination via `IsPMF_of_mass_fixpoint`. Note: this proof
-  is largely the same as `List.arbitrary_terminates` in `Examples/ArbList.lean`. -/
+  is largely the same as `List.arbitrary_terminates` in `Examples/ArbList.lean`.
+
+  (Note: this lemma is at the bottom of the file since it requires the
+  `ENNReal` lemmas defined earlier.) -/
 theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
     IsPMF (listOf g) := by
   refine (IsPMF_of_mass_fixpoint
