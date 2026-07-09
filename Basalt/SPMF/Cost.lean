@@ -491,6 +491,8 @@ theorem IsBounded_vectorOf
 theorem IsBounded_listOfMaxLength
     (hx : IsBounded g cost_g) :
     IsBounded (listOfMaxLength n g) (fun xs => 1 + List.sum (cost_g <$> xs)) := by
+  -- Note: we have to explicitly instantiate `cx` & `cf` here, otherwise we will get a heartbeat timeout
+  -- when we do `lake build`
   apply IsBounded_bind
     (cx := fun _ => 1)                            -- 1 random choice to pick length of list
     (cf := fun _ xs => List.sum (cost_g <$> xs))  -- Sum all the cost incurred from generating each list element
