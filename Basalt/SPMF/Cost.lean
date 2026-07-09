@@ -528,7 +528,6 @@ theorem IsBounded_listOfMaxLength
   · omega
 
 
-
 open Lean.Order in
 /-- `IsBounded` is an admissible relation.
 
@@ -541,3 +540,38 @@ theorem admissible_IsBounded (f : α → Nat) :
   rw [SPMF.mem_support_csup hc] at hp
   obtain ⟨x, hxc, hxp⟩ := hp
   exact ih x hxc p hxp
+
+/-- Note: this proof is very similar to `List.arbitrary_cost` in `Examples/ArbList.lean`,
+    except the cost function now comprises the following:
+    - `2 * xs.length`: 2 random choices for each element in `xs` (a call to `pick` and a call to `g`)
+    - `(cost_g <$> xs).sum`: Need to apply `g`'s cost function to each generated element and sum them
+    - `1`: one final call to `pick` to produce the ned of the list -/
+theorem IsBounded_listOf
+    {g : SPMF.Cost α}
+    (hx : IsBounded g cost_g) :
+    IsBounded (listOf g) (fun xs => 2 * xs.length + (cost_g <$> xs).sum + 1) := by
+  open Lean.Order in
+  delta listOf
+  apply fix_induct (motive := fun (g : SPMF.Cost (List α)) => IsBounded g
+    (fun xs => 2 * xs.length + (cost_g <$> xs).sum + 1)) _ ?admissible ?step
+  case admissible =>
+    apply admissible_IsBounded
+  case step =>
+    intro arbitrary_rec ih
+    simp [IsBounded_iff] at ih ⊢
+    have hg : ∀ p ∈ SPMF.support g, p.2 ≤ cost_g p.1 := by
+      apply IsBounded_iff.mp
+      assumption
+    intro xs c hxs
+    simp [pick, SPMF.Cost.mem_support_bind_iff, SPMF.Cost.mem_support_choose_iff, SPMF.Cost.mem_support_pure_iff] at hxs
+    obtain ⟨a, ha1, x, (⟨heq0, rfl, rfl⟩ | ⟨hne, hd, n1, hg_mem, x1, ⟨tl, htl, rfl⟩, rfl⟩), rfl⟩ := hxs
+    · omega
+    · have htail : x1 ≤ 2 * tl.length + (List.map cost_g tl).sum + 1 := by
+        apply ih
+        assumption
+      have hhead : (hd, n1).2 ≤ cost_g (hd, n1).1 := by
+        apply hg
+        assumption
+      simp only [List.length_cons] at *
+      dsimp
+      omega
