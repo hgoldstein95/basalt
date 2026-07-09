@@ -268,6 +268,36 @@ theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ 
     apply hgs
     apply List.getElem_mem
 
+/-- If a generator `g` is an SPMF, then for any `n`, `vectorOf n g` is also an SPMF -/
+theorem IsPMF_vectorOf {g : SPMF α} (hg : IsPMF g) :
+    IsPMF (vectorOf n g) := by
+  induction n with
+  | zero =>
+    simp [vectorOf]
+    apply IsPMF_pure
+  | succ n IH =>
+    -- Unfold one layer of recursion in the body of `vectorOf`
+    rw [vectorOf_succ]
+    apply IsPMF_bind
+    . assumption
+    . intro x
+      apply IsPMF_bind
+      . assumption
+      . intro xs
+        apply IsPMF_pure
+
+/-- If a generator `g` is an SPMF, then for any `n`, `listOfMaxLength n g` is also an SPMF -/
+theorem IsPMF_listOfMaxLength {g : SPMF α} (hg : IsPMF g) :
+    IsPMF (listOfMaxLength n g) := by
+  unfold listOfMaxLength
+  apply IsPMF_bind
+  . apply IsPMF_map
+    apply IsPMF_choose
+  . intro ⟨x, hge, hle⟩
+    dsimp
+    apply IsPMF_vectorOf
+    assumption
+
 private lemma weighted_avg_mono_ennreal {t p x : ℝ≥0∞}
     (htp : t ≥ p) (hx_le_one : x ≤ 1) (ht_le_one : t ≤ 1) (hp_le_one : p ≤ 1) :
     t + (1 - t) * x ≥ p + (1 - p) * x := by
@@ -343,3 +373,36 @@ lemma ENNReal.eq_one_of_fixed_ineq' {c v : ENNReal}
   have hmono := (toReal_le_toReal hv_ne hc_ne).mpr hge
   have hge_one := hf_one hmono
   rw [← ofReal_toReal hc_ne, le_antisymm hle' hge_one, ofReal_one]
+
+namespace SPMF
+
+/-- If a generator `g` is an SPMF, then `listOf g` is also an SPMF.
+  Unlike `vectorOf`/`listOfMaxLength`, `listOf` is defined by `partial_fixpoint`,
+  so we prove termination via `IsPMF_of_mass_fixpoint`. Note: this proof
+  is largely the same as `List.arbitrary_terminates` in `Examples/ArbList.lean`.
+
+  (Note: this lemma is at the bottom of the file since it requires the
+  `ENNReal` lemmas defined earlier.) -/
+theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
+    IsPMF (listOf g) := by
+  refine (IsPMF_of_mass_fixpoint
+    (g := fun () => listOf g)
+    (F := fun c => 1 / 2 + 1 / 2 * c)
+    ?bounds ?mass) ()
+  case bounds =>
+    intro c hle hge
+    apply ENNReal.eq_one_of_fixed_ineq' hle hge
+    intro hmono
+    rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
+    norm_num at hmono; linarith
+  case mass =>
+    intro () h
+    conv_lhs => rw [listOf]
+    simp only [mass_pick, mass_pure, mul_one]
+    gcongr
+    apply mass_bind_ge_of_isPMF hg
+    intro x
+    rw [mass_bind_pure]
+    exact mass_ge_iInf _ ()
+
+end SPMF

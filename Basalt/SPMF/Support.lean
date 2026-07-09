@@ -153,6 +153,154 @@ theorem mem_support_pick_iff
     a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
   simp
 
+/-- The support of `vectorOf n g` is the set of all length-`n` list where
+    each element is in `g`'s support -/
+theorem support_vectorOf
+    {n : Nat}
+    {g : SPMF α} :
+    support (vectorOf n g) = { xs | List.length xs = n ∧ ∀ x ∈ xs, x ∈ g.support } := by
+  induction n with
+  | zero =>
+    simp [vectorOf]
+    ext a
+    dsimp only [Set.mem_setOf_eq]
+    constructor
+    . intro h
+      rw [Set.mem_singleton_iff] at h
+      constructor
+      . assumption
+      . intro x hmem
+        subst h
+        contradiction
+    . intro h
+      obtain ⟨heq, hmem⟩ := h
+      apply Set.mem_singleton_iff.mpr
+      assumption
+  | succ n' IH =>
+    rw [vectorOf_succ]
+    ext xs
+    simp [Set.mem_setOf_eq]
+    constructor
+    . -- Forwards direction
+      intro h
+      obtain ⟨x, ⟨hmem, ⟨xs, ⟨hxs, hcons⟩⟩⟩⟩ := h
+      subst hcons
+      rw [IH] at hxs
+      dsimp at hxs
+      obtain ⟨hlen, hsupp⟩ := hxs
+      constructor
+      . simp
+        assumption
+      . -- ∀ y ∈ x :: xs, y ∈ g.support
+        intro y hy
+        rw [List.mem_cons] at hy
+        obtain ⟨heq, hy⟩ := hy
+        . assumption
+        . apply hsupp
+          assumption
+    . -- Backwards direction
+      intro ⟨hlen, hmem⟩
+      -- Since we know `hlen: xs.length = n' + 1`,
+      -- we must have `xs = y :: ys` for some `y, ys`
+      obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hlen
+      exists y
+      constructor
+      . apply hmem
+        apply List.mem_cons_self
+      . exists ys
+        constructor
+        . rw [IH]
+          apply Set.mem_sep
+          . simp at hlen
+            assumption
+          . intro x hx
+            apply hmem
+            apply List.mem_cons_of_mem
+            assumption
+        . rfl
+
+/-- `xs` is in the support of `vectorOf n g` iff `xs` has length `n`
+    and all elements of `xs` are in `g`'s support -/
+@[simp]
+theorem mem_support_vectorOf_iff
+    {n : Nat}
+    {g : SPMF α} :
+    xs ∈ (vectorOf n g).support ↔ xs.length = n ∧ ∀ x ∈ xs, x ∈ g.support := by
+  simp [support_vectorOf]
+
+
+/-- The support of `listOfMaxLength n g` is the set of all lists with length
+    at most `n`, where each element is in `g`'s support -/
+theorem support_listOfMaxLength
+    {n : Nat}
+    {g : SPMF α} :
+    support (listOfMaxLength n g) = { xs | List.length xs ≤ n ∧ ∀ x ∈ xs, x ∈ g.support } := by
+  simp [listOfMaxLength]
+
+@[simp]
+theorem mem_support_listOfMaxLength_iff
+    {n : Nat}
+    {g : SPMF α} :
+    xs ∈ (listOfMaxLength n g).support ↔ xs.length ≤ n ∧ ∀ x ∈ xs, x ∈ g.support := by
+  simp [support_listOfMaxLength]
+
+/-- The support of `listOf g` is the set of all lists where each element
+    is in `g`'s support -/
+theorem support_listOf
+    {g : SPMF α} :
+    support (listOf g) = { xs | ∀ x ∈ xs, x ∈ g.support } := by
+  ext xs
+  induction xs with
+  | nil =>
+    dsimp
+    constructor
+    . intro h x hvacuous
+      contradiction
+    . intro h
+      unfold listOf
+      simp [support_pick]
+  | cons x xs' IH =>
+    constructor
+    . dsimp
+      intro h y hy
+      -- Case on y ∈ x :: xs' (whether y = x or y ∈ xs')
+      cases hy with
+      | head =>
+        -- y = x
+        unfold listOf at h
+        simp [support_pick] at h
+        obtain ⟨h1, _⟩ := h
+        assumption
+      | tail =>
+        -- y ∈ xs'
+        rename_i hy
+        unfold listOf at h
+        simp [support_pick] at h
+        obtain ⟨_, h2⟩ := h
+        rw [IH] at h2
+        apply h2
+        assumption
+    . intro h
+      rw [Set.mem_setOf_eq] at h
+      unfold listOf
+      simp [support_pick]
+      constructor
+      . apply h
+        apply List.mem_cons_self
+      . apply IH.mpr
+        rw [Set.mem_setOf_eq]
+        intro x hx
+        apply h
+        apply List.mem_cons_of_mem
+        assumption
+
+@[simp]
+theorem mem_support_listOf
+    {xs : List α}
+    {g : SPMF α} :
+    xs ∈ (listOf g).support ↔ xs ∈ {xs | ∀ x ∈ xs, x ∈ g.support} := by
+  simp [support_listOf]
+
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]
 theorem support_elements
@@ -247,6 +395,7 @@ theorem mem_support_oneOf_iff
     (hne : gs ≠ []) :
     a ∈ support (oneOf gs hne) ↔ ∃ g ∈ gs, a ∈ (g ()).support := by
   simp [support_oneOf]
+
 
 
 /-- If `n < sum (fst <$> gs)`, then `frequencySelect gs n h` picks a sub-generator
