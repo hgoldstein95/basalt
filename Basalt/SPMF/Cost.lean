@@ -545,7 +545,7 @@ theorem admissible_IsBounded (f : α → Nat) :
     except the cost function now comprises the following:
     - `2 * xs.length`: 2 random choices for each element in `xs` (a call to `pick` and a call to `g`)
     - `(cost_g <$> xs).sum`: Need to apply `g`'s cost function to each generated element and sum them
-    - `1`: one final call to `pick` to produce the ned of the list -/
+    - `1`: one final call to `pick` to produce the end of the list -/
 theorem IsBounded_listOf
     {g : SPMF.Cost α}
     (hx : IsBounded g cost_g) :
