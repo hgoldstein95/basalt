@@ -471,3 +471,46 @@ theorem monotone_listOfMaxLength [Gen G] {γ : Sort w} [PartialOrder γ]
     dsimp
     apply monotone_vectorOf
     assumption
+
+/-- Lemma allowing us to use `listOf` in functions marked as `partial_fixpoint`
+    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`).
+
+    Unlike `vectorOf`/`listOfMaxLength`, `listOf` is itself defined by `partial_fixpoint`
+    (`listOf g = fix (F (g))`), so we have to prove `listOf (g x) ⊑ listOf (g y)` via
+    fixpoint induction (`fix_induct`) on the left-hand fixpoint,
+    with the motive being `fun z => z ⊑ listOf (g y)`. -/
+@[partial_fixpoint_monotone]
+theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
+    (g : γ → G α) (hg : monotone g) :
+    monotone (fun x => listOf (g x)) := by
+  unfold monotone
+  intro x y hxy
+  show listOf (g x) ⊑ listOf (g y)
+  -- Convert the RHS to a variable `z` so that we only delta-reduce `listOf` on the LHS
+  generalize hw : listOf (g y) = w
+  delta listOf
+  apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
+  · -- Admissibility: a chain's supremum is ⊑ `w`
+    -- iff every chain element is ⊑ `w`
+    intro c hc hall
+    apply Lean.Order.csup_le <;> assumption
+  · -- Induction step: assuming `z ⊑ w` (where `w = listOf (g y)`),
+    -- one unfolding of the `listOf`'s body is still ⊑ `w`.
+    intro z hz
+    subst hw
+    unfold listOf
+    -- Both sides of the ⊑ are now in terms of `pick` only
+    simp only [RandomChoice.pick]
+    -- Both sides now in terms of `bind` and `choose` only
+    apply MonoBind.bind_mono_right
+    intro n
+    -- Case on which branch `pick` selects
+    split
+    · -- Non-recursive branch: both sides return the empty list
+      apply PartialOrder.rel_refl
+    · -- Recursive branch: `bind (g x) … ⊑ bind (g y) …`
+      apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
+      apply MonoBind.bind_mono_right
+      intro a
+      apply MonoBind.bind_mono_left
+      assumption
