@@ -527,6 +527,14 @@ theorem IsBounded_listOfMaxLength
     assumption
   · omega
 
+theorem IsBounded_oneOf
+    {gs : List (Unit → SPMF.Cost α)}
+    (hne : gs ≠ [])
+    (cost : ∀ g ∈ gs, {cost_g // IsBounded (g ()) cost_g}) :
+    IsBounded (oneOf gs hne)
+      (fun x => 1 + Option.get! (List.max? (gs.attach.map (fun g => (cost g.val g.property).val x)))) := by
+  sorry
+
 
 open Lean.Order in
 /-- `IsBounded` is an admissible relation.
