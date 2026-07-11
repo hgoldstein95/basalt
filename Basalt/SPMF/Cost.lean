@@ -532,8 +532,48 @@ theorem IsBounded_oneOf
     (hne : gs ≠ [])
     (cost : ∀ g ∈ gs, {cost_g // IsBounded (g ()) cost_g}) :
     IsBounded (oneOf gs hne)
-      (fun x => 1 + Option.get! (List.max? (gs.attach.map (fun g => (cost g.val g.property).val x)))) := by
-  sorry
+      (fun x => 1 + List.foldr (fun ⟨ g, hg ⟩ acc => max ((cost g hg).val x) acc) 0 gs.attach) := by
+  -- Every generator's cost is ≤ the max cost over all generators.
+  have hcost_le : ∀ (i : Nat) (hi : i < gs.length) (y : α),
+      (cost gs[i] (List.getElem_mem hi)).val y ≤
+        List.foldr (fun g acc => max ((cost g.val g.property).val y) acc) 0 gs.attach := by
+    intro i hi y
+    -- Rewrite `foldr` over `attach` as a `foldr` plus a `map` via `List.foldr_map`
+    rw [← List.foldr_map]
+    apply List.le_max_of_le'
+    . apply List.mem_map.mpr
+      . exists ⟨gs[i], List.getElem_mem hi⟩
+        constructor
+        . apply List.mem_attach
+        . rfl
+    . constructor
+  -- Any index chosen by `choose 0 (gs.length - 1)` is in bounds
+  have hidx : ∀ (idx : {i : Nat // 0 ≤ i ∧ i ≤ gs.length - 1}), idx.val < gs.length := by
+    intro idx
+    have hle : idx.val ≤ gs.length - 1 :=
+      idx.property.2
+    have h_nonzero : 0 < gs.length := by
+      apply List.length_pos_iff.mpr hne
+    omega
+  unfold oneOf Helpers.oneOfAux
+  apply IsBounded_bind
+    (cx := fun _ => 1)
+    (cf := fun idx y => (cost (gs[idx.val]'(hidx idx)) (List.getElem_mem (hidx idx))).val y)
+  · apply IsBounded_map
+    · apply IsBounded_choose
+    · intro p _
+      constructor
+  · -- For each `i`, `gs[i]` is bounded by its own cost function
+    rintro ⟨i, hge, hle⟩
+    have hlt : i < gs.length := hidx ⟨i, hge, hle⟩
+    have h_bounded := (cost gs[i] (List.getElem_mem hlt)).property
+    assumption
+  · -- The chosen generator's cost is ≤ the max cost, so 1 + it ≤ 1 + the max
+    rintro ⟨idx, -⟩ - ⟨g, -⟩ -
+    dsimp
+    have := hcost_le idx.val (hidx idx) g
+    omega
+
 
 
 open Lean.Order in
