@@ -530,13 +530,13 @@ theorem IsBounded_listOfMaxLength
 theorem IsBounded_oneOf
     {gs : List (Unit → SPMF.Cost α)}
     (hne : gs ≠ [])
-    (cost : ∀ g ∈ gs, {cost_g // IsBounded (g ()) cost_g}) :
+    (hcost : ∀ g ∈ gs, {cost_g // IsBounded (g ()) cost_g}) :
     IsBounded (oneOf gs hne)
-      (fun x => 1 + List.foldr (fun ⟨ g, hg ⟩ acc => max ((cost g hg).val x) acc) 0 gs.attach) := by
+      (fun x => 1 + List.foldr (fun ⟨ g, hg ⟩ acc => max ((hcost g hg).val x) acc) 0 gs.attach) := by
   -- Every generator's cost is ≤ the max cost over all generators.
   have hcost_le : ∀ (i : Nat) (hi : i < gs.length) (y : α),
-      (cost gs[i] (List.getElem_mem hi)).val y ≤
-        List.foldr (fun g acc => max ((cost g.val g.property).val y) acc) 0 gs.attach := by
+      (hcost gs[i] (List.getElem_mem hi)).val y ≤
+        List.foldr (fun g acc => max ((hcost g.val g.property).val y) acc) 0 gs.attach := by
     intro i hi y
     -- Rewrite `foldr` over `attach` as a `foldr` plus a `map` via `List.foldr_map`
     rw [← List.foldr_map]
@@ -558,7 +558,7 @@ theorem IsBounded_oneOf
   unfold oneOf Helpers.oneOfAux
   apply IsBounded_bind
     (cx := fun _ => 1)
-    (cf := fun idx y => (cost (gs[idx.val]'(hidx idx)) (List.getElem_mem (hidx idx))).val y)
+    (cf := fun idx y => (hcost (gs[idx.val]'(hidx idx)) (List.getElem_mem (hidx idx))).val y)
   · apply IsBounded_map
     · apply IsBounded_choose
     · intro p _
@@ -566,7 +566,7 @@ theorem IsBounded_oneOf
   · -- For each `i`, `gs[i]` is bounded by its own cost function
     rintro ⟨i, hge, hle⟩
     have hlt : i < gs.length := hidx ⟨i, hge, hle⟩
-    have h_bounded := (cost gs[i] (List.getElem_mem hlt)).property
+    have h_bounded := (hcost gs[i] (List.getElem_mem hlt)).property
     assumption
   · -- The chosen generator's cost is ≤ the max cost, so 1 + it ≤ 1 + the max
     rintro ⟨idx, -⟩ - ⟨g, -⟩ -
@@ -574,6 +574,48 @@ theorem IsBounded_oneOf
     have := hcost_le idx.val (hidx idx) g
     omega
 
+theorem foo
+    {gs : List (Nat × (Unit → SPMF.Cost α))}
+    (hne : 0 < (List.map Prod.fst gs).sum) :
+    gs ≠ [] := by
+  rintro rfl
+  contradiction
+
+
+theorem IsBounded_frequency
+    {gs : List (Nat × (Unit → SPMF.Cost α))}
+    (hne : 0 < (List.map Prod.fst gs).sum)
+    (hcost : ∀ g ∈ gs, {cost_g // IsBounded (g.2 ()) cost_g}) :
+    IsBounded (frequency gs hne)
+      (fun x => 1 + List.foldr (fun ⟨ (w, g), hg ⟩ acc => max ((hcost (w, g) hg).val x) acc) 0 gs.attach) := by
+  -- Every generator's cost is ≤ the max cost over all generators.
+  have hcost_le : ∀ (i : Nat) (hi : i < gs.length) (y : α),
+      (hcost gs[i] (List.getElem_mem hi)).val y ≤
+        List.foldr (fun ⟨ (w, g), hg ⟩ acc => max ((hcost (w, g) hg).val y) acc) 0 gs.attach := by
+    intro i hi y
+    -- Rewrite `foldr` over `attach` as a `foldr` plus a `map` via `List.foldr_map`
+    rw [← List.foldr_map]
+    apply List.le_max_of_le'
+    . apply List.mem_map.mpr
+      . exists ⟨gs[i], List.getElem_mem hi⟩
+        constructor
+        . apply List.mem_attach
+        . rfl
+    . constructor
+  unfold frequency Helpers.frequencyAux
+  apply IsBounded_bind
+  . apply IsBounded_map
+    . apply IsBounded_choose
+    . intro (i, w) hi
+      sorry
+  . intro ⟨n, hge, hle⟩
+    split
+    . -- n ≤ (List.map Prod.fst gs).sum
+      -- TODO: need a helper lemma for `IsBounded (frequencySelect ...) ...`
+      sorry
+    . -- ¬ n ≤ (List.map Prod.fst gs).sum
+      sorry
+  . sorry
 
 
 open Lean.Order in
