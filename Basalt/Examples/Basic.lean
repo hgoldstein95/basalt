@@ -7,5 +7,6 @@ import Basalt.Examples.SortedList
 import Basalt.Examples.Monoid
 import Basalt.Examples.AllTwoList
 import Basalt.Examples.AllTwoTree
+import Basalt.Examples.GenStats
 import Basalt.Examples.Heap
 import Basalt.Examples.NatOrFloat

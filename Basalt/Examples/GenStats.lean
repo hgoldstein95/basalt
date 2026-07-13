@@ -1,0 +1,98 @@
+import Basalt
+import Basalt.Examples.BST
+import Basalt.Examples.AllTwoTree
+
+open RandomChoice
+
+/-!
+# `#genstats` Examples
+
+`#genstats` draws from a generator and summarizes its distribution
+-/
+
+namespace GenStatsExamples
+
+/--
+info: BST.Tree.genBST 0 10 — 200 draws (seed 0, fuel 10000)
+
+  outcomes    ok 200 (100.0%)
+  size        mean 4.1   p50 1   p95 15   max 21
+  choices     mean 4.8   p50 1   p95 17   max 24
+  distinct    80 / 200
+
+  head constructor
+    leaf    54.0%  (108)
+    node    46.0%   (92)
+
+  most common
+     54.0%  (108)  BST.Tree.leaf
+      2.0%    (4)  BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf)
+      1.5%    (3)  BST.Tree.node (BST.Tree.leaf) 3 (BST.Tree.leaf)
+      1.5%    (3)  BST.Tree.node (BST.Tree.leaf) 5 (BST.Tree.leaf)
+      1.0%    (2)  BST.Tree.node (BST.Tree.leaf) 2 (BST.Tree.leaf)
+
+  samples
+    BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf)
+    BST.Tree.leaf
+    BST.Tree.leaf
+-/
+#guard_msgs in
+#genstats (draws := 200) BST.Tree.genBST 0 10
+
+/--
+info: BST.Tree.genWeightedBST 0 10 — 200 draws (seed 0, fuel 10000)
+
+  outcomes    ok 200 (100.0%)
+  size        mean 8.6   p50 8   p95 21   max 43
+  choices     mean 19.0   p50 19   p95 45   max 87
+  distinct    161 / 200
+
+  head constructor
+    node    82.0%  (164)
+    leaf    18.0%   (36)
+
+  most common
+     18.0%  (36)  BST.Tree.leaf
+      1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 3 (BST.Tree.leaf)
+      1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 9 (BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf))
+      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 0 (BST.Tre…
+      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.le…
+
+  samples
+    BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.node (BST.Tree.node (BST.Tree.no…
+    BST.Tree.leaf
+    BST.Tree.leaf
+-/
+#guard_msgs in
+#genstats (draws := 200) (size := BST.Tree.size) BST.Tree.genWeightedBST 0 10
+
+/--
+info: AllTwoTree.genTree — 1000 draws (seed 0, fuel 10000)
+
+  outcomes    ok 995 (99.5%)   fuel-exhausted 5 (0.5%)
+  size        mean 75.4   p50 1   p95 161   max 9851
+  choices     mean 75.4   p50 1   p95 161   max 9851
+
+  head constructor
+    leaf    50.6%  (503)
+    node    49.4%  (492)
+-/
+#guard_msgs in
+#genstats AllTwoTree.genTree
+
+def genDiverge [Gen G] : G Nat := do
+  let _ ← choose 0 1 (by omega)
+  genDiverge
+partial_fixpoint
+
+/--
+info: genDiverge — 50 draws (seed 0, fuel 100)
+
+  outcomes    ok 0 (0.0%)   fuel-exhausted 50 (100.0%)
+  size        (no data)
+  choices     (no data)
+-/
+#guard_msgs in
+#genstats (draws := 50) (fuel := 100) genDiverge
+
+end GenStatsExamples
