@@ -21,7 +21,7 @@ def RandomChoice.pick [Monad m] [RandomChoice m] (x y : Unit → m α) := do
 
 /-- A weighted binary choice. -/
 def RandomChoice.coin [Monad m] [RandomChoice m] (r : Rat) : m Bool := do
-  if (ULift.down (← choose 0 r.den (by simp))).val < r.num then pure true else pure false
+  if (ULift.down (← choose 0 (r.den - 1) (by simp))).val < r.num then pure true else pure false
 
 /-- The `pick` combinator is `monotone` if its arguments are.
 

@@ -11,6 +11,8 @@ import Basalt.SPMF
 import Basalt.SPMF.Cost
 import Basalt.Classes
 import Basalt.Combinators
+import Basalt.GenStats
+import Basalt.GenStats.Command
 
 /-!
 # A Coinductive Model for Generators
