@@ -399,7 +399,11 @@ theorem mem_support_oneOf_iff
 
 
 /-- If `n < sum (fst <$> gs)`, then `frequencySelect gs n h` picks a sub-generator
-    from `gs` that has non-zero weight `w` -/
+    from `gs` that has non-zero weight `w`.
+
+    Note: this lemma is parameterized over `Gen G`, not `SPMF`, as it is used
+    both for support & cost lemmas (i.e. `G` is instantiated with `SPMF` and `SPMF.Cost`)
+    about `frequency`. -/
 theorem frequencySelect_mem [Gen G]
     {gs : List (Nat × (Unit → G α))}
     {n : Nat}
