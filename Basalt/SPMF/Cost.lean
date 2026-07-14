@@ -602,9 +602,24 @@ theorem IsBounded_frequencySelect
     {n : Nat}
     (h : n < List.sum (List.map Prod.fst gs))
     (hcost : ∀ g ∈ gs, {cost_g // IsBounded (g.2 ()) cost_g}) :
-    IsBounded (Helpers.frequencySelect gs n h)
-      (fun x => List.foldr (fun ⟨(w, g), hg⟩ acc => max ((hcost (w, g) hg).val x) acc) 0 gs.attach) :=
-  sorry
+    ∃ w g, ∃ (hg : (w, g) ∈ gs),
+      Helpers.frequencySelect gs n h = g () ∧
+        IsBounded (Helpers.frequencySelect gs n h) (hcost (w, g) hg).val := by
+  have hne : gs ≠ [] := by
+    apply foo
+    cases n with
+    | zero => assumption
+    | succ n' => omega
+  obtain ⟨w, g, hwg, hge, heq⟩ := SPMF.frequencySelect_mem h
+  exists w, g, hwg
+  constructor
+  . assumption
+  . -- `heq` rewrites the `frequencySelect` to the chosen generator `g ()`,
+    -- which we know from `hcost` is already bounded
+    rw [heq]
+    have hbounded : IsBounded (g ()) (hcost (w, g) hwg) := by
+      apply (hcost (w, g) hwg).property
+    apply hbounded
 
 theorem IsBounded_frequency
     {gs : List (Nat × (Unit → SPMF.Cost α))}
@@ -631,19 +646,43 @@ theorem IsBounded_frequency
   apply IsBounded_bind
     (cx := fun _ => 1)
     (cf := fun _ x => List.foldr (fun ⟨(w, g), hg⟩ acc => max ((hcost (w, g) hg).val x) acc) 0 gs.attach)
-  . apply IsBounded_map
+  . -- IsBounded (ULift.down <$> choose 0 ((List.map Prod.fst gs).sum - 1) ⋯) (fun _ => 1)
+    apply IsBounded_map
     . apply IsBounded_choose
     . intro (i, w) hi
-      sorry
-  . rintro ⟨n, hge, hle⟩
+      apply le_refl
+  . -- ∀ x, IsBounded (if x < (Prod.fst <$> gs).sum then ... else ...) (List.foldr ... 0 gs)
+    rintro ⟨n, hge, hle⟩
     dsimp only
     split
-    . -- n ≤ (List.map Prod.fst gs).sum
-      apply IsBounded_frequencySelect
-    . -- ¬ n ≤ (List.map Prod.fst gs).sum
+    . -- In this case, we have `n ≤ (List.map Prod.fst gs).sum`, so
+      -- `frequencyAux` calls `frequencySelect`.
+      -- Here we use the fact that `frequencySelect` is bounded...
+      obtain ⟨w, g, hwg, _, hbounded⟩ := by
+        apply IsBounded_frequencySelect <;> assumption
+      -- ...along the fact that the `IsBounded` relation is monotonic
+      apply IsBounded_mono hbounded
+      intro x
+      -- Now we rewrite `List.foldr (fun x1 acc => max ...) 0 gs.attach`
+      -- into `List.foldr max 0 (List.map ... gs.attach)`
+      rw [← List.foldr_map]
+      -- Finally we use the fact that the cost of each sub-generator
+      -- is upper-bounded by the `max` of all sub-generators' costs.
+      apply List.le_max_of_le' (x := (hcost (w, g) hwg).val x)
+      . apply List.mem_map.mpr
+        exists ⟨(w, g), hwg⟩
+        constructor
+        . apply List.mem_attach
+        . rfl
+      . apply le_refl
+    . -- In this case, we have `¬ n ≤ (List.map Prod.fst gs).sum`,
+      -- so `frequencyAux` ends up using the `default` generator instead.
       -- The fallback `default` generator has empty support, so it is bounded by anything.
       apply IsBounded_default
-  . sorry
+  . -- The bound for the cost function for the continuation (after the bind) is tight
+    dsimp
+    intro p hp q hq
+    apply le_refl
 
 
 open Lean.Order in

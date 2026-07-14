@@ -400,8 +400,8 @@ theorem mem_support_oneOf_iff
 
 /-- If `n < sum (fst <$> gs)`, then `frequencySelect gs n h` picks a sub-generator
     from `gs` that has non-zero weight `w` -/
-private theorem frequencySelect_mem
-    {gs : List (Nat × (Unit → SPMF α))}
+theorem frequencySelect_mem [Gen G]
+    {gs : List (Nat × (Unit → G α))}
     {n : Nat}
     (h : n < (List.map Prod.fst gs).sum) :
     ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ Helpers.frequencySelect gs n h = g () := by
