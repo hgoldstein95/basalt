@@ -587,9 +587,9 @@ theorem IsBounded_oneOf
     have h_bounded := (hcost gs[i] (List.getElem_mem hlt)).property
     assumption
   · -- The chosen generator's cost is ≤ the max cost, so 1 + it ≤ 1 + the max
-    rintro ⟨⟨i, hge, hle⟩, -⟩ - ⟨g, -⟩ -
-    dsimp only
-    have := hcost_le i (hidx ⟨i, hge, hle⟩) g
+    rintro ⟨⟨i, hge, hle⟩, _⟩ _ ⟨g, _⟩ _
+    dsimp
+    specialize hcost_le i (hidx ⟨i, hge, hle⟩) g
     omega
 
 /-- `frequencySelect`'s cost function is upper-bounded by
