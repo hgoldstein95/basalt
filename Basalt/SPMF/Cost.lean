@@ -78,6 +78,8 @@ end SPMF
 namespace SPMF.Cost
 
 instance instInhabited : Inhabited (SPMF.Cost α) where
+  -- Note: default value for `SPMF.Cost` is just the constant
+  -- function returning 0
   default := @Bot.bot (SPMF (α × Nat)) _
 
 noncomputable instance instMonad : Monad SPMF.Cost where
@@ -395,6 +397,18 @@ theorem IsBounded_choose : IsBounded (choose lo hi h) (fun _ => 1) := by
   simp only [mem_support_choose_iff] at hmem
   omega
 
+/-- The `default` generator has empty support since it's just the constant function returning 0.
+    Thus, `default` is bounded by any cost function `f`. -/
+theorem IsBounded_default {f : α → Nat} : IsBounded (default : SPMF.Cost α) f := by
+  rw [IsBounded_iff]
+  intro (x, c) hp
+  rw [SPMF.mem_support_iff] at hp
+  dsimp
+  apply Nat.le_of_not_lt
+  intro hcontra
+  apply hp
+  rfl
+
 theorem IsBounded_bind
     {cx : α → Nat}
     {cf : α → β → Nat}
@@ -565,13 +579,15 @@ theorem IsBounded_oneOf
       constructor
   · -- For each `i`, `gs[i]` is bounded by its own cost function
     rintro ⟨i, hge, hle⟩
+    -- Reduce the `match` on the index subtype and the `↑⟨i, ⋯⟩` coercion down to `i`
+    dsimp only
     have hlt : i < gs.length := hidx ⟨i, hge, hle⟩
     have h_bounded := (hcost gs[i] (List.getElem_mem hlt)).property
     assumption
   · -- The chosen generator's cost is ≤ the max cost, so 1 + it ≤ 1 + the max
-    rintro ⟨idx, -⟩ - ⟨g, -⟩ -
-    dsimp
-    have := hcost_le idx.val (hidx idx) g
+    rintro ⟨⟨i, hge, hle⟩, -⟩ - ⟨g, -⟩ -
+    dsimp only
+    have := hcost_le i (hidx ⟨i, hge, hle⟩) g
     omega
 
 theorem foo
@@ -581,6 +597,14 @@ theorem foo
   rintro rfl
   contradiction
 
+theorem IsBounded_frequencySelect
+    {gs : List (Nat × (Unit → SPMF.Cost α))}
+    {n : Nat}
+    (h : n < List.sum (List.map Prod.fst gs))
+    (hcost : ∀ g ∈ gs, {cost_g // IsBounded (g.2 ()) cost_g}) :
+    IsBounded (Helpers.frequencySelect gs n h)
+      (fun x => List.foldr (fun ⟨(w, g), hg⟩ acc => max ((hcost (w, g) hg).val x) acc) 0 gs.attach) :=
+  sorry
 
 theorem IsBounded_frequency
     {gs : List (Nat × (Unit → SPMF.Cost α))}
@@ -603,18 +627,22 @@ theorem IsBounded_frequency
         . rfl
     . constructor
   unfold frequency Helpers.frequencyAux
+  -- We need to instantiate `cx`/`cf` explicitly here, otherwise unification times out
   apply IsBounded_bind
+    (cx := fun _ => 1)
+    (cf := fun _ x => List.foldr (fun ⟨(w, g), hg⟩ acc => max ((hcost (w, g) hg).val x) acc) 0 gs.attach)
   . apply IsBounded_map
     . apply IsBounded_choose
     . intro (i, w) hi
       sorry
-  . intro ⟨n, hge, hle⟩
+  . rintro ⟨n, hge, hle⟩
+    dsimp only
     split
     . -- n ≤ (List.map Prod.fst gs).sum
-      -- TODO: need a helper lemma for `IsBounded (frequencySelect ...) ...`
-      sorry
+      apply IsBounded_frequencySelect
     . -- ¬ n ≤ (List.map Prod.fst gs).sum
-      sorry
+      -- The fallback `default` generator has empty support, so it is bounded by anything.
+      apply IsBounded_default
   . sorry
 
 
