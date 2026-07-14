@@ -521,7 +521,7 @@ theorem IsBounded_vectorOf
     omega
 
 /-- The cost function here is 1 more than the cost of `vectorOf`, because
-    `listOfMaxLength` needs to randomly choose a length of the list before invoking `vectorOf` -/
+    `listOfMaxLength` needs to randomly choose a length for the list before invoking `vectorOf` -/
 theorem IsBounded_listOfMaxLength
     (hx : IsBounded g cost_g) :
     IsBounded (listOfMaxLength n g) (fun xs => 1 + List.sum (cost_g <$> xs)) := by
