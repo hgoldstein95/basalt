@@ -456,7 +456,7 @@ theorem IsBounded_mono
   simp_all only [IsBounded_iff]
   grind
 
--- The `elements` combinator makes only one random choice (the index into the list)
+/-- The `elements` combinator makes only one random choice (the index into the list) -/
 theorem IsBounded_elements
     (hne : xs ≠ []) :
     IsBounded (elements xs hne) (fun _ => 1) := by
@@ -493,7 +493,7 @@ theorem IsBounded_pick
     simp only
     split_ifs <;> omega
 
--- The cost incurred by `vectorOf n g` is the sum of the costs of generating each element using `g`
+/-- The cost incurred by `vectorOf n g` is the sum of the costs of generating each element using `g` -/
 theorem IsBounded_vectorOf
     (hx : IsBounded g cost_g) :
     IsBounded (vectorOf n g) (fun xs => List.sum (cost_g <$> xs)) := by
@@ -520,8 +520,8 @@ theorem IsBounded_vectorOf
     simp only [Functor.map] at *
     omega
 
--- The cost function here is 1 more than the cost of `vectorOf`, because
--- `listOfMaxLength` needs to randomly choose a length of the list before invoking `vectorOf`
+/-- The cost function here is 1 more than the cost of `vectorOf`, because
+    `listOfMaxLength` needs to randomly choose a length of the list before invoking `vectorOf` -/
 theorem IsBounded_listOfMaxLength
     (hx : IsBounded g cost_g) :
     IsBounded (listOfMaxLength n g) (fun xs => 1 + List.sum (cost_g <$> xs)) := by
@@ -541,6 +541,8 @@ theorem IsBounded_listOfMaxLength
     assumption
   · omega
 
+/-- `oneOf`'s cost function is upper-bounded by 1 +
+    the max-valued cost function out of all the sub-generators -/
 theorem IsBounded_oneOf
     {gs : List (Unit → SPMF.Cost α)}
     (hne : gs ≠ [])
@@ -590,13 +592,8 @@ theorem IsBounded_oneOf
     have := hcost_le i (hidx ⟨i, hge, hle⟩) g
     omega
 
-theorem foo
-    {gs : List (Nat × (Unit → SPMF.Cost α))}
-    (hne : 0 < (List.map Prod.fst gs).sum) :
-    gs ≠ [] := by
-  rintro rfl
-  contradiction
-
+/-- `frequencySelect`'s cost function is upper-bounded by
+     the cost function of the sub-generator that is chosen -/
 theorem IsBounded_frequencySelect
     {gs : List (Nat × (Unit → SPMF.Cost α))}
     {n : Nat}
@@ -605,11 +602,6 @@ theorem IsBounded_frequencySelect
     ∃ w g, ∃ (hg : (w, g) ∈ gs),
       Helpers.frequencySelect gs n h = g () ∧
         IsBounded (Helpers.frequencySelect gs n h) (hcost (w, g) hg).val := by
-  have hne : gs ≠ [] := by
-    apply foo
-    cases n with
-    | zero => assumption
-    | succ n' => omega
   obtain ⟨w, g, hwg, hge, heq⟩ := SPMF.frequencySelect_mem h
   exists w, g, hwg
   constructor
@@ -621,6 +613,8 @@ theorem IsBounded_frequencySelect
       apply (hcost (w, g) hwg).property
     apply hbounded
 
+/-- `frequency`'s cost function is upper-bounded by 1 +
+    the max-valued cost function out of all the sub-generators -/
 theorem IsBounded_frequency
     {gs : List (Nat × (Unit → SPMF.Cost α))}
     (hne : 0 < (List.map Prod.fst gs).sum)
