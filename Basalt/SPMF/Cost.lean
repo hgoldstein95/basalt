@@ -654,22 +654,33 @@ theorem IsBounded_frequency
   . -- ∀ x, IsBounded (if x < (Prod.fst <$> gs).sum then ... else ...) (List.foldr ... 0 gs)
     rintro ⟨n, hge, hle⟩
     dsimp only
+    -- `frequencySelect` has an `if`-expression that cases on whether `n < (Prod.fst <$> gs).sum`,
+    -- we case on this
     split
     . -- In this case, we have `n ≤ (List.map Prod.fst gs).sum`, so
       -- `frequencyAux` calls `frequencySelect`.
       -- Here we use the fact that `frequencySelect` is bounded...
       obtain ⟨w, g, hwg, _, hbounded⟩ := by
         apply IsBounded_frequencySelect <;> assumption
-      -- ...along the fact that the `IsBounded` relation is monotonic
+      -- We name the chosen sub-generator's cost function `cost_g : α → Nat`.
+      -- `set` (not `have`) rewrites every occurrence, including inside `hbounded`,
+      -- so the remaining goal is phrased in terms of `cost_g` throughout.
+      set cost_g : α → Nat := (hcost (w, g) hwg).val with hcost_g
+      -- ...along the fact that the `IsBounded` relation is monotonic over `≤`
       apply IsBounded_mono hbounded
+      -- Now we just need to show that `cost_g` is less than
+      -- `List.foldr (fun ... acc => max <some_cost_function> acc) 0 gs.attach`
       intro x
-      -- Now we rewrite `List.foldr (fun x1 acc => max ...) 0 gs.attach`
-      -- into `List.foldr max 0 (List.map ... gs.attach)`
+      -- Now we rewrite the RHS into a
+      -- into `List.foldr max 0 (List.map <cost_function> gs.attach)`
       rw [← List.foldr_map]
-      -- Finally we use the fact that the cost of each sub-generator
+      -- We use the fact that the cost of each sub-generator
       -- is upper-bounded by the `max` of all sub-generators' costs.
-      apply List.le_max_of_le' (x := (hcost (w, g) hwg).val x)
-      . apply List.mem_map.mpr
+      -- (We instantiate the variable `x` of the `List.le_max_of_le'` lemma
+      -- here to make subsequent goals clearer.)
+      apply List.le_max_of_le' (x := cost_g x)
+      . -- `cost_g x ∈ List.map <cost_function> gs`
+        apply List.mem_map.mpr
         exists ⟨(w, g), hwg⟩
         constructor
         . apply List.mem_attach
