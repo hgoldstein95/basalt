@@ -592,27 +592,6 @@ theorem IsBounded_oneOf
     specialize hcost_le i (hidx ⟨i, hge, hle⟩) g
     omega
 
-/-- `frequencySelect`'s cost function is upper-bounded by
-     the cost function of the sub-generator that is chosen -/
-theorem IsBounded_frequencySelect
-    {gs : List (Nat × (Unit → SPMF.Cost α))}
-    {n : Nat}
-    (h : n < List.sum (List.map Prod.fst gs))
-    (hcost : ∀ g ∈ gs, {cost_g // IsBounded (g.2 ()) cost_g}) :
-    ∃ w g, ∃ (hg : (w, g) ∈ gs),
-      Helpers.frequencySelect gs n h = g () ∧
-        IsBounded (Helpers.frequencySelect gs n h) (hcost (w, g) hg).val := by
-  obtain ⟨w, g, hwg, hge, heq⟩ := SPMF.frequencySelect_mem h
-  exists w, g, hwg
-  constructor
-  . assumption
-  . -- `heq` rewrites the `frequencySelect` to the chosen generator `g ()`,
-    -- which we know from `hcost` is already bounded
-    rw [heq]
-    have hbounded : IsBounded (g ()) (hcost (w, g) hwg) := by
-      apply (hcost (w, g) hwg).property
-    apply hbounded
-
 /-- `frequency`'s cost function is upper-bounded by 1 +
     the max-valued cost function out of all the sub-generators -/
 theorem IsBounded_frequency
@@ -654,12 +633,14 @@ theorem IsBounded_frequency
     . -- In this case, we have `n ≤ (List.map Prod.fst gs).sum`, so
       -- `frequencyAux` calls `frequencySelect`.
       -- Here we use the fact that `frequencySelect` is bounded...
-      obtain ⟨w, g, hwg, _, hbounded⟩ := by
-        apply IsBounded_frequencySelect <;> assumption
+      obtain ⟨w, g, hwg, _, heq⟩ := SPMF.frequencySelect_mem (by assumption)
       -- We name the chosen sub-generator's cost function `cost_g : α → Nat`.
       -- `set` (not `have`) rewrites every occurrence, including inside `hbounded`,
       -- so the remaining goal is phrased in terms of `cost_g` throughout.
       set cost_g : α → Nat := (hcost (w, g) hwg).val with hcost_g
+      -- `frequencySelect` reduces to the chosen generator `g ()`, which `hcost` bounds
+      rw [heq]
+      have hbounded : IsBounded (g ()) cost_g := (hcost (w, g) hwg).property
       -- ...along the fact that the `IsBounded` relation is monotonic over `≤`
       apply IsBounded_mono hbounded
       -- Now we just need to show that `cost_g` is less than
