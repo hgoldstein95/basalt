@@ -646,8 +646,8 @@ theorem IsBounded_frequency
       -- Now we just need to show that `cost_g` is less than
       -- `List.foldr (fun ... acc => max <some_cost_function> acc) 0 gs.attach`
       intro x
-      -- Now we rewrite the RHS into a
-      -- into `List.foldr max 0 (List.map <cost_function> gs.attach)`
+      -- Now we rewrite the RHS into
+      -- the form `List.foldr max 0 (List.map <cost_function> gs.attach)`
       rw [← List.foldr_map]
       -- We use the fact that the cost of each sub-generator
       -- is upper-bounded by the `max` of all sub-generators' costs.
