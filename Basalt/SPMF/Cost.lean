@@ -130,6 +130,42 @@ theorem mem_support_choose_iff
   · rintro rfl
     exact ⟨n, rfl, rfl⟩
 
+@[simp]
+theorem mem_support_map_iff {m : SPMF.Cost α} {f : α → β} {b : β} {n : Nat} :
+    (b, n) ∈ (f <$> m).support ↔ ∃ a, (a, n) ∈ m.support ∧ b = f a := by
+  have : (f <$> m : SPMF.Cost β) = m >>= fun a => Pure.pure (f a) := rfl
+  rw [this]
+  simp only [mem_support_bind_iff, mem_support_pure_iff]
+  constructor
+  · rintro ⟨a, n1, n2, hmem, ⟨rfl, rfl⟩, rfl⟩
+    exact ⟨a, by simpa using hmem, rfl⟩
+  · rintro ⟨a, hmem, rfl⟩
+    exact ⟨a, n, 0, hmem, ⟨rfl, rfl⟩, rfl⟩
+
+/-- Support inversion for `frequency` at the cost interpretation: a draw from `frequency gs`
+  is a draw from one of its positive-weight branches, plus exactly one choice (the branch
+  selection). The cost-side counterpart of `SPMF.support_frequency`. -/
+theorem mem_support_frequency
+    {gs : List (Nat × (Unit → SPMF.Cost α))}
+    {hne : 0 < (List.map Prod.fst gs).sum}
+    {a : α} {n : Nat}
+    (hmem : (a, n) ∈ (frequency gs hne).support) :
+    ∃ w g m, (w, g) ∈ gs ∧ 0 < w ∧ (a, m) ∈ (g ()).support ∧ n = m + 1 := by
+  unfold frequency Helpers.frequencyAux at hmem
+  rw [mem_support_bind_iff] at hmem
+  obtain ⟨v, n1, n2, hchoose, hrest, rfl⟩ := hmem
+  rw [mem_support_map_iff] at hchoose
+  obtain ⟨u, hu, rfl⟩ := hchoose
+  rw [mem_support_choose_iff] at hu
+  subst hu
+  obtain ⟨⟨x, hx0, hxle⟩⟩ := u
+  simp only at hrest
+  have hlt : x < (List.map Prod.fst gs).sum := by omega
+  rw [dif_pos hlt] at hrest
+  obtain ⟨w, g, hwg, hw, heq⟩ := SPMF.frequencySelect_mem hlt
+  rw [heq] at hrest
+  exact ⟨w, g, n2, hwg, hw, hrest, by omega⟩
+
 end support
 
 end SPMF.Cost

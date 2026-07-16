@@ -80,6 +80,27 @@ info: AllTwoTree.genTree — 1000 draws (seed 0, fuel 10000)
 #guard_msgs in
 #genstats AllTwoTree.genTree
 
+/-
+The subcritical variant (`m = 2/3`): the branching-process theory predicts an expected
+`1/(1 - 2/3) = 3` constructors (`AllTwoTree.genWeightedTree_expectedSteps`), and the measured
+mean below is 2.9 — against `genTree`'s fueled mean of 75.4 with a 9851-node maximum above.
+The size function counts constructors (`2 * size + 1` for a binary tree), matching what
+`LevelOp.expectedSteps` counts.
+-/
+/--
+info: AllTwoTree.genWeightedTree — 200 draws (seed 0, fuel 10000)
+
+  outcomes    ok 200 (100.0%)
+  size        mean 2.9   p50 1   p95 11   max 37
+  choices     mean 2.9   p50 1   p95 11   max 37
+
+  head constructor
+    leaf    65.5%  (131)
+    node    34.5%   (69)
+-/
+#guard_msgs in
+#genstats (draws := 200) (size := fun t => 2 * t.size + 1) AllTwoTree.genWeightedTree
+
 def genDiverge [Gen G] : G Nat := do
   let _ ← choose 0 1 (by omega)
   genDiverge

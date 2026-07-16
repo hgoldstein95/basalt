@@ -94,13 +94,11 @@ theorem String.arbitrary_cost :
     IsBounded String.arbitrary (fun s => 2 * s.length + 1) := by
   unfold String.arbitrary
   simp [IsBounded_iff]
-  intro s cost h
-  simp [Functor.map] at h
-  obtain ⟨cs, hcs, rfl⟩ := h
-  have hcost : cost ≤ 2 * cs.length + 1 := by
-    apply IsBounded_iff.mp genCharList_cost (cs, cost) hcs
-  simp [String.length_ofList]
-  assumption
+  intro s cost cs hcs heq
+  subst heq
+  have hcost : cost ≤ 2 * cs.length + 1 :=
+    IsBounded_iff.mp genCharList_cost (cs, cost) hcs
+  simpa [String.length_ofList] using hcost
 
 #guard_msgs(drop info) in
 #eval (for _ in [0:10] do

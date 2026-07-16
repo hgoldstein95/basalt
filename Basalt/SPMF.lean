@@ -6,6 +6,7 @@ Authors: Harrison Goldstein
 import Basalt.SPMF.Core
 import Basalt.SPMF.Support
 import Basalt.SPMF.Termination
+import Basalt.SPMF.Ranking
 
 /-!
 # Sub-Probability Mass Functions

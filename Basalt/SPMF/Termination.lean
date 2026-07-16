@@ -26,6 +26,8 @@ section mass
 /-- The total mass of an SPMF. Always ≤ 1 by definition. -/
 noncomputable def mass (p : SPMF α) : ℝ≥0∞ := ∑' a, p a
 
+theorem mass_le_one (p : SPMF α) : p.mass ≤ 1 := p.tsum_coe
+
 theorem mass_eq_zero_of_support_empty {p : SPMF α} (h : p.support = ∅) : p.mass = 0 := by
   unfold mass
   rw [ENNReal.tsum_eq_zero]
@@ -174,6 +176,27 @@ theorem mass_bind_ge_of_isPMF {x : SPMF α} (hx : x.mass = 1)
 theorem mass_ge_iInf {ι : Type*} (g : ι → SPMF α) (i : ι) :
     (g i).mass ≥ ⨅ j, (g j).mass :=
   iInf_le (fun j => (g j).mass) i
+
+/-- Lower-bound the mass of a generator that draws a pivot with `choose` and continues:
+  the mass is at least the *average* over the range of a per-pivot lower bound. -/
+theorem mass_bind_choose_ge {lo hi : Nat} (h : lo ≤ hi)
+    {f : ULift {x : Nat // lo ≤ x ∧ x ≤ hi} → SPMF α} {m : Nat → ℝ≥0∞}
+    (hf : ∀ a, (f a).mass ≥ m a.down.val) :
+    (choose lo hi h >>= f).mass
+      ≥ (∑ x ∈ Finset.Icc lo hi, m x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
+  rw [mass_bind_tsum]
+  calc ∑' a, (choose lo hi h : SPMF _) a * (f a).mass
+      ≥ ∑' (a : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}),
+          (1 / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) * m a.down.val := by
+        refine ENNReal.tsum_le_tsum fun a => ?_
+        rw [choose_apply lo hi h a]
+        exact mul_le_mul' le_rfl (hf a)
+    _ = (1 / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) *
+          ∑' (a : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}), m a.down.val := ENNReal.tsum_mul_left
+    _ = (1 / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) * ∑ x ∈ Finset.Icc lo hi, m x := by
+        rw [tsum_subtype_Icc]
+    _ = (∑ x ∈ Finset.Icc lo hi, m x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
+        rw [one_div, mul_comm, div_eq_mul_inv]
 
 /-- A `tsum` over `α` commutes with a weighted `List.sum`. -/
 private theorem tsum_map_weighted (gs : List (Nat × (Unit → SPMF α))) :
@@ -443,35 +466,3 @@ lemma ENNReal.eq_one_of_fixed_ineq' {c v : ENNReal}
   have hge_one := hf_one hmono
   rw [← ofReal_toReal hc_ne, le_antisymm hle' hge_one, ofReal_one]
 
-namespace SPMF
-
-/-- If a generator `g` is an SPMF, then `listOf g` is also an SPMF.
-  Unlike `vectorOf`/`listOfMaxLength`, `listOf` is defined by `partial_fixpoint`,
-  so we prove termination via `IsPMF_of_mass_fixpoint`. Note: this proof
-  is largely the same as `List.arbitrary_terminates` in `Examples/ArbList.lean`.
-
-  (Note: this lemma is at the bottom of the file since it requires the
-  `ENNReal` lemmas defined earlier.) -/
-theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
-    IsPMF (listOf g) := by
-  refine (IsPMF_of_mass_fixpoint
-    (g := fun () => listOf g)
-    (F := fun c => 1 / 2 + 1 / 2 * c)
-    ?bounds ?mass) ()
-  case bounds =>
-    intro c hle hge
-    apply ENNReal.eq_one_of_fixed_ineq' hle hge
-    intro hmono
-    rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
-    norm_num at hmono; linarith
-  case mass =>
-    intro () h
-    conv_lhs => rw [listOf]
-    simp only [mass_pick, mass_pure, mul_one]
-    gcongr
-    apply mass_bind_ge_of_isPMF hg
-    intro x
-    rw [mass_bind_pure]
-    exact mass_ge_iInf _ ()
-
-end SPMF
