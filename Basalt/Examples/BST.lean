@@ -39,8 +39,11 @@ partial_fixpoint
     This example demonstrates that we can successfully call `frequency`
     in functions marked as `partial_fixpoint`.
 
+    It is also `tunable`; the emitted `.tuned`/`.defaults`/`.sites`/
+    `.tuned_defaults` are exercised in `Basalt/Examples/Tunable.lean`.
+
     Note: the proofs below are for `genBST`, not `genWeightedBST`. -/
-def Tree.genWeightedBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
+tunable def Tree.genWeightedBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
   if h : lo > hi then
     return leaf
   else
