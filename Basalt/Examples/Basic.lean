@@ -11,3 +11,4 @@ import Basalt.Examples.GenStats
 import Basalt.Examples.Tunable
 import Basalt.Examples.Heap
 import Basalt.Examples.NatOrFloat
+import Basalt.Examples.Frequency

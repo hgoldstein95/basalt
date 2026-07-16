@@ -175,6 +175,42 @@ theorem mass_ge_iInf {ι : Type*} (g : ι → SPMF α) (i : ι) :
     (g i).mass ≥ ⨅ j, (g j).mass :=
   iInf_le (fun j => (g j).mass) i
 
+/-- A `tsum` over `α` commutes with a weighted `List.sum`. -/
+private theorem tsum_map_weighted (gs : List (Nat × (Unit → SPMF α))) :
+    ∑' a, (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()).mass).sum := by
+  induction gs with
+  | nil => simp
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.sum_cons]
+    rw [ENNReal.tsum_add, ENNReal.tsum_mul_left, ih]
+    rfl
+
+/-- The mass of a weighted choice is the weighted average of the branch masses. -/
+@[simp]
+theorem mass_frequency
+    {gs : List (Nat × (Unit → SPMF α))} (h : 0 < (gs.map Prod.fst).sum) :
+    (frequency gs h : SPMF α).mass
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()).mass).sum / ((gs.map Prod.fst).sum : ℝ≥0∞) := by
+  have hm : (frequency gs h : SPMF α).mass = ∑' a, frequency gs h a := rfl
+  rw [hm]
+  simp only [frequency_apply, div_eq_mul_inv]
+  rw [ENNReal.tsum_mul_right, tsum_map_weighted]
+
+/-- Lower-bound form of `mass_frequency`, for termination proofs: inside a `partial_fixpoint` one
+  only ever has a *lower bound* on a recursive branch's mass, never an equality. -/
+theorem mass_frequency_ge {gs : List (Nat × (Unit → SPMF α))}
+    (h : 0 < (gs.map Prod.fst).sum)
+    {f : (Nat × (Unit → SPMF α)) → ℝ≥0∞}
+    (hgs : ∀ p ∈ gs, (p.2 ()).mass ≥ f p) :
+    (frequency gs h : SPMF α).mass
+      ≥ (gs.map fun p => (p.1 : ℝ≥0∞) * f p).sum / ((gs.map Prod.fst).sum : ℝ≥0∞) := by
+  rw [mass_frequency h]
+  refine ENNReal.div_le_div_right ?_ _
+  refine List.sum_le_sum fun p hp => ?_
+  gcongr
+  exact hgs p hp
+
 end mass
 
 section is_pmf
@@ -275,6 +311,31 @@ theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ 
     dsimp
     apply hgs
     apply List.getElem_mem
+
+/-- If every positive-weight branch is a PMF, the weighted masses sum to the total weight. -/
+private theorem sum_weights_of_IsPMF {gs : List (Nat × (Unit → SPMF α))}
+    (hgs : ∀ p ∈ gs, 0 < p.1 → IsPMF (p.2 ())) :
+    (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()).mass).sum = ((gs.map Prod.fst).sum : ℝ≥0∞) := by
+  induction gs with
+  | nil => simp
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.sum_cons, Nat.cast_add]
+    rw [ih (fun p hp => hgs p (List.mem_cons_of_mem _ hp))]
+    congr 1
+    rcases Nat.eq_zero_or_pos hd.1 with hz | hpos
+    · simp [hz]
+    · have hm : (hd.2 ()).mass = 1 := hgs hd List.mem_cons_self hpos
+      rw [hm, mul_one]
+
+/-- A weighted choice among PMFs is a PMF. Only *positive-weight* branches need to be
+    PMFs — a zero-weight branch is never selected. -/
+theorem IsPMF_frequency {gs : List (Nat × (Unit → SPMF α))}
+    (h : 0 < (gs.map Prod.fst).sum)
+    (hgs : ∀ p ∈ gs, 0 < p.1 → IsPMF (p.2 ())) :
+    IsPMF (frequency gs h) := by
+  unfold IsPMF
+  rw [mass_frequency h, sum_weights_of_IsPMF hgs]
+  exact ENNReal.div_self (Nat.cast_ne_zero.mpr h.ne') (ENNReal.natCast_ne_top _)
 
 /-- If a generator `g` is an SPMF, then for any `n`, `vectorOf n g` is also an SPMF -/
 theorem IsPMF_vectorOf {g : SPMF α} (hg : IsPMF g) :
