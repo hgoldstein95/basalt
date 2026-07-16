@@ -61,6 +61,14 @@ theorem mass_pure (a : α) : (Pure.pure a : SPMF α).mass = 1 := by
     simp [ha']
 
 @[simp]
+theorem mass_bind_tsum {x : SPMF α} {f : α → SPMF β} :
+    (x >>= f).mass = ∑' a, x a * (f a).mass := by
+  unfold SPMF.mass
+  simp only [Bind.bind, SPMF.bind, DFunLike.coe]
+  rw [ENNReal.tsum_comm]
+  simp_rw [ENNReal.tsum_mul_left]
+
+@[simp]
 theorem mass_choose (lo hi : Nat) (h : lo ≤ hi) :
     (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})).mass = 1 := by
   unfold mass

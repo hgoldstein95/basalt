@@ -267,6 +267,9 @@ instance instLawfulMonadSPMF : LawfulMonad SPMF where
     unfold Function.comp
     simp [pure_bind]
 
+theorem bind_apply {x : SPMF α} {f : α → SPMF β} (b : β) :
+    (x >>= f) b = ∑' a, x a * (f a) b := rfl
+
 theorem bind_pick {α β} (x y : SPMF α) (f : α → SPMF β) :
     (pick (fun () => x) (fun () => y) >>= f) = pick (fun _ => x >>= f) (fun _ => y >>= f) := by
   apply SPMF.ext

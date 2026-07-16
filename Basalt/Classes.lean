@@ -6,6 +6,7 @@ Authors: Harrison Goldstein
 import Basalt.Gen
 import Basalt.SPMF
 import Basalt.SPMF.Cost
+import Basalt.SPMF.Failure
 
 /-!
 # Generator Correctness Classes
@@ -44,7 +45,14 @@ class IsAlmostSurelyTerminating (g : SPMF α) where
 class IsCostBounded (g : SPMF.Cost α) (c : α → Nat) where
   is_bounded : IsBounded g c
 
-/-- We say that a generator is a `LawfulGenerator` with respect to a predicate `P` a cost function
-    `c` if it `IsSoundAndComplete` with respect to `P` and it `IsAlmostSurelyTerminating` and it
-    `IsCostBounded` with respect to `c`. -/
 class LawfulGenerator (g : ∀ {G : Type → Type} [Gen G], G α) (P : α → Prop) (c : α → Nat) extends IsSoundAndComplete g P, IsAlmostSurelyTerminating g, IsCostBounded g c
+
+/-- A partial generator `IsFilterFree` if all of its mass lands on *successful* outcomes: it never
+  actually fails.  -/
+class IsFilterFree (g : SPMF (Option α)) where
+  filter_free : SPMF.massSome g = 1
+
+/-- A partial generator `IsProductive` if it succeeds with positive probability.  Proving this shows
+  that rejection sampling is safe. -/
+class IsProductive (g : SPMF (Option α)) where
+  productive : 0 < SPMF.massSome g

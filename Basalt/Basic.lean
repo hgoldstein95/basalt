@@ -5,10 +5,12 @@ Authors: Harrison Goldstein
 -/
 import Basalt.RandomChoice
 import Basalt.Gen
+import Basalt.OptionT
 import Basalt.IO
 import Basalt.PlausibleGen
 import Basalt.SPMF
 import Basalt.SPMF.Cost
+import Basalt.SPMF.Failure
 import Basalt.Classes
 import Basalt.Combinators
 import Basalt.GenStats
