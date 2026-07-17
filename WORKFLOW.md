@@ -205,6 +205,11 @@ operator and one rank, differing only in the recursion weight. Two things to kno
   needs a `+4` bump at `lo = 0` because the pivot `x = 0` recurses on `(0, 0-1) = (0, 0)`.
 - A wrong `φ` is a *failed drift check*, never a wrong theorem. Guess freely.
 
+Whatever the regime, the residual ENNReal *arithmetic* (drift inequalities, fixed-point
+bounds) is handled by `ennreal_to_real` + `norm_num`/`linarith`/`nlinarith` — see
+`Basalt/ENNRealAuto.lean`, with worked uses in `genWeightedBST_drift` (`BST.lean`),
+`genTree_terminates` (`AllTwoTree.lean`), and `IsPMF_retry` (`Failure.lean`).
+
 ### Recipe 3: Cost
 
 Worked instances: `Nat.arbitrary_cost` (`ArbNat.lean`) is the minimal case; `Tree.genHeap_cost`

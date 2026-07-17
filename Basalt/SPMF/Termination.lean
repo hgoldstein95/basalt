@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Support
+import Basalt.ENNRealAuto
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
@@ -411,38 +412,6 @@ theorem IsPMF_listOfMaxLength {g : SPMF α} (hg : IsPMF g) :
     apply IsPMF_vectorOf
     assumption
 
-private lemma weighted_avg_mono_ennreal {t p x : ℝ≥0∞}
-    (htp : t ≥ p) (hx_le_one : x ≤ 1) (ht_le_one : t ≤ 1) (hp_le_one : p ≤ 1) :
-    t + (1 - t) * x ≥ p + (1 - p) * x := by
-  have ht_ne_top : t ≠ ⊤ := ne_of_lt (lt_of_le_of_lt ht_le_one ENNReal.one_lt_top)
-  have hp_ne_top : p ≠ ⊤ := ne_of_lt (lt_of_le_of_lt hp_le_one ENNReal.one_lt_top)
-  have hx_ne_top : x ≠ ⊤ := ne_of_lt (lt_of_le_of_lt hx_le_one ENNReal.one_lt_top)
-  have h1mt_ne_top : (1 - t) ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top tsub_le_self
-  have h1mp_ne_top : (1 - p) ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top tsub_le_self
-  have heq_t : t + (1 - t) * x = t * (1 - x) + x := by
-    calc t + (1 - t) * x
-      _ = t * 1 + (1 - t) * x := by rw [mul_one]
-      _ = t * ((1 - x) + x) + (1 - t) * x := by rw [tsub_add_cancel_of_le hx_le_one]
-      _ = t * (1 - x) + t * x + (1 - t) * x := by rw [mul_add]
-      _ = t * (1 - x) + (t * x + (1 - t) * x) := by rw [add_assoc]
-      _ = t * (1 - x) + (t + (1 - t)) * x := by rw [add_mul]
-      _ = t * (1 - x) + 1 * x := by rw [add_tsub_cancel_of_le ht_le_one]
-      _ = t * (1 - x) + x := by rw [one_mul]
-  have heq_p : p + (1 - p) * x = p * (1 - x) + x := by
-    calc p + (1 - p) * x
-      _ = p * 1 + (1 - p) * x := by rw [mul_one]
-      _ = p * ((1 - x) + x) + (1 - p) * x := by rw [tsub_add_cancel_of_le hx_le_one]
-      _ = p * (1 - x) + p * x + (1 - p) * x := by rw [mul_add]
-      _ = p * (1 - x) + (p * x + (1 - p) * x) := by rw [add_assoc]
-      _ = p * (1 - x) + (p + (1 - p)) * x := by rw [add_mul]
-      _ = p * (1 - x) + 1 * x := by rw [add_tsub_cancel_of_le hp_le_one]
-      _ = p * (1 - x) + x := by rw [one_mul]
-  have h1 : t * (1 - x) + x ≥ p * (1 - x) + x := by
-    have : t * (1 - x) ≥ p * (1 - x) := mul_le_mul_left htp (1 - x)
-    exact add_le_add this (le_refl x)
-  rw [heq_t, heq_p]
-  exact h1
-
 /-- A general fixpoint principle for proving almost-sure termination.
 
   If the mass of each generator satisfies `mass ≥ F(inf mass)` and `F` is such that
@@ -463,27 +432,3 @@ theorem IsPMF_of_mass_fixpoint {ι : Type*} {α : Type*} [Nonempty ι]
 end is_pmf
 
 end SPMF
-
-/-- If `c ≤ 1`, `v ≠ ⊤`, `c ≥ v`, and real arithmetic shows `x ≥ v.toReal ∧ x ≤ 1 → x = 1`,
-  then `c = 1`. Used to close the `bounds` case of `IsPMF_of_mass_fixpoint` proofs. -/
-lemma ENNReal.eq_one_of_fixed_ineq {c v : ENNReal}
-    (hle : c ≤ 1) (hv_ne : v ≠ ⊤) (hge : c ≥ v)
-    (hf_one : c.toReal ≥ v.toReal → c.toReal ≤ 1 → c.toReal = 1) : c = 1 := by
-  have hc_ne : c ≠ ⊤ := ne_top_of_le_ne_top one_ne_top hle
-  have hle' : c.toReal ≤ 1 := (toReal_le_toReal hc_ne one_ne_top).mpr hle
-  have hmono := (toReal_le_toReal hv_ne hc_ne).mpr hge
-  rw [← ofReal_toReal hc_ne, hf_one hmono hle', ofReal_one]
-
-/-- Variant of `ENNReal.eq_one_of_fixed_ineq` that auto-derives `v ≠ ⊤` from `hge` + `hle`.
-  The callback need only prove `1 ≤ c.toReal` from `c.toReal ≥ v.toReal`; the lemma closes
-  `c = 1` using `c ≤ 1` internally. -/
-lemma ENNReal.eq_one_of_fixed_ineq' {c v : ENNReal}
-    (hle : c ≤ 1) (hge : c ≥ v)
-    (hf_one : c.toReal ≥ v.toReal → 1 ≤ c.toReal) : c = 1 := by
-  have hc_ne : c ≠ ⊤ := ne_top_of_le_ne_top one_ne_top hle
-  have hv_ne : v ≠ ⊤ := ne_top_of_le_ne_top hc_ne hge
-  have hle' : c.toReal ≤ 1 := (toReal_le_toReal hc_ne one_ne_top).mpr hle
-  have hmono := (toReal_le_toReal hv_ne hc_ne).mpr hge
-  have hge_one := hf_one hmono
-  rw [← ofReal_toReal hc_ne, le_antisymm hle' hge_one, ofReal_one]
-

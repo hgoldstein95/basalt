@@ -270,7 +270,6 @@ section corollaries
 theorem IsPMF_of_subcritical {α : Type*} {g : SPMF α} {m : ℝ≥0∞} (hm : m < 1)
     (hstep : 1 - g.mass ≤ m * (1 - g.mass)) : IsPMF g := by
   have h1m : 1 - m ≠ 0 := fun h0 => absurd (tsub_eq_zero_iff_le.mp h0) (not_le.mpr hm)
-  have h1m_top : (1 : ℝ≥0∞) - m ≠ ⊤ := (tsub_le_self.trans_lt one_lt_top).ne
   refine IsPMF_of_ranking (ι := Unit) (fun _ => g)
     (A := fun e _ => m * e ()) ⟨?_, ?_, ?_⟩ (fun _ => (1 - m)⁻¹) (fun _ => ?_) (ε := 1)
     one_pos (fun _ => ?_) (fun _ => hstep) ()
@@ -282,16 +281,15 @@ theorem IsPMF_of_subcritical {α : Type*} {g : SPMF α} {m : ℝ≥0∞} (hm : m
   · intro r e
     funext _
     exact mul_left_comm m r (e ())
-  · exact ENNReal.inv_ne_top.mpr h1m
+  · finiteness
   · -- drift: `m * (1-m)⁻¹ + 1 ≤ (1-m)⁻¹`, with equality — the geometric series bound is tight.
-    have hcancel : (1 - m) * (1 - m)⁻¹ = 1 := ENNReal.mul_inv_cancel h1m h1m_top
-    have heq : m * (1 - m)⁻¹ + 1 = (1 - m)⁻¹ :=
-      calc m * (1 - m)⁻¹ + 1
-          = m * (1 - m)⁻¹ + (1 - m) * (1 - m)⁻¹ := by rw [hcancel]
-        _ = (m + (1 - m)) * (1 - m)⁻¹ := (add_mul _ _ _).symm
-        _ = (1 : ℝ≥0∞) * (1 - m)⁻¹ := by rw [add_tsub_cancel_of_le hm.le]
-        _ = (1 - m)⁻¹ := one_mul _
-    exact heq.le
+    show m * (1 - m)⁻¹ + 1 ≤ (1 - m)⁻¹
+    have hm1 : m ≤ 1 := hm.le
+    have hmlt : m.toReal < 1 := by
+      simpa using (ENNReal.toReal_lt_toReal (by finiteness) ENNReal.one_ne_top).mpr hm
+    ennreal_to_real
+    have hne : (1 : ℝ) - m.toReal ≠ 0 := by linarith
+    exact le_of_eq (by field_simp; ring)
 
 /-- Mass form of `IsPMF_of_subcritical`: what one reads off directly from unfolding a
   generator whose non-recursive branches carry total probability `1 - m`. -/
@@ -361,17 +359,6 @@ theorem IsPMF_of_critical_family {ι : Type*} {α : Type*} [Nonempty ι]
     (hstep : ∀ i, F (⨅ j, (g j).mass) ≤ (g i).mass) :
     ∀ i, IsPMF (g i) :=
   IsPMF_of_mass_fixpoint g F (fun c hle hge => hF c hle hge) (fun i _ => hstep i)
-
-/-- The fixed-point side condition for the uniform binary critical case
-  `F c = 1/2 + 1/2 * c^2` — the generating function of a generator that recurses twice with
-  probability `1/2`. Proved once here so examples need no `nlinarith`. -/
-theorem eq_one_of_half_add_half_sq_le {c : ℝ≥0∞} (hle : c ≤ 1)
-    (hge : 1 / 2 + 1 / 2 * c ^ 2 ≤ c) : c = 1 := by
-  apply ENNReal.eq_one_of_fixed_ineq' hle hge
-  intro hmono
-  rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
-  norm_num at hmono
-  nlinarith [sq_nonneg c.toReal]
 
 end corollaries
 

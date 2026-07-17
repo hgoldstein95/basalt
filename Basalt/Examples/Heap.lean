@@ -68,16 +68,21 @@ theorem Tree.genHeap_terminates : SPMF.IsPMF (Tree.genHeap lo) := by
   refine SPMF.IsPMF_of_critical_family
     (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree))
     (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
-    (fun _ hle hge => SPMF.eq_one_of_half_add_half_sq_le hle hge) ?_ lo
-  intro lo
-  conv_rhs => rw [Tree.genHeap]
-  simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-  gcongr
-  rw [sq]
-  refine SPMF.mass_bind_ge_of_isPMF Nat.arbitrary_terminates (fun delta => ?_)
-  refine SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo + delta)) (fun l => ?_)
-  simpa [SPMF.mass_bind_pure] using SPMF.mass_ge_iInf
-    (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree)) (lo + delta)
+    (fun c hle hge => ?_) ?_ lo
+  · rw [← ENNReal.toReal_eq_one_iff]
+    ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
+    ennreal_to_real at hle
+    norm_num at hge hle
+    nlinarith [sq_nonneg (c.toReal - 1)]
+  · intro lo
+    conv_rhs => rw [Tree.genHeap]
+    simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
+    gcongr
+    rw [sq]
+    refine SPMF.mass_bind_ge_of_isPMF Nat.arbitrary_terminates (fun delta => ?_)
+    refine SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo + delta)) (fun l => ?_)
+    simpa [SPMF.mass_bind_pure] using SPMF.mass_ge_iInf
+      (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree)) (lo + delta)
 
 /-- `genHeap` makes a number of random choices bounded by the size and the sum
     of the values of the tree it produces (no backtracking choices). -/

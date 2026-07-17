@@ -35,15 +35,20 @@ theorem genTree_support : t ∈ SPMF.support genTree ↔ Tree.isAllTwos t := by
 
 theorem genTree_terminates : SPMF.IsPMF genTree := by
   refine SPMF.IsPMF_of_critical (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
-    (fun _ hle hge => SPMF.eq_one_of_half_add_half_sq_le hle hge) ?_
-  conv_rhs => rw [genTree]
-  simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-  gcongr
-  rw [sq]
-  apply SPMF.mass_bind_ge_mul le_rfl
-  intro l
-  simp only [SPMF.mass_bind_pure]
-  exact le_rfl
+    (fun c hle hge => ?_) ?_
+  · rw [← ENNReal.toReal_eq_one_iff]
+    ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
+    ennreal_to_real at hle
+    norm_num at hge hle
+    nlinarith [sq_nonneg (c.toReal - 1)]
+  · conv_rhs => rw [genTree]
+    simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
+    gcongr
+    rw [sq]
+    apply SPMF.mass_bind_ge_mul le_rfl
+    intro l
+    simp only [SPMF.mass_bind_pure]
+    exact le_rfl
 
 theorem genTree_cost : IsBounded genTree Tree.cost := by
   open Lean.Order in
@@ -85,11 +90,6 @@ def genWeightedTree [Gen G] : G Tree :=
   ] (by dsimp; omega)
 partial_fixpoint
 
-private lemma one_sub_two_thirds : (1 : ℝ≥0∞) - 2 / 3 = 1 / 3 := by
-  refine ENNReal.sub_eq_of_eq_add (ENNReal.div_lt_top (by norm_num) (by norm_num)).ne ?_
-  rw [ENNReal.div_add_div_same, show (1 : ℝ≥0∞) + 2 = 3 by norm_num]
-  exact (ENNReal.div_self (by norm_num) (by norm_num)).symm
-
 theorem genWeightedTree_terminates : SPMF.IsPMF genWeightedTree := by
   refine SPMF.IsPMF_of_subcritical (m := 2 / 3) ?_ ?_
   · rw [ENNReal.div_lt_iff (by norm_num) (by norm_num), one_mul]
@@ -108,22 +108,20 @@ theorem genWeightedTree_terminates : SPMF.IsPMF genWeightedTree := by
     calc 1 - (genWeightedTree : SPMF Tree).mass
         ≤ 1 / 3 * (1 - (genWeightedTree : SPMF Tree).mass
             * (genWeightedTree : SPMF Tree).mass) :=
-          ENNReal.one_sub_le_mul_one_sub
-            (by rw [ENNReal.div_add_div_same, show (2 : ℝ≥0∞) + 1 = 3 by norm_num]
-                exact ENNReal.div_self (by norm_num) (by norm_num))
-            (ENNReal.div_lt_top (by norm_num) (by norm_num)).ne hmass.ge
+          ENNReal.one_sub_le_mul_one_sub (by ennreal_to_real; norm_num)
+            (by finiteness) hmass.ge
       _ ≤ 1 / 3 * ((1 - (genWeightedTree : SPMF Tree).mass)
             + (1 - (genWeightedTree : SPMF Tree).mass)) := by
           gcongr
           exact ENNReal.one_sub_mul_le_add (SPMF.mass_le_one _) (SPMF.mass_le_one _)
       _ = 2 / 3 * (1 - (genWeightedTree : SPMF Tree).mass) := by
-          rw [← two_mul, ← mul_assoc]
-          congr 1
-          rw [one_div, mul_comm 3⁻¹ 2, ← div_eq_mul_inv]
+          rw [← two_mul, ← mul_assoc,
+            show (1 / 3 : ℝ≥0∞) * 2 = 2 / 3 by ennreal_to_real; norm_num]
 
 theorem genWeightedTree_expectedSteps :
     SPMF.LevelOp.expectedSteps (fun e (j : Unit) => 2 / 3 * e j) () = 3 := by
-  rw [SPMF.LevelOp.expectedSteps_const_mul, one_sub_two_thirds, one_div, inv_inv]
+  rw [SPMF.LevelOp.expectedSteps_const_mul,
+    show (1 : ℝ≥0∞) - 2 / 3 = 1 / 3 from by ennreal_to_real; norm_num, one_div, inv_inv]
 
 theorem genTree_expectedSteps_infinite :
     SPMF.LevelOp.expectedSteps (fun e (j : Unit) => 1 * e j) () = ⊤ := by

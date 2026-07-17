@@ -150,26 +150,6 @@ private lemma bstRank_sum_zero (hi : Nat) :
 
 /-! ### `genWeightedBST` (`w = 5/6`, `ε = 1/6`) -/
 
-private lemma five_sixths_add_sixth : (5 / 6 : ℝ≥0∞) + 1 / 6 = 1 := by
-  rw [ENNReal.div_add_div_same, show (5 : ℝ≥0∞) + 1 = 6 by norm_num]
-  exact ENNReal.div_self (by norm_num) (by norm_num)
-
-private lemma five_sixths_split (t : ℝ≥0∞) : 5 / 6 * t + 1 / 6 * t = t := by
-  rw [← add_mul, five_sixths_add_sixth, one_mul]
-
-private lemma five_sixths_le {t : ℝ≥0∞} (ht : 1 ≤ t) : 5 / 6 * t + 1 / 6 ≤ t :=
-  calc 5 / 6 * t + 1 / 6 = 5 / 6 * t + 1 / 6 * 1 := by rw [mul_one]
-    _ ≤ 5 / 6 * t + 1 / 6 * t := by gcongr
-    _ = t := five_sixths_split t
-
-private lemma five_sixths_le' {t : ℝ≥0∞} (ht : 6 ≤ t) : 5 / 6 * (t + 1) + 1 / 6 ≤ t :=
-  calc 5 / 6 * (t + 1) + 1 / 6
-      = 5 / 6 * t + (5 / 6 + 1 / 6) := by ring
-    _ = 5 / 6 * t + 1 / 6 * 6 := by
-        rw [five_sixths_add_sixth, one_div, ENNReal.inv_mul_cancel (by norm_num) (by norm_num)]
-    _ ≤ 5 / 6 * t + 1 / 6 * t := by gcongr
-    _ = t := five_sixths_split t
-
 private theorem genWeightedBST_drift (p : Nat × Nat) :
     bstLevel (5 / 6) (fun q => (bstRank q : ℝ≥0∞)) p + 1 / 6
       ≤ (bstRank p : ℝ≥0∞) := by
@@ -189,8 +169,7 @@ private theorem genWeightedBST_drift (p : Nat × Nat) :
             ((bstRank (0, x - 1) : ℝ≥0∞) + (bstRank (x + 1, hi) : ℝ≥0∞)))
           = ((hi + 1 : ℕ) : ℝ≥0∞) * (bstRank (0, hi) : ℝ≥0∞) + 1 := by
         exact_mod_cast congrArg (Nat.cast (R := ℝ≥0∞)) (bstRank_sum_zero hi)
-      have hne0 : ((hi + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
-        exact_mod_cast (Nat.succ_ne_zero hi)
+      have hne0 : ((hi + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by positivity
       have h6 : (6 : ℝ≥0∞) ≤ (bstRank (0, hi) : ℝ≥0∞) := by
         exact_mod_cast (show 6 ≤ bstRank (0, hi) by
           simp only [bstRank, reduceIte]; omega)
@@ -199,21 +178,21 @@ private theorem genWeightedBST_drift (p : Nat × Nat) :
       calc 5 / 6 * ((bstRank (0, hi) : ℝ≥0∞) + 1 / ((hi + 1 : ℕ) : ℝ≥0∞)) + 1 / 6
           ≤ 5 / 6 * ((bstRank (0, hi) : ℝ≥0∞) + 1) + 1 / 6 := by
             gcongr
-            exact ENNReal.div_le_of_le_mul
-              (by rw [one_mul]; exact Nat.one_le_cast.mpr hi.succ_pos)
-        _ ≤ (bstRank (0, hi) : ℝ≥0∞) := five_sixths_le' h6
+            bound
+        _ ≤ (bstRank (0, hi) : ℝ≥0∞) := by
+            ennreal_to_real
+            ennreal_to_real at h6
+            linarith
     · have hcast : (∑ x ∈ Finset.Icc lo hi,
             ((bstRank (lo, x - 1) : ℝ≥0∞) + (bstRank (x + 1, hi) : ℝ≥0∞)))
           = ((hi - lo + 1 : ℕ) : ℝ≥0∞) * (bstRank (lo, hi) : ℝ≥0∞) := by
         exact_mod_cast congrArg (Nat.cast (R := ℝ≥0∞))
           (bstRank_sum_pos (by omega) hgt)
-      have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
-        exact_mod_cast (Nat.succ_ne_zero (hi - lo))
+      have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by positivity
       rw [hcast, mul_div_assoc, ENNReal.mul_div_cancel hne0 (ENNReal.natCast_ne_top _)]
-      exact five_sixths_le hrank1
-
-private lemma div6_split (M : ℝ≥0∞) : (1 + 5 * M) / 6 = 1 / 6 + 5 / 6 * M := by
-  rw [ENNReal.add_div, ENNReal.mul_div_right_comm]
+      ennreal_to_real
+      ennreal_to_real at hrank1
+      linarith
 
 private theorem genWeightedBST_mass_ge (lo hi : Nat) (hle : lo ≤ hi) :
     (Tree.genWeightedBST lo hi : SPMF (Tree Nat)).mass
@@ -226,7 +205,7 @@ private theorem genWeightedBST_mass_ge (lo hi : Nat) (hle : lo ≤ hi) :
   rw [mass_frequency]
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, mass_pure,
     Nat.cast_one, Nat.cast_ofNat, add_zero, mul_one]
-  rw [show ((1 + 5 : ℕ) : ℝ≥0∞) = 6 by norm_num, div6_split]
+  rw [show ((1 + 5 : ℕ) : ℝ≥0∞) = 6 by norm_num, ENNReal.add_div, ENNReal.mul_div_right_comm]
   gcongr
   refine mass_bind_choose_ge hle fun a => ?_
   refine mass_bind_ge_mul le_rfl fun l => ?_
@@ -244,8 +223,7 @@ private theorem genWeightedBST_step (p : Nat × Nat) :
   · push Not at hgt
     rw [if_neg (by omega)]
     simp only
-    have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
-      exact_mod_cast (Nat.succ_ne_zero (hi - lo))
+    have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by positivity
     have hcard : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≤ ((Finset.Icc lo hi).card : ℝ≥0∞) := by
       rw [Nat.card_Icc]
       norm_cast
@@ -255,8 +233,8 @@ private theorem genWeightedBST_step (p : Nat × Nat) :
               (Tree.genWeightedBST lo (x - 1) : SPMF (Tree Nat)).mass
                 * (Tree.genWeightedBST (x + 1) hi : SPMF (Tree Nat)).mass)
             / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) :=
-          ENNReal.one_sub_le_mul_one_sub (by rw [add_comm]; exact five_sixths_add_sixth)
-            (ENNReal.div_lt_top (by norm_num) (by norm_num)).ne
+          ENNReal.one_sub_le_mul_one_sub (by ennreal_to_real; norm_num)
+            (by finiteness)
             (genWeightedBST_mass_ge lo hi hgt)
       _ ≤ 5 / 6 * ((∑ x ∈ Finset.Icc lo hi,
               (1 - (Tree.genWeightedBST lo (x - 1) : SPMF (Tree Nat)).mass
@@ -283,22 +261,6 @@ theorem Tree.genWeightedBST_terminates : SPMF.IsPMF (Tree.genWeightedBST lo hi) 
 
 /-! ### `genBST` (`w = 1/2`, `ε = 1/2`) -/
 
-private lemma half_split (t : ℝ≥0∞) : 1 / 2 * t + 1 / 2 * t = t := by
-  rw [← add_mul, ENNReal.add_halves, one_mul]
-
-private lemma half_le {t : ℝ≥0∞} (ht : 1 ≤ t) : 1 / 2 * t + 1 / 2 ≤ t :=
-  calc 1 / 2 * t + 1 / 2 = 1 / 2 * t + 1 / 2 * 1 := by rw [mul_one]
-    _ ≤ 1 / 2 * t + 1 / 2 * t := by gcongr
-    _ = t := half_split t
-
-private lemma half_le' {t : ℝ≥0∞} (ht : 2 ≤ t) : 1 / 2 * (t + 1) + 1 / 2 ≤ t :=
-  calc 1 / 2 * (t + 1) + 1 / 2
-      = 1 / 2 * t + (1 / 2 + 1 / 2) := by ring
-    _ = 1 / 2 * t + 1 / 2 * 2 := by
-        rw [ENNReal.add_halves, one_div, ENNReal.inv_mul_cancel (by norm_num) (by norm_num)]
-    _ ≤ 1 / 2 * t + 1 / 2 * t := by gcongr
-    _ = t := half_split t
-
 private theorem genBST_drift (p : Nat × Nat) :
     bstLevel (1 / 2) (fun q => (bstRank q : ℝ≥0∞)) p + 1 / 2
       ≤ (bstRank p : ℝ≥0∞) := by
@@ -318,8 +280,7 @@ private theorem genBST_drift (p : Nat × Nat) :
             ((bstRank (0, x - 1) : ℝ≥0∞) + (bstRank (x + 1, hi) : ℝ≥0∞)))
           = ((hi + 1 : ℕ) : ℝ≥0∞) * (bstRank (0, hi) : ℝ≥0∞) + 1 := by
         exact_mod_cast congrArg (Nat.cast (R := ℝ≥0∞)) (bstRank_sum_zero hi)
-      have hne0 : ((hi + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
-        exact_mod_cast (Nat.succ_ne_zero hi)
+      have hne0 : ((hi + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by positivity
       have h2 : (2 : ℝ≥0∞) ≤ (bstRank (0, hi) : ℝ≥0∞) := by
         exact_mod_cast (show 2 ≤ bstRank (0, hi) by
           simp only [bstRank, reduceIte]; omega)
@@ -328,18 +289,21 @@ private theorem genBST_drift (p : Nat × Nat) :
       calc 1 / 2 * ((bstRank (0, hi) : ℝ≥0∞) + 1 / ((hi + 1 : ℕ) : ℝ≥0∞)) + 1 / 2
           ≤ 1 / 2 * ((bstRank (0, hi) : ℝ≥0∞) + 1) + 1 / 2 := by
             gcongr
-            exact ENNReal.div_le_of_le_mul
-              (by rw [one_mul]; exact Nat.one_le_cast.mpr hi.succ_pos)
-        _ ≤ (bstRank (0, hi) : ℝ≥0∞) := half_le' h2
+            bound
+        _ ≤ (bstRank (0, hi) : ℝ≥0∞) := by
+            ennreal_to_real
+            ennreal_to_real at h2
+            linarith
     · have hcast : (∑ x ∈ Finset.Icc lo hi,
             ((bstRank (lo, x - 1) : ℝ≥0∞) + (bstRank (x + 1, hi) : ℝ≥0∞)))
           = ((hi - lo + 1 : ℕ) : ℝ≥0∞) * (bstRank (lo, hi) : ℝ≥0∞) := by
         exact_mod_cast congrArg (Nat.cast (R := ℝ≥0∞))
           (bstRank_sum_pos (by omega) hgt)
-      have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
-        exact_mod_cast (Nat.succ_ne_zero (hi - lo))
+      have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by positivity
       rw [hcast, mul_div_assoc, ENNReal.mul_div_cancel hne0 (ENNReal.natCast_ne_top _)]
-      exact half_le hrank1
+      ennreal_to_real
+      ennreal_to_real at hrank1
+      linarith
 
 private theorem genBST_mass_ge (lo hi : Nat) (hle : lo ≤ hi) :
     (Tree.genBST lo hi : SPMF (Tree Nat)).mass
@@ -367,8 +331,7 @@ private theorem genBST_step (p : Nat × Nat) :
   · push Not at hgt
     rw [if_neg (by omega)]
     simp only
-    have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
-      exact_mod_cast (Nat.succ_ne_zero (hi - lo))
+    have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by positivity
     have hcard : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≤ ((Finset.Icc lo hi).card : ℝ≥0∞) := by
       rw [Nat.card_Icc]
       norm_cast
@@ -379,7 +342,7 @@ private theorem genBST_step (p : Nat × Nat) :
                 * (Tree.genBST (x + 1) hi : SPMF (Tree Nat)).mass)
             / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) :=
           ENNReal.one_sub_le_mul_one_sub (ENNReal.add_halves 1)
-            (ENNReal.div_lt_top (by norm_num) (by norm_num)).ne
+            (by finiteness)
             (genBST_mass_ge lo hi hgt)
       _ ≤ 1 / 2 * ((∑ x ∈ Finset.Icc lo hi,
               (1 - (Tree.genBST lo (x - 1) : SPMF (Tree Nat)).mass

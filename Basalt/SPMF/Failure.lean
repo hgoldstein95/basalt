@@ -109,19 +109,14 @@ theorem IsPMF_retry (p : SPMF (Option α)) (hmass : p.mass = 1)
     ?bounds ?mass) ()
   case bounds =>
     intro c hle hge
-    have hs_ne : massSome p ≠ ⊤ :=
-      ne_top_of_le_ne_top one_ne_top (le_of_add_le_left hsn.le)
-    have hn_ne : massNone p ≠ ⊤ := SPMF.apply_ne_top p none
-    have hc_ne : c ≠ ⊤ := ne_top_of_le_ne_top one_ne_top hle
-    have key : c.toReal ≥ (massSome p).toReal + (massNone p).toReal * c.toReal := by
-      have := (toReal_le_toReal (by finiteness) hc_ne).mpr hge
-      rwa [ENNReal.toReal_add hs_ne (by finiteness), ENNReal.toReal_mul] at this
-    have hsn' : (massSome p).toReal + (massNone p).toReal = 1 := by
-      rw [← ENNReal.toReal_add hs_ne hn_ne, hsn]; simp
-    have hcle : c.toReal ≤ 1 := (toReal_le_toReal hc_ne one_ne_top).mpr hle
-    have hspos : 0 < (massSome p).toReal := ENNReal.toReal_pos hprod.ne' hs_ne
-    have hone : c.toReal = 1 := by nlinarith [key, hsn', hcle, hspos]
-    rw [← ofReal_toReal hc_ne, hone, ofReal_one]
+    have hs1 : massSome p ≤ 1 := le_of_add_le_left hsn.le
+    have hn1 : massNone p ≤ 1 := le_of_add_le_right hsn.le
+    have hspos : 0 < (massSome p).toReal := ENNReal.toReal_pos hprod.ne' (by finiteness)
+    rw [← ENNReal.toReal_eq_one_iff]
+    ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
+    ennreal_to_real at hsn
+    ennreal_to_real at hle
+    nlinarith [hge, hsn, hle, hspos]
   case mass =>
     intro _ _
     rw [iInf_const]
