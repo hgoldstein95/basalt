@@ -6,10 +6,24 @@ open RandomChoice SPMF List
 def Bool.arbitrary [Gen G] : G Bool :=
   pick (fun _ => pure true) (fun _ => pure false)
 
+/-- Types are just Bool or function types -/
 inductive Ty where
   | Bool : Ty
   | Fun : Ty → Ty → Ty
-  deriving DecidableEq, Repr, BEq
+  deriving DecidableEq, BEq
+
+/-- Pretty-prints a `Ty`. Arrows are right-associative, so a function type on the
+    left of an arrow gets parenthesized but one on the right does not
+    (`(Bool → Bool) → Bool` vs. `Bool → Bool → Bool`). -/
+private def Ty.reprPrec (τ : Ty) (prec : Nat) : Std.Format :=
+  match τ with
+  | .Bool => "Bool"
+  | .Fun τ1 τ2 =>
+    let body := Ty.reprPrec τ1 1 ++ " → " ++ Ty.reprPrec τ2 0
+    if prec ≥ 1 then "(" ++ body ++ ")" else body
+
+instance : Repr Ty where
+  reprPrec := Ty.reprPrec
 
 /-- Terms in the STLC extended with Bools.
     (This type is called `Term` instead of `Expr` to avoid conflicting
@@ -19,7 +33,30 @@ inductive Term where
   | Var: Nat → Term
   | App: Term → Term → Term
   | Abs: Ty → Term → Term
-  deriving DecidableEq, BEq, Repr
+  deriving DecidableEq, BEq
+
+/-- Pretty-prints a `Term`. Variables use De Bruijn indices (`#n`).
+
+    Three precedence levels drive the parenthesization:
+    * lambdas (`0`) extend as far to the right as possible, so they get
+      parenthesized whenever they appear as a function or argument;
+    * application (`1`) is left-associative, so the argument (right child) is
+      printed at the atomic level while the function (left child) stays at the
+      application level;
+    * variables and Boolean literals (`2`) are atomic and never parenthesized. -/
+private def Term.reprPrec (t : Term) (prec : Nat) : Std.Format :=
+  match t with
+  | .Bool b => if b then "true" else "false"
+  | .Var n => "#" ++ repr n
+  | .App e1 e2 =>
+    let body := Term.reprPrec e1 1 ++ " " ++ Term.reprPrec e2 2
+    if prec ≥ 2 then "(" ++ body ++ ")" else body
+  | .Abs τ e =>
+    let body := "λ:" ++ repr τ ++ ". " ++ Term.reprPrec e 0
+    if prec ≥ 1 then "(" ++ body ++ ")" else body
+
+instance : Repr Term where
+  reprPrec := Term.reprPrec
 
 /-- A context is just a list of types (variables represented using De Bruijn variables) -/
 abbrev Ctx := List Ty
