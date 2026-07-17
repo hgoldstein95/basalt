@@ -161,6 +161,21 @@ theorem tsum_subtype_Icc_const (lo hi : Nat) (c : ℝ≥0∞) :
     _ = ∑ _ ∈ Finset.Icc lo hi, c := Finset.tsum_subtype (Finset.Icc lo hi) (fun _ => c)
     _ = (Finset.Icc lo hi).card * c := by rw [Finset.sum_const, nsmul_eq_mul]
 
+/-- Generalizes `tsum_subtype_Icc_const` to non-constant summands. -/
+theorem tsum_subtype_Icc (lo hi : Nat) (f : Nat → ℝ≥0∞) :
+    ∑' (m : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi}), f m.down.val
+      = ∑ n ∈ Finset.Icc lo hi, f n := by
+  calc ∑' (m : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi}), f m.down.val
+      = ∑' (n : ↥(Finset.Icc lo hi)), f n.val :=
+        Equiv.tsum_eq
+          (({ toFun := fun m => ⟨m.down.val, Finset.mem_Icc.mpr m.down.property⟩
+              invFun := fun n => ⟨⟨n.val, Finset.mem_Icc.mp n.property⟩⟩
+              left_inv := fun _ => rfl
+              right_inv := fun _ => rfl } :
+            ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} ≃ ↥(Finset.Icc lo hi)))
+          (fun n : ↥(Finset.Icc lo hi) => f n.val)
+    _ = ∑ n ∈ Finset.Icc lo hi, f n := Finset.tsum_subtype _ _
+
 theorem card_Icc_eq (lo hi : Nat) (h : lo ≤ hi) :
     (Finset.Icc lo hi).card = hi - lo + 1 := by
   rw [Nat.card_Icc]; omega
@@ -266,6 +281,20 @@ instance instLawfulMonadSPMF : LawfulMonad SPMF where
     simp only [Seq.seq, Functor.map, Pure.pure]
     unfold Function.comp
     simp [pure_bind]
+
+theorem bind_apply {x : SPMF α} {f : α → SPMF β} (b : β) :
+    (x >>= f) b = ∑' a, x a * (f a) b := rfl
+
+open Classical in
+@[simp]
+theorem pure_apply (a a' : α) :
+    (Pure.pure a : SPMF α) a' = if a' = a then 1 else 0 := rfl
+
+theorem choose_apply (lo hi : Nat) (h : lo ≤ hi) (m : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}) :
+    (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) m
+      = 1 / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := rfl
+
+theorem default_apply (a : α) : (default : SPMF α) a = 0 := rfl
 
 theorem bind_pick {α β} (x y : SPMF α) (f : α → SPMF β) :
     (pick (fun () => x) (fun () => y) >>= f) = pick (fun _ => x >>= f) (fun _ => y >>= f) := by

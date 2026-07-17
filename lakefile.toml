@@ -4,6 +4,9 @@ defaultTargets = ["Basalt", "Examples"]
 
 [[lean_lib]]
 name = "Basalt"
+# `#genstats` on tuned generators runs deep interpreter recursion; the Lean
+# 4.29.1 interpreter's default C-stack is smaller than 4.31+, so raise it here.
+weakLeanArgs = ["--tstack=1000000"]
 
 [[lean_lib]]
 name = "Examples"

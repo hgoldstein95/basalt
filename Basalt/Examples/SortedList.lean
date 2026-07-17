@@ -53,16 +53,10 @@ theorem List.genSortedGt_support (xs : List Nat) (m : Nat) :
       . grind
   case _ x y xs ih =>
     unfold genSortedGt
-    simp only [bind_pure_comp, SPMF.support_pick, SPMF.support_pure, SPMF.support_bind,
-      SPMF.support_map, Set.mem_setOf_eq, Set.singleton_union, Set.mem_insert_iff, reduceCtorEq,
-      List.cons.injEq, exists_eq_right_right', false_or, List.Forall, List.forall_cons]
+    simp [ih, List.Forall, List.forall_cons]
     constructor
+    . grind only [List.forall_iff_forall_mem, List.forall_cons]
     . intro h
-      replace ⟨a, _, h, heq⟩ := h
-      subst heq
-      grind only [List.forall_iff_forall_mem, List.forall_cons]
-    . intro h
-      replace ⟨h, hx, hy, hxs⟩ := h
       exists x - m
       grind only [
         List.forall_iff_forall_mem, List.Forall.eq_def, List.Forall.imp, List.sorted_cons_forall_le,
@@ -74,25 +68,19 @@ theorem List.genSorted_support (xs : List Nat) :
   simp [genSortedGt_support, List.forall_iff_forall_mem]
 
 theorem List.genSortedGt_terminates (m : Nat) : SPMF.IsPMF (List.genSortedGt m) := by
-  refine (SPMF.IsPMF_of_mass_fixpoint
-    (g := fun (m : Nat) => (List.genSortedGt m : SPMF (List Nat)))
-    (F := fun c => 1 / 2 + 1 / 2 * c)
-    ?bounds ?mass) m
-  case bounds =>
-    intro c hle hge
-    apply ENNReal.eq_one_of_fixed_ineq' hle hge
-    intro hmono
-    rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
-    norm_num at hmono; linarith
-  case mass =>
-    intro m h
-    conv_lhs => unfold List.genSortedGt
-    simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-    gcongr
-    apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary_terminates
-    intro x
-    simp only [SPMF.mass_bind_pure]
-    exact SPMF.mass_ge_iInf _ (m + x)
+  -- Subcritical (mean offspring 1/2); the recursion re-indexes the seed, hence the family form.
+  refine SPMF.IsPMF_of_subcritical_mass_family
+    (fun (m : Nat) => (List.genSortedGt m : SPMF (List Nat)))
+    (m := 1 / 2) (by norm_num) ?_ m
+  intro n
+  rw [ENNReal.one_sub_half]
+  conv_rhs => unfold List.genSortedGt
+  simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
+  gcongr
+  apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary_terminates
+  intro x
+  simp only [SPMF.mass_bind_pure]
+  exact SPMF.mass_ge_iInf _ (n + x)
 
 theorem List.genSorted_terminates : SPMF.IsPMF List.genSorted :=
   List.genSortedGt_terminates 0
@@ -107,16 +95,19 @@ theorem List.genSortedGt_cost :
     exact admissible_pi_apply _ fun _ => admissible_IsBounded _
   case step =>
     intro genSortedGt_rec ih m
-    simp [IsBounded_iff] at *
-    have hnat : ∀ p ∈ (Nat.arbitrary : SPMF.Cost Nat).support,
-        p.2 ≤ p.1 + 1 := IsBounded_iff.mp Nat.arbitrary_cost
-    intro xs c hxs
-    grind [
-      pick,
-      SPMF.Cost.mem_support_bind_iff,
-      SPMF.Cost.mem_support_choose_iff,
-      SPMF.Cost.mem_support_pure_iff
-    ]
+    rw [IsBounded_iff]
+    rintro ⟨xs, c⟩ hmem
+    cost_support_simp at hmem
+    obtain ⟨k, rfl, h | h⟩ := hmem
+    · obtain ⟨rfl, rfl⟩ := h
+      simp
+    · obtain ⟨delta, n1, n2, hdelta, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, hn2⟩, hk⟩ := h
+      have hhead : n1 ≤ delta + 1 := IsBounded_iff.mp Nat.arbitrary_cost (delta, n1) hdelta
+      have htail : n3 ≤ tl.length + tl.sum + tl.length + 1 := ih (m + delta) (tl, n3) htl
+      show 1 + k ≤ ((m + delta) :: tl).length + ((m + delta) :: tl).sum
+        + ((m + delta) :: tl).length + 1
+      simp only [List.length_cons, List.sum_cons]
+      omega
 
 theorem List.genSorted_cost :
     IsBounded List.genSorted List.genSorted.costBound :=

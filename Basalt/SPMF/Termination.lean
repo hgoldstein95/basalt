@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Support
+import Basalt.ENNRealAuto
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
@@ -25,6 +26,8 @@ section mass
 
 /-- The total mass of an SPMF. Always ≤ 1 by definition. -/
 noncomputable def mass (p : SPMF α) : ℝ≥0∞ := ∑' a, p a
+
+theorem mass_le_one (p : SPMF α) : p.mass ≤ 1 := p.tsum_coe
 
 theorem mass_eq_zero_of_support_empty {p : SPMF α} (h : p.support = ∅) : p.mass = 0 := by
   unfold mass
@@ -59,6 +62,14 @@ theorem mass_pure (a : α) : (Pure.pure a : SPMF α).mass = 1 := by
   · simp
   · intro a' ha'
     simp [ha']
+
+@[simp]
+theorem mass_bind_tsum {x : SPMF α} {f : α → SPMF β} :
+    (x >>= f).mass = ∑' a, x a * (f a).mass := by
+  unfold SPMF.mass
+  simp only [Bind.bind, SPMF.bind, DFunLike.coe]
+  rw [ENNReal.tsum_comm]
+  simp_rw [ENNReal.tsum_mul_left]
 
 @[simp]
 theorem mass_choose (lo hi : Nat) (h : lo ≤ hi) :
@@ -105,6 +116,13 @@ theorem mass_map {x : SPMF α} {f : α → β} :
     split_ifs with heq
     · simp_all
     · rfl
+
+@[simp]
+theorem mass_chooseNat (lo hi : Nat) (h : lo ≤ hi) :
+    (chooseNat lo hi h : SPMF Nat).mass = 1 := by
+  unfold chooseNat
+  rw [mass_map]
+  exact mass_choose lo hi h
 
 theorem mass_bind_const {x : SPMF α} {y : SPMF β} :
     (x >>= fun _ => y).mass = x.mass * y.mass := by
@@ -167,6 +185,73 @@ theorem mass_ge_iInf {ι : Type*} (g : ι → SPMF α) (i : ι) :
     (g i).mass ≥ ⨅ j, (g j).mass :=
   iInf_le (fun j => (g j).mass) i
 
+/-- Lower-bound the mass of a generator that draws a pivot with `choose` and continues:
+  the mass is at least the *average* over the range of a per-pivot lower bound. -/
+theorem mass_bind_choose_ge {lo hi : Nat} (h : lo ≤ hi)
+    {f : ULift {x : Nat // lo ≤ x ∧ x ≤ hi} → SPMF α} {m : Nat → ℝ≥0∞}
+    (hf : ∀ a, (f a).mass ≥ m a.down.val) :
+    (choose lo hi h >>= f).mass
+      ≥ (∑ x ∈ Finset.Icc lo hi, m x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
+  rw [mass_bind_tsum]
+  calc ∑' a, (choose lo hi h : SPMF _) a * (f a).mass
+      ≥ ∑' (a : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}),
+          (1 / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) * m a.down.val := by
+        refine ENNReal.tsum_le_tsum fun a => ?_
+        rw [choose_apply lo hi h a]
+        exact mul_le_mul' le_rfl (hf a)
+    _ = (1 / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) *
+          ∑' (a : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}), m a.down.val := ENNReal.tsum_mul_left
+    _ = (1 / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) * ∑ x ∈ Finset.Icc lo hi, m x := by
+        rw [tsum_subtype_Icc]
+    _ = (∑ x ∈ Finset.Icc lo hi, m x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
+        rw [one_div, mul_comm, div_eq_mul_inv]
+
+/-- `chooseNat` form of `mass_bind_choose_ge`. -/
+theorem mass_bind_chooseNat_ge {lo hi : Nat} (h : lo ≤ hi)
+    {f : Nat → SPMF α} {m : Nat → ℝ≥0∞}
+    (hf : ∀ x, lo ≤ x → x ≤ hi → (f x).mass ≥ m x) :
+    (chooseNat lo hi h >>= f).mass
+      ≥ (∑ x ∈ Finset.Icc lo hi, m x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
+  unfold chooseNat
+  rw [bind_map_left]
+  exact mass_bind_choose_ge h fun a => hf a.down.val a.down.property.1 a.down.property.2
+
+/-- A `tsum` over `α` commutes with a weighted `List.sum`. -/
+private theorem tsum_map_weighted (gs : List (Nat × (Unit → SPMF α))) :
+    ∑' a, (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()).mass).sum := by
+  induction gs with
+  | nil => simp
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.sum_cons]
+    rw [ENNReal.tsum_add, ENNReal.tsum_mul_left, ih]
+    rfl
+
+/-- The mass of a weighted choice is the weighted average of the branch masses. -/
+@[simp]
+theorem mass_frequency
+    {gs : List (Nat × (Unit → SPMF α))} (h : 0 < (gs.map Prod.fst).sum) :
+    (frequency gs h : SPMF α).mass
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()).mass).sum / ((gs.map Prod.fst).sum : ℝ≥0∞) := by
+  have hm : (frequency gs h : SPMF α).mass = ∑' a, frequency gs h a := rfl
+  rw [hm]
+  simp only [frequency_apply, div_eq_mul_inv]
+  rw [ENNReal.tsum_mul_right, tsum_map_weighted]
+
+/-- Lower-bound form of `mass_frequency`, for termination proofs: inside a `partial_fixpoint` one
+  only ever has a *lower bound* on a recursive branch's mass, never an equality. -/
+theorem mass_frequency_ge {gs : List (Nat × (Unit → SPMF α))}
+    (h : 0 < (gs.map Prod.fst).sum)
+    {f : (Nat × (Unit → SPMF α)) → ℝ≥0∞}
+    (hgs : ∀ p ∈ gs, (p.2 ()).mass ≥ f p) :
+    (frequency gs h : SPMF α).mass
+      ≥ (gs.map fun p => (p.1 : ℝ≥0∞) * f p).sum / ((gs.map Prod.fst).sum : ℝ≥0∞) := by
+  rw [mass_frequency h]
+  refine ENNReal.div_le_div_right ?_ _
+  refine List.sum_le_sum fun p hp => ?_
+  gcongr
+  exact hgs p hp
+
 end mass
 
 section is_pmf
@@ -188,6 +273,10 @@ theorem IsPMF_pure (a : α) : IsPMF (Pure.pure a : SPMF α) := mass_pure a
 theorem IsPMF_choose (lo hi : Nat) (h : lo ≤ hi) :
     IsPMF (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) :=
   mass_choose lo hi h
+
+theorem IsPMF_chooseNat (lo hi : Nat) (h : lo ≤ hi) :
+    IsPMF (chooseNat lo hi h : SPMF Nat) :=
+  mass_chooseNat lo hi h
 
 theorem IsPMF_bind_pure {x : SPMF α} {f : α → β} (hx : IsPMF x) :
     IsPMF (x >>= fun a => Pure.pure (f a)) := by
@@ -268,6 +357,31 @@ theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ 
     apply hgs
     apply List.getElem_mem
 
+/-- If every positive-weight branch is a PMF, the weighted masses sum to the total weight. -/
+private theorem sum_weights_of_IsPMF {gs : List (Nat × (Unit → SPMF α))}
+    (hgs : ∀ p ∈ gs, 0 < p.1 → IsPMF (p.2 ())) :
+    (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()).mass).sum = ((gs.map Prod.fst).sum : ℝ≥0∞) := by
+  induction gs with
+  | nil => simp
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.sum_cons, Nat.cast_add]
+    rw [ih (fun p hp => hgs p (List.mem_cons_of_mem _ hp))]
+    congr 1
+    rcases Nat.eq_zero_or_pos hd.1 with hz | hpos
+    · simp [hz]
+    · have hm : (hd.2 ()).mass = 1 := hgs hd List.mem_cons_self hpos
+      rw [hm, mul_one]
+
+/-- A weighted choice among PMFs is a PMF. Only *positive-weight* branches need to be
+    PMFs — a zero-weight branch is never selected. -/
+theorem IsPMF_frequency {gs : List (Nat × (Unit → SPMF α))}
+    (h : 0 < (gs.map Prod.fst).sum)
+    (hgs : ∀ p ∈ gs, 0 < p.1 → IsPMF (p.2 ())) :
+    IsPMF (frequency gs h) := by
+  unfold IsPMF
+  rw [mass_frequency h, sum_weights_of_IsPMF hgs]
+  exact ENNReal.div_self (Nat.cast_ne_zero.mpr h.ne') (ENNReal.natCast_ne_top _)
+
 /-- If a generator `g` is an SPMF, then for any `n`, `vectorOf n g` is also an SPMF -/
 theorem IsPMF_vectorOf {g : SPMF α} (hg : IsPMF g) :
     IsPMF (vectorOf n g) := by
@@ -298,38 +412,6 @@ theorem IsPMF_listOfMaxLength {g : SPMF α} (hg : IsPMF g) :
     apply IsPMF_vectorOf
     assumption
 
-private lemma weighted_avg_mono_ennreal {t p x : ℝ≥0∞}
-    (htp : t ≥ p) (hx_le_one : x ≤ 1) (ht_le_one : t ≤ 1) (hp_le_one : p ≤ 1) :
-    t + (1 - t) * x ≥ p + (1 - p) * x := by
-  have ht_ne_top : t ≠ ⊤ := ne_of_lt (lt_of_le_of_lt ht_le_one ENNReal.one_lt_top)
-  have hp_ne_top : p ≠ ⊤ := ne_of_lt (lt_of_le_of_lt hp_le_one ENNReal.one_lt_top)
-  have hx_ne_top : x ≠ ⊤ := ne_of_lt (lt_of_le_of_lt hx_le_one ENNReal.one_lt_top)
-  have h1mt_ne_top : (1 - t) ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top tsub_le_self
-  have h1mp_ne_top : (1 - p) ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top tsub_le_self
-  have heq_t : t + (1 - t) * x = t * (1 - x) + x := by
-    calc t + (1 - t) * x
-      _ = t * 1 + (1 - t) * x := by rw [mul_one]
-      _ = t * ((1 - x) + x) + (1 - t) * x := by rw [tsub_add_cancel_of_le hx_le_one]
-      _ = t * (1 - x) + t * x + (1 - t) * x := by rw [mul_add]
-      _ = t * (1 - x) + (t * x + (1 - t) * x) := by rw [add_assoc]
-      _ = t * (1 - x) + (t + (1 - t)) * x := by rw [add_mul]
-      _ = t * (1 - x) + 1 * x := by rw [add_tsub_cancel_of_le ht_le_one]
-      _ = t * (1 - x) + x := by rw [one_mul]
-  have heq_p : p + (1 - p) * x = p * (1 - x) + x := by
-    calc p + (1 - p) * x
-      _ = p * 1 + (1 - p) * x := by rw [mul_one]
-      _ = p * ((1 - x) + x) + (1 - p) * x := by rw [tsub_add_cancel_of_le hx_le_one]
-      _ = p * (1 - x) + p * x + (1 - p) * x := by rw [mul_add]
-      _ = p * (1 - x) + (p * x + (1 - p) * x) := by rw [add_assoc]
-      _ = p * (1 - x) + (p + (1 - p)) * x := by rw [add_mul]
-      _ = p * (1 - x) + 1 * x := by rw [add_tsub_cancel_of_le hp_le_one]
-      _ = p * (1 - x) + x := by rw [one_mul]
-  have h1 : t * (1 - x) + x ≥ p * (1 - x) + x := by
-    have : t * (1 - x) ≥ p * (1 - x) := mul_le_mul_left htp (1 - x)
-    exact add_le_add this (le_refl x)
-  rw [heq_t, heq_p]
-  exact h1
-
 /-- A general fixpoint principle for proving almost-sure termination.
 
   If the mass of each generator satisfies `mass ≥ F(inf mass)` and `F` is such that
@@ -348,61 +430,5 @@ theorem IsPMF_of_mass_fixpoint {ι : Type*} {α : Type*} [Nonempty ι]
     _ ≤ (g i).mass := iInf_le _ i
 
 end is_pmf
-
-end SPMF
-
-/-- If `c ≤ 1`, `v ≠ ⊤`, `c ≥ v`, and real arithmetic shows `x ≥ v.toReal ∧ x ≤ 1 → x = 1`,
-  then `c = 1`. Used to close the `bounds` case of `IsPMF_of_mass_fixpoint` proofs. -/
-lemma ENNReal.eq_one_of_fixed_ineq {c v : ENNReal}
-    (hle : c ≤ 1) (hv_ne : v ≠ ⊤) (hge : c ≥ v)
-    (hf_one : c.toReal ≥ v.toReal → c.toReal ≤ 1 → c.toReal = 1) : c = 1 := by
-  have hc_ne : c ≠ ⊤ := ne_top_of_le_ne_top one_ne_top hle
-  have hle' : c.toReal ≤ 1 := (toReal_le_toReal hc_ne one_ne_top).mpr hle
-  have hmono := (toReal_le_toReal hv_ne hc_ne).mpr hge
-  rw [← ofReal_toReal hc_ne, hf_one hmono hle', ofReal_one]
-
-/-- Variant of `ENNReal.eq_one_of_fixed_ineq` that auto-derives `v ≠ ⊤` from `hge` + `hle`.
-  The callback need only prove `1 ≤ c.toReal` from `c.toReal ≥ v.toReal`; the lemma closes
-  `c = 1` using `c ≤ 1` internally. -/
-lemma ENNReal.eq_one_of_fixed_ineq' {c v : ENNReal}
-    (hle : c ≤ 1) (hge : c ≥ v)
-    (hf_one : c.toReal ≥ v.toReal → 1 ≤ c.toReal) : c = 1 := by
-  have hc_ne : c ≠ ⊤ := ne_top_of_le_ne_top one_ne_top hle
-  have hv_ne : v ≠ ⊤ := ne_top_of_le_ne_top hc_ne hge
-  have hle' : c.toReal ≤ 1 := (toReal_le_toReal hc_ne one_ne_top).mpr hle
-  have hmono := (toReal_le_toReal hv_ne hc_ne).mpr hge
-  have hge_one := hf_one hmono
-  rw [← ofReal_toReal hc_ne, le_antisymm hle' hge_one, ofReal_one]
-
-namespace SPMF
-
-/-- If a generator `g` is an SPMF, then `listOf g` is also an SPMF.
-  Unlike `vectorOf`/`listOfMaxLength`, `listOf` is defined by `partial_fixpoint`,
-  so we prove termination via `IsPMF_of_mass_fixpoint`. Note: this proof
-  is largely the same as `List.arbitrary_terminates` in `Examples/ArbList.lean`.
-
-  (Note: this lemma is at the bottom of the file since it requires the
-  `ENNReal` lemmas defined earlier.) -/
-theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
-    IsPMF (listOf g) := by
-  refine (IsPMF_of_mass_fixpoint
-    (g := fun () => listOf g)
-    (F := fun c => 1 / 2 + 1 / 2 * c)
-    ?bounds ?mass) ()
-  case bounds =>
-    intro c hle hge
-    apply ENNReal.eq_one_of_fixed_ineq' hle hge
-    intro hmono
-    rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
-    norm_num at hmono; linarith
-  case mass =>
-    intro () h
-    conv_lhs => rw [listOf]
-    simp only [mass_pick, mass_pure, mul_one]
-    gcongr
-    apply mass_bind_ge_of_isPMF hg
-    intro x
-    rw [mass_bind_pure]
-    exact mass_ge_iInf _ ()
 
 end SPMF

@@ -9,20 +9,11 @@ theorem Nat.arbitrary_support : n ∈ SPMF.support Nat.arbitrary := by
   induction n <;> rw [Nat.arbitrary] <;> simp [*]
 
 theorem Nat.arbitrary_terminates : SPMF.IsPMF Nat.arbitrary := by
-  refine (SPMF.IsPMF_of_mass_fixpoint
-    (g := fun () => (Nat.arbitrary : SPMF Nat))
-    (F := fun c => 1 / 2 + 1 / 2 * c)
-    ?bounds ?mass) ()
-  case bounds =>
-    intro c hle hge
-    apply ENNReal.eq_one_of_fixed_ineq' hle hge
-    intro hmono
-    rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
-    norm_num at hmono; linarith
-  case mass =>
-    intro () h
-    conv_lhs => rw [Nat.arbitrary]
-    simp
+  -- Static seed, mean offspring 1/2: subcritical.
+  refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
+  rw [ENNReal.one_sub_half]
+  conv_rhs => rw [Nat.arbitrary]
+  simp
 
 theorem Nat.arbitrary_cost :
     IsBounded Nat.arbitrary (fun n => n + 1) := by
@@ -33,14 +24,16 @@ theorem Nat.arbitrary_cost :
     apply admissible_IsBounded
   case step =>
     intro arbitrary_rec ih
-    simp [IsBounded_iff] at *
-    intro n c hn
-    grind only [
-      pick,
-      SPMF.Cost.mem_support_bind_iff,
-      SPMF.Cost.mem_support_choose_iff,
-      SPMF.Cost.mem_support_pure_iff
-    ]
+    rw [IsBounded_iff]
+    rintro ⟨n, c⟩ hmem
+    cost_support_simp at hmem
+    obtain ⟨m, rfl, h | h⟩ := hmem
+    · obtain ⟨rfl, rfl⟩ := h
+      omega
+    · obtain ⟨a, n1, n2, ha, ⟨hn, hn2⟩, hm⟩ := h
+      have h1 : n1 ≤ a + 1 := ih (a, n1) ha
+      show 1 + m ≤ n + 1
+      omega
 
 instance : LawfulGenerator Nat.arbitrary ⊤ (fun n => n + 1) where
   support_iff := by simp [Nat.arbitrary_support]

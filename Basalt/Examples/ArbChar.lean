@@ -20,28 +20,10 @@ theorem Char.arbitrary_terminates : SPMF.IsPMF Char.arbitrary := by
   unfold Char.arbitrary
   apply SPMF.IsPMF_elements
 
--- Proof is similar to `Nat.arbitrary_cost`, but `Char.arbitrary` makes only
--- one random choice, so `fun _ => 1` suffices as the cost function
 theorem Char.arbitrary_cost :
     IsBounded Char.arbitrary (fun _ => 1) := by
-  rw [IsBounded_iff]
-  rintro ⟨c, cost⟩ h
-  rw [Char.arbitrary, elements] at h
-  simp only [SPMF.Cost.mem_support_bind_iff, Functor.map] at h
-  obtain ⟨⟨i, hi⟩, n1, n2, h1, h2, rfl⟩ := h
-  have hlen : alphanumChars.length = 62 := by decide
-  replace h2 : n2 = 0 := by
-    split at h2
-    simp only [Pure.pure, SPMF.mem_support_pure_iff, Prod.mk.injEq] at h2
-    have ⟨_, h⟩ := h2
-    assumption
-  subst h2
-  replace h1 : n1 = 1 := by
-    revert h1
-    simp [SPMF.mem_support_bind_iff, SPMF.mem_support_pure_iff]
-  subst h1
-  dsimp
-  constructor
+  unfold Char.arbitrary
+  exact IsBounded_elements _
 
 #guard_msgs(drop info) in
 #eval (for _ in [0:20] do
