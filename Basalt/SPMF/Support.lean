@@ -27,6 +27,12 @@ def support (p : SPMF α) : Set α := Function.support p
 
 theorem mem_support_iff (p : SPMF α) (a : α) : a ∈ p.support ↔ p a ≠ 0 := Iff.rfl
 
+/-- `SPMF.bind` is the monad's `>>=`. -/
+theorem bind_eq (x : SPMF α) (f : α → SPMF β) : x.bind f = x >>= f := rfl
+
+/-- `SPMF.pure` is the monad's `pure`. -/
+theorem pure_eq (a : α) : (SPMF.pure a : SPMF α) = Pure.pure a := rfl
+
 @[simp]
 theorem support_countable (p : SPMF α) : p.support.Countable :=
   Summable.countable_support_ennreal (tsum_coe_ne_top p)
@@ -65,8 +71,8 @@ theorem support_bind
 theorem mem_support_bind_iff
     {x : SPMF α}
     {f : α → SPMF β} :
-    b ∈ (bind x f).support ↔ ∃ a ∈ x.support, b ∈ (f a).support := by
-  simp [support, Function.mem_support, SPMF.bind, DFunLike.coe]
+    b ∈ (x >>= f).support ↔ ∃ a ∈ x.support, b ∈ (f a).support := by
+  simp [support_bind]
 
 @[simp]
 theorem support_pure :
@@ -86,8 +92,8 @@ theorem support_pure :
 
 @[simp]
 theorem mem_support_pure_iff :
-    b ∈ (pure a).support ↔ b = a := by
-  simp [support, Function.mem_support, SPMF.pure, DFunLike.coe]
+    b ∈ (Pure.pure a : SPMF α).support ↔ b = a := by
+  simp [support_pure]
 
 @[simp]
 theorem support_map
@@ -152,6 +158,17 @@ theorem mem_support_pick_iff
     {x y : SPMF α} :
     a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
   simp
+
+@[simp]
+theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
+    n ∈ (chooseNat lo hi h : SPMF Nat).support ↔ lo ≤ n ∧ n ≤ hi := by
+  unfold chooseNat
+  simp only [mem_support_map_iff, mem_support_choose_iff, true_and]
+  constructor
+  · rintro ⟨a, rfl⟩
+    exact a.down.property
+  · rintro ⟨h1, h2⟩
+    exact ⟨⟨⟨n, h1, h2⟩⟩, rfl⟩
 
 /-- The support of `vectorOf n g` is the set of all length-`n` list where
     each element is in `g`'s support -/
@@ -320,7 +337,7 @@ theorem support_elements
       assumption
     have h_lt : i < xs.length := by omega
     dsimp at ha
-    simp [Pure.pure] at ha
+    simp only [mem_support_pure_iff] at ha
     apply List.mem_of_getElem (id (Eq.symm ha))
   . -- a ∈ xs → ∃ i ≤ xs.length - 1, a = xs[i]?.getD default
     intro hmem
@@ -333,7 +350,7 @@ theorem support_elements
         rw [← heq]
         apply List.getElem?_eq_getElem hlt
       dsimp
-      simp [Pure.pure]
+      simp only [mem_support_pure_iff]
       apply (Eq.symm heq)
 
 /-- `a` is in the support of `elements xs` if and only if `a ∈ xs` -/
@@ -537,6 +554,14 @@ theorem support_frequency
     mul_eq_zero, Nat.cast_eq_zero, not_forall, Prod.exists, mem_support_iff,
     Nat.pos_iff_ne_zero]
   grind
+
+/-- Membership form of `support_frequency`. -/
+@[simp]
+theorem mem_support_frequency_iff
+    {gs : List (Nat × (Unit → SPMF α))}
+    (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
+    a ∈ (frequency gs h_pos).support ↔ ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support := by
+  simp [support_frequency]
 
 theorem bind_congr_support
     {x : SPMF α}

@@ -53,16 +53,18 @@ theorem genTree_cost : IsBounded genTree Tree.cost := by
     exact admissible_IsBounded _
   case step =>
     intro genTree_rec ih
-    simp [IsBounded_iff] at *
-    intro t n hn
-    grind [
-      pick,
-      Tree.cost,
-      Tree.size,
-      SPMF.Cost.mem_support_bind_iff,
-      SPMF.Cost.mem_support_pure_iff,
-      SPMF.Cost.mem_support_choose_iff
-    ]
+    rw [IsBounded_iff]
+    rintro ⟨t, n⟩ hmem
+    cost_support_simp at hmem
+    obtain ⟨m, rfl, h | h⟩ := hmem
+    · obtain ⟨rfl, rfl⟩ := h
+      simp [Tree.cost, Tree.size]
+    · obtain ⟨l, n1, n2, hl, ⟨r, n3, n4, hr, ⟨rfl, hn4⟩, hn2⟩, hm⟩ := h
+      have hL : n1 ≤ Tree.cost l := ih (l, n1) hl
+      have hR : n3 ≤ Tree.cost r := ih (r, n3) hr
+      show 1 + m ≤ Tree.cost (Tree.node l 2 r)
+      simp only [Tree.cost, Tree.size] at *
+      omega
 
 instance : LawfulGenerator genTree Tree.isAllTwos Tree.cost where
   support_iff := genTree_support

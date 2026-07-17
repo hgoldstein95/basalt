@@ -116,6 +116,13 @@ theorem mass_map {x : SPMF α} {f : α → β} :
     · simp_all
     · rfl
 
+@[simp]
+theorem mass_chooseNat (lo hi : Nat) (h : lo ≤ hi) :
+    (chooseNat lo hi h : SPMF Nat).mass = 1 := by
+  unfold chooseNat
+  rw [mass_map]
+  exact mass_choose lo hi h
+
 theorem mass_bind_const {x : SPMF α} {y : SPMF β} :
     (x >>= fun _ => y).mass = x.mass * y.mass := by
   unfold mass
@@ -198,6 +205,16 @@ theorem mass_bind_choose_ge {lo hi : Nat} (h : lo ≤ hi)
     _ = (∑ x ∈ Finset.Icc lo hi, m x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
         rw [one_div, mul_comm, div_eq_mul_inv]
 
+/-- `chooseNat` form of `mass_bind_choose_ge`. -/
+theorem mass_bind_chooseNat_ge {lo hi : Nat} (h : lo ≤ hi)
+    {f : Nat → SPMF α} {m : Nat → ℝ≥0∞}
+    (hf : ∀ x, lo ≤ x → x ≤ hi → (f x).mass ≥ m x) :
+    (chooseNat lo hi h >>= f).mass
+      ≥ (∑ x ∈ Finset.Icc lo hi, m x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
+  unfold chooseNat
+  rw [bind_map_left]
+  exact mass_bind_choose_ge h fun a => hf a.down.val a.down.property.1 a.down.property.2
+
 /-- A `tsum` over `α` commutes with a weighted `List.sum`. -/
 private theorem tsum_map_weighted (gs : List (Nat × (Unit → SPMF α))) :
     ∑' a, (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum
@@ -255,6 +272,10 @@ theorem IsPMF_pure (a : α) : IsPMF (Pure.pure a : SPMF α) := mass_pure a
 theorem IsPMF_choose (lo hi : Nat) (h : lo ≤ hi) :
     IsPMF (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) :=
   mass_choose lo hi h
+
+theorem IsPMF_chooseNat (lo hi : Nat) (h : lo ≤ hi) :
+    IsPMF (chooseNat lo hi h : SPMF Nat) :=
+  mass_chooseNat lo hi h
 
 theorem IsPMF_bind_pure {x : SPMF α} {f : α → β} (hx : IsPMF x) :
     IsPMF (x >>= fun a => Pure.pure (f a)) := by

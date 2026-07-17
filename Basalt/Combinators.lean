@@ -73,6 +73,11 @@ def frequencyAux [Gen G] (gs : List (Nat × (Unit → G α))) (total : Nat)
 
 end Helpers
 
+/-- Choose a plain `Nat` uniformly from `[lo, hi]` (inclusive). Prefer this over raw `choose`
+    in generators: it hides `choose`'s `ULift` subtype from bodies and proofs. -/
+def chooseNat [Gen G] (lo hi : Nat) (h : lo ≤ hi) : G Nat :=
+  (·.down.val) <$> RandomChoice.choose lo hi h
+
 /-- Generates an element of the list `xs` at random.
     This combinator takes as input a proof that `xs` is non-empty. -/
 def elements [Gen G] (xs : List α) (hne : xs ≠ []) : G α := do

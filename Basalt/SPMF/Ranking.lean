@@ -191,6 +191,10 @@ end SPMF
 
 namespace ENNReal
 
+/-- `1 - 1/2 = 1/2` in `ℝ≥0∞`. -/
+theorem one_sub_half : (1 : ℝ≥0∞) - 1 / 2 = 1 / 2 := by
+  rw [one_div, ENNReal.one_sub_inv_two]
+
 private theorem list_prod_le_one {xs : List ℝ≥0∞} (h : ∀ x ∈ xs, x ≤ 1) : xs.prod ≤ 1 := by
   induction xs with
   | nil => simp
@@ -302,6 +306,37 @@ theorem IsPMF_of_subcritical_mass {α : Type*} {g : SPMF α} {m : ℝ≥0∞} (h
     _ = m * (1 - g.mass) := by
         rw [ENNReal.mul_sub fun _ _ => hm_top, mul_one]
 
+/-- A `c ≤ 1` whose deficit shrinks by a factor `m < 1` must be `1`. -/
+theorem _root_.ENNReal.eq_one_of_deficit_le_mul {c m : ℝ≥0∞} (hm : m < 1) (hle : c ≤ 1)
+    (h : 1 - c ≤ m * (1 - c)) : c = 1 := by
+  by_contra hne
+  have hpos : 0 < 1 - c :=
+    pos_iff_ne_zero.mpr fun h0 => hne (le_antisymm hle (tsub_eq_zero_iff_le.mp h0))
+  have htop : (1 : ℝ≥0∞) - c ≠ ⊤ := (tsub_le_self.trans_lt one_lt_top).ne
+  have hlt : (1 : ℝ≥0∞) - c < 1 - c :=
+    calc 1 - c ≤ m * (1 - c) := h
+      _ = (1 - c) * m := mul_comm _ _
+      _ < (1 - c) * 1 := ENNReal.mul_lt_mul_right hpos.ne' htop hm
+      _ = 1 - c := mul_one _
+  exact absurd hlt (lt_irrefl _)
+
+/-- **Family form of subcritical termination**, for a subcritical generator whose recursion
+  re-indexes the seed. One unfolding must bound the mass below by `(1 - m) + m * X` where `X`
+  is the family infimum of the masses; recursive occurrences are bounded by `mass_ge_iInf`. -/
+theorem IsPMF_of_subcritical_mass_family {ι : Type*} {α : Type*} [Nonempty ι]
+    (g : ι → SPMF α) {m : ℝ≥0∞} (hm : m < 1)
+    (hstep : ∀ i, (1 - m) + m * (⨅ j, (g j).mass) ≤ (g i).mass) :
+    ∀ i, IsPMF (g i) := by
+  have hm_top : m ≠ ⊤ := (hm.trans one_lt_top).ne
+  refine IsPMF_of_mass_fixpoint g (fun c => (1 - m) + m * c) ?_ (fun i _ => hstep i)
+  intro c hle hge
+  refine ENNReal.eq_one_of_deficit_le_mul hm hle ?_
+  calc 1 - c
+      ≤ 1 - ((1 - m) + m * c) := tsub_le_tsub_left hge 1
+    _ = (1 - (1 - m)) - m * c := by rw [tsub_add_eq_tsub_tsub]
+    _ = m - m * c := by rw [ENNReal.sub_sub_cancel one_ne_top hm.le]
+    _ = m * (1 - c) := by rw [ENNReal.mul_sub fun _ _ => hm_top, mul_one]
+
 /-- **Critical termination** (the `m = 1` boundary). A single-seed wrapper around
   `IsPMF_of_mass_fixpoint`: if the mass satisfies `F g.mass ≤ g.mass` for an `F` whose only
   fixed-or-below point in `[0, 1]` is `1`, then `g` is a PMF. This is the classical extinction
@@ -316,6 +351,16 @@ theorem IsPMF_of_critical {α : Type*} {g : SPMF α} (F : ℝ≥0∞ → ℝ≥0
     exact hF c hle hge
   · intro _ _
     simpa [iInf_const] using hstep
+
+/-- **Family form of critical termination**, for a critical generator whose recursion
+  re-indexes the seed: one unfolding must bound the mass below by `F` of the family infimum
+  of the masses. Like `IsPMF_of_critical`, it comes with no expected-size bound. -/
+theorem IsPMF_of_critical_family {ι : Type*} {α : Type*} [Nonempty ι]
+    (g : ι → SPMF α) (F : ℝ≥0∞ → ℝ≥0∞)
+    (hF : ∀ c : ℝ≥0∞, c ≤ 1 → F c ≤ c → c = 1)
+    (hstep : ∀ i, F (⨅ j, (g j).mass) ≤ (g i).mass) :
+    ∀ i, IsPMF (g i) :=
+  IsPMF_of_mass_fixpoint g F (fun c hle hge => hF c hle hge) (fun i _ => hstep i)
 
 /-- The fixed-point side condition for the uniform binary critical case
   `F c = 1/2 + 1/2 * c^2` — the generating function of a generator that recurses twice with
@@ -338,9 +383,7 @@ variable {α : Type*}
 theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
     IsPMF (listOf g) := by
   refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
-  have h : (1 : ℝ≥0∞) - 1 / 2 = 1 / 2 := by
-    rw [one_div, ENNReal.one_sub_inv_two]
-  rw [h]
+  rw [ENNReal.one_sub_half]
   conv_rhs => rw [listOf]
   simp only [mass_pick, mass_pure, mul_one]
   gcongr

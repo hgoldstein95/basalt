@@ -28,10 +28,10 @@ def Tree.genBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
     pick
       (fun () => pure leaf)
       (fun () => do
-        let x ← choose lo hi (by omega)
-        let l ← Tree.genBST lo (x.down.val - 1)
-        let r ← Tree.genBST (x.down.val + 1) hi
-        return node l x.down.val r)
+        let x ← chooseNat lo hi (by omega)
+        let l ← Tree.genBST lo (x - 1)
+        let r ← Tree.genBST (x + 1) hi
+        return node l x r)
 partial_fixpoint
 
 tunable def Tree.genWeightedBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
@@ -57,98 +57,98 @@ theorem Tree.genBST_support :
     <;> simp
     <;> grind
 
-theorem Tree.genBST_terminates : SPMF.IsPMF (Tree.genBST lo hi) := by
-  haveI : Nonempty (Nat × Nat) := ⟨(0, 0)⟩
-  refine (SPMF.IsPMF_of_mass_fixpoint
-      (g := fun (lo, hi) => (Tree.genBST lo hi : SPMF (Tree Nat)))
-      (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
-      ?bounds ?mass) (lo, hi)
-  case bounds =>
-    intro c hle hge
-    apply ENNReal.eq_one_of_fixed_ineq' hle hge
-    intro hmono
-    rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
-    norm_num at hmono
-    nlinarith [sq_nonneg c.toReal]
-  case mass =>
-    intro ⟨lo, hi⟩ hc_le
-    dsimp only
-    by_cases hlt : lo > hi
-    · rw [Tree.genBST, dif_pos hlt, SPMF.mass_pure]
-      conv_lhs => rw [← ENNReal.add_halves 1]
-      gcongr
-      exact mul_le_of_le_one_right (by positivity) (pow_le_one₀ (by positivity) hc_le)
-    · push Not at hlt
-      conv_lhs => rw [Tree.genBST, dif_neg (by omega)]
-      simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-      gcongr
-      rw [sq]
-      apply SPMF.mass_bind_ge_of_isPMF (SPMF.IsPMF_choose lo hi hlt)
-      intro x
-      apply SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo, x.down.val - 1))
-      intro l
-      simp only [SPMF.mass_bind_pure]
-      exact SPMF.mass_ge_iInf _ (x.down.val + 1, hi)
+/-! ## Termination
 
-theorem Tree.genBST_cost :
-    IsBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
-  open Lean.Order in
-  delta genBST
-  apply (fix_induct (motive := fun (g : Nat → Nat → SPMF.Cost (Tree Nat)) => ∀ lo hi, IsBounded (g lo hi) (fun t => 3 * t.size + 1)) _ ?admissible ?step)
-  case admissible =>
-    exact admissible_pi_apply _ fun _ => admissible_pi_apply _ fun _ => admissible_IsBounded _
-  case step =>
-    intro genBST_rec ih lo hi
-    simp [IsBounded_iff] at *
-    intro t n hn
-    grind [
-      pick,
-      size,
-      SPMF.Cost.mem_support_bind_iff,
-      SPMF.Cost.mem_support_choose_iff,
-      SPMF.Cost.mem_support_pure_iff
-    ]
+Both generators shrink the seed the same way, so one level operator (parameterized by the
+recursion weight `w`) and one ranking function serve both. -/
 
-instance {lo hi : Nat} : LawfulGenerator (Tree.genBST lo hi) (Tree.isBST lo hi) (fun t => 3 * t.size + 1) where
-  support_iff := Tree.genBST_support
-  is_pmf := Tree.genBST_terminates
-  is_bounded := Tree.genBST_cost
-
-section weighted_termination
+section ranking_termination
 
 open SPMF
 open scoped NNReal ENNReal
 
-noncomputable def weightedBSTLevel (e : Nat × Nat → ℝ≥0∞) (p : Nat × Nat) : ℝ≥0∞ :=
+/-- The level operator for the BST generators: recurse with probability `w` on the two
+  subintervals of a uniform pivot. `genBST` has `w = 1/2`; `genWeightedBST` has `w = 5/6`. -/
+noncomputable def bstLevel (w : ℝ≥0∞) (e : Nat × Nat → ℝ≥0∞) (p : Nat × Nat) : ℝ≥0∞ :=
   if p.1 > p.2 then 0
-  else 5 / 6 * ((∑ x ∈ Finset.Icc p.1 p.2, (e (p.1, x - 1) + e (x + 1, p.2)))
+  else w * ((∑ x ∈ Finset.Icc p.1 p.2, (e (p.1, x - 1) + e (x + 1, p.2)))
     / ((p.2 - p.1 + 1 : ℕ) : ℝ≥0∞))
 
-def weightedBSTRank (p : Nat × Nat) : Nat :=
+/-- The ranking function. The `+ 4` bump at `lo = 0` compensates for `Nat` truncation: the
+  pivot `x = 0` recurses on `(0, 0 - 1) = (0, 0)`, an unshrunk seed, so the plain interval
+  measure has positive drift there. Tight for `w = 5/6`; `w = 1/2` shares it. -/
+def bstRank (p : Nat × Nat) : Nat :=
   (p.2 + 1 - p.1) + 1 + (if p.1 = 0 then 4 else 0)
 
-private theorem levelOp_weightedBSTLevel : LevelOp weightedBSTLevel := by
+private theorem levelOp_bstLevel (w : ℝ≥0∞) : LevelOp (bstLevel w) := by
   constructor
   · -- mono
     intro e f hef p
-    unfold weightedBSTLevel
+    unfold bstLevel
     split
     · exact le_rfl
     · gcongr with x hx <;> exact hef _
   · -- add
     intro e f
     funext p
-    simp only [weightedBSTLevel, Pi.add_apply]
+    simp only [bstLevel, Pi.add_apply]
     split
     · simp
     · simp only [add_add_add_comm, Finset.sum_add_distrib, ← ENNReal.div_add_div_same, mul_add]
   · -- smul
     intro r e
     funext p
-    simp only [weightedBSTLevel]
+    simp only [bstLevel]
     split
     · simp
     · simp only [← mul_add, ← Finset.mul_sum, ← mul_div_assoc, mul_left_comm]
+
+/-- Away from `lo = 0`, the children's total rank equals the parent's rank *exactly, for every
+  pivot* — the interval partitions. Summed over the `hi - lo + 1` pivots: -/
+private lemma bstRank_sum_pos {lo hi : Nat} (h1 : 1 ≤ lo) (hle : lo ≤ hi) :
+    ∑ x ∈ Finset.Icc lo hi, (bstRank (lo, x - 1) + bstRank (x + 1, hi))
+      = (hi - lo + 1) * bstRank (lo, hi) := by
+  have hterm : ∀ x ∈ Finset.Icc lo hi,
+      bstRank (lo, x - 1) + bstRank (x + 1, hi)
+        = bstRank (lo, hi) := by
+    intro x hx
+    rw [Finset.mem_Icc] at hx
+    have hlo : ¬(lo = 0) := by omega
+    have hx1 : ¬(x + 1 = 0) := by omega
+    simp only [bstRank, if_neg hlo, if_neg hx1]
+    omega
+  rw [Finset.sum_congr rfl hterm, Finset.sum_const, Nat.card_Icc, smul_eq_mul]
+  congr 1
+  omega
+
+/-- At `lo = 0` the pivot `x = 0` recurses on `(0, 0)` — an *unshrunk* child — and the
+  children's total rank exceeds the parent's by exactly 1 at that pivot (and only there). -/
+private lemma bstRank_sum_zero (hi : Nat) :
+    ∑ x ∈ Finset.Icc 0 hi, (bstRank (0, x - 1) + bstRank (x + 1, hi))
+      = (hi + 1) * bstRank (0, hi) + 1 := by
+  have hsplit : Finset.Icc 0 hi = insert 0 (Finset.Icc 1 hi) := by
+    ext y
+    simp only [Finset.mem_Icc, Finset.mem_insert]
+    omega
+  have h0 : (0 : Nat) ∉ Finset.Icc 1 hi := by simp
+  have hhead : bstRank (0, 0 - 1) + bstRank (0 + 1, hi)
+      = bstRank (0, hi) + 1 := by
+    simp only [bstRank, if_neg (by omega : ¬(0 + 1 = 0))]
+    omega
+  have htail : ∀ x ∈ Finset.Icc 1 hi,
+      bstRank (0, x - 1) + bstRank (x + 1, hi)
+        = bstRank (0, hi) := by
+    intro x hx
+    rw [Finset.mem_Icc] at hx
+    simp only [bstRank, if_neg (by omega : ¬(x + 1 = 0))]
+    omega
+  rw [hsplit, Finset.sum_insert h0, hhead, Finset.sum_congr rfl htail, Finset.sum_const,
+    Nat.card_Icc, smul_eq_mul]
+  have : hi + 1 - 1 = hi := by omega
+  rw [this]
+  ring
+
+/-! ### `genWeightedBST` (`w = 5/6`, `ε = 1/6`) -/
 
 private lemma five_sixths_add_sixth : (5 / 6 : ℝ≥0∞) + 1 / 6 = 1 := by
   rw [ENNReal.div_add_div_same, show (5 : ℝ≥0∞) + 1 = 6 by norm_num]
@@ -170,58 +170,13 @@ private lemma five_sixths_le' {t : ℝ≥0∞} (ht : 6 ≤ t) : 5 / 6 * (t + 1) 
     _ ≤ 5 / 6 * t + 1 / 6 * t := by gcongr
     _ = t := five_sixths_split t
 
-/-- Away from `lo = 0`, the children's total rank equals the parent's rank *exactly, for every
-  pivot* — the interval partitions. Summed over the `hi - lo + 1` pivots: -/
-private lemma weightedBSTRank_sum_pos {lo hi : Nat} (h1 : 1 ≤ lo) (hle : lo ≤ hi) :
-    ∑ x ∈ Finset.Icc lo hi, (weightedBSTRank (lo, x - 1) + weightedBSTRank (x + 1, hi))
-      = (hi - lo + 1) * weightedBSTRank (lo, hi) := by
-  have hterm : ∀ x ∈ Finset.Icc lo hi,
-      weightedBSTRank (lo, x - 1) + weightedBSTRank (x + 1, hi)
-        = weightedBSTRank (lo, hi) := by
-    intro x hx
-    rw [Finset.mem_Icc] at hx
-    have hlo : ¬(lo = 0) := by omega
-    have hx1 : ¬(x + 1 = 0) := by omega
-    simp only [weightedBSTRank, if_neg hlo, if_neg hx1]
-    omega
-  rw [Finset.sum_congr rfl hterm, Finset.sum_const, Nat.card_Icc, smul_eq_mul]
-  congr 1
-  omega
-
-/-- At `lo = 0` the pivot `x = 0` recurses on `(0, 0)` — an *unshrunk* child — and the
-  children's total rank exceeds the parent's by exactly 1 at that pivot (and only there). -/
-private lemma weightedBSTRank_sum_zero (hi : Nat) :
-    ∑ x ∈ Finset.Icc 0 hi, (weightedBSTRank (0, x - 1) + weightedBSTRank (x + 1, hi))
-      = (hi + 1) * weightedBSTRank (0, hi) + 1 := by
-  have hsplit : Finset.Icc 0 hi = insert 0 (Finset.Icc 1 hi) := by
-    ext y
-    simp only [Finset.mem_Icc, Finset.mem_insert]
-    omega
-  have h0 : (0 : Nat) ∉ Finset.Icc 1 hi := by simp
-  have hhead : weightedBSTRank (0, 0 - 1) + weightedBSTRank (0 + 1, hi)
-      = weightedBSTRank (0, hi) + 1 := by
-    simp only [weightedBSTRank, if_neg (by omega : ¬(0 + 1 = 0))]
-    omega
-  have htail : ∀ x ∈ Finset.Icc 1 hi,
-      weightedBSTRank (0, x - 1) + weightedBSTRank (x + 1, hi)
-        = weightedBSTRank (0, hi) := by
-    intro x hx
-    rw [Finset.mem_Icc] at hx
-    simp only [weightedBSTRank, if_neg (by omega : ¬(x + 1 = 0))]
-    omega
-  rw [hsplit, Finset.sum_insert h0, hhead, Finset.sum_congr rfl htail, Finset.sum_const,
-    Nat.card_Icc, smul_eq_mul]
-  have : hi + 1 - 1 = hi := by omega
-  rw [this]
-  ring
-
 private theorem genWeightedBST_drift (p : Nat × Nat) :
-    weightedBSTLevel (fun q => (weightedBSTRank q : ℝ≥0∞)) p + 1 / 6
-      ≤ (weightedBSTRank p : ℝ≥0∞) := by
+    bstLevel (5 / 6) (fun q => (bstRank q : ℝ≥0∞)) p + 1 / 6
+      ≤ (bstRank p : ℝ≥0∞) := by
   obtain ⟨lo, hi⟩ := p
-  have hrank1 : (1 : ℝ≥0∞) ≤ (weightedBSTRank (lo, hi) : ℝ≥0∞) := by
-    exact_mod_cast (show 1 ≤ weightedBSTRank (lo, hi) by simp only [weightedBSTRank]; omega)
-  unfold weightedBSTLevel
+  have hrank1 : (1 : ℝ≥0∞) ≤ (bstRank (lo, hi) : ℝ≥0∞) := by
+    exact_mod_cast (show 1 ≤ bstRank (lo, hi) by simp only [bstRank]; omega)
+  unfold bstLevel
   by_cases hgt : lo > hi
   · rw [if_pos hgt, zero_add]
     exact (ENNReal.div_le_of_le_mul (by norm_num)).trans hrank1
@@ -231,27 +186,27 @@ private theorem genWeightedBST_drift (p : Nat × Nat) :
     by_cases hlo : lo = 0
     · subst hlo
       have hcast : (∑ x ∈ Finset.Icc 0 hi,
-            ((weightedBSTRank (0, x - 1) : ℝ≥0∞) + (weightedBSTRank (x + 1, hi) : ℝ≥0∞)))
-          = ((hi + 1 : ℕ) : ℝ≥0∞) * (weightedBSTRank (0, hi) : ℝ≥0∞) + 1 := by
-        exact_mod_cast congrArg (Nat.cast (R := ℝ≥0∞)) (weightedBSTRank_sum_zero hi)
+            ((bstRank (0, x - 1) : ℝ≥0∞) + (bstRank (x + 1, hi) : ℝ≥0∞)))
+          = ((hi + 1 : ℕ) : ℝ≥0∞) * (bstRank (0, hi) : ℝ≥0∞) + 1 := by
+        exact_mod_cast congrArg (Nat.cast (R := ℝ≥0∞)) (bstRank_sum_zero hi)
       have hne0 : ((hi + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
         exact_mod_cast (Nat.succ_ne_zero hi)
-      have h6 : (6 : ℝ≥0∞) ≤ (weightedBSTRank (0, hi) : ℝ≥0∞) := by
-        exact_mod_cast (show 6 ≤ weightedBSTRank (0, hi) by
-          simp only [weightedBSTRank, reduceIte]; omega)
+      have h6 : (6 : ℝ≥0∞) ≤ (bstRank (0, hi) : ℝ≥0∞) := by
+        exact_mod_cast (show 6 ≤ bstRank (0, hi) by
+          simp only [bstRank, reduceIte]; omega)
       rw [Nat.sub_zero, hcast, ENNReal.add_div, mul_div_assoc,
         ENNReal.mul_div_cancel hne0 (ENNReal.natCast_ne_top _)]
-      calc 5 / 6 * ((weightedBSTRank (0, hi) : ℝ≥0∞) + 1 / ((hi + 1 : ℕ) : ℝ≥0∞)) + 1 / 6
-          ≤ 5 / 6 * ((weightedBSTRank (0, hi) : ℝ≥0∞) + 1) + 1 / 6 := by
+      calc 5 / 6 * ((bstRank (0, hi) : ℝ≥0∞) + 1 / ((hi + 1 : ℕ) : ℝ≥0∞)) + 1 / 6
+          ≤ 5 / 6 * ((bstRank (0, hi) : ℝ≥0∞) + 1) + 1 / 6 := by
             gcongr
             exact ENNReal.div_le_of_le_mul
               (by rw [one_mul]; exact Nat.one_le_cast.mpr hi.succ_pos)
-        _ ≤ (weightedBSTRank (0, hi) : ℝ≥0∞) := five_sixths_le' h6
+        _ ≤ (bstRank (0, hi) : ℝ≥0∞) := five_sixths_le' h6
     · have hcast : (∑ x ∈ Finset.Icc lo hi,
-            ((weightedBSTRank (lo, x - 1) : ℝ≥0∞) + (weightedBSTRank (x + 1, hi) : ℝ≥0∞)))
-          = ((hi - lo + 1 : ℕ) : ℝ≥0∞) * (weightedBSTRank (lo, hi) : ℝ≥0∞) := by
+            ((bstRank (lo, x - 1) : ℝ≥0∞) + (bstRank (x + 1, hi) : ℝ≥0∞)))
+          = ((hi - lo + 1 : ℕ) : ℝ≥0∞) * (bstRank (lo, hi) : ℝ≥0∞) := by
         exact_mod_cast congrArg (Nat.cast (R := ℝ≥0∞))
-          (weightedBSTRank_sum_pos (by omega) hgt)
+          (bstRank_sum_pos (by omega) hgt)
       have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
         exact_mod_cast (Nat.succ_ne_zero (hi - lo))
       rw [hcast, mul_div_assoc, ENNReal.mul_div_cancel hne0 (ENNReal.natCast_ne_top _)]
@@ -279,10 +234,10 @@ private theorem genWeightedBST_mass_ge (lo hi : Nat) (hle : lo ≤ hi) :
 
 private theorem genWeightedBST_step (p : Nat × Nat) :
     1 - (Tree.genWeightedBST p.1 p.2 : SPMF (Tree Nat)).mass
-      ≤ weightedBSTLevel
+      ≤ bstLevel (5 / 6)
           (fun q => 1 - (Tree.genWeightedBST q.1 q.2 : SPMF (Tree Nat)).mass) p := by
   obtain ⟨lo, hi⟩ := p
-  unfold weightedBSTLevel
+  unfold bstLevel
   by_cases hgt : lo > hi
   · rw [if_pos hgt, Tree.genWeightedBST, dif_pos hgt]
     simp
@@ -320,11 +275,202 @@ private theorem genWeightedBST_step (p : Nat × Nat) :
 theorem Tree.genWeightedBST_terminates : SPMF.IsPMF (Tree.genWeightedBST lo hi) := by
   refine SPMF.IsPMF_of_ranking
     (fun p : Nat × Nat => (Tree.genWeightedBST p.1 p.2 : SPMF (Tree Nat)))
-    levelOp_weightedBSTLevel
-    (fun p => (weightedBSTRank p : ℝ≥0∞))
+    (levelOp_bstLevel (5 / 6))
+    (fun p => (bstRank p : ℝ≥0∞))
     (fun p => ENNReal.natCast_ne_top _)
     (ε := 1 / 6) (ENNReal.div_pos one_ne_zero (by norm_num))
     genWeightedBST_drift genWeightedBST_step (lo, hi)
+
+/-! ### `genBST` (`w = 1/2`, `ε = 1/2`) -/
+
+private lemma half_split (t : ℝ≥0∞) : 1 / 2 * t + 1 / 2 * t = t := by
+  rw [← add_mul, ENNReal.add_halves, one_mul]
+
+private lemma half_le {t : ℝ≥0∞} (ht : 1 ≤ t) : 1 / 2 * t + 1 / 2 ≤ t :=
+  calc 1 / 2 * t + 1 / 2 = 1 / 2 * t + 1 / 2 * 1 := by rw [mul_one]
+    _ ≤ 1 / 2 * t + 1 / 2 * t := by gcongr
+    _ = t := half_split t
+
+private lemma half_le' {t : ℝ≥0∞} (ht : 2 ≤ t) : 1 / 2 * (t + 1) + 1 / 2 ≤ t :=
+  calc 1 / 2 * (t + 1) + 1 / 2
+      = 1 / 2 * t + (1 / 2 + 1 / 2) := by ring
+    _ = 1 / 2 * t + 1 / 2 * 2 := by
+        rw [ENNReal.add_halves, one_div, ENNReal.inv_mul_cancel (by norm_num) (by norm_num)]
+    _ ≤ 1 / 2 * t + 1 / 2 * t := by gcongr
+    _ = t := half_split t
+
+private theorem genBST_drift (p : Nat × Nat) :
+    bstLevel (1 / 2) (fun q => (bstRank q : ℝ≥0∞)) p + 1 / 2
+      ≤ (bstRank p : ℝ≥0∞) := by
+  obtain ⟨lo, hi⟩ := p
+  have hrank1 : (1 : ℝ≥0∞) ≤ (bstRank (lo, hi) : ℝ≥0∞) := by
+    exact_mod_cast (show 1 ≤ bstRank (lo, hi) by simp only [bstRank]; omega)
+  unfold bstLevel
+  by_cases hgt : lo > hi
+  · rw [if_pos hgt, zero_add]
+    exact (ENNReal.div_le_of_le_mul (by norm_num)).trans hrank1
+  · push Not at hgt
+    rw [if_neg (by omega)]
+    simp only
+    by_cases hlo : lo = 0
+    · subst hlo
+      have hcast : (∑ x ∈ Finset.Icc 0 hi,
+            ((bstRank (0, x - 1) : ℝ≥0∞) + (bstRank (x + 1, hi) : ℝ≥0∞)))
+          = ((hi + 1 : ℕ) : ℝ≥0∞) * (bstRank (0, hi) : ℝ≥0∞) + 1 := by
+        exact_mod_cast congrArg (Nat.cast (R := ℝ≥0∞)) (bstRank_sum_zero hi)
+      have hne0 : ((hi + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
+        exact_mod_cast (Nat.succ_ne_zero hi)
+      have h2 : (2 : ℝ≥0∞) ≤ (bstRank (0, hi) : ℝ≥0∞) := by
+        exact_mod_cast (show 2 ≤ bstRank (0, hi) by
+          simp only [bstRank, reduceIte]; omega)
+      rw [Nat.sub_zero, hcast, ENNReal.add_div, mul_div_assoc,
+        ENNReal.mul_div_cancel hne0 (ENNReal.natCast_ne_top _)]
+      calc 1 / 2 * ((bstRank (0, hi) : ℝ≥0∞) + 1 / ((hi + 1 : ℕ) : ℝ≥0∞)) + 1 / 2
+          ≤ 1 / 2 * ((bstRank (0, hi) : ℝ≥0∞) + 1) + 1 / 2 := by
+            gcongr
+            exact ENNReal.div_le_of_le_mul
+              (by rw [one_mul]; exact Nat.one_le_cast.mpr hi.succ_pos)
+        _ ≤ (bstRank (0, hi) : ℝ≥0∞) := half_le' h2
+    · have hcast : (∑ x ∈ Finset.Icc lo hi,
+            ((bstRank (lo, x - 1) : ℝ≥0∞) + (bstRank (x + 1, hi) : ℝ≥0∞)))
+          = ((hi - lo + 1 : ℕ) : ℝ≥0∞) * (bstRank (lo, hi) : ℝ≥0∞) := by
+        exact_mod_cast congrArg (Nat.cast (R := ℝ≥0∞))
+          (bstRank_sum_pos (by omega) hgt)
+      have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
+        exact_mod_cast (Nat.succ_ne_zero (hi - lo))
+      rw [hcast, mul_div_assoc, ENNReal.mul_div_cancel hne0 (ENNReal.natCast_ne_top _)]
+      exact half_le hrank1
+
+private theorem genBST_mass_ge (lo hi : Nat) (hle : lo ≤ hi) :
+    (Tree.genBST lo hi : SPMF (Tree Nat)).mass
+      ≥ 1 / 2 + 1 / 2 * ((∑ x ∈ Finset.Icc lo hi,
+            (Tree.genBST lo (x - 1) : SPMF (Tree Nat)).mass
+              * (Tree.genBST (x + 1) hi : SPMF (Tree Nat)).mass)
+          / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) := by
+  conv_lhs => rw [Tree.genBST]
+  rw [dif_neg (by omega)]
+  simp only [mass_pick, mass_pure, mul_one]
+  gcongr
+  refine mass_bind_chooseNat_ge hle fun x hxlo hxhi => ?_
+  refine mass_bind_ge_mul le_rfl fun l => ?_
+  rw [mass_bind_pure]
+
+private theorem genBST_step (p : Nat × Nat) :
+    1 - (Tree.genBST p.1 p.2 : SPMF (Tree Nat)).mass
+      ≤ bstLevel (1 / 2)
+          (fun q => 1 - (Tree.genBST q.1 q.2 : SPMF (Tree Nat)).mass) p := by
+  obtain ⟨lo, hi⟩ := p
+  unfold bstLevel
+  by_cases hgt : lo > hi
+  · rw [if_pos hgt, Tree.genBST, dif_pos hgt]
+    simp
+  · push Not at hgt
+    rw [if_neg (by omega)]
+    simp only
+    have hne0 : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by
+      exact_mod_cast (Nat.succ_ne_zero (hi - lo))
+    have hcard : ((hi - lo + 1 : ℕ) : ℝ≥0∞) ≤ ((Finset.Icc lo hi).card : ℝ≥0∞) := by
+      rw [Nat.card_Icc]
+      norm_cast
+      omega
+    calc 1 - (Tree.genBST lo hi : SPMF (Tree Nat)).mass
+        ≤ 1 / 2 * (1 - (∑ x ∈ Finset.Icc lo hi,
+              (Tree.genBST lo (x - 1) : SPMF (Tree Nat)).mass
+                * (Tree.genBST (x + 1) hi : SPMF (Tree Nat)).mass)
+            / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) :=
+          ENNReal.one_sub_le_mul_one_sub (ENNReal.add_halves 1)
+            (ENNReal.div_lt_top (by norm_num) (by norm_num)).ne
+            (genBST_mass_ge lo hi hgt)
+      _ ≤ 1 / 2 * ((∑ x ∈ Finset.Icc lo hi,
+              (1 - (Tree.genBST lo (x - 1) : SPMF (Tree Nat)).mass
+                * (Tree.genBST (x + 1) hi : SPMF (Tree Nat)).mass))
+            / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) := by
+          gcongr 1 / 2 * ?_
+          exact ENNReal.one_sub_sum_div_le hne0 (ENNReal.natCast_ne_top _) hcard
+            fun x _ => mul_le_one' (mass_le_one _) (mass_le_one _)
+      _ ≤ 1 / 2 * ((∑ x ∈ Finset.Icc lo hi,
+              ((1 - (Tree.genBST lo (x - 1) : SPMF (Tree Nat)).mass)
+                + (1 - (Tree.genBST (x + 1) hi : SPMF (Tree Nat)).mass)))
+            / ((hi - lo + 1 : ℕ) : ℝ≥0∞)) := by
+          gcongr with x hx
+          exact ENNReal.one_sub_mul_le_add (mass_le_one _) (mass_le_one _)
+
+theorem Tree.genBST_terminates : SPMF.IsPMF (Tree.genBST lo hi) := by
+  refine SPMF.IsPMF_of_ranking
+    (fun p : Nat × Nat => (Tree.genBST p.1 p.2 : SPMF (Tree Nat)))
+    (levelOp_bstLevel (1 / 2))
+    (fun p => (bstRank p : ℝ≥0∞))
+    (fun p => ENNReal.natCast_ne_top _)
+    (ε := 1 / 2) (ENNReal.div_pos one_ne_zero (by norm_num))
+    genBST_drift genBST_step (lo, hi)
+
+end ranking_termination
+
+/-! ## Cost -/
+
+theorem Tree.genBST_cost :
+    IsBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
+  open Lean.Order in
+  delta genBST
+  apply (fix_induct (motive := fun (g : Nat → Nat → SPMF.Cost (Tree Nat)) =>
+    ∀ lo hi, IsBounded (g lo hi) (fun t => 3 * t.size + 1)) _ ?admissible ?step)
+  case admissible =>
+    exact admissible_pi_apply _ fun _ => admissible_pi_apply _ fun _ => admissible_IsBounded _
+  case step =>
+    intro genBST_rec ih lo hi
+    rw [IsBounded_iff]
+    rintro ⟨t, n⟩ hmem
+    cost_support_simp at hmem
+    obtain ⟨_, rfl, rfl⟩ | ⟨_, m, hn, hmem⟩ := hmem
+    · simp [Tree.size]
+    · obtain ⟨rfl, rfl⟩ | ⟨x, n1, n2, ⟨⟨hxlo, hxhi⟩, hn1⟩, hmem, hm⟩ := hmem
+      · simp only [Tree.size]
+        omega
+      · obtain ⟨l, n3, n4, hl, hmem, hn2⟩ := hmem
+        obtain ⟨r, n5, n6, hr, ⟨rfl, hn6⟩, hn4⟩ := hmem
+        have hL : n3 ≤ 3 * l.size + 1 := ih lo (x - 1) (l, n3) hl
+        have hR : n5 ≤ 3 * r.size + 1 := ih (x + 1) hi (r, n5) hr
+        simp only [Tree.size]
+        omega
+
+theorem Tree.genWeightedBST_cost :
+    IsBounded (Tree.genWeightedBST lo hi) (fun t => 3 * t.size + 1) := by
+  open Lean.Order in
+  delta genWeightedBST
+  apply (fix_induct (motive := fun (g : Nat → Nat → SPMF.Cost (Tree Nat)) =>
+    ∀ lo hi, IsBounded (g lo hi) (fun t => 3 * t.size + 1)) _ ?admissible ?step)
+  case admissible =>
+    exact admissible_pi_apply _ fun _ => admissible_pi_apply _ fun _ => admissible_IsBounded _
+  case step =>
+    intro rec ih lo hi
+    rw [IsBounded_iff]
+    rintro ⟨t, n⟩ hmem
+    rw [SPMF.mem_support_dite_iff] at hmem
+    obtain ⟨_, hmem⟩ | ⟨_, hmem⟩ := hmem
+    · cost_support_simp at hmem
+      obtain ⟨rfl, rfl⟩ := hmem
+      simp [Tree.size]
+    · -- `Cost.mem_support_frequency` is an implication, not a simp lemma.
+      obtain ⟨w, g, m, hbr, hw, hmem, rfl⟩ := SPMF.Cost.mem_support_frequency hmem
+      simp only [List.mem_cons, List.not_mem_nil, or_false, Prod.mk.injEq] at hbr
+      obtain ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ := hbr
+      · cost_support_simp at hmem
+        obtain ⟨rfl, rfl⟩ := hmem
+        simp [Tree.size]
+      · cost_support_simp at hmem
+        obtain ⟨⟨⟨x, hxlo, hxhi⟩⟩, n1, n2, hn1, hmem, hm⟩ := hmem
+        obtain ⟨l, n3, n4, hl, hmem, hn2⟩ := hmem
+        obtain ⟨r, n5, n6, hr, ⟨rfl, hn6⟩, hn4⟩ := hmem
+        have hL : n3 ≤ 3 * l.size + 1 := ih lo (x - 1) (l, n3) hl
+        have hR : n5 ≤ 3 * r.size + 1 := ih (x + 1) hi (r, n5) hr
+        simp only [Tree.size]
+        omega
+
+instance {lo hi : Nat} : LawfulGenerator (Tree.genBST lo hi) (Tree.isBST lo hi)
+    (fun t => 3 * t.size + 1) where
+  support_iff := Tree.genBST_support
+  is_pmf := Tree.genBST_terminates
+  is_bounded := Tree.genBST_cost
 
 theorem Tree.genWeightedBST_support :
     t ∈ SPMF.support (Tree.genWeightedBST lo hi) ↔ Tree.isBST lo hi t := by
@@ -350,33 +496,11 @@ theorem Tree.genWeightedBST_support :
       simp
       grind
 
-theorem Tree.genWeightedBST_cost :
-    IsBounded (Tree.genWeightedBST lo hi) (fun t => 3 * t.size + 1) := by
-  open Lean.Order in
-  delta genWeightedBST
-  apply (fix_induct (motive := fun (g : Nat → Nat → SPMF.Cost (Tree Nat)) =>
-    ∀ lo hi, IsBounded (g lo hi) (fun t => 3 * t.size + 1)) _ ?admissible ?step)
-  case admissible =>
-    exact admissible_pi_apply _ fun _ => admissible_pi_apply _ fun _ => admissible_IsBounded _
-  case step =>
-    intro rec ih lo hi
-    simp [IsBounded_iff] at *
-    intro t n hn
-    grind [
-      size,
-      SPMF.Cost.mem_support_frequency,
-      SPMF.Cost.mem_support_bind_iff,
-      SPMF.Cost.mem_support_choose_iff,
-      SPMF.Cost.mem_support_pure_iff
-    ]
-
 instance {lo hi : Nat} : LawfulGenerator (Tree.genWeightedBST lo hi) (Tree.isBST lo hi)
     (fun t => 3 * t.size + 1) where
   support_iff := Tree.genWeightedBST_support
   is_pmf := Tree.genWeightedBST_terminates
   is_bounded := Tree.genWeightedBST_cost
-
-end weighted_termination
 
 /- `genBST` can be run in `IO`. -/
 #guard_msgs(drop info) in

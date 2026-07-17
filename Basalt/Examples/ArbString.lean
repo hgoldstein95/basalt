@@ -39,25 +39,15 @@ theorem String.arbitrary_support :
 -- except with calls to `List.arbitrary` / `Nat.arbitrary` replaced with
 -- `genCharList` / `Char.arbitrary` respectively
 theorem genCharList_terminates : SPMF.IsPMF genCharList := by
-  refine (SPMF.IsPMF_of_mass_fixpoint
-    (g := fun () => (genCharList : SPMF (List Char)))
-    (F := fun c => 1 / 2 + 1 / 2 * c)
-    ?bounds ?mass) ()
-  case bounds =>
-    intro c hle hge
-    apply ENNReal.eq_one_of_fixed_ineq' hle hge
-    intro hmono
-    rw [ENNReal.toReal_add (by norm_num) (by aesop), ENNReal.toReal_mul] at hmono
-    norm_num at hmono; linarith
-  case mass =>
-    intro () h
-    conv_lhs => rw [genCharList]
-    simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-    gcongr
-    apply SPMF.mass_bind_ge_of_isPMF Char.arbitrary_terminates
-    intro c
-    rw [SPMF.mass_bind_pure]
-    exact SPMF.mass_ge_iInf _ ()
+  -- Static seed, mean offspring 1/2: subcritical.
+  refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
+  rw [ENNReal.one_sub_half]
+  conv_rhs => rw [genCharList]
+  simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
+  gcongr
+  apply SPMF.mass_bind_ge_of_isPMF Char.arbitrary_terminates
+  intro c
+  rw [SPMF.mass_bind_pure]
 
 /-- `String.arbitrary` almost surely terminates -/
 theorem String.arbitrary_terminates : SPMF.IsPMF String.arbitrary := by
@@ -79,16 +69,18 @@ theorem genCharList_cost :
     apply admissible_IsBounded
   case step =>
     intro arbitrary_rec ih
-    simp [IsBounded_iff] at *
-    -- ∀ (c, cost) ∈ SPMF.support Char.arbitrary, cost ≤ 1
-    have := IsBounded_iff.mp Char.arbitrary_cost
-    intro xs c hxs
-    grind [
-      pick,
-      SPMF.Cost.mem_support_bind_iff,
-      SPMF.Cost.mem_support_choose_iff,
-      SPMF.Cost.mem_support_pure_iff
-    ]
+    rw [IsBounded_iff]
+    rintro ⟨cs, c⟩ hmem
+    cost_support_simp at hmem
+    obtain ⟨m, rfl, h | h⟩ := hmem
+    · obtain ⟨rfl, rfl⟩ := h
+      simp
+    · obtain ⟨ch, n1, n2, hch, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, hn2⟩, hm⟩ := h
+      have hhead : n1 ≤ 1 := IsBounded_iff.mp Char.arbitrary_cost (ch, n1) hch
+      have htail : n3 ≤ 2 * tl.length + 1 := ih (tl, n3) htl
+      show 1 + m ≤ 2 * (ch :: tl).length + 1
+      simp only [List.length_cons]
+      omega
 
 theorem String.arbitrary_cost :
     IsBounded String.arbitrary (fun s => 2 * s.length + 1) := by
