@@ -22,7 +22,7 @@ import Basalt.GenStats.Command
 /-!
 # A Coinductive Model for Generators
 
-This file presents a formal definiton of PBT generators that allows for first-class coinductive
+This file presents a formal definition of PBT generators that allows for first-class coinductive
 fixed points.
 
 ## Background
@@ -36,14 +36,14 @@ Hughes, 2000) defines generators as:
 def Gen α := Seed → α
 ```
 This was the original "monadic" generator formulation (it uses a splittable RNG to define the monad
-operations), and it works quite well operationally. However, this reprentation is a nightmare to
+operations), and it works quite well operationally. However, this representation is a nightmare to
 work with formally: any proofs about generators needs to reason explicitly about the mapping from
 seeds to values. This representation also has the downside that important equivalences (e.g., the
 monad laws) don't hold definitionally; they require a different definition of "distributional
 equivalence."
 
 ### QuickChick
-The first formalized representation of generaotrs comes from QuickChick (Paraskevopoulou et al.,
+The first formalized representation of generators comes from QuickChick (Paraskevopoulou et al.,
 2015). In QuickChick, generators are still defined as above, but now the randomness is idealized and
 axiomatized. The actual type that the authors use in most of their proofs is:
 ```
@@ -54,7 +54,7 @@ of values that can be produced by the generator. Representing generators based o
 significant advantages for proofs, including the fact that the monad laws are true definitionally.
 
 One downside of QuickChick's representation is that generators are required to terminate on all
-paths, since generators are expressed as Rocq functions and Rocq that all functions terminate. The
+paths, since generators are expressed as Rocq functions and Rocq requires that all functions terminate. The
 authors get around this by adding a fuel parameter, allowing generators to fail if they run out of
 fuel, but this is messy and makes it difficult to talk about termination as a first-class concept.
 

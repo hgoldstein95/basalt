@@ -31,8 +31,7 @@ end SPMF
 namespace SPMF.Cost
 
 instance instInhabited : Inhabited (SPMF.Cost α) where
-  -- Note: default value for `SPMF.Cost` is just the constant
-  -- function returning 0
+  -- default = ⊥, the empty-support SPMF
   default := @Bot.bot (SPMF (α × Nat)) _
 
 noncomputable instance instMonad : Monad SPMF.Cost where
