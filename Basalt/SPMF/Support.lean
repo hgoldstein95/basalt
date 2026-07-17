@@ -27,6 +27,12 @@ def support (p : SPMF α) : Set α := Function.support p
 
 theorem mem_support_iff (p : SPMF α) (a : α) : a ∈ p.support ↔ p a ≠ 0 := Iff.rfl
 
+/-- `SPMF.bind` is the monad's `>>=`. -/
+theorem bind_eq (x : SPMF α) (f : α → SPMF β) : x.bind f = x >>= f := rfl
+
+/-- `SPMF.pure` is the monad's `pure`. -/
+theorem pure_eq (a : α) : (SPMF.pure a : SPMF α) = Pure.pure a := rfl
+
 @[simp]
 theorem support_countable (p : SPMF α) : p.support.Countable :=
   Summable.countable_support_ennreal (tsum_coe_ne_top p)
@@ -65,8 +71,8 @@ theorem support_bind
 theorem mem_support_bind_iff
     {x : SPMF α}
     {f : α → SPMF β} :
-    b ∈ (bind x f).support ↔ ∃ a ∈ x.support, b ∈ (f a).support := by
-  simp [support, Function.mem_support, SPMF.bind, DFunLike.coe]
+    b ∈ (x >>= f).support ↔ ∃ a ∈ x.support, b ∈ (f a).support := by
+  simp [support_bind]
 
 @[simp]
 theorem support_pure :
@@ -86,8 +92,8 @@ theorem support_pure :
 
 @[simp]
 theorem mem_support_pure_iff :
-    b ∈ (pure a).support ↔ b = a := by
-  simp [support, Function.mem_support, SPMF.pure, DFunLike.coe]
+    b ∈ (Pure.pure a : SPMF α).support ↔ b = a := by
+  simp [support_pure]
 
 @[simp]
 theorem support_map
@@ -152,6 +158,17 @@ theorem mem_support_pick_iff
     {x y : SPMF α} :
     a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
   simp
+
+@[simp]
+theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
+    n ∈ (chooseNat lo hi h : SPMF Nat).support ↔ lo ≤ n ∧ n ≤ hi := by
+  unfold chooseNat
+  simp only [mem_support_map_iff, mem_support_choose_iff, true_and]
+  constructor
+  · rintro ⟨a, rfl⟩
+    exact a.down.property
+  · rintro ⟨h1, h2⟩
+    exact ⟨⟨⟨n, h1, h2⟩⟩, rfl⟩
 
 /-- The support of `vectorOf n g` is the set of all length-`n` list where
     each element is in `g`'s support -/
@@ -320,7 +337,7 @@ theorem support_elements
       assumption
     have h_lt : i < xs.length := by omega
     dsimp at ha
-    simp [Pure.pure] at ha
+    simp only [mem_support_pure_iff] at ha
     apply List.mem_of_getElem (id (Eq.symm ha))
   . -- a ∈ xs → ∃ i ≤ xs.length - 1, a = xs[i]?.getD default
     intro hmem
@@ -333,7 +350,7 @@ theorem support_elements
         rw [← heq]
         apply List.getElem?_eq_getElem hlt
       dsimp
-      simp [Pure.pure]
+      simp only [mem_support_pure_iff]
       apply (Eq.symm heq)
 
 /-- `a` is in the support of `elements xs` if and only if `a ∈ xs` -/
@@ -437,40 +454,92 @@ theorem frequencySelect_mem [Gen G]
       . -- 0 < w' ∧ frequencySelect tl (n - w) = g'
         constructor <;> assumption
 
-/-- If a weighted generator `(w, g) ∈ gs` where the weight `w` is non-zero,
-    then there exists `n` with a proof `h : n < sum (fst <$> gs)` such that
-    `frequencySelect gs n h = g ()` -/
-private theorem frequencySelect_n_exists
-    {gs : List (Nat × (Unit → SPMF α))}
-    {w : Nat}
-    {g : Unit → SPMF α}
-    (hmem : (w, g) ∈ gs)
-    (hnonzero : 0 < w) :
-    ∃ n, ∃ h : n < List.sum (List.map Prod.fst gs), Helpers.frequencySelect gs n h = g () := by
+/-- Summing `frequencySelect` over all values of the uniform draw counts each branch
+    `(w, g)` exactly `w` times. -/
+private theorem sum_frequencySelect_apply
+    (gs : List (Nat × (Unit → SPMF α))) (a : α) :
+    ∑ n ∈ Finset.range ((gs.map Prod.fst).sum),
+        (if h : n < (gs.map Prod.fst).sum then Helpers.frequencySelect gs n h a else 0)
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum := by
   induction gs with
-  | nil => contradiction
+  | nil => simp
   | cons hd tl ih =>
-    rcases List.mem_cons.mp hmem with rfl | h_tl
-    · -- hd = (w, g)
-      refine ⟨0, ?_, ?_⟩
-      · dsimp only [List.map_cons, List.sum_cons]
-        omega
-      · unfold Helpers.frequencySelect
-        simp [hnonzero]
-    · -- (w, g) ∈ tl
-      obtain ⟨n, h_n, h_eq⟩ := ih h_tl
-      obtain ⟨ w', _ ⟩ := hd
-      refine ⟨w' + n, ?_, ?_⟩
-      · -- w' + n < (fst <$> gs).sum
-        dsimp only [List.map_cons, List.sum_cons]
-        omega
-      · -- frequencySelect gs n h = g ()
-        unfold Helpers.frequencySelect
-        have hcontra : ¬ (w' + n < w') := by omega
-        simp only [hcontra]
-        simp only [show w' + n - w' = n from by omega]
-        dsimp
-        assumption
+    obtain ⟨k, g⟩ := hd
+    have hS : ((((k, g) :: tl).map Prod.fst).sum) = k + (tl.map Prod.fst).sum := by simp
+    -- Rewriting the summand to a total function of `n` first keeps the range split below
+    -- from having to transport the `frequencySelect` proof arguments.
+    have hsummand : ∀ n ∈ Finset.range ((((k, g) :: tl).map Prod.fst).sum),
+        (if h : n < (((k, g) :: tl).map Prod.fst).sum
+          then Helpers.frequencySelect ((k, g) :: tl) n h a else 0)
+          = if n < k then g () a
+            else (if h : n - k < (tl.map Prod.fst).sum
+                  then Helpers.frequencySelect tl (n - k) h a else 0) := by
+      intro n hn
+      have hn' : n < (((k, g) :: tl).map Prod.fst).sum := Finset.mem_range.mp hn
+      rw [dif_pos hn']
+      simp only [Helpers.frequencySelect]
+      by_cases hlt : n < k
+      · rw [dif_pos hlt, if_pos hlt]
+      · rw [dif_neg hlt, if_neg hlt, dif_pos (by omega)]
+    rw [Finset.sum_congr rfl hsummand, hS]
+    rw [Finset.range_eq_Ico,
+      ← Finset.sum_Ico_consecutive _ (Nat.zero_le k) (Nat.le_add_right k _)]
+    have hfirst : ∑ n ∈ Finset.Ico 0 k,
+        (if n < k then g () a
+          else (if h : n - k < (tl.map Prod.fst).sum
+                then Helpers.frequencySelect tl (n - k) h a else 0))
+          = (k : ℝ≥0∞) * g () a := by
+      rw [Finset.sum_congr rfl (fun n hn => if_pos (Finset.mem_Ico.mp hn).2),
+        Finset.sum_const, Nat.card_Ico, Nat.sub_zero, nsmul_eq_mul]
+    have hsecond : ∑ n ∈ Finset.Ico k (k + (tl.map Prod.fst).sum),
+        (if n < k then g () a
+          else (if h : n - k < (tl.map Prod.fst).sum
+                then Helpers.frequencySelect tl (n - k) h a else 0))
+          = (tl.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum := by
+      rw [Finset.sum_Ico_eq_sum_range,
+        show k + (tl.map Prod.fst).sum - k = (tl.map Prod.fst).sum from by omega]
+      have h2 : ∀ n ∈ Finset.range ((tl.map Prod.fst).sum),
+          (if k + n < k then g () a
+            else (if h : k + n - k < (tl.map Prod.fst).sum
+                  then Helpers.frequencySelect tl (k + n - k) h a else 0))
+            = (if h : n < (tl.map Prod.fst).sum
+                then Helpers.frequencySelect tl n h a else 0) := by
+        intro n _
+        rw [if_neg (by omega)]
+        simp only [Nat.add_sub_cancel_left]
+      rw [Finset.sum_congr rfl h2]
+      exact ih
+    rw [hfirst, hsecond]
+    simp
+
+/-- Branch `j` of `frequency` fires with probability `wⱼ / Σᵢ wᵢ`.
+
+    The sums are `List.sum`s, not `Finset` sums: duplicate `(weight, generator)` pairs are
+    distinct branches, and a `Finset` sum would collapse them. -/
+@[simp]
+theorem frequency_apply
+    (gs : List (Nat × (Unit → SPMF α))) (h : 0 < (gs.map Prod.fst).sum) (a : α) :
+    frequency gs h a
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum / ((gs.map Prod.fst).sum : ℝ≥0∞) := by
+  unfold frequency Helpers.frequencyAux
+  rw [bind_map_left, bind_apply]
+  simp only [choose_apply, apply_dite (fun p : SPMF α => p a), default_apply]
+  trans (∑ n ∈ Finset.Icc 0 ((gs.map Prod.fst).sum - 1),
+      (fun n : Nat => (1 / (((gs.map Prod.fst).sum - 1 - 0 + 1 : ℕ) : ℝ≥0∞)) *
+        (if hn : n < (gs.map Prod.fst).sum
+          then Helpers.frequencySelect gs n hn a else 0)) n)
+  · exact tsum_subtype_Icc 0 ((gs.map Prod.fst).sum - 1)
+      (fun n : Nat => (1 / (((gs.map Prod.fst).sum - 1 - 0 + 1 : ℕ) : ℝ≥0∞)) *
+        (if hn : n < (gs.map Prod.fst).sum
+          then Helpers.frequencySelect gs n hn a else 0))
+  · have hIcc : Finset.Icc 0 ((gs.map Prod.fst).sum - 1)
+        = Finset.range ((gs.map Prod.fst).sum) := by
+      ext n
+      simp only [Finset.mem_Icc, Finset.mem_range]
+      omega
+    have hT : (gs.map Prod.fst).sum - 1 - 0 + 1 = (gs.map Prod.fst).sum := by omega
+    rw [hIcc, hT, ← Finset.mul_sum, sum_frequencySelect_apply, one_div,
+      div_eq_mul_inv, mul_comm]
 
 /-- If the sum of weights in `gs` is non-zero, then the support of `frequency gs`
     is exactly the union of the support of the generators in `gs` with non-zero weights -/
@@ -480,40 +549,20 @@ theorem support_frequency
     (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
     support (frequency gs h_pos) = {a | ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support} := by
   ext a
-  dsimp only [Set.mem_setOf_eq]
-  constructor
-  · -- a ∈ support (frequency gs h_pos) -> ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support
-    intro h
-    simp only [frequency, Helpers.frequencyAux, support_bind, support_map, support_choose,
-      mem_support_dite_iff] at h
-    obtain ⟨i, h_idx, (⟨hlt, hsupp⟩ | ⟨hn, _⟩)⟩ := h
-    · -- i < sum of weights ∧ a ∈ frequencySelect.support
-      obtain ⟨w, g, hwg, hwg_pos, heq⟩ := frequencySelect_mem hlt
-      rw [heq] at hsupp
-      exists w, g
-    ·  -- ¬(i < sum of weights) ∧ a ∈ default.support
-      -- Contradiction: We have `i ≤ total - 1` and also `¬(i < total)` as hypotheses
-      obtain ⟨n, ⟨_, h_upper⟩, hi⟩ := h_idx
-      rw [← hi] at *
-      contradiction
-  · -- ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support -> a ∈ support (frequency gs h_pos)
-    simp only [frequency, Helpers.frequencyAux, support_bind, support_map, support_choose,
-      mem_support_dite_iff]
-    intro ⟨w, g, hwg_mem, hwt, ha⟩
-    obtain ⟨n, hlt, heq⟩ := frequencySelect_n_exists hwg_mem hwt
-    have hle : n ≤ (List.map Prod.fst gs).sum - 1 := by omega
-    refine ⟨⟨ n, ⟨ by omega, hle ⟩ ⟩, ?_, ?_⟩
-    . dsimp
-      refine ⟨ ⟨ n, ⟨ by omega, hle ⟩ ⟩, ?_, ?_ ⟩
-      . -- 0 ≤ n ∧ n ≤ (fst <$> gs).sum - 1
-        apply Set.mem_univ
-      . rfl
-    . -- Goal: `a ∈ frequencySelect.support ∨ a ∈ default.support`
-      -- (We pick the left branch)
-      left
-      exists hlt
-      rw [heq]
-      assumption
+  rw [mem_support_iff, frequency_apply gs h_pos a, Set.mem_setOf_eq, ne_eq,
+    ENNReal.div_eq_zero_iff]
+  simp only [ENNReal.natCast_ne_top, or_false, List.sum_eq_zero_iff, List.forall_mem_map,
+    mul_eq_zero, Nat.cast_eq_zero, not_forall, Prod.exists, mem_support_iff,
+    Nat.pos_iff_ne_zero]
+  grind
+
+/-- Membership form of `support_frequency`. -/
+@[simp]
+theorem mem_support_frequency_iff
+    {gs : List (Nat × (Unit → SPMF α))}
+    (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
+    a ∈ (frequency gs h_pos).support ↔ ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support := by
+  simp [support_frequency]
 
 theorem bind_congr_support
     {x : SPMF α}

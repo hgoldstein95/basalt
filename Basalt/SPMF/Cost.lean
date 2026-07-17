@@ -92,8 +92,8 @@ section support
 @[simp]
 theorem mem_support_pure_iff {a b : α} {n : Nat} :
     (b, n) ∈ (Pure.pure a : SPMF.Cost α).support ↔ b = a ∧ n = 0 := by
-  have : (Pure.pure a : SPMF.Cost α) = (SPMF.pure (a, 0) : SPMF _) := rfl
-  simp [this, SPMF.mem_support_pure_iff, Prod.mk.injEq]
+  have : (Pure.pure a : SPMF.Cost α) = (Pure.pure (a, 0) : SPMF _) := rfl
+  simp [this, Prod.mk.injEq]
 
 @[simp]
 theorem mem_support_bind_iff
@@ -103,9 +103,10 @@ theorem mem_support_bind_iff
   have : (m >>= f : SPMF.Cost β) =
       SPMF.bind m fun pair =>
         SPMF.bind (f pair.1) fun pair2 =>
-          (SPMF.pure (pair2.1, pair.2 + pair2.2) : SPMF _) := rfl
+          SPMF.pure (pair2.1, pair.2 + pair2.2) := rfl
   rw [this]
-  simp only [SPMF.mem_support_bind_iff, SPMF.mem_support_pure_iff, Prod.mk.injEq]
+  simp only [SPMF.bind_eq, SPMF.pure_eq, SPMF.mem_support_bind_iff, SPMF.mem_support_pure_iff,
+    Prod.mk.injEq]
   constructor
   · rintro ⟨⟨a, n1⟩, hmem1, ⟨b', n2⟩, hmem2, rfl, h_n⟩
     exact ⟨a, n1, n2, hmem1, hmem2, h_n⟩
@@ -118,15 +119,82 @@ theorem mem_support_choose_iff
     (n, c) ∈ (choose lo hi h : SPMF.Cost (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})).support ↔ c = 1 := by
   have : (choose lo hi h : SPMF.Cost (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) =
       SPMF.bind (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi}))
-        fun k => (SPMF.pure (k, 1) : SPMF _) := rfl
+        fun k => SPMF.pure (k, 1) := rfl
   rw [this]
-  simp only [SPMF.mem_support_bind_iff, SPMF.mem_support_choose_iff,
+  simp only [SPMF.bind_eq, SPMF.pure_eq, SPMF.mem_support_bind_iff, SPMF.mem_support_choose_iff,
              SPMF.mem_support_pure_iff, Prod.mk.injEq, true_and]
   constructor
   · rintro ⟨k, rfl, rfl⟩
     rfl
   · rintro rfl
     exact ⟨n, rfl, rfl⟩
+
+@[simp]
+theorem mem_support_map_iff {m : SPMF.Cost α} {f : α → β} {b : β} {n : Nat} :
+    (b, n) ∈ (f <$> m).support ↔ ∃ a, (a, n) ∈ m.support ∧ b = f a := by
+  have : (f <$> m : SPMF.Cost β) = m >>= fun a => Pure.pure (f a) := rfl
+  rw [this]
+  simp only [mem_support_bind_iff, mem_support_pure_iff]
+  constructor
+  · rintro ⟨a, n1, n2, hmem, ⟨rfl, rfl⟩, rfl⟩
+    exact ⟨a, by simpa using hmem, rfl⟩
+  · rintro ⟨a, hmem, rfl⟩
+    exact ⟨a, n, 0, hmem, ⟨rfl, rfl⟩, rfl⟩
+
+/-- Support inversion for `pick` at the cost interpretation: a branch draw plus one choice. -/
+@[simp]
+theorem mem_support_pick_iff {x y : Unit → SPMF.Cost α} {a : α} {n : Nat} :
+    (a, n) ∈ (pick x y).support ↔
+      ∃ m, n = 1 + m ∧ ((a, m) ∈ (x ()).support ∨ (a, m) ∈ (y ()).support) := by
+  unfold RandomChoice.pick
+  simp only [SPMF.Cost.mem_support_bind_iff, SPMF.Cost.mem_support_choose_iff]
+  constructor
+  · rintro ⟨k, n1, n2, h1, h2, rfl⟩
+    subst h1
+    refine ⟨n2, rfl, ?_⟩
+    rcases Nat.le_one_iff_eq_zero_or_eq_one.mp k.down.property.2 with h0 | h1
+    · left; simpa [h0] using h2
+    · right
+      have : (k.down.val == 0) = false := by simp [h1]
+      simpa [this] using h2
+  · rintro ⟨m, rfl, h | h⟩
+    · exact ⟨⟨⟨0, by omega⟩⟩, 1, m, rfl, by simpa using h, rfl⟩
+    · exact ⟨⟨⟨1, by omega⟩⟩, 1, m, rfl, by simpa using h, rfl⟩
+
+@[simp]
+theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n c : Nat} :
+    (n, c) ∈ (chooseNat lo hi h : SPMF.Cost Nat).support ↔ (lo ≤ n ∧ n ≤ hi) ∧ c = 1 := by
+  unfold chooseNat
+  simp only [mem_support_map_iff, mem_support_choose_iff]
+  constructor
+  · rintro ⟨a, rfl, rfl⟩
+    exact ⟨a.down.property, rfl⟩
+  · rintro ⟨⟨h1, h2⟩, rfl⟩
+    exact ⟨⟨⟨n, h1, h2⟩⟩, rfl, rfl⟩
+
+/-- Support inversion for `frequency` at the cost interpretation: a draw from `frequency gs`
+  is a draw from one of its positive-weight branches, plus exactly one choice (the branch
+  selection). The cost-side counterpart of `SPMF.support_frequency`. -/
+theorem mem_support_frequency
+    {gs : List (Nat × (Unit → SPMF.Cost α))}
+    {hne : 0 < (List.map Prod.fst gs).sum}
+    {a : α} {n : Nat}
+    (hmem : (a, n) ∈ (frequency gs hne).support) :
+    ∃ w g m, (w, g) ∈ gs ∧ 0 < w ∧ (a, m) ∈ (g ()).support ∧ n = m + 1 := by
+  unfold frequency Helpers.frequencyAux at hmem
+  rw [mem_support_bind_iff] at hmem
+  obtain ⟨v, n1, n2, hchoose, hrest, rfl⟩ := hmem
+  rw [mem_support_map_iff] at hchoose
+  obtain ⟨u, hu, rfl⟩ := hchoose
+  rw [mem_support_choose_iff] at hu
+  subst hu
+  obtain ⟨⟨x, hx0, hxle⟩⟩ := u
+  simp only at hrest
+  have hlt : x < (List.map Prod.fst gs).sum := by omega
+  rw [dif_pos hlt] at hrest
+  obtain ⟨w, g, hwg, hw, heq⟩ := SPMF.frequencySelect_mem hlt
+  rw [heq] at hrest
+  exact ⟨w, g, n2, hwg, hw, hrest, by omega⟩
 
 end support
 
@@ -178,11 +246,13 @@ theorem IsBounded_bind
     IsBounded (x >>= f) c := by
   simp_all only [IsBounded_iff]
   intro (b, nb) hb
-  simp only [bind, SPMF.mem_support_bind_iff, SPMF.mem_support_pure_iff] at hb
-  replace ⟨(a, na), ha, ⟨(b, nb), hb, h⟩⟩ := hb
-  cases h
-  simp_all
-  grind
+  simp only [SPMF.Cost.mem_support_bind_iff] at hb
+  obtain ⟨a, n1, n2, ha, hb2, rfl⟩ := hb
+  have h1 : n1 ≤ cx a := hx (a, n1) ha
+  have h2 : n2 ≤ cf a b := hf a (b, n2) hb2
+  have h3 : cx a + cf a b ≤ c b := hg (a, n1) ha (b, n2) hb2
+  show n1 + n2 ≤ c b
+  omega
 
 -- We add this lemma to make it easier to reason about generators that use `<$>`
 theorem IsBounded_map
@@ -460,20 +530,16 @@ theorem IsBounded_listOf
     apply admissible_IsBounded
   case step =>
     intro arbitrary_rec ih
-    simp [IsBounded_iff] at ih ⊢
-    have hg : ∀ p ∈ SPMF.support g, p.2 ≤ cost_g p.1 := by
-      apply IsBounded_iff.mp
-      assumption
-    intro xs c hxs
-    simp [pick, SPMF.Cost.mem_support_bind_iff, SPMF.Cost.mem_support_choose_iff, SPMF.Cost.mem_support_pure_iff] at hxs
-    obtain ⟨a, ha1, x, (⟨heq0, rfl, rfl⟩ | ⟨hne, hd, n1, hg_mem, x1, ⟨tl, htl, rfl⟩, rfl⟩), rfl⟩ := hxs
-    · omega
-    · have htail : x1 ≤ 2 * tl.length + (List.map cost_g tl).sum + 1 := by
-        apply ih
-        assumption
-      have hhead : (hd, n1).2 ≤ cost_g (hd, n1).1 := by
-        apply hg
-        assumption
-      simp only [List.length_cons] at *
-      dsimp
+    rw [IsBounded_iff] at ih ⊢
+    rintro ⟨xs, c⟩ hxs
+    simp only [SPMF.Cost.mem_support_pick_iff, SPMF.Cost.mem_support_bind_iff,
+      SPMF.Cost.mem_support_pure_iff] at hxs
+    obtain ⟨m, rfl, h | h⟩ := hxs
+    · obtain ⟨rfl, rfl⟩ := h
+      simp
+    · obtain ⟨hd, n1, n2, hhd, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, hn2⟩, hm⟩ := h
+      have hhead : n1 ≤ cost_g hd := IsBounded_iff.mp hx (hd, n1) hhd
+      have htail : n3 ≤ 2 * tl.length + (List.map cost_g tl).sum + 1 := ih (tl, n3) htl
+      show 1 + m ≤ 2 * (hd :: tl).length + (List.map cost_g (hd :: tl)).sum + 1
+      simp only [List.length_cons, List.map_cons, List.sum_cons]
       omega
