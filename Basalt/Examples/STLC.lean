@@ -149,6 +149,8 @@ theorem genType_cost : IsBounded (genType (G := SPMF.Cost)) (fun τ => τ.size) 
       simp only [Ty.size]
       omega
 
+-- Note that there is no predicate constraining the random types produced by `genType` here,
+-- so we just instantitate the predicate with `⊤`
 instance : LawfulGenerator genType ⊤ (fun τ => τ.size) where
   support_iff := by simp [genType_support]
   is_pmf := genType_terminates
@@ -238,7 +240,11 @@ theorem varsWithType_sound :
 
 
 /-- Generates a well-typed term of a particular `depth`,
-    at type `τ` in context `Γ` -/
+    at type `τ` in context `Γ`.
+
+    TODO: this recurses on `depth`, but ideally we'd like to
+    rewrite this using `partial_fixpoint` instead in order to have a
+    `LawfulGenerator` instance for `genTerm`. -/
 def genTerm [Gen G] (Γ : Ctx) (depth : Nat) (τ : Ty) : G Term :=
   match depth with
   | 0 =>
