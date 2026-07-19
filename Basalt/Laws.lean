@@ -53,3 +53,39 @@ def IsFilterFree (g : SPMF (Option α)) : Prop :=
   that rejection sampling is safe. -/
 def IsProductive (g : SPMF (Option α)) : Prop :=
   0 < SPMF.massSome g
+
+/-- A single reachable outcome makes a generator productive. `massSome` is a sum over *all* successes,
+  so a lower bound needs only one of them — this is the cheap route to `IsProductive`, and the reason
+  productivity is a much weaker ask than filter-freedom. -/
+theorem IsProductive_of_apply_pos {g : SPMF (Option α)} {a : α} (h : 0 < g (some a)) :
+    IsProductive g :=
+  lt_of_lt_of_le h (ENNReal.le_tsum a)
+
+/-- `IsProductive` from support membership — the form a `support` characterization hands you
+  directly, so exhibiting one value the generator can produce discharges it. -/
+theorem IsProductive_of_mem_support {g : SPMF (Option α)} {a : α}
+    (h : some a ∈ SPMF.support g) : IsProductive g :=
+  IsProductive_of_apply_pos ((SPMF.apply_pos_iff g (some a)).mpr h)
+
+/-- Filter-freedom is strictly stronger than productivity. -/
+theorem IsProductive_of_IsFilterFree {g : SPMF (Option α)} (h : IsFilterFree g) :
+    IsProductive g := by
+  rw [IsProductive, h]; exact zero_lt_one
+
+/-- For an almost-surely-terminating generator, filter-freedom is exactly "never *explicitly* fails".
+  This is the form worth proving: `massNone` is a single value of `g`, whereas `massSome` is a sum
+  over the whole success set. The hypothesis is what separates the two failure modes — without
+  `mass = 1`, missing mass could be divergence rather than filtering. -/
+theorem IsFilterFree_iff_massNone_eq_zero {g : SPMF (Option α)} (hmass : g.mass = 1) :
+    IsFilterFree g ↔ SPMF.massNone g = 0 := by
+  have hsplit := SPMF.mass_split g
+  rw [hmass] at hsplit
+  constructor
+  · intro h
+    rw [IsFilterFree] at h
+    rw [h] at hsplit
+    have hsplit' : (1 : ENNReal) + 0 = 1 + SPMF.massNone g := by simpa using hsplit
+    exact ((ENNReal.add_right_inj (by finiteness)).mp hsplit').symm
+  · intro h
+    rw [h, add_zero] at hsplit
+    exact hsplit.symm
