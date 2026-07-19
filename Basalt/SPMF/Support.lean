@@ -442,7 +442,7 @@ theorem frequencySelect_mem [Gen G]
         . rfl
     · -- n >= w
       have h_remaining_weight : n - w < List.sum (List.map Prod.fst tl) := by
-        dsimp only [List.map_cons, List.sum_cons] at h
+        simp only [List.map_cons, List.sum_cons] at h
         omega
       obtain ⟨w', g', hwg_mem, hwg_pos, hwg_eq⟩ := ih h_remaining_weight
       exists w', g'

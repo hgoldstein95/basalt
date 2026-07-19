@@ -45,7 +45,7 @@ tunable def Tree.genWeightedBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
         let l ← Tree.genWeightedBST lo (x.down.val - 1)
         let r ← Tree.genWeightedBST (x.down.val + 1) hi
         return node l x.down.val r)
-    ] (by dsimp; omega)
+    ] (by simp)
 partial_fixpoint
 
 theorem Tree.genBST_support :

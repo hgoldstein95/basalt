@@ -87,7 +87,7 @@ def genWeightedTree [Gen G] : G Tree :=
       let l ← genWeightedTree
       let r ← genWeightedTree
       return .node l 2 r)
-  ] (by dsimp; omega)
+  ] (by simp)
 partial_fixpoint
 
 theorem genWeightedTree_terminates : SPMF.IsPMF genWeightedTree := by

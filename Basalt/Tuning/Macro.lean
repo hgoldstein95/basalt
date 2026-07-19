@@ -19,7 +19,7 @@ tunable def genBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
   else frequency [
     (1, fun _ => pure leaf),
     (5, fun _ => do … genBST … genBST …)
-  ] (by dsimp; omega)
+  ] (by simp)
 partial_fixpoint
 ```
 
@@ -212,7 +212,10 @@ where
     let newListLit := listLit.setArg 1 (.node (listLit[1].getHeadInfo) nullKind recElems)
     -- the positivity proof must hold for every θ; cite `Tuning.weight_pos` for
     -- the site's first branch (one positive summand suffices)
-    let proofTerm ← `((by dsimp; have := Tuning.weight_pos $θ $(quote offset) $dTerm; omega))
+    let proofTerm ← `((by
+      simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]
+      have := Tuning.weight_pos $θ $(quote offset) $dTerm
+      omega))
     return .node info ``Lean.Parser.Term.app
       #[app[0], .node (argsNode.getHeadInfo) nullKind #[newListLit, proofTerm.raw]]
 

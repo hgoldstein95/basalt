@@ -347,7 +347,7 @@ theorem IsBounded_vectorOf
     have hys_cost : (ys, ys_cost).2 ≤ (cost_g <$> (ys, ys_cost).1).sum := by
       apply IH
       assumption
-    simp only [Functor.map] at *
+    simp only [Functor.map, List.map_cons, List.sum_cons] at *
     omega
 
 /-- The cost function here is 1 more than the cost of `vectorOf`, because

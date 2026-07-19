@@ -103,19 +103,8 @@ theorem mass_bind_pure {x : SPMF α} {f : α → β} :
 @[simp]
 theorem mass_map {x : SPMF α} {f : α → β} :
     (f <$> x).mass = x.mass := by
-  classical
-  unfold mass
-  simp only [Functor.map, bind, pure, DFunLike.coe, Function.comp_apply]
-  rw [ENNReal.tsum_comm]
-  congr 1
-  ext a
-  rw [tsum_eq_single (f a)]
-  · simp
-  · intro b hb
-    simp only [mul_ite, mul_one, mul_zero]
-    split_ifs with heq
-    · simp_all
-    · rfl
+  rw [map_eq_pure_bind]
+  exact mass_bind_pure
 
 @[simp]
 theorem mass_chooseNat (lo hi : Nat) (h : lo ≤ hi) :

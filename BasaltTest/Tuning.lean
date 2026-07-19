@@ -134,7 +134,7 @@ tunable def genTree [Gen G] (depth : Nat) : G (BST.Tree Nat) :=
       let l ← genTree (depth + 1)
       let r ← genTree (depth + 1)
       return .node l 0 r)
-  ] (by dsimp; omega)
+  ] (by simp)
 partial_fixpoint
 
 /-- The site override names the site; one site, holes `#[0, 2]`. -/
@@ -216,7 +216,7 @@ tunable def genZero [Gen G] : G Nat := do
   frequency [
     (0, fun _ => pure 0),
     (1, fun _ => pure 1)
-  ] (by dsimp; omega)
+  ] (by simp)
 
 /-! Zero entries in a *runtime* `θ` cannot break support either: they read as
 weight `1` (`Tuning.weight` clamps), so the generator is total in `θ`. -/
