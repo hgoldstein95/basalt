@@ -34,6 +34,12 @@ generator may have. Which of them apply depends on the generator.
 def IsSoundAndComplete (g : SPMF α) (P : α → Prop) : Prop :=
   ∀ a, a ∈ SPMF.support g ↔ P a
 
+/-- Soundness and completeness transfers along a support equation. -/
+theorem IsSoundAndComplete.of_support_eq {g g' : SPMF α} {P : α → Prop}
+    (h : SPMF.support g' = SPMF.support g) (hg : IsSoundAndComplete g P) :
+    IsSoundAndComplete g' P :=
+  fun a => (h ▸ Iff.rfl : a ∈ SPMF.support g' ↔ a ∈ SPMF.support g).trans (hg a)
+
 /-- We say that a generator `g` `IsAlmostSurelyTerminating` if, when
   interpreted as an `SPMF`, its mass sums to 1 (i.e., it is a true `PMF`). -/
 def IsAlmostSurelyTerminating (g : SPMF α) : Prop :=

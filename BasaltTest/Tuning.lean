@@ -229,3 +229,35 @@ example (depth d : Nat) :
   rcases d with _ | _ | d <;> simp
 
 end TunableExamples
+
+section ReweightObligation
+
+variable {α : Type}
+
+-- Reweighting a uniform choice: `oneOf` to `frequency`, the shape `derive_tuning` rewrites.
+example (gs : List (Unit → SPMF α)) (gs' : List (Nat × (Unit → SPMF α)))
+    (hsnd : gs'.map Prod.snd = gs) (hpos : ∀ p ∈ gs', 0 < p.1)
+    (hne : gs ≠ []) (h' : 0 < List.sum (List.map Prod.fst gs')) :
+    SPMF.support (frequency gs' h') = SPMF.support (oneOf gs hne) :=
+  SPMF.support_frequency_reweight hsnd hpos hne h'
+
+-- Changing weights in place: `frequency` to `frequency`, the shape `tunable def` rewrites.
+example (gs gs' : List (Nat × (Unit → SPMF α)))
+    (hsnd : gs'.map Prod.snd = gs.map Prod.snd)
+    (hpos : ∀ p ∈ gs', 0 < p.1) (hpos' : ∀ p ∈ gs, 0 < p.1)
+    (h : 0 < List.sum (List.map Prod.fst gs)) (h' : 0 < List.sum (List.map Prod.fst gs')) :
+    SPMF.support (frequency gs' h') = SPMF.support (frequency gs h) :=
+  SPMF.support_frequency_congr_weights hsnd hpos hpos' h h'
+
+-- `Tuning.weight` satisfies the positivity hypothesis unconditionally, for every `θ` and depth —
+-- there is no tuning a user can supply that fails it.
+example (θ : Tuning) (i d : Nat) : 0 < θ.weight i d := Tuning.weight_pos θ i d
+
+-- And given a `tuned_support`, the law transfers in one application. This is
+-- `genFoo.tuned_sound_complete`, on whichever side emits it.
+example {g g' : SPMF α} {P : α → Prop}
+    (tuned_support : SPMF.support g' = SPMF.support g) (sound_complete : IsSoundAndComplete g P) :
+    IsSoundAndComplete g' P :=
+  IsSoundAndComplete.of_support_eq tuned_support sound_complete
+
+end ReweightObligation
