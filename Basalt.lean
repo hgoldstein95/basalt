@@ -16,12 +16,12 @@ generators (e.g., via classical program synthesis or LLM automation), this libra
 foundation.
 
 Generator writers should look at the `Gen` module to see the operations available in generators. For
-proving generators correct, look at `LawfulGen` and the examples in `BasaltExamples/`.
+proving generators correct, look at `Basalt.Laws` and the examples in `BasaltExamples/`.
 
 ## Main Definitions
 
 - `SPMF` — A type of sub-probability mass functions.
 - `RandomChoice` — A type class capturing random choices.
 - `Gen` — A type class capturing all of the operations necessary for PBT generators.
-- `LawfulGen` - A type class capturing what it means for a `Gen` to be correct.
+- `Basalt.Laws` - Correctness properties that a `Gen` may be proved to have.
 -/

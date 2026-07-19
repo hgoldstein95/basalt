@@ -12,7 +12,7 @@ import Basalt.SPMF
 import Basalt.SPMF.Cost
 import Basalt.SPMF.Failure
 import Basalt.Tactics
-import Basalt.Classes
+import Basalt.Laws
 import Basalt.Combinators
 import Basalt.Tuning
 import Basalt.Tuning.Macro

@@ -84,13 +84,16 @@ Guidelines that make the proofs go smoothly:
 
 ## Part 2: The Three Proof Obligations
 
-`LawfulGenerator g P c` (`Basalt/Classes.lean`) bundles three facts:
+For a total generator, the properties to prove are these three (`Basalt/Laws.lean`, where they
+are plain `def`s — there is no bundle to instantiate). A *filtering* generator is the exception: its
+mass is below 1, so termination is replaced by `IsProductive` / `IsFilterFree` on the `Option`
+interpretation.
 
 | Obligation | Statement shape | Meaning |
 |---|---|---|
-| Support | `x ∈ SPMF.support g ↔ P x` | Soundness and completeness: nothing invalid is produced, nothing valid is missed. |
-| Termination | `SPMF.IsPMF g` (i.e. `mass g = 1`) | The generator terminates with probability 1. |
-| Cost | `IsBounded g c` | Producing `v` takes at most `c v` random choices. |
+| Support | `IsSoundAndComplete g P`, i.e. `∀ a, a ∈ SPMF.support g ↔ P a` | Soundness and completeness: nothing invalid is produced, nothing valid is missed. |
+| Termination | `IsAlmostSurelyTerminating g`, i.e. `SPMF.IsPMF g` (`mass g = 1`) | The generator terminates with probability 1. |
+| Cost | `IsCostBounded g c`, i.e. `IsBounded g c` | Producing `v` takes at most `c v` random choices. |
 
 Each has a fixed recipe. All three start the same way — unfold one step of the recursion, invert
 what one step can produce, then do logic/arithmetic — and they differ only in which interpretation
@@ -113,7 +116,8 @@ Worked instances: `Tree.genHeap_support` (`Heap.lean`) is the recipe verbatim;
 `genAllTwos_support` (`AllTwoList.lean`) is the short form where `simp` finishes outright.
 
 ```lean
-theorem <GEN>_support : x ∈ SPMF.support (<GEN> <IDX>) ↔ <PRED> <IDX> x := by
+theorem <GEN>_support : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) := by
+  intro x
   -- 1. Induct on the generated value, generalizing any index the recursion changes.
   induction x generalizing <IDX> with
   | <base case> =>
@@ -123,7 +127,7 @@ theorem <GEN>_support : x ∈ SPMF.support (<GEN> <IDX>) ↔ <PRED> <IDX> x := b
     rw [<GEN>]                        -- 2. unfold one step
     -- 3. Invert "what can one step produce": the standard support set, plus the validity
     --    predicate, constructor `injEq` lemmas, and callee support lemmas.
-    support_simp [<PRED>, <CTOR>.injEq, <callee>_support]
+    support_simp [<PRED>, <CTOR>.injEq, <callee>_mem_support]
     -- 4. Two directions.
     constructor
     · rintro ⟨...witnesses...⟩        -- forward: destruct, apply the IHs
@@ -140,6 +144,11 @@ Notes:
 - `support_simp [extra, lemmas]` is `simp only` with the `mem_support_*_iff` set (`pick`, `bind`,
   `pure`, `map`, `chooseNat`, `ite`/`dite`, `elements`, `oneOf`, `frequency`, …). It fires on real
   generator goals — the set is stated on monad notation. It also takes `at h`.
+- **A callee's `_support` law is not a `simp` lemma.** `IsSoundAndComplete` is a semireducible
+  `def`, so `simp` cannot see the `↔` inside it. A generator whose support fact is consumed by
+  *other* proofs therefore states both: `<callee>_mem_support` (the raw `↔`, what you pass to
+  `support_simp`) and `<callee>_support` (the law, a one-line corollary). See `Nat.arbitrary`
+  (`ArbNat.lean`) and `Char.arbitrary` (`ArbChar.lean`).
 - An *alternative* opener when the predicate (not the value) drives the case split:
   `fun_induction <PRED> <;> rw [<GEN>] <;> split <;> simp <;> grind` — see `Tree.genBST_support`
   (`BST.lean`). Elegant when it works; when it doesn't, fall back to the explicit recipe, which
@@ -169,7 +178,7 @@ The step obligation is the same in every regime: *unfold once and lower-bound th
 per `←` in the do-block*.
 
 ```lean
-theorem <GEN>_terminates : SPMF.IsPMF <GEN> := by
+theorem <GEN>_terminates : IsAlmostSurelyTerminating <GEN> := by
   -- Subcritical, static seed (worked instances: Nat.arbitrary, List.arbitrary, genAllTwos,
   -- genCharList; family form: List.genSortedGt):
   refine SPMF.IsPMF_of_subcritical_mass (m := <M>) (by norm_num) ?_
@@ -217,7 +226,7 @@ Worked instances: `Nat.arbitrary_cost` (`ArbNat.lean`) is the minimal case; `Tre
 (`BST.lean`) show `dite`, `chooseNat`, and `frequency`.
 
 ```lean
-theorem <GEN>_cost : IsBounded <GEN> <COST> := by
+theorem <GEN>_cost : IsCostBounded <GEN> <COST> := by
   open Lean.Order in
   delta <GEN>                        -- 1. expose the `fix`
   apply fix_induct (motive := fun (g : SPMF.Cost <α>) => IsBounded g <COST>) _ ?admissible ?step
@@ -254,15 +263,6 @@ algebra: `IsBounded_pure`, `IsBounded_choose`, `IsBounded_pick`, `IsBounded_bind
 `IsBounded_elements`, `IsBounded_map`, `IsBounded_mono` — see `Char.arbitrary_cost`
 (`ArbChar.lean`). Don't use the combinator path for recursive generators: under `fix_induct` the
 inversion path above is uniform and the combinator side conditions just reintroduce the same work.
-
-### Assembling the instance
-
-```lean
-instance : LawfulGenerator <GEN> <PRED> <COST> where
-  support_iff := <GEN>_support
-  is_pmf      := <GEN>_terminates
-  is_bounded  := <GEN>_cost
-```
 
 ## When Stuck
 

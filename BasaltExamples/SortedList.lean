@@ -33,7 +33,7 @@ lemma List.sorted_cons_forall_le : List.sorted (x :: xs) → List.Forall (x ≤ 
   case _ => simp
   case _ x xs ih => grind [= sorted.eq_def, sorted, List.forall_cons]
 
-theorem List.genSortedGt_support (xs : List Nat) (m : Nat) :
+theorem List.genSortedGt_mem_support (xs : List Nat) (m : Nat) :
     xs ∈ SPMF.support (List.genSortedGt m) ↔ (List.sorted xs ∧ List.Forall (m ≤ ·) xs) := by
   fun_induction List.sorted generalizing m
   case _ =>
@@ -46,7 +46,7 @@ theorem List.genSortedGt_support (xs : List Nat) (m : Nat) :
     . grind
     . intro h
       exists x - m
-      apply And.intro Nat.arbitrary_support
+      apply And.intro Nat.arbitrary_mem_support
       constructor
       . unfold genSortedGt
         simp
@@ -60,14 +60,19 @@ theorem List.genSortedGt_support (xs : List Nat) (m : Nat) :
       exists x - m
       grind only [
         List.forall_iff_forall_mem, List.Forall.eq_def, List.Forall.imp, List.sorted_cons_forall_le,
-        sorted.eq_def, Nat.arbitrary_support]
+        sorted.eq_def, Nat.arbitrary_mem_support]
 
-theorem List.genSorted_support (xs : List Nat) :
-    xs ∈ SPMF.support List.genSorted ↔ List.sorted xs := by
+theorem List.genSortedGt_support :
+    IsSoundAndComplete (List.genSortedGt m)
+      (fun xs => List.sorted xs ∧ List.Forall (m ≤ ·) xs) :=
+  fun xs => List.genSortedGt_mem_support xs m
+
+theorem List.genSorted_support : IsSoundAndComplete List.genSorted List.sorted := by
+  intro xs
   unfold genSorted
-  simp [genSortedGt_support, List.forall_iff_forall_mem]
+  simp [genSortedGt_mem_support, List.forall_iff_forall_mem]
 
-theorem List.genSortedGt_terminates (m : Nat) : SPMF.IsPMF (List.genSortedGt m) := by
+theorem List.genSortedGt_terminates (m : Nat) : IsAlmostSurelyTerminating (List.genSortedGt m) := by
   -- Subcritical (mean offspring 1/2); the recursion re-indexes the seed, hence the family form.
   refine SPMF.IsPMF_of_subcritical_mass_family
     (fun (m : Nat) => (List.genSortedGt m : SPMF (List Nat)))
@@ -82,11 +87,11 @@ theorem List.genSortedGt_terminates (m : Nat) : SPMF.IsPMF (List.genSortedGt m) 
   simp only [SPMF.mass_bind_pure]
   exact SPMF.mass_ge_iInf _ (n + x)
 
-theorem List.genSorted_terminates : SPMF.IsPMF List.genSorted :=
+theorem List.genSorted_terminates : IsAlmostSurelyTerminating List.genSorted :=
   List.genSortedGt_terminates 0
 
 theorem List.genSortedGt_cost :
-    IsBounded (List.genSortedGt m) (fun xs => xs.length + xs.sum + xs.length + 1) := by
+    IsCostBounded (List.genSortedGt m) (fun xs => xs.length + xs.sum + xs.length + 1) := by
   open Lean.Order in
   delta genSortedGt
   apply (fix_induct (motive := fun (g : Nat → SPMF.Cost (List Nat)) =>
@@ -110,12 +115,7 @@ theorem List.genSortedGt_cost :
       omega
 
 theorem List.genSorted_cost :
-    IsBounded List.genSorted List.genSorted.costBound :=
+    IsCostBounded List.genSorted List.genSorted.costBound :=
   IsBounded_mono List.genSortedGt_cost (by unfold genSorted.costBound; intro xs; omega)
-
-instance : LawfulGenerator List.genSorted List.sorted List.genSorted.costBound where
-  support_iff := by simp [List.genSorted_support]
-  is_pmf := List.genSorted_terminates
-  is_bounded := List.genSorted_cost
 
 end SortedList

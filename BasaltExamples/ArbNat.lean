@@ -12,10 +12,13 @@ def Nat.arbitrary [Gen G] : G Nat := do
       pure (n + 1))
 partial_fixpoint
 
-theorem Nat.arbitrary_support : n ∈ SPMF.support Nat.arbitrary := by
+theorem Nat.arbitrary_mem_support : n ∈ SPMF.support Nat.arbitrary := by
   induction n <;> rw [Nat.arbitrary] <;> simp [*]
 
-theorem Nat.arbitrary_terminates : SPMF.IsPMF Nat.arbitrary := by
+theorem Nat.arbitrary_support : IsSoundAndComplete Nat.arbitrary ⊤ :=
+  fun _ => iff_of_true Nat.arbitrary_mem_support trivial
+
+theorem Nat.arbitrary_terminates : IsAlmostSurelyTerminating Nat.arbitrary := by
   -- Static seed, mean offspring 1/2: subcritical.
   refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
   rw [ENNReal.one_sub_half]
@@ -23,7 +26,7 @@ theorem Nat.arbitrary_terminates : SPMF.IsPMF Nat.arbitrary := by
   simp
 
 theorem Nat.arbitrary_cost :
-    IsBounded Nat.arbitrary (fun n => n + 1) := by
+    IsCostBounded Nat.arbitrary (fun n => n + 1) := by
   open Lean.Order in
   delta arbitrary
   apply fix_induct (motive := fun (g : SPMF.Cost Nat) => IsBounded g (fun n => n + 1)) _ ?admissible ?step
@@ -41,10 +44,5 @@ theorem Nat.arbitrary_cost :
       have h1 : n1 ≤ a + 1 := ih (a, n1) ha
       show 1 + m ≤ n + 1
       omega
-
-instance : LawfulGenerator Nat.arbitrary ⊤ (fun n => n + 1) where
-  support_iff := by simp [Nat.arbitrary_support]
-  is_pmf := Nat.arbitrary_terminates
-  is_bounded := Nat.arbitrary_cost
 
 end ArbNat

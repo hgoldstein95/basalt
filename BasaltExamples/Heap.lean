@@ -43,14 +43,15 @@ partial_fixpoint
 
 /-- `genHeap` produces exactly the min-heaps bounded below by `lo`. -/
 theorem Tree.genHeap_support :
-    t ∈ SPMF.support (Tree.genHeap lo) ↔ Tree.isHeap lo t := by
+    IsSoundAndComplete (Tree.genHeap lo) (Tree.isHeap lo) := by
+  intro t
   induction t generalizing lo with
   | leaf =>
     rw [Tree.genHeap]
     simp [Tree.isHeap]
   | node l x r ihl ihr =>
     rw [Tree.genHeap]
-    support_simp [Tree.isHeap, Tree.node.injEq, Nat.arbitrary_support, true_and]
+    support_simp [Tree.isHeap, Tree.node.injEq, Nat.arbitrary_mem_support, true_and]
     constructor
     · rintro (h | ⟨d, l', hl', r', hr', hle, hld, hrd⟩)
       · simp at h
@@ -63,7 +64,7 @@ theorem Tree.genHeap_support :
       · rw [show lo + (x - lo) = x by omega]; exact ihr.mpr hr
 
 /-- `genHeap` terminates with probability 1. -/
-theorem Tree.genHeap_terminates : SPMF.IsPMF (Tree.genHeap lo) := by
+theorem Tree.genHeap_terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   -- Critical (mean offspring exactly 1); the recursion re-indexes the seed, hence the family form.
   refine SPMF.IsPMF_of_critical_family
     (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree))
@@ -87,7 +88,7 @@ theorem Tree.genHeap_terminates : SPMF.IsPMF (Tree.genHeap lo) := by
 /-- `genHeap` makes a number of random choices bounded by the size and the sum
     of the values of the tree it produces (no backtracking choices). -/
 theorem Tree.genHeap_cost :
-    IsBounded (Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1) := by
+    IsCostBounded (Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1) := by
   open Lean.Order in
   delta genHeap
   apply (fix_induct (motive := fun (g : Nat → SPMF.Cost Tree) => ∀ lo, IsBounded (g lo) (fun t => 3 * t.size + t.sum + 1)) _ ?admissible ?step) lo
@@ -109,11 +110,5 @@ theorem Tree.genHeap_cost :
       show 1 + m ≤ 3 * (Tree.node l (lo + delta) r).size + (Tree.node l (lo + delta) r).sum + 1
       simp only [Tree.size, Tree.sum]
       omega
-
-instance {lo : Nat} :
-    LawfulGenerator (Tree.genHeap lo) (Tree.isHeap lo) (fun t => 3 * t.size + t.sum + 1) where
-  support_iff := Tree.genHeap_support
-  is_pmf := Tree.genHeap_terminates
-  is_bounded := Tree.genHeap_cost
 
 end Heap

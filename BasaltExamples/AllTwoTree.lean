@@ -27,13 +27,14 @@ def genTree [Gen G] : G Tree :=
       return .node l 2 r)
 partial_fixpoint
 
-theorem genTree_support : t ∈ SPMF.support genTree ↔ Tree.isAllTwos t := by
+theorem genTree_support : IsSoundAndComplete genTree Tree.isAllTwos := by
+  intro t
   fun_induction Tree.isAllTwos
     <;> rw [genTree]
     <;> simp
   grind
 
-theorem genTree_terminates : SPMF.IsPMF genTree := by
+theorem genTree_terminates : IsAlmostSurelyTerminating genTree := by
   refine SPMF.IsPMF_of_critical (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
     (fun c hle hge => ?_) ?_
   · rw [← ENNReal.toReal_eq_one_iff]
@@ -50,7 +51,7 @@ theorem genTree_terminates : SPMF.IsPMF genTree := by
     simp only [SPMF.mass_bind_pure]
     exact le_rfl
 
-theorem genTree_cost : IsBounded genTree Tree.cost := by
+theorem genTree_cost : IsCostBounded genTree Tree.cost := by
   open Lean.Order in
   delta genTree
   apply (fix_induct (motive := fun (g : SPMF.Cost Tree) => IsBounded g Tree.cost) _ ?admissible ?step)
@@ -71,11 +72,6 @@ theorem genTree_cost : IsBounded genTree Tree.cost := by
       simp only [Tree.cost, Tree.size] at *
       omega
 
-instance : LawfulGenerator genTree Tree.isAllTwos Tree.cost where
-  support_iff := genTree_support
-  is_pmf      := genTree_terminates
-  is_bounded  := genTree_cost
-
 section weighted
 
 open scoped NNReal ENNReal
@@ -90,7 +86,7 @@ def genWeightedTree [Gen G] : G Tree :=
   ] (by simp)
 partial_fixpoint
 
-theorem genWeightedTree_terminates : SPMF.IsPMF genWeightedTree := by
+theorem genWeightedTree_terminates : IsAlmostSurelyTerminating genWeightedTree := by
   refine SPMF.IsPMF_of_subcritical (m := 2 / 3) ?_ ?_
   · rw [ENNReal.div_lt_iff (by norm_num) (by norm_num), one_mul]
     norm_num
