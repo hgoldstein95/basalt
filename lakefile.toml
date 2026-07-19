@@ -1,12 +1,22 @@
 name = "basalt"
 version = "0.1.0"
-defaultTargets = ["Basalt", "Examples"]
+defaultTargets = ["Basalt", "BasaltExamples", "BasaltTest"]
 
 [[lean_lib]]
 name = "Basalt"
+globs = ["Basalt", "Basalt.+"]
 
 [[lean_lib]]
-name = "Examples"
+name = "BasaltExamples"
+globs = ["BasaltExamples.+"]
+
+[[lean_lib]]
+name = "BasaltTest"
+globs = ["BasaltTest.+"]
+
+[[lean_lib]]
+name = "BasaltExperiments"
+globs = ["BasaltExperiments.+"]
 
 [[require]]
 name = "mathlib"

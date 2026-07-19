@@ -465,20 +465,4 @@ instance {lo hi : Nat} : LawfulGenerator (Tree.genWeightedBST lo hi) (Tree.isBST
   is_pmf := Tree.genWeightedBST_terminates
   is_bounded := Tree.genWeightedBST_cost
 
-/- `genBST` can be run in `IO`. -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← Tree.genBST 0 10) : IO Unit)
-
-/- `genBST` can be run in `PlausibleGen`. -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← Plausible.Gen.run (Tree.genBST (G := Plausible.Gen) 0 10) 10) : IO Unit)
-
-/- `genWeightedBST` can be run in `IO` and indeed generates
-    non-empty trees more frequently than leaves (by inspection) -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:10] do
-  IO.println <| repr (← Tree.genWeightedBST 0 10) : IO Unit)
-
 end BST

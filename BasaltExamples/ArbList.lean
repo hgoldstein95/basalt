@@ -1,5 +1,5 @@
 import Basalt
-import Basalt.Examples.ArbNat
+import BasaltExamples.ArbNat
 
 open RandomChoice ArbNat
 
@@ -64,14 +64,5 @@ instance : LawfulGenerator List.arbitrary ⊤ (fun xs => 2 * xs.length + xs.sum 
   support_iff := by simp [List.arbitrary_support]
   is_pmf := List.arbitrary_terminates
   is_bounded := List.arbitrary_cost
-
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← List.arbitrary) : IO Unit)
-
-#guard_msgs(drop info) in
-#eval (for _ in [0:10] do
-  IO.println <| repr (← List.arbitrary') : IO Unit)
-
 
 end ArbList

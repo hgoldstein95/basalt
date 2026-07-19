@@ -16,7 +16,7 @@ generators (e.g., via classical program synthesis or LLM automation), this libra
 foundation.
 
 Generator writers should look at the `Gen` module to see the operations available in generators. For
-proving generators correct, look at `LawfulGen` and the examples in `Examples/`.
+proving generators correct, look at `LawfulGen` and the examples in `BasaltExamples/`.
 
 ## Main Definitions
 

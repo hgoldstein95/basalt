@@ -514,7 +514,7 @@ theorem admissible_IsBounded (f : α → Nat) :
   obtain ⟨x, hxc, hxp⟩ := hp
   exact ih x hxc p hxp
 
-/-- Note: this proof is very similar to `List.arbitrary_cost` in `Examples/ArbList.lean`,
+/-- Note: this proof is very similar to `List.arbitrary_cost` in `BasaltExamples/ArbList.lean`,
     except the cost function now comprises the following:
     - `2 * xs.length`: 2 random choices for each element in `xs` (a call to `pick` and a call to `g`)
     - `(cost_g <$> xs).sum`: Need to apply `g`'s cost function to each generated element and sum them

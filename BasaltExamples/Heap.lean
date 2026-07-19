@@ -1,5 +1,5 @@
 import Basalt
-import Basalt.Examples.ArbNat
+import BasaltExamples.ArbNat
 
 open RandomChoice ArbNat
 
@@ -115,15 +115,5 @@ instance {lo : Nat} :
   support_iff := Tree.genHeap_support
   is_pmf := Tree.genHeap_terminates
   is_bounded := Tree.genHeap_cost
-
-/- `genHeap` can be run in `IO`. -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← Tree.genHeap 0) : IO Unit)
-
-/- `genHeap` can be run in `PlausibleGen`. -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← Plausible.Gen.run (Tree.genHeap (G := Plausible.Gen) 0) 10) : IO Unit)
 
 end Heap

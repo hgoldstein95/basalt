@@ -1,5 +1,5 @@
 import Basalt.Gen
-import Basalt.Examples.ArbChar.Def
+import BasaltExamples.ArbChar.Def
 
 open RandomChoice ArbChar
 

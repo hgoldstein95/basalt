@@ -6,14 +6,14 @@ Authors: Harrison Goldstein
 
 import Basalt
 import Basalt.Combinators
-import Basalt.Examples.BST
+import BasaltExamples.BST
 
 open RandomChoice
 
 /-!
 # `tunable def` Examples
 
-`Tree.genWeightedBST` (`Basalt/Examples/BST.lean`) is declared `tunable`, so the
+`Tree.genWeightedBST` (`BasaltExamples/BST.lean`) is declared `tunable`, so the
 macro emitted `Tree.genWeightedBST.tuned/.defaults/.sites/.tuned_defaults`
 alongside it. This file exercises the whole contract:
 

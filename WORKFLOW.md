@@ -10,7 +10,7 @@ obligations**, as a skeleton with named holes. The recipes are written so that e
 standard tactic with a local, legible failure mode — follow them mechanically and the failures tell
 you what to fix.
 
-The worked instances live in `Basalt/Examples/`; each recipe below names the examples that follow it
+The worked instances live in `BasaltExamples/`; each recipe below names the examples that follow it
 verbatim.
 
 ## Part 1: Writing the Generator
@@ -71,14 +71,14 @@ Guidelines that make the proofs go smoothly:
   `ULift {x : Nat // lo ≤ x ∧ x ≤ hi}`, which costs `.down.val` projections in the generator and
   `⟨⟨n, ⟨hge, hle⟩⟩⟩` destructuring in every proof. `chooseNat` returns a bare `Nat`, and its
   inversion lemmas produce plain inequalities that `omega` consumes directly. See `Tree.genBST` in
-  `Basalt/Examples/BST.lean`.
+  `BasaltExamples/BST.lean`.
 - **Recursive generators use `partial_fixpoint`** (Lean's CCPO fixpoint). Any combinator appearing
   in the recursive body needs a `@[partial_fixpoint_monotone]` lemma; the ones in the library
   (`pick`, `oneOf`, `frequency`, `vectorOf`, `listOfMaxLength`, `listOf`) are covered, and
   combinators that don't mention the recursive call (like `chooseNat`) need nothing.
 - **Weighted choices go through `frequency`**, one n-ary choice per site, with the weights inline.
   Prefix the definition with `tunable` to make the weights runtime-addressable later (see
-  `CLAUDE.md` and `Basalt/Examples/Tunable.lean`); it changes nothing about the proofs below.
+  `CLAUDE.md` and `BasaltTest/Tuning.lean`); it changes nothing about the proofs below.
 - Sample it (`#eval`, or `#genstats` for distribution statistics) before proving anything. A
   generator whose median output is trivial passes every proof below and is still useless.
 

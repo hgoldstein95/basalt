@@ -1,5 +1,5 @@
 import Basalt
-import Basalt.Examples.ArbNat
+import BasaltExamples.ArbNat
 
 open RandomChoice ArbNat
 

@@ -1,6 +1,6 @@
 import Basalt
 import Batteries.Data.Char
-import Basalt.Examples.ArbChar.Def
+import BasaltExamples.ArbChar.Def
 
 open RandomChoice
 
@@ -24,9 +24,5 @@ theorem Char.arbitrary_cost :
     IsBounded Char.arbitrary (fun _ => 1) := by
   unfold Char.arbitrary
   exact IsBounded_elements _
-
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← Char.arbitrary) : IO Unit)
 
 end ArbChar
