@@ -514,17 +514,17 @@ theorem admissible_IsBounded (f : α → Nat) :
 
 /-- Note: this proof is very similar to `List.arbitrary_cost` in `BasaltExamples/ArbList.lean`,
     except the cost function now comprises the following:
-    - `2 * xs.length`: 2 random choices for each element in `xs` (a call to `pick` and a call to `g`)
+    - `xs.length`: Each element in `xs` requires a call to `pick`
     - `(cost_g <$> xs).sum`: Need to apply `g`'s cost function to each generated element and sum them
     - `1`: one final call to `pick` to produce the end of the list -/
 theorem IsBounded_listOf
     {g : SPMF.Cost α}
     (hx : IsBounded g cost_g) :
-    IsBounded (listOf g) (fun xs => 2 * xs.length + (cost_g <$> xs).sum + 1) := by
+    IsBounded (listOf g) (fun xs => xs.length + (cost_g <$> xs).sum + 1) := by
   open Lean.Order in
   delta listOf
   apply fix_induct (motive := fun (g : SPMF.Cost (List α)) => IsBounded g
-    (fun xs => 2 * xs.length + (cost_g <$> xs).sum + 1)) _ ?admissible ?step
+    (fun xs => xs.length + (cost_g <$> xs).sum + 1)) _ ?admissible ?step
   case admissible =>
     apply admissible_IsBounded
   case step =>
@@ -536,11 +536,14 @@ theorem IsBounded_listOf
     obtain ⟨m, rfl, h | h⟩ := hxs
     · obtain ⟨rfl, rfl⟩ := h
       simp
-    · obtain ⟨hd, n1, n2, hhd, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, hn2⟩, hm⟩ := h
-      have hhead : n1 ≤ cost_g hd := IsBounded_iff.mp hx (hd, n1) hhd
-      have htail : n3 ≤ 2 * tl.length + (List.map cost_g tl).sum + 1 := ih (tl, n3) htl
-      show 1 + m ≤ 2 * (hd :: tl).length + (List.map cost_g (hd :: tl)).sum + 1
-      simp only [List.length_cons, List.map_cons, List.sum_cons]
+    · obtain ⟨hd, n1, n2, hhd, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, rfl⟩, rfl⟩ := h
+      have hhead : n1 ≤ cost_g hd := by
+        apply IsBounded_iff.mp hx (hd, n1)
+        assumption
+      have htail : n3 ≤ tl.length + (List.map cost_g tl).sum + 1 := by
+        apply ih (tl, n3)
+        assumption
+      dsimp
       omega
 
 /-- The value of `nonEmptyListOf`'s cost function is always one less than `listOf`'s cost
@@ -552,11 +555,11 @@ theorem IsBounded_listOf
 theorem IsBounded_nonEmptyListOf
     {g : SPMF.Cost α}
     (hx : IsBounded g cost_g) :
-    IsBounded (nonEmptyListOf g) (fun xs => 2 * xs.length + (cost_g <$> xs).sum) := by
+    IsBounded (nonEmptyListOf g) (fun xs => xs.length + (cost_g <$> xs).sum) := by
   open Lean.Order in
   delta nonEmptyListOf
   apply fix_induct (motive := fun (g : SPMF.Cost (List α)) => IsBounded g
-    (fun xs => 2 * xs.length + (cost_g <$> xs).sum)) _ ?admissible ?step
+    (fun xs => xs.length + (cost_g <$> xs).sum)) _ ?admissible ?step
   case admissible =>
     apply admissible_IsBounded
   case step =>
@@ -576,7 +579,7 @@ theorem IsBounded_nonEmptyListOf
     · -- Recursive case
       obtain ⟨hd, n1, n2, hhd, ⟨tl, n3, n4, htl, ⟨rfl, rfl⟩, hn2⟩, rfl⟩ := h
       have hhead : n1 ≤ cost_g hd := IsBounded_iff.mp hx (hd, n1) hhd
-      have htail : n3 ≤ 2 * tl.length + (List.map cost_g tl).sum := by
+      have htail : n3 ≤ tl.length + (List.map cost_g tl).sum := by
         apply IH (tl, n3)
         assumption
       simp only [List.length_cons]
