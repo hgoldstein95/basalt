@@ -323,7 +323,7 @@ theorem support_nonEmptyListOf
     constructor
     . intro h
       unfold nonEmptyListOf at h
-      simp [support_bind, support_pick] at *
+      simp [support_pick] at h
     . intro ⟨hneq, hmem⟩
       contradiction
   | cons x xs' IH =>
@@ -382,6 +382,13 @@ theorem mem_support_listOf
     {g : SPMF α} :
     xs ∈ (listOf g).support ↔ xs ∈ {xs | ∀ x ∈ xs, x ∈ g.support} := by
   simp [support_listOf]
+
+@[simp]
+theorem mem_support_nonEmptylistOf
+    {xs : List α}
+    {g : SPMF α} :
+    xs ∈ (nonEmptyListOf g).support ↔ xs ∈ {xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support} := by
+  simp [support_nonEmptyListOf]
 
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]

@@ -547,7 +547,7 @@ theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
   unfold monotone
   intro x y hxy
   show nonEmptyListOf (g x) ⊑ nonEmptyListOf (g y)
-  -- Convert the RHS to a variable `z` so that we only delta-reduce `listOf` on the LHS
+  -- Convert the RHS to a variable `z` so that we only delta-reduce `nonEmptyListOf` on the LHS
   generalize hw : nonEmptyListOf (g y) = w
   delta nonEmptyListOf
   apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
