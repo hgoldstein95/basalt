@@ -543,32 +543,42 @@ theorem IsBounded_listOf
       simp only [List.length_cons, List.map_cons, List.sum_cons]
       omega
 
+/-- The value of `nonEmptyListOf`'s cost function is always one less than `listOf`'s cost
+    function, since `listOf` needs to incur 1 random choice at the end (a call to `pick`
+    to produce the empty list in its base case),
+    whereas `nonEmptyListOf` doesn't need to do this since it never generates the random list.
+
+    Otherwise, this proof is largely similar to `IsBounded_listOf`. -/
 theorem IsBounded_nonEmptyListOf
     {g : SPMF.Cost α}
     (hx : IsBounded g cost_g) :
-    IsBounded (nonEmptyListOf g) (fun xs => 2 * xs.length + (cost_g <$> xs).sum + 1) := by
+    IsBounded (nonEmptyListOf g) (fun xs => 2 * xs.length + (cost_g <$> xs).sum) := by
   open Lean.Order in
   delta nonEmptyListOf
   apply fix_induct (motive := fun (g : SPMF.Cost (List α)) => IsBounded g
-    (fun xs => 2 * xs.length + (cost_g <$> xs).sum + 1)) _ ?admissible ?step
+    (fun xs => 2 * xs.length + (cost_g <$> xs).sum)) _ ?admissible ?step
   case admissible =>
     apply admissible_IsBounded
   case step =>
-    intro arbitrary_rec ih
-    rw [IsBounded_iff] at ih ⊢
+    intro arbitrary_rec IH
+    rw [IsBounded_iff] at IH ⊢
     rintro ⟨xs, c⟩ hxs
     simp only [SPMF.Cost.mem_support_pick_iff, SPMF.Cost.mem_support_bind_iff,
       SPMF.Cost.mem_support_pure_iff] at hxs
     obtain ⟨m, rfl, h | h⟩ := hxs
-    · obtain ⟨a, n1, n2, hmem, ⟨rfl, rfl⟩, rfl⟩ := h
+    · -- Base case
+      obtain ⟨a, n1, n2, hmem, ⟨rfl, rfl⟩, rfl⟩ := h
       dsimp
       have hm : m ≤ cost_g a := by
         apply IsBounded_iff.mp hx (a, m)
         assumption
       omega
-    · obtain ⟨hd, n1, n2, hhd, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, hn2⟩, hm⟩ := h
+    · -- Recursive case
+      obtain ⟨hd, n1, n2, hhd, ⟨tl, n3, n4, htl, ⟨rfl, rfl⟩, hn2⟩, rfl⟩ := h
       have hhead : n1 ≤ cost_g hd := IsBounded_iff.mp hx (hd, n1) hhd
-      have htail : n3 ≤ 2 * tl.length + (List.map cost_g tl).sum + 1 := ih (tl, n3) htl
-      show 1 + m ≤ 2 * (hd :: tl).length + (List.map cost_g (hd :: tl)).sum + 1
-      simp only [List.length_cons, List.map_cons, List.sum_cons]
+      have htail : n3 ≤ 2 * tl.length + (List.map cost_g tl).sum := by
+        apply IH (tl, n3)
+        assumption
+      simp only [List.length_cons]
+      dsimp
       omega
