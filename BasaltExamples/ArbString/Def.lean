@@ -1,4 +1,5 @@
 import Basalt.Gen
+import Basalt.Combinators
 import BasaltExamples.ArbChar.Def
 
 open RandomChoice ArbChar
@@ -15,8 +16,12 @@ def genCharList [Gen G] : G (List Char) :=
       return x :: xs)
 partial_fixpoint
 
-/-- Generates a random alphanumeric string -/
+/-- Generates a random (possibly empty) alphanumeric string -/
 def String.arbitrary [Gen G] : G String :=
   String.ofList <$> genCharList
+
+/-- Generates a random, non-empty alphanumeric string -/
+def NonEmptyString.arbitrary [Gen G] : G String :=
+  String.ofList <$> nonEmptyListOf Char.arbitrary
 
 end ArbString

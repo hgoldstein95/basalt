@@ -25,6 +25,10 @@ import BasaltExamples.Heap
 #eval (for _ in [0:10] do
   IO.println <| repr (← ArbString.String.arbitrary) : IO Unit)
 
+#guard_msgs(drop info) in
+#eval (for _ in [0:10] do
+  IO.println <| repr (← ArbString.NonEmptyString.arbitrary) : IO Unit)
+
 /- `genBST` can be run in `IO`. -/
 #guard_msgs(drop info) in
 #eval (for _ in [0:20] do
