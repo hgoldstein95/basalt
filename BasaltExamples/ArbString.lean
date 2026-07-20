@@ -97,6 +97,13 @@ theorem String.arbitrary_terminates : IsAlmostSurelyTerminating String.arbitrary
   rw [SPMF.mass_map]
   apply genCharList_terminates
 
+/-- `NonEmptyString.arbitrary` almost surely terminates -/
+theorem NonEmptyString.arbitrary_terminates : IsAlmostSurelyTerminating NonEmptyString.arbitrary := by
+  unfold NonEmptyString.arbitrary IsAlmostSurelyTerminating SPMF.IsPMF
+  rw [SPMF.mass_map]
+  rw [SPMF.IsPMF_nonEmptyListOf]
+  apply Char.arbitrary_terminates
+
 -- Proof is similar to `List.arbitrary_cost`, except here the cost function
 -- is just the no. of calls to `pick` + `Char.arbitrary` (`2 * cs.length`),
 -- along with one final call to `pick` to produce the end of the list
