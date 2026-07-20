@@ -62,17 +62,17 @@ theorem List.genSortedGt_mem_support (xs : List Nat) (m : Nat) :
         List.forall_iff_forall_mem, List.Forall.eq_def, List.Forall.imp, List.sorted_cons_forall_le,
         sorted.eq_def, Nat.arbitrary_mem_support]
 
-theorem List.genSortedGt_support :
+theorem List.genSortedGt.sound_complete :
     IsSoundAndComplete (List.genSortedGt m)
       (fun xs => List.sorted xs ∧ List.Forall (m ≤ ·) xs) :=
   fun xs => List.genSortedGt_mem_support xs m
 
-theorem List.genSorted_support : IsSoundAndComplete List.genSorted List.sorted := by
+theorem List.genSorted.sound_complete : IsSoundAndComplete List.genSorted List.sorted := by
   intro xs
   unfold genSorted
   simp [genSortedGt_mem_support, List.forall_iff_forall_mem]
 
-theorem List.genSortedGt_terminates (m : Nat) : IsAlmostSurelyTerminating (List.genSortedGt m) := by
+theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.genSortedGt m) := by
   -- Subcritical (mean offspring 1/2); the recursion re-indexes the seed, hence the family form.
   refine SPMF.IsPMF_of_subcritical_mass_family
     (fun (m : Nat) => (List.genSortedGt m : SPMF (List Nat)))
@@ -82,15 +82,15 @@ theorem List.genSortedGt_terminates (m : Nat) : IsAlmostSurelyTerminating (List.
   conv_rhs => unfold List.genSortedGt
   simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
   gcongr
-  apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary_terminates
+  apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates
   intro x
   simp only [SPMF.mass_bind_pure]
   exact SPMF.mass_ge_iInf _ (n + x)
 
-theorem List.genSorted_terminates : IsAlmostSurelyTerminating List.genSorted :=
-  List.genSortedGt_terminates 0
+theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=
+  List.genSortedGt.terminates 0
 
-theorem List.genSortedGt_cost :
+theorem List.genSortedGt.cost_bounded :
     IsCostBounded (List.genSortedGt m) (fun xs => xs.length + xs.sum + xs.length + 1) := by
   open Lean.Order in
   delta genSortedGt
@@ -107,15 +107,15 @@ theorem List.genSortedGt_cost :
     · obtain ⟨rfl, rfl⟩ := h
       simp
     · obtain ⟨delta, n1, n2, hdelta, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, hn2⟩, hk⟩ := h
-      have hhead : n1 ≤ delta + 1 := IsBounded_iff.mp Nat.arbitrary_cost (delta, n1) hdelta
+      have hhead : n1 ≤ delta + 1 := IsBounded_iff.mp Nat.arbitrary.cost_bounded (delta, n1) hdelta
       have htail : n3 ≤ tl.length + tl.sum + tl.length + 1 := ih (m + delta) (tl, n3) htl
       show 1 + k ≤ ((m + delta) :: tl).length + ((m + delta) :: tl).sum
         + ((m + delta) :: tl).length + 1
       simp only [List.length_cons, List.sum_cons]
       omega
 
-theorem List.genSorted_cost :
+theorem List.genSorted.cost_bounded :
     IsCostBounded List.genSorted List.genSorted.costBound :=
-  IsBounded_mono List.genSortedGt_cost (by unfold genSorted.costBound; intro xs; omega)
+  IsBounded_mono List.genSortedGt.cost_bounded (by unfold genSorted.costBound; intro xs; omega)
 
 end SortedList

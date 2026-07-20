@@ -14,7 +14,7 @@ def genAllTwos [Gen G] : G (List Nat) :=
       return 2 :: xs)
 partial_fixpoint
 
-theorem genAllTwos_support : IsSoundAndComplete genAllTwos AllTwos := by
+theorem genAllTwos.sound_complete : IsSoundAndComplete genAllTwos AllTwos := by
   intro a
   induction a with
   | nil =>
@@ -24,14 +24,14 @@ theorem genAllTwos_support : IsSoundAndComplete genAllTwos AllTwos := by
     rw [genAllTwos]
     simp [ih, AllTwos, and_comm]
 
-theorem genAllTwos_terminates : IsAlmostSurelyTerminating genAllTwos := by
+theorem genAllTwos.terminates : IsAlmostSurelyTerminating genAllTwos := by
   -- Static seed, mean offspring 1/2: subcritical.
   refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
   rw [ENNReal.one_sub_half]
   conv_rhs => rw [genAllTwos]
   simp
 
-theorem genAllTwos_cost : IsCostBounded genAllTwos AllTwos.cost := by
+theorem genAllTwos.cost_bounded : IsCostBounded genAllTwos AllTwos.cost := by
   open Lean.Order in
   delta genAllTwos
   apply fix_induct (motive := fun (g : SPMF.Cost (List Nat)) =>

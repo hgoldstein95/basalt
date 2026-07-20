@@ -48,7 +48,7 @@ tunable def Tree.genWeightedBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
     ] (by simp)
 partial_fixpoint
 
-theorem Tree.genBST_support :
+theorem Tree.genBST.sound_complete :
     IsSoundAndComplete (Tree.genBST lo hi) (Tree.isBST lo hi) := by
   intro t
   fun_induction Tree.isBST
@@ -250,7 +250,7 @@ private theorem genWeightedBST_step (p : Nat × Nat) :
           gcongr with x hx
           exact ENNReal.one_sub_mul_le_add (mass_le_one _) (mass_le_one _)
 
-theorem Tree.genWeightedBST_terminates : IsAlmostSurelyTerminating (Tree.genWeightedBST lo hi) := by
+theorem Tree.genWeightedBST.terminates : IsAlmostSurelyTerminating (Tree.genWeightedBST lo hi) := by
   refine SPMF.IsPMF_of_ranking
     (fun p : Nat × Nat => (Tree.genWeightedBST p.1 p.2 : SPMF (Tree Nat)))
     (levelOp_bstLevel (5 / 6))
@@ -358,7 +358,7 @@ private theorem genBST_step (p : Nat × Nat) :
           gcongr with x hx
           exact ENNReal.one_sub_mul_le_add (mass_le_one _) (mass_le_one _)
 
-theorem Tree.genBST_terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) := by
+theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) := by
   refine SPMF.IsPMF_of_ranking
     (fun p : Nat × Nat => (Tree.genBST p.1 p.2 : SPMF (Tree Nat)))
     (levelOp_bstLevel (1 / 2))
@@ -371,7 +371,7 @@ end ranking_termination
 
 /-! ## Cost -/
 
-theorem Tree.genBST_cost :
+theorem Tree.genBST.cost_bounded :
     IsCostBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
   open Lean.Order in
   delta genBST
@@ -396,7 +396,7 @@ theorem Tree.genBST_cost :
         simp only [Tree.size]
         omega
 
-theorem Tree.genWeightedBST_cost :
+theorem Tree.genWeightedBST.cost_bounded :
     IsCostBounded (Tree.genWeightedBST lo hi) (fun t => 3 * t.size + 1) := by
   open Lean.Order in
   delta genWeightedBST
@@ -429,7 +429,7 @@ theorem Tree.genWeightedBST_cost :
         simp only [Tree.size]
         omega
 
-theorem Tree.genWeightedBST_support :
+theorem Tree.genWeightedBST.sound_complete :
     IsSoundAndComplete (Tree.genWeightedBST lo hi) (Tree.isBST lo hi) := by
   intro t
   fun_induction Tree.isBST

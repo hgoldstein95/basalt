@@ -15,16 +15,16 @@ theorem Char.arbitrary_mem_support :
   rw [Char.arbitrary, SPMF.mem_support_elements_iff]
   exact alphanumChars_eq_filter c
 
-theorem Char.arbitrary_support :
+theorem Char.arbitrary.sound_complete :
     IsSoundAndComplete Char.arbitrary (fun c => c.isAlphanum = true) :=
   fun _ => Char.arbitrary_mem_support
 
 /-- `Char.arbitrary` almost surely terminates -/
-theorem Char.arbitrary_terminates : IsAlmostSurelyTerminating Char.arbitrary := by
+theorem Char.arbitrary.terminates : IsAlmostSurelyTerminating Char.arbitrary := by
   unfold Char.arbitrary
   apply SPMF.IsPMF_elements
 
-theorem Char.arbitrary_cost :
+theorem Char.arbitrary.cost_bounded :
     IsCostBounded Char.arbitrary (fun _ => 1) := by
   unfold Char.arbitrary
   exact IsBounded_elements _

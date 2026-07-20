@@ -15,17 +15,17 @@ partial_fixpoint
 theorem Nat.arbitrary_mem_support : n ∈ SPMF.support Nat.arbitrary := by
   induction n <;> rw [Nat.arbitrary] <;> simp [*]
 
-theorem Nat.arbitrary_support : IsSoundAndComplete Nat.arbitrary ⊤ :=
+theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ :=
   fun _ => iff_of_true Nat.arbitrary_mem_support trivial
 
-theorem Nat.arbitrary_terminates : IsAlmostSurelyTerminating Nat.arbitrary := by
+theorem Nat.arbitrary.terminates : IsAlmostSurelyTerminating Nat.arbitrary := by
   -- Static seed, mean offspring 1/2: subcritical.
   refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
   rw [ENNReal.one_sub_half]
   conv_rhs => rw [Nat.arbitrary]
   simp
 
-theorem Nat.arbitrary_cost :
+theorem Nat.arbitrary.cost_bounded :
     IsCostBounded Nat.arbitrary (fun n => n + 1) := by
   open Lean.Order in
   delta arbitrary
