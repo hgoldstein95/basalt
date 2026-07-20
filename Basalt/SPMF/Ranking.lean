@@ -369,6 +369,7 @@ variable {α : Type*}
 /-- If a generator `g` is an SPMF, then `listOf g` is also an SPMF. -/
 theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
     IsPMF (listOf g) := by
+  -- Total probability of non-recursive branches is 1/2, hence `m := 1/2`
   refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
   rw [ENNReal.one_sub_half]
   conv_rhs => rw [listOf]
@@ -377,6 +378,23 @@ theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
   apply mass_bind_ge_of_isPMF hg
   intro x
   rw [mass_bind_pure]
+
+/-- If a generator `g` is an SPMF, then `nonEmptyListOf g` is also an SPMF. -/
+theorem IsPMF_nonEmptyListOf {g : SPMF α} (hg : IsPMF g) :
+    IsPMF (nonEmptyListOf g) := by
+  -- Total probability of non-recursive branches is 1/2, hence `m := 1/2`
+  refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
+  rw [ENNReal.one_sub_half]
+  conv_rhs => rw [nonEmptyListOf]
+  -- In the base case, we have `g >>= fun x => pure [x]`,
+  -- whose mass is `g.mass = 1` by assumption
+  have hg' : g.mass = 1 := hg
+  simp only [mass_pick, mass_bind_pure, hg', mul_one]
+  gcongr
+  apply mass_bind_ge_of_isPMF
+  . assumption
+  . intro x
+    rw [mass_bind_pure]
 
 end combinators
 
