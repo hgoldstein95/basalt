@@ -39,7 +39,7 @@ def frequencySelect [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
     if hlt : n < k then
       x ()
     else
-      frequencySelect xs (n - k) (by dsimp at h; omega)
+      frequencySelect xs (n - k) (by simp only [List.map_cons, List.sum_cons] at h; omega)
 
 /-- Implementation of the `oneOf` combinator, parameterized by an upper bound `n`
     for the random index. The caller is required to supply a proof that `n`

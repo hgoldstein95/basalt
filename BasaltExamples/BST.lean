@@ -45,12 +45,12 @@ tunable def Tree.genWeightedBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
         let l ← Tree.genWeightedBST lo (x.down.val - 1)
         let r ← Tree.genWeightedBST (x.down.val + 1) hi
         return node l x.down.val r)
-    ] (by dsimp; omega)
+    ] (by simp)
 partial_fixpoint
 
 theorem Tree.genBST_support :
-    t ∈ SPMF.support (Tree.genBST lo hi) ↔ t ∈ {t | Tree.isBST lo hi t} := by
-  simp
+    IsSoundAndComplete (Tree.genBST lo hi) (Tree.isBST lo hi) := by
+  intro t
   fun_induction Tree.isBST
     <;> rw [Tree.genBST]
     <;> split
@@ -250,7 +250,7 @@ private theorem genWeightedBST_step (p : Nat × Nat) :
           gcongr with x hx
           exact ENNReal.one_sub_mul_le_add (mass_le_one _) (mass_le_one _)
 
-theorem Tree.genWeightedBST_terminates : SPMF.IsPMF (Tree.genWeightedBST lo hi) := by
+theorem Tree.genWeightedBST_terminates : IsAlmostSurelyTerminating (Tree.genWeightedBST lo hi) := by
   refine SPMF.IsPMF_of_ranking
     (fun p : Nat × Nat => (Tree.genWeightedBST p.1 p.2 : SPMF (Tree Nat)))
     (levelOp_bstLevel (5 / 6))
@@ -358,7 +358,7 @@ private theorem genBST_step (p : Nat × Nat) :
           gcongr with x hx
           exact ENNReal.one_sub_mul_le_add (mass_le_one _) (mass_le_one _)
 
-theorem Tree.genBST_terminates : SPMF.IsPMF (Tree.genBST lo hi) := by
+theorem Tree.genBST_terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) := by
   refine SPMF.IsPMF_of_ranking
     (fun p : Nat × Nat => (Tree.genBST p.1 p.2 : SPMF (Tree Nat)))
     (levelOp_bstLevel (1 / 2))
@@ -372,7 +372,7 @@ end ranking_termination
 /-! ## Cost -/
 
 theorem Tree.genBST_cost :
-    IsBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
+    IsCostBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
   open Lean.Order in
   delta genBST
   apply (fix_induct (motive := fun (g : Nat → Nat → SPMF.Cost (Tree Nat)) =>
@@ -397,7 +397,7 @@ theorem Tree.genBST_cost :
         omega
 
 theorem Tree.genWeightedBST_cost :
-    IsBounded (Tree.genWeightedBST lo hi) (fun t => 3 * t.size + 1) := by
+    IsCostBounded (Tree.genWeightedBST lo hi) (fun t => 3 * t.size + 1) := by
   open Lean.Order in
   delta genWeightedBST
   apply (fix_induct (motive := fun (g : Nat → Nat → SPMF.Cost (Tree Nat)) =>
@@ -429,14 +429,9 @@ theorem Tree.genWeightedBST_cost :
         simp only [Tree.size]
         omega
 
-instance {lo hi : Nat} : LawfulGenerator (Tree.genBST lo hi) (Tree.isBST lo hi)
-    (fun t => 3 * t.size + 1) where
-  support_iff := Tree.genBST_support
-  is_pmf := Tree.genBST_terminates
-  is_bounded := Tree.genBST_cost
-
 theorem Tree.genWeightedBST_support :
-    t ∈ SPMF.support (Tree.genWeightedBST lo hi) ↔ Tree.isBST lo hi t := by
+    IsSoundAndComplete (Tree.genWeightedBST lo hi) (Tree.isBST lo hi) := by
+  intro t
   fun_induction Tree.isBST
     <;> rw [Tree.genWeightedBST]
     <;> split
@@ -458,27 +453,5 @@ theorem Tree.genWeightedBST_support :
       refine ⟨5, _, Or.inr ⟨rfl, rfl⟩, by norm_num, ?_⟩
       simp
       grind
-
-instance {lo hi : Nat} : LawfulGenerator (Tree.genWeightedBST lo hi) (Tree.isBST lo hi)
-    (fun t => 3 * t.size + 1) where
-  support_iff := Tree.genWeightedBST_support
-  is_pmf := Tree.genWeightedBST_terminates
-  is_bounded := Tree.genWeightedBST_cost
-
-/- `genBST` can be run in `IO`. -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← Tree.genBST 0 10) : IO Unit)
-
-/- `genBST` can be run in `PlausibleGen`. -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← Plausible.Gen.run (Tree.genBST (G := Plausible.Gen) 0 10) 10) : IO Unit)
-
-/- `genWeightedBST` can be run in `IO` and indeed generates
-    non-empty trees more frequently than leaves (by inspection) -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:10] do
-  IO.println <| repr (← Tree.genWeightedBST 0 10) : IO Unit)
 
 end BST

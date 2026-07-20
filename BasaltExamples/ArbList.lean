@@ -1,5 +1,5 @@
 import Basalt
-import Basalt.Examples.ArbNat
+import BasaltExamples.ArbNat
 
 open RandomChoice ArbNat
 
@@ -21,12 +21,14 @@ def List.arbitrary' [Gen G] : G (List Nat) := do
   let n ← Nat.arbitrary
   vectorOf n Nat.arbitrary
 
-theorem List.arbitrary_support : xs ∈ SPMF.support List.arbitrary := by
+theorem List.arbitrary_support : IsSoundAndComplete List.arbitrary ⊤ := by
+  intro xs
+  simp only [Pi.top_apply]
   induction xs <;> rw [List.arbitrary]
   case _ => simp
-  case _ x xs ih => simp [ih, Nat.arbitrary_support]
+  case _ x xs ih => simp [ih, Nat.arbitrary_mem_support]
 
-theorem List.arbitrary_terminates : SPMF.IsPMF List.arbitrary := by
+theorem List.arbitrary_terminates : IsAlmostSurelyTerminating List.arbitrary := by
   -- Static seed, mean offspring 1/2: subcritical.
   refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
   rw [ENNReal.one_sub_half]
@@ -38,7 +40,7 @@ theorem List.arbitrary_terminates : SPMF.IsPMF List.arbitrary := by
   rw [SPMF.mass_bind_pure]
 
 theorem List.arbitrary_cost :
-    IsBounded List.arbitrary (fun xs => 2 * xs.length + xs.sum + 1) := by
+    IsCostBounded List.arbitrary (fun xs => 2 * xs.length + xs.sum + 1) := by
   open Lean.Order in
   delta arbitrary
   apply fix_induct (motive := fun (g : SPMF.Cost (List Nat)) =>
@@ -59,19 +61,5 @@ theorem List.arbitrary_cost :
       show 1 + m ≤ 2 * (x :: tl).length + (x :: tl).sum + 1
       simp only [List.length_cons, List.sum_cons]
       omega
-
-instance : LawfulGenerator List.arbitrary ⊤ (fun xs => 2 * xs.length + xs.sum + 1) where
-  support_iff := by simp [List.arbitrary_support]
-  is_pmf := List.arbitrary_terminates
-  is_bounded := List.arbitrary_cost
-
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← List.arbitrary) : IO Unit)
-
-#guard_msgs(drop info) in
-#eval (for _ in [0:10] do
-  IO.println <| repr (← List.arbitrary') : IO Unit)
-
 
 end ArbList

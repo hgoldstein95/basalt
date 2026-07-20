@@ -31,8 +31,7 @@ end SPMF
 namespace SPMF.Cost
 
 instance instInhabited : Inhabited (SPMF.Cost α) where
-  -- Note: default value for `SPMF.Cost` is just the constant
-  -- function returning 0
+  -- default = ⊥, the empty-support SPMF
   default := @Bot.bot (SPMF (α × Nat)) _
 
 noncomputable instance instMonad : Monad SPMF.Cost where
@@ -346,7 +345,7 @@ theorem IsBounded_vectorOf
     have hys_cost : (ys, ys_cost).2 ≤ (cost_g <$> (ys, ys_cost).1).sum := by
       apply IH
       assumption
-    simp only [Functor.map] at *
+    simp only [Functor.map, List.map_cons, List.sum_cons] at *
     omega
 
 /-- The cost function here is 1 more than the cost of `vectorOf`, because
@@ -513,7 +512,7 @@ theorem admissible_IsBounded (f : α → Nat) :
   obtain ⟨x, hxc, hxp⟩ := hp
   exact ih x hxc p hxp
 
-/-- Note: this proof is very similar to `List.arbitrary_cost` in `Examples/ArbList.lean`,
+/-- Note: this proof is very similar to `List.arbitrary_cost` in `BasaltExamples/ArbList.lean`,
     except the cost function now comprises the following:
     - `2 * xs.length`: 2 random choices for each element in `xs` (a call to `pick` and a call to `g`)
     - `(cost_g <$> xs).sum`: Need to apply `g`'s cost function to each generated element and sum them

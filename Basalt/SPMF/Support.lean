@@ -443,7 +443,7 @@ theorem frequencySelect_mem [Gen G]
         . rfl
     · -- n >= w
       have h_remaining_weight : n - w < List.sum (List.map Prod.fst tl) := by
-        dsimp only [List.map_cons, List.sum_cons] at h
+        simp only [List.map_cons, List.sum_cons] at h
         omega
       obtain ⟨w', g', hwg_mem, hwg_pos, hwg_eq⟩ := ih h_remaining_weight
       exists w', g'
@@ -599,6 +599,49 @@ theorem mem_support_csup {c : SPMF α → Prop} (hc : chain c) {a : α} :
     simp_all
   · rintro ⟨f, hcf, haf⟩ h
     simp_all
+
+/-- Reweighting a uniform choice preserves its support. Replacing `oneOf gs` by a `frequency`
+over the same branches leaves the set of reachable values unchanged, provided every weight is
+positive. -/
+theorem support_frequency_reweight
+    {gs : List (Unit → SPMF α)} {gs' : List (Nat × (Unit → SPMF α))}
+    (hsnd : gs'.map Prod.snd = gs) (hpos : ∀ p ∈ gs', 0 < p.1)
+    (hne : gs ≠ []) (h_pos : 0 < List.sum (List.map Prod.fst gs')) :
+    support (frequency gs' h_pos) = support (oneOf gs hne) := by
+  subst hsnd
+  rw [support_frequency, support_oneOf]
+  ext a
+  simp only [Set.mem_setOf_eq, List.mem_map]
+  constructor
+  · rintro ⟨w, g, hmem, _, ha⟩
+    exact ⟨g, ⟨(w, g), hmem, rfl⟩, ha⟩
+  · rintro ⟨g, ⟨⟨w, g'⟩, hmem, hg⟩, ha⟩
+    cases hg
+    exact ⟨w, g', hmem, hpos _ hmem, ha⟩
+
+/-- The same, between two `frequency`s. This is the shape a tuning rewrite has: `tunable def`
+replaces literal weights by `Tuning.weight θ i d` in place, so both sides are already `frequency`s
+and only the weights differ. -/
+theorem support_frequency_congr_weights
+    {gs gs' : List (Nat × (Unit → SPMF α))}
+    (hsnd : gs'.map Prod.snd = gs.map Prod.snd)
+    (hpos : ∀ p ∈ gs', 0 < p.1) (hpos' : ∀ p ∈ gs, 0 < p.1)
+    (h : 0 < List.sum (List.map Prod.fst gs)) (h' : 0 < List.sum (List.map Prod.fst gs')) :
+    support (frequency gs' h') = support (frequency gs h) := by
+  rw [support_frequency, support_frequency]
+  ext a
+  simp only [Set.mem_setOf_eq]
+  constructor
+  · rintro ⟨w, g, hmem, _, ha⟩
+    have : g ∈ gs.map Prod.snd := hsnd ▸ List.mem_map.mpr ⟨(w, g), hmem, rfl⟩
+    obtain ⟨⟨w', g'⟩, hmem', hg⟩ := List.mem_map.mp this
+    cases hg
+    exact ⟨w', g', hmem', hpos' _ hmem', ha⟩
+  · rintro ⟨w, g, hmem, _, ha⟩
+    have : g ∈ gs'.map Prod.snd := hsnd ▸ List.mem_map.mpr ⟨(w, g), hmem, rfl⟩
+    obtain ⟨⟨w', g'⟩, hmem', hg⟩ := List.mem_map.mp this
+    cases hg
+    exact ⟨w', g', hmem', hpos _ hmem', ha⟩
 
 end support
 
