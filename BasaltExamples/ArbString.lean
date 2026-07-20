@@ -22,7 +22,7 @@ theorem genCharList_support :
     IsSoundAndComplete genCharList (fun cs => ∀ c ∈ cs, c.isAlphanum = true) :=
   fun _ => genCharList_mem_support
 
-/-- `String.arbitrary`'s support is exactly the set of alphanumeric characters -/
+/-- `String.arbitrary`'s support is exactly the set of alphanumeric strings -/
 theorem String.arbitrary_support :
     IsSoundAndComplete String.arbitrary (fun s => ∀ c ∈ s.toList, c.isAlphanum = true) := by
   intro s
@@ -38,6 +38,43 @@ theorem String.arbitrary_support :
     constructor
     . apply genCharList_mem_support.mpr
       assumption
+    . rw [String.ofList_toList]
+
+/-- `NonEmptyString.arbitrary`'s support is exactly the set of
+    *non-empty* alphanumeric strings -/
+theorem NonEmptyString.arbitrary_support :
+    IsSoundAndComplete NonEmptyString.arbitrary (fun s => !s.isEmpty ∧ ∀ c ∈ s.toList, c.isAlphanum = true) := by
+  intro s
+  simp only [NonEmptyString.arbitrary, SPMF.mem_support_map_iff]
+  constructor
+  · rintro ⟨cs, hcs, rfl⟩
+    rw [SPMF.mem_support_nonEmptylistOf] at hcs
+    rw [Set.mem_setOf_eq] at hcs
+    obtain ⟨h1, h2⟩ := hcs
+    constructor
+    . rw [Bool.not_eq_true_eq_eq_false]
+      simp [String.isEmpty]
+      assumption
+    . intro c hc
+      rw [String.toList_ofList] at hc
+      specialize h2 c hc
+      simp [Char.arbitrary_mem_support] at h2
+      assumption
+  · intro h
+    set cs := s.toList
+    exists cs
+    constructor
+    . obtain ⟨hne, hc⟩ := h
+      simp at hne
+      subst cs
+      rw [SPMF.support_nonEmptyListOf]
+      rw [Set.mem_setOf_eq]
+      constructor
+      . simpa [String.isEmpty, String.toList_eq_nil_iff] using hne
+      . intro c hmem
+        simp [Char.arbitrary_mem_support]
+        apply hc
+        assumption
     . rw [String.ofList_toList]
 
 -- This proof is largely the same as `List.arbitrary_terminates`,
