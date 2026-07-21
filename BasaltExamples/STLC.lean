@@ -38,7 +38,7 @@ inductive Term where
   | Var: Nat → Term
   | App: Term → Term → Term
   | Abs: Ty → Term → Term
-  deriving DecidableEq, BEq
+  deriving DecidableEq, BEq, Inhabited
 
 /-- Pretty-prints a `Term`. Variables use De Bruijn indices (`#n`).
 
@@ -292,6 +292,23 @@ theorem varsWithType_sound :
   apply getElem?_lookup
   assumption
 
+/-- Converse of `getElem?_lookup`: `lookup Γ i τ` implies `Γ[i]? = some τ`. -/
+theorem lookup_getElem? :
+    lookup Γ i τ → Γ[i]? = some τ := by
+  intro h
+  induction h with
+  | Now τ Γ => simp
+  | Later τ τ' n Γ hl IH => simpa using IH
+
+/-- If `lookup Γ x τ` holds, then `Var x` is contained in the output of `varsWithType Γ τ` -/
+theorem varsWithType_complete :
+    lookup Γ x τ → Term.Var x ∈ varsWithType Γ τ := by
+  intro h
+  simp only [varsWithType, List.mem_filterMap]
+  refine ⟨(τ, x), ?_, by simp⟩
+  rw [mk_mem_zipIdx_iff_getElem?]
+  exact lookup_getElem? h
+
 
 /-- Generates a well-typed term at type `τ` in context `Γ`. -/
 def genTerm [Gen G] (Γ : Ctx) (τ : Ty) : G Term :=
@@ -333,10 +350,36 @@ theorem genTerm_complete :
     Typing Γ e τ → e ∈ SPMF.support (genTerm Γ τ) := by
   intro h
   induction h with
-  | TBool => sorry
-  | TVar => sorry
-  | TAbs => sorry
-  | TApp => sorry
+  | TBool Γ b =>
+    rw [genTerm]
+    support_simp [mem_support_oneOf_iff]
+    by_cases hne : varsWithType Γ Ty.Bool ≠ []
+    · -- varsWithType Γ Ty.Bool ≠ []
+      left
+      refine ⟨hne, fun _ => genBool, ?_⟩
+      simp
+      cases b <;> simp [genBool, Bool.arbitrary]
+    ·-- varsWithType Γ Ty.Bool = []
+      right
+      refine ⟨hne, fun _ => genBool, ?_⟩
+      simp
+      cases b <;> simp [genBool, Bool.arbitrary]
+  | TVar Γ x τ hlookup =>
+    unfold genTerm
+    support_simp [mem_support_oneOf_iff]
+    left
+    have hmem : .Var x ∈ varsWithType Γ τ := by
+      apply varsWithType_complete
+      assumption
+    have hne : varsWithType Γ τ ≠ [] := by
+      apply List.ne_nil_of_mem
+      assumption
+    exists hne
+    exists (fun _ => elements (varsWithType Γ τ) hne)
+    simp
+    assumption
+  | TAbs Γ body τ1 τ2 hbody IH => sorry
+  | TApp Γ e1 e2 τ1 τ2 h2 h1 IH2 IH1 => sorry
 
 theorem genTerm_sound :
     e ∈ SPMF.support (genTerm Γ τ) → Typing Γ e τ := by
