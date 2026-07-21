@@ -183,7 +183,7 @@ theorem genBool_sound :
 
 /-- Finds all variables in `Γ` that have type `τ` -/
 def varsWithType (Γ : Ctx) (τ : Ty) : List Term :=
-  Γ.filterMap (fun τ' => if τ' == τ then Term.Var <$> Γ.idxOf? τ' else none)
+  Γ.zipIdx.filterMap (fun (τ', i) => if τ' == τ then some (Term.Var i) else none)
 
 /-- Generates a term with size 0 -/
 def genZero [Gen G] (Γ : Ctx) (τ : Ty) : G Term :=
@@ -263,14 +263,33 @@ theorem lookup_of_idxOf? {Γ : Ctx} {τ : Ty} {n : Nat} :
         apply lookup.Later _ _ _ _
         apply IH hmap
 
+/-- If `Γ[i]` returns `τ`, then the judgment `lookup Γ i τ` holds -/
+theorem getElem?_lookup :
+    Γ[i]? = some τ → lookup Γ i τ := by
+  intro h
+  induction Γ generalizing i τ with
+  | nil => contradiction
+  | cons τ' Γ' IH =>
+    cases i with
+    | zero =>
+      simp at h
+      subst h
+      constructor
+    | succ i' =>
+      apply lookup.Later
+      apply IH
+      simp at h
+      assumption
+
 /-- All terms in the list produced by `varsWithType` are sound -/
 theorem varsWithType_sound :
     e ∈ varsWithType Γ τ → Typing Γ e τ := by
   intro h
   simp [varsWithType] at h
-  obtain ⟨hmem, a, hidx, rfl⟩ := h
+  obtain ⟨i, hmem, rfl⟩ := h
   apply Typing.TVar
-  apply lookup_of_idxOf?
+  rw [mk_mem_zipIdx_iff_getElem?] at hmem
+  apply getElem?_lookup
   assumption
 
 
@@ -309,6 +328,15 @@ def genTerm [Gen G] (Γ : Ctx) (τ : Ty) : G Term :=
           return .Abs τ1 e
     ] (by apply cons_ne_nil)
 partial_fixpoint
+
+theorem genTerm_complete :
+    Typing Γ e τ → e ∈ SPMF.support (genTerm Γ τ) := by
+  intro h
+  induction h with
+  | TBool => sorry
+  | TVar => sorry
+  | TAbs => sorry
+  | TApp => sorry
 
 theorem genTerm_sound :
     e ∈ SPMF.support (genTerm Γ τ) → Typing Γ e τ := by
