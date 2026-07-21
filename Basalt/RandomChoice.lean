@@ -25,7 +25,8 @@ def RandomChoice.coin [Monad m] [RandomChoice m] (r : Rat) : m Bool := do
 
 /-- The `pick` combinator is `monotone` if its arguments are.
 
-This is intended to be used in the construction of partial_fixpoint, and not meant to be used otherwise. -/
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used
+otherwise. -/
 @[partial_fixpoint_monotone]
 theorem RandomChoice.monotone_pick
     [∀ α, PartialOrder (m α)]
