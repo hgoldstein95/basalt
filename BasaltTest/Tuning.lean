@@ -7,6 +7,7 @@ Authors: Harrison Goldstein
 import Basalt
 import Basalt.Combinators
 import BasaltExamples.BST
+import BasaltExamples.BST.Weighted
 
 open RandomChoice
 

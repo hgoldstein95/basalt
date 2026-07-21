@@ -1,9 +1,23 @@
+/-
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein
+-/
 import Basalt
 
 open RandomChoice
 
+/-!
+# Arbitrary Natural Numbers
+
+`Nat.arbitrary` generates an arbitrary natural number by repeatedly flipping a coin to decide
+whether to increment. It is the simplest recursive generator in the cookbook and a building block
+for several others (`ArbList`, `SortedList`, `Heap`).
+-/
+
 namespace ArbNat
 
+/-- Generates an arbitrary natural number: flip a coin to stop at `0` or recurse and add one. -/
 def Nat.arbitrary [Gen G] : G Nat := do
   pick
     (fun () => pure 0)
@@ -24,6 +38,7 @@ theorem Nat.arbitrary.terminates : IsAlmostSurelyTerminating Nat.arbitrary := by
   conv_rhs => rw [Nat.arbitrary]
   simp
 
+/-- Producing `n` costs `n + 1` random choices (one per increment, plus the final stop). -/
 theorem Nat.arbitrary.cost_bounded :
     IsCostBounded Nat.arbitrary (fun n => n + 1) := by
   open Lean.Order in

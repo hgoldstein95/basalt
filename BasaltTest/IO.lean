@@ -3,6 +3,7 @@ import BasaltExamples.ArbNat
 import BasaltExamples.ArbList
 import BasaltExamples.ArbString
 import BasaltExamples.BST
+import BasaltExamples.BST.Weighted
 import BasaltExamples.Heap
 
 /-! # Exercising `IO` Interpretations

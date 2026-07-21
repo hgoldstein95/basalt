@@ -1,10 +1,27 @@
+/-
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein
+-/
 import Basalt
 import BasaltExamples.ArbNat
 
 open RandomChoice ArbNat
 
+/-!
+# Sorted Lists
+
+`List.genSorted` generates sorted `List Nat`s. It works by generating each element as the previous
+one plus a `Nat.arbitrary` gap, threading the running lower bound `m` through the recursion:
+`List.genSortedGt m` produces sorted lists whose every element is at least `m`. Because the
+recursion *re-indexes the seed* (`genSortedGt x` for a new `x`), termination uses the `_family` form
+of the subcritical criterion. The public `genSorted` and its laws are the `m = 0` specializations.
+-/
+
 namespace SortedList
 
+/-- Generates a sorted list whose every element is at least `m`: stop with `[]`, or draw a gap with
+`Nat.arbitrary`, emit `m + gap`, and recurse with that as the new lower bound. -/
 def List.genSortedGt [Gen G] (m : Nat) : G (List Nat) := do
   pick
     (fun () => pure [])
@@ -15,12 +32,15 @@ def List.genSortedGt [Gen G] (m : Nat) : G (List Nat) := do
       return x :: xs)
 partial_fixpoint
 
+/-- Generates an arbitrary sorted list, i.e. one with lower bound `0`. -/
 def List.genSorted [Gen G] : G (List Nat) := List.genSortedGt 0
 
+/-- The cost bound for `genSorted`. -/
 def List.genSorted.costBound (xs : List Nat) : Nat :=
   xs.length + 1 + -- Cost of choosing `xs.length` cons-cells and one nil.
   xs.sum + xs.length -- Cost of choosing `xs.length` natural numbers `n`, each of which costs `n + 1`.
 
+/-- The validity predicate: the list is (non-strictly) sorted. -/
 def List.sorted (xs : List Nat) : Prop :=
   match xs with
   | [] => True
@@ -90,6 +110,8 @@ theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.
 theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=
   List.genSortedGt.terminates 0
 
+/-- Producing `xs` from `genSortedGt m` costs at most `xs.length + xs.sum + xs.length + 1` choices:
+one per cons cell and the final nil, plus each element `n`'s `Nat.arbitrary` cost of `n + 1`. -/
 theorem List.genSortedGt.cost_bounded :
     IsCostBounded (List.genSortedGt m) (fun xs => xs.length + xs.sum + xs.length + 1) := by
   open Lean.Order in
