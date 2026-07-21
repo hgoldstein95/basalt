@@ -14,10 +14,10 @@ This file establishes the infrastructure necessary to make a `Gen` instance for 
 
 There are two `IO`-flavored interpretations:
 
-| monad | `choose` via | uniform? | draws per `choose` |
-|---|---|---|---|
-| `IO` | `IO.rand` | to within `1 ± 1/1000` | 1 while `k ≲ 2^21`, more beyond |
-| `UniformIO` | `IO.getRandomBytes` + rejection | exactly | 1 per attempt, expected `< 2` |
+| monad       | `choose` via                    | uniform?               | draws per `choose`              |
+|-------------|---------------------------------|------------------------|---------------------------------|
+| `IO`        | `IO.rand`                       | to within `1 ± 1/1000` | 1 while `k ≲ 2^21`, more beyond |
+| `UniformIO` | `IO.getRandomBytes` + rejection | exactly                | 1 per attempt, expected `< 2`   |
 
 `IO` remains the default because it is fast: a pure PRNG step, no syscall. `UniformIO` is the
 interpretation to reach for when you want the running generator to actually match what the `SPMF`
@@ -52,7 +52,7 @@ instance : Lean.Order.MonoBind UniformIO := inferInstanceAs (Lean.Order.MonoBind
 def run (x : UniformIO α) : IO α := x
 
 /-- The number of bits needed to represent every value `< k`. Zero when `k ≤ 1`, since a single
-  possible outcome carries no information. -/
+possible outcome carries no information. -/
 def bitsFor (k : Nat) : Nat :=
   if k ≤ 1 then 0 else (k - 1).log2 + 1
 
@@ -71,7 +71,7 @@ partial def uniformLt (k : Nat) : IO Nat := do
   loop
 
 /-- `UniformIO` draws by rejection sampling over `IO.getRandomBytes`, so each value is exactly
-  uniform and each attempt is exactly one read from the OS entropy source. -/
+uniform and each attempt is exactly one read from the OS entropy source. -/
 instance : RandomChoice UniformIO where
   choose lo hi h := do
     let v ← uniformLt (hi - lo + 1)

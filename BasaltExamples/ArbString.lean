@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein
+-/
 import Basalt
 import Batteries.Data.Char
 import BasaltExamples.ArbChar
@@ -5,9 +10,17 @@ import BasaltExamples.ArbString.Def
 
 open RandomChoice ArbChar
 
+/-!
+# Arbitrary Strings
+
+Correctness proofs for `String.arbitrary` (defined in `BasaltExamples/ArbString.Def`), an arbitrary
+alphanumeric string. Each property is proved first for the underlying `genCharList` and then
+transported across `String.ofList`. The `genCharList` proofs mirror `List.arbitrary`'s, with
+`Char.arbitrary` in place of `Nat.arbitrary`.
+-/
+
 namespace ArbString
 
-/-- `genCharList`'s support is exactly the set of alphanumeric characters -/
 theorem genCharList_mem_support :
     cs ∈ SPMF.support genCharList ↔ ∀ c ∈ cs, c.isAlphanum = true := by
   induction cs with
@@ -22,7 +35,6 @@ theorem genCharList.sound_complete :
     IsSoundAndComplete genCharList (fun cs => ∀ c ∈ cs, c.isAlphanum = true) :=
   fun _ => genCharList_mem_support
 
-/-- `String.arbitrary`'s support is exactly the set of alphanumeric characters -/
 theorem String.arbitrary.sound_complete :
     IsSoundAndComplete String.arbitrary (fun s => ∀ c ∈ s.toList, c.isAlphanum = true) := by
   intro s
@@ -40,34 +52,28 @@ theorem String.arbitrary.sound_complete :
       assumption
     . rw [String.ofList_toList]
 
--- This proof is largely the same as `List.arbitrary.terminates`,
--- except with calls to `List.arbitrary` / `Nat.arbitrary` replaced with
--- `genCharList` / `Char.arbitrary` respectively
 theorem genCharList.terminates : IsAlmostSurelyTerminating genCharList := by
   -- Static seed, mean offspring 1/2: subcritical.
   refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
-  rw [ENNReal.one_sub_half]
   conv_rhs => rw [genCharList]
   simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
   gcongr
-  apply SPMF.mass_bind_ge_of_isPMF Char.arbitrary.terminates
-  intro c
-  rw [SPMF.mass_bind_pure]
+  · simp_all
+  · apply SPMF.mass_bind_ge_of_isPMF Char.arbitrary.terminates
+    intro c
+    rw [SPMF.mass_bind_pure]
 
-/-- `String.arbitrary` almost surely terminates -/
 theorem String.arbitrary.terminates : IsAlmostSurelyTerminating String.arbitrary := by
   unfold String.arbitrary IsAlmostSurelyTerminating SPMF.IsPMF
   rw [SPMF.mass_map]
   apply genCharList.terminates
 
--- Proof is similar to `List.arbitrary.cost_bounded`, except here the cost function
--- is just the no. of calls to `pick` + `Char.arbitrary` (`2 * cs.length`),
--- along with one final call to `pick` to produce the end of the list
+/-- Producing `cs` costs at most `2 * cs.length + 1` choices: one `pick` and one `Char.arbitrary`
+(cost 1) per cons cell, plus the final `pick` that ends the list. -/
 theorem genCharList.cost_bounded :
     IsCostBounded genCharList (fun cs => 2 * cs.length + 1) := by
   open Lean.Order in
   delta genCharList
-  -- Apply fixpoint induction
   apply fix_induct (motive := fun (g : SPMF.Cost (List Char)) =>
     IsBounded g (fun cs => 2 * cs.length + 1)) _ ?admissible ?step
   case admissible =>
@@ -87,6 +93,7 @@ theorem genCharList.cost_bounded :
       simp only [List.length_cons]
       omega
 
+/-- Producing a string of length `n` costs at most `2 * n + 1` choices. -/
 theorem String.arbitrary.cost_bounded :
     IsCostBounded String.arbitrary (fun s => 2 * s.length + 1) := by
   unfold String.arbitrary IsCostBounded

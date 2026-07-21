@@ -1,5 +1,6 @@
 import Basalt
 import BasaltExamples.BST
+import BasaltExamples.BST.Weighted
 import BasaltExamples.AllTwoTree
 
 open RandomChoice

@@ -1,15 +1,32 @@
+/-
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein
+-/
 import Basalt
 import BasaltExamples.ArbNat
 
 open RandomChoice ArbNat
 
+/-!
+# Min-Heaps
+
+`Tree.genHeap lo` generates arbitrary binary min-heaps whose values are all at least `lo`. It draws
+each node's value as `lo` plus a `Nat.arbitrary` gap, then recurses on both children with that
+value as the new lower bound. Like `SortedList`, the recursion re-indexes the seed, so termination
+uses a `_family` criterion; unlike it, recursing on *two* children makes the mean offspring exactly
+`1`, so this is a **critical** generator (almost surely terminating, infinite expected size).
+-/
+
 namespace Heap
 
+/-- A binary tree with `Nat`-labelled nodes. -/
 inductive Tree where
   | leaf : Tree
   | node : Tree → Nat → Tree → Tree
 deriving Repr
 
+/-- The number of nodes in the tree. -/
 def Tree.size : Tree → Nat
   | leaf => 0
   | node l _ r => l.size + r.size + 1
@@ -41,7 +58,6 @@ def Tree.genHeap [Gen G] (lo : Nat) : G Tree :=
       return node l x r)
 partial_fixpoint
 
-/-- `genHeap` produces exactly the min-heaps bounded below by `lo`. -/
 theorem Tree.genHeap.sound_complete :
     IsSoundAndComplete (Tree.genHeap lo) (Tree.isHeap lo) := by
   intro t
@@ -63,7 +79,6 @@ theorem Tree.genHeap.sound_complete :
       · rw [show lo + (x - lo) = x by omega]; exact ihl.mpr hl
       · rw [show lo + (x - lo) = x by omega]; exact ihr.mpr hr
 
-/-- `genHeap` terminates with probability 1. -/
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   -- Critical (mean offspring exactly 1); the recursion re-indexes the seed, hence the family form.
   refine SPMF.IsPMF_of_critical_family
@@ -85,8 +100,7 @@ theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) :=
     simpa [SPMF.mass_bind_pure] using SPMF.mass_ge_iInf
       (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree)) (lo + delta)
 
-/-- `genHeap` makes a number of random choices bounded by the size and the sum
-    of the values of the tree it produces (no backtracking choices). -/
+/-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/
 theorem Tree.genHeap.cost_bounded :
     IsCostBounded (Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1) := by
   open Lean.Order in
