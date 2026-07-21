@@ -72,3 +72,25 @@ example : Gen UniformIO := inferInstance
   let hi : Nat := 2 ^ 70 + 2 ^ 65
   let b := (← RandomChoice.choose (m := UniformIO) lo hi (by omega)).down.val
   IO.println s!"{a == 7} {lo ≤ b && b ≤ hi}" : UniformIO Unit).run
+
+/-! ## `OptionT` over `IO`
+
+The `OptionT` lift (`Basalt/OptionT.lean`) makes any generator monad into one, so `Gen` resolves at
+`OptionT G` and every generator term can be reinterpreted there. This is the interpretation of a
+filtering generator; a total generator term run through it never fails, so every draw is `some`. -/
+
+example : Gen (OptionT IO) := inferInstance
+
+/-- Run `gen` at `OptionT IO` `n` times and report how many draws succeeded — all of them, for a
+total generator. -/
+def exerciseOptionT (n : Nat) (gen : OptionT IO α) : IO Unit := do
+  let mut somes := 0
+  for _ in [0:n] do
+    if (← gen.run).isSome then somes := somes + 1
+  IO.println s!"{somes}/{n} some"
+
+/-- info: 10/10 some -/
+#guard_msgs in #eval exerciseOptionT 10 (ArbNat.Nat.arbitrary : OptionT IO Nat)
+
+/-- info: 10/10 some -/
+#guard_msgs in #eval exerciseOptionT 10 (BST.Tree.genBST 0 10 : OptionT IO (BST.Tree Nat))
