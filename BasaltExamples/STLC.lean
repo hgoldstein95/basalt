@@ -346,6 +346,7 @@ def genTerm [Gen G] (Γ : Ctx) (τ : Ty) : G Term :=
     ] (by apply cons_ne_nil)
 partial_fixpoint
 
+/-- All well-typed terms are in `genTerm`'s suport -/
 theorem genTerm_complete :
     Typing Γ e τ → e ∈ SPMF.support (genTerm Γ τ) := by
   intro h
@@ -374,12 +375,51 @@ theorem genTerm_complete :
     have hne : varsWithType Γ τ ≠ [] := by
       apply List.ne_nil_of_mem
       assumption
-    exists hne
-    exists (fun _ => elements (varsWithType Γ τ) hne)
+    exists hne, (fun _ => elements (varsWithType Γ τ) hne)
     simp
     assumption
-  | TAbs Γ body τ1 τ2 hbody IH => sorry
-  | TApp Γ e1 e2 τ1 τ2 h2 h1 IH2 IH1 => sorry
+  | TAbs Γ body τ1 τ2 hbody IH =>
+    rw [genTerm]
+    support_simp [mem_support_oneOf_iff]
+    by_cases hne : varsWithType Γ (.Fun τ1 τ2) ≠ []
+    . left
+      exists hne, (fun _ => do
+        let e ← genTerm (τ1 :: Γ) τ2
+        return (.Abs τ1 e))
+      simp
+      assumption
+    . right
+      exists hne, (fun _ => do
+        let e ← genTerm (τ1 :: Γ) τ2
+        return (.Abs τ1 e))
+      simp
+      assumption
+  | TApp Γ e1 e2 τ1 τ2 h2 h1 IH2 IH1 =>
+    unfold genTerm
+    support_simp [mem_support_oneOf_iff]
+    by_cases hne : varsWithType Γ τ2 ≠ []
+    . left
+      exists hne, (fun _ => do
+        let argTy ← genType
+        let e1 ← genTerm Γ (.Fun argTy τ2)
+        let e2 ← genTerm Γ argTy
+        return (.App e1 e2))
+      simp
+      exists τ1
+      constructor
+      . apply genType_support
+      . constructor <;> assumption
+    . right
+      exists hne, (fun _ => do
+        let argTy ← genType
+        let e1 ← genTerm Γ (.Fun argTy τ2)
+        let e2 ← genTerm Γ argTy
+        return (.App e1 e2))
+      simp
+      exists τ1
+      constructor
+      . apply genType_support
+      . constructor <;> assumption
 
 theorem genTerm_sound :
     e ∈ SPMF.support (genTerm Γ τ) → Typing Γ e τ := by
