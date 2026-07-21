@@ -1,15 +1,32 @@
+/-
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein
+-/
 import Basalt
-import Basalt.Examples.ArbNat
+import BasaltExamples.ArbNat
 
 open RandomChoice ArbNat
 
+/-!
+# Min-Heaps
+
+`Tree.genHeap lo` generates arbitrary binary min-heaps whose values are all at least `lo`. It draws
+each node's value as `lo` plus a `Nat.arbitrary` gap, then recurses on both children with that
+value as the new lower bound. Like `SortedList`, the recursion re-indexes the seed, so termination
+uses a `_family` criterion; unlike it, recursing on *two* children makes the mean offspring exactly
+`1`, so this is a **critical** generator (almost surely terminating, infinite expected size).
+-/
+
 namespace Heap
 
+/-- A binary tree with `Nat`-labelled nodes. -/
 inductive Tree where
   | leaf : Tree
   | node : Tree → Nat → Tree → Tree
 deriving Repr
 
+/-- The number of nodes in the tree. -/
 def Tree.size : Tree → Nat
   | leaf => 0
   | node l _ r => l.size + r.size + 1
@@ -41,16 +58,16 @@ def Tree.genHeap [Gen G] (lo : Nat) : G Tree :=
       return node l x r)
 partial_fixpoint
 
-/-- `genHeap` produces exactly the min-heaps bounded below by `lo`. -/
-theorem Tree.genHeap_support :
-    t ∈ SPMF.support (Tree.genHeap lo) ↔ Tree.isHeap lo t := by
+theorem Tree.genHeap.sound_complete :
+    IsSoundAndComplete (Tree.genHeap lo) (Tree.isHeap lo) := by
+  intro t
   induction t generalizing lo with
   | leaf =>
     rw [Tree.genHeap]
     simp [Tree.isHeap]
   | node l x r ihl ihr =>
     rw [Tree.genHeap]
-    support_simp [Tree.isHeap, Tree.node.injEq, Nat.arbitrary_support, true_and]
+    support_simp [Tree.isHeap, Tree.node.injEq, Nat.arbitrary_mem_support, true_and]
     constructor
     · rintro (h | ⟨d, l', hl', r', hr', hle, hld, hrd⟩)
       · simp at h
@@ -62,8 +79,7 @@ theorem Tree.genHeap_support :
       · rw [show lo + (x - lo) = x by omega]; exact ihl.mpr hl
       · rw [show lo + (x - lo) = x by omega]; exact ihr.mpr hr
 
-/-- `genHeap` terminates with probability 1. -/
-theorem Tree.genHeap_terminates : SPMF.IsPMF (Tree.genHeap lo) := by
+theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   -- Critical (mean offspring exactly 1); the recursion re-indexes the seed, hence the family form.
   refine SPMF.IsPMF_of_critical_family
     (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree))
@@ -79,15 +95,14 @@ theorem Tree.genHeap_terminates : SPMF.IsPMF (Tree.genHeap lo) := by
     simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
     gcongr
     rw [sq]
-    refine SPMF.mass_bind_ge_of_isPMF Nat.arbitrary_terminates (fun delta => ?_)
+    refine SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates (fun delta => ?_)
     refine SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo + delta)) (fun l => ?_)
     simpa [SPMF.mass_bind_pure] using SPMF.mass_ge_iInf
       (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree)) (lo + delta)
 
-/-- `genHeap` makes a number of random choices bounded by the size and the sum
-    of the values of the tree it produces (no backtracking choices). -/
-theorem Tree.genHeap_cost :
-    IsBounded (Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1) := by
+/-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/
+theorem Tree.genHeap.cost_bounded :
+    IsCostBounded (Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1) := by
   open Lean.Order in
   delta genHeap
   apply (fix_induct (motive := fun (g : Nat → SPMF.Cost Tree) => ∀ lo, IsBounded (g lo) (fun t => 3 * t.size + t.sum + 1)) _ ?admissible ?step) lo
@@ -103,27 +118,11 @@ theorem Tree.genHeap_cost :
       simp [Tree.size, Tree.sum]
     · obtain ⟨delta, n1, n2, hdelta,
         ⟨l, n3, n4, hl, ⟨r, n5, n6, hr, ⟨rfl, hn6⟩, hn4⟩, hn2⟩, hm⟩ := h
-      have hd : n1 ≤ delta + 1 := IsBounded_iff.mp Nat.arbitrary_cost (delta, n1) hdelta
+      have hd : n1 ≤ delta + 1 := IsBounded_iff.mp Nat.arbitrary.cost_bounded (delta, n1) hdelta
       have hL : n3 ≤ 3 * l.size + l.sum + 1 := ih (lo + delta) (l, n3) hl
       have hR : n5 ≤ 3 * r.size + r.sum + 1 := ih (lo + delta) (r, n5) hr
       show 1 + m ≤ 3 * (Tree.node l (lo + delta) r).size + (Tree.node l (lo + delta) r).sum + 1
       simp only [Tree.size, Tree.sum]
       omega
-
-instance {lo : Nat} :
-    LawfulGenerator (Tree.genHeap lo) (Tree.isHeap lo) (fun t => 3 * t.size + t.sum + 1) where
-  support_iff := Tree.genHeap_support
-  is_pmf := Tree.genHeap_terminates
-  is_bounded := Tree.genHeap_cost
-
-/- `genHeap` can be run in `IO`. -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← Tree.genHeap 0) : IO Unit)
-
-/- `genHeap` can be run in `PlausibleGen`. -/
-#guard_msgs(drop info) in
-#eval (for _ in [0:20] do
-  IO.println <| repr (← Plausible.Gen.run (Tree.genHeap (G := Plausible.Gen) 0) 10) : IO Unit)
 
 end Heap

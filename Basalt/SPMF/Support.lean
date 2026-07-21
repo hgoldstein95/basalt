@@ -16,6 +16,23 @@ This file sets up basic definitions for working with the support of `SPMF`s.
 ## Main Definitions
 
 - `SPMF.support` — Defines the set of values that have nonzero mass in the distribution.
+
+## Main Statements
+
+The bulk of the file is the support-inversion lemma family: for each combinator, a characterization
+of its support as an explicit set, packaged as the `mem_support_*_iff` `simp` lemmas that
+`support_simp` (`Basalt/Tactics.lean`) fires on real generator goals.
+
+- `mem_support_bind_iff` / `mem_support_pure_iff` / `mem_support_map_iff` — the monad primitives.
+- `mem_support_choose_iff` / `mem_support_chooseNat_iff` — the sole source of randomness.
+- `mem_support_pick_iff`, `mem_support_vectorOf_iff`, `mem_support_listOfMaxLength_iff`,
+  `mem_support_listOf`, `mem_support_elements_iff`, `mem_support_oneOf_iff`,
+  `mem_support_frequency_iff` — the derived combinators.
+- `frequency_apply` — the exact branch probability `wⱼ / Σᵢ wᵢ` (a mass computation, not a support
+  fact; the engine behind `support_frequency`, and reused by `Basalt/SPMF/Termination.lean`).
+- `mem_support_csup` — support of a `CCPO` supremum, for `partial_fixpoint` generators.
+- `support_frequency_reweight` / `support_frequency_congr_weights` — support is unchanged when a
+  uniform choice is reweighted, the shape a `tunable def` rewrite takes.
 -/
 
 namespace SPMF
@@ -170,8 +187,8 @@ theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
   · rintro ⟨h1, h2⟩
     exact ⟨⟨⟨n, h1, h2⟩⟩, rfl⟩
 
-/-- The support of `vectorOf n g` is the set of all length-`n` list where
-    each element is in `g`'s support -/
+/-- The support of `vectorOf n g` is the set of all length-`n` list where each element is in `g`'s
+support. -/
 theorem support_vectorOf
     {n : Nat}
     {g : SPMF α} :
@@ -236,8 +253,7 @@ theorem support_vectorOf
             assumption
         . rfl
 
-/-- `xs` is in the support of `vectorOf n g` iff `xs` has length `n`
-    and all elements of `xs` are in `g`'s support -/
+/-- Membership form of `support_vectorOf`. -/
 @[simp]
 theorem mem_support_vectorOf_iff
     {n : Nat}
@@ -246,8 +262,8 @@ theorem mem_support_vectorOf_iff
   simp [support_vectorOf]
 
 
-/-- The support of `listOfMaxLength n g` is the set of all lists with length
-    at most `n`, where each element is in `g`'s support -/
+/-- The support of `listOfMaxLength n g` is the set of all lists with length at most `n`, where each
+element is in `g`'s support -/
 theorem support_listOfMaxLength
     {n : Nat}
     {g : SPMF α} :
@@ -261,8 +277,7 @@ theorem mem_support_listOfMaxLength_iff
     xs ∈ (listOfMaxLength n g).support ↔ xs.length ≤ n ∧ ∀ x ∈ xs, x ∈ g.support := by
   simp [support_listOfMaxLength]
 
-/-- The support of `listOf g` is the set of all lists where each element
-    is in `g`'s support -/
+/-- The support of `listOf g` is the set of all lists where each element is in `g`'s support -/
 theorem support_listOf
     {g : SPMF α} :
     support (listOf g) = { xs | ∀ x ∈ xs, x ∈ g.support } := by
@@ -353,7 +368,7 @@ theorem support_elements
       simp only [mem_support_pure_iff]
       apply (Eq.symm heq)
 
-/-- `a` is in the support of `elements xs` if and only if `a ∈ xs` -/
+/-- Membership form of `support_elements`. -/
 @[simp]
 theorem mem_support_elements_iff
     [Inhabited α]
@@ -404,8 +419,7 @@ theorem support_oneOf
       subst heq
       assumption
 
-/-- Any element in the support of `oneOf gs` is in the support of some
-    generator in `gs` -/
+/-- Membership form of `support_oneOf`. -/
 @[simp]
 theorem mem_support_oneOf_iff
     {gs : List (Unit → SPMF α)}
@@ -413,49 +427,8 @@ theorem mem_support_oneOf_iff
     a ∈ support (oneOf gs hne) ↔ ∃ g ∈ gs, a ∈ (g ()).support := by
   simp [support_oneOf]
 
-
-
-/-- If `n < sum (fst <$> gs)`, then `frequencySelect gs n h` picks a sub-generator
-    from `gs` that has non-zero weight `w`.
-
-    Note: this lemma is parameterized over `Gen G`, not `SPMF`, as it is used
-    both for support & cost lemmas (i.e. `G` is instantiated with `SPMF` and `SPMF.Cost`)
-    about `frequency`. -/
-theorem frequencySelect_mem [Gen G]
-    {gs : List (Nat × (Unit → G α))}
-    {n : Nat}
-    (h : n < (List.map Prod.fst gs).sum) :
-    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ Helpers.frequencySelect gs n h = g () := by
-  induction gs generalizing n with
-  | nil => simp at h
-  | cons hd tl ih =>
-    unfold Helpers.frequencySelect
-    obtain ⟨ w, g ⟩ := hd
-    split
-    · -- n < w
-      exists w, g
-      constructor
-      . -- (w, g) ∈ (w, g) :: tl
-        apply List.Mem.head
-      . -- 0 < w ∧ fst (w, g) () = g ()
-        constructor
-        . omega
-        . rfl
-    · -- n >= w
-      have h_remaining_weight : n - w < List.sum (List.map Prod.fst tl) := by
-        dsimp only [List.map_cons, List.sum_cons] at h
-        omega
-      obtain ⟨w', g', hwg_mem, hwg_pos, hwg_eq⟩ := ih h_remaining_weight
-      exists w', g'
-      constructor
-      . -- (w', g') ∈ (w, g) :: tl
-        apply List.mem_cons_of_mem
-        assumption
-      . -- 0 < w' ∧ frequencySelect tl (n - w) = g'
-        constructor <;> assumption
-
-/-- Summing `frequencySelect` over all values of the uniform draw counts each branch
-    `(w, g)` exactly `w` times. -/
+/-- Summing `frequencySelect` over all values of the uniform draw counts each branch `(w, g)`
+exactly `w` times. -/
 private theorem sum_frequencySelect_apply
     (gs : List (Nat × (Unit → SPMF α))) (a : α) :
     ∑ n ∈ Finset.range ((gs.map Prod.fst).sum),
@@ -466,8 +439,6 @@ private theorem sum_frequencySelect_apply
   | cons hd tl ih =>
     obtain ⟨k, g⟩ := hd
     have hS : ((((k, g) :: tl).map Prod.fst).sum) = k + (tl.map Prod.fst).sum := by simp
-    -- Rewriting the summand to a total function of `n` first keeps the range split below
-    -- from having to transport the `frequencySelect` proof arguments.
     have hsummand : ∀ n ∈ Finset.range ((((k, g) :: tl).map Prod.fst).sum),
         (if h : n < (((k, g) :: tl).map Prod.fst).sum
           then Helpers.frequencySelect ((k, g) :: tl) n h a else 0)
@@ -512,10 +483,7 @@ private theorem sum_frequencySelect_apply
     rw [hfirst, hsecond]
     simp
 
-/-- Branch `j` of `frequency` fires with probability `wⱼ / Σᵢ wᵢ`.
-
-    The sums are `List.sum`s, not `Finset` sums: duplicate `(weight, generator)` pairs are
-    distinct branches, and a `Finset` sum would collapse them. -/
+/-- Branch `j` of `frequency` fires with probability `wⱼ / Σᵢ wᵢ`. -/
 @[simp]
 theorem frequency_apply
     (gs : List (Nat × (Unit → SPMF α))) (h : 0 < (gs.map Prod.fst).sum) (a : α) :
@@ -541,8 +509,8 @@ theorem frequency_apply
     rw [hIcc, hT, ← Finset.mul_sum, sum_frequencySelect_apply, one_div,
       div_eq_mul_inv, mul_comm]
 
-/-- If the sum of weights in `gs` is non-zero, then the support of `frequency gs`
-    is exactly the union of the support of the generators in `gs` with non-zero weights -/
+/-- If the sum of weights in `gs` is non-zero, then the support of `frequency gs` is exactly the
+union of the support of the generators in `gs` with non-zero weights. -/
 @[simp]
 theorem support_frequency
     {gs : List (Nat × (Unit → SPMF α))}
@@ -599,6 +567,49 @@ theorem mem_support_csup {c : SPMF α → Prop} (hc : chain c) {a : α} :
     simp_all
   · rintro ⟨f, hcf, haf⟩ h
     simp_all
+
+/-- Reweighting a uniform choice preserves its support. Replacing `oneOf gs` by a `frequency`
+over the same branches leaves the set of reachable values unchanged, provided every weight is
+positive. -/
+theorem support_frequency_reweight
+    {gs : List (Unit → SPMF α)} {gs' : List (Nat × (Unit → SPMF α))}
+    (hsnd : gs'.map Prod.snd = gs) (hpos : ∀ p ∈ gs', 0 < p.1)
+    (hne : gs ≠ []) (h_pos : 0 < List.sum (List.map Prod.fst gs')) :
+    support (frequency gs' h_pos) = support (oneOf gs hne) := by
+  subst hsnd
+  rw [support_frequency, support_oneOf]
+  ext a
+  simp only [Set.mem_setOf_eq, List.mem_map]
+  constructor
+  · rintro ⟨w, g, hmem, _, ha⟩
+    exact ⟨g, ⟨(w, g), hmem, rfl⟩, ha⟩
+  · rintro ⟨g, ⟨⟨w, g'⟩, hmem, hg⟩, ha⟩
+    cases hg
+    exact ⟨w, g', hmem, hpos _ hmem, ha⟩
+
+/-- The same, between two `frequency`s. This is the shape a tuning rewrite has: `tunable def`
+replaces literal weights by `Tuning.weight θ i d` in place, so both sides are already `frequency`s
+and only the weights differ. -/
+theorem support_frequency_congr_weights
+    {gs gs' : List (Nat × (Unit → SPMF α))}
+    (hsnd : gs'.map Prod.snd = gs.map Prod.snd)
+    (hpos : ∀ p ∈ gs', 0 < p.1) (hpos' : ∀ p ∈ gs, 0 < p.1)
+    (h : 0 < List.sum (List.map Prod.fst gs)) (h' : 0 < List.sum (List.map Prod.fst gs')) :
+    support (frequency gs' h') = support (frequency gs h) := by
+  rw [support_frequency, support_frequency]
+  ext a
+  simp only [Set.mem_setOf_eq]
+  constructor
+  · rintro ⟨w, g, hmem, _, ha⟩
+    have : g ∈ gs.map Prod.snd := hsnd ▸ List.mem_map.mpr ⟨(w, g), hmem, rfl⟩
+    obtain ⟨⟨w', g'⟩, hmem', hg⟩ := List.mem_map.mp this
+    cases hg
+    exact ⟨w', g', hmem', hpos' _ hmem', ha⟩
+  · rintro ⟨w, g, hmem, _, ha⟩
+    have : g ∈ gs'.map Prod.snd := hsnd ▸ List.mem_map.mpr ⟨(w, g), hmem, rfl⟩
+    obtain ⟨⟨w', g'⟩, hmem', hg⟩ := List.mem_map.mp this
+    cases hg
+    exact ⟨w', g', hmem', hpos _ hmem', ha⟩
 
 end support
 

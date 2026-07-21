@@ -26,7 +26,7 @@ This file provides lemmas for working with partial generators that can be interp
 namespace SPMF
 
 /-- Sums over an `Option`-indexed `ℝ≥0∞` family split off the `none` term. Mathlib has no
-  `tsum_option` in this toolchain, so we prove the special case we need. -/
+`tsum_option` in this toolchain, so we prove the special case we need. -/
 theorem tsum_option (f : Option α → ℝ≥0∞) :
     ∑' o, f o = f none + ∑' a, f (some a) := by
   classical
@@ -42,18 +42,18 @@ theorem tsum_option (f : Option α → ℝ≥0∞) :
   intro a
   simp
 
-/-- The mass on *successful* outcomes: the probability a draw yields a value. This is the acceptance
-  rate of a filtering generator; it is `1` exactly when the generator never fails and never
-  diverges. -/
+/-- The mass on successful outcomes: the probability a draw yields a value. This is the acceptance
+rate of a filtering generator; it is `1` exactly when the generator never fails and never diverges.
+-/
 noncomputable def massSome (p : SPMF (Option α)) : ℝ≥0∞ := ∑' a, p (some a)
 
 /-- The probability a draw yields an *explicit* failure (`none`). -/
 noncomputable def massNone (p : SPMF (Option α)) : ℝ≥0∞ := p none
 
 /-- The expected number of draws of `p` that a retry loop performs before it succeeds. Each attempt
-  fails independently with probability `massNone p`, so `P(at least k+1 attempts) = massNone p ^ k`,
-  and this is the tail-sum expectation `∑ₖ P(≥ k+1 attempts)` of that geometric count.
-  `retry_attempts` evaluates it to `1 / massSome p`. -/
+fails independently with probability `massNone p`, so `P(at least k+1 attempts) = massNone p ^ k`,
+and this is the tail-sum expectation `∑ₖ P(≥ k+1 attempts)` of that geometric count.
+`retry_attempts` evaluates it to `1 / massSome p`. -/
 noncomputable def expectedAttempts (p : SPMF (Option α)) : ℝ≥0∞ := ∑' k : ℕ, (massNone p) ^ k
 
 /-- The total mass of a draw splits into successes and explicit failures. Whatever is left over
@@ -89,7 +89,7 @@ theorem retry_eq (p : SPMF (Option α)) :
   conv_lhs => rw [retry]
 
 /-- The mass recurrence: a retry either succeeds now (mass `massSome p`) or fails now (probability
-  `massNone p`) and re-enters the same loop. -/
+`massNone p`) and re-enters the same loop. -/
 theorem mass_retry (p : SPMF (Option α)) :
     (retry p).mass = massSome p + massNone p * (retry p).mass := by
   conv_lhs => rw [retry_eq]
@@ -98,8 +98,8 @@ theorem mass_retry (p : SPMF (Option α)) :
   rw [add_comm]
   rfl
 
-/-- The retry loop terminates almost surely whenever the underlying draw is *productive* (succeeds
-  with positive probability) and itself terminates almost surely. -/
+/-- The retry loop terminates almost surely whenever the underlying draw is productive (succeeds
+with positive probability) and itself terminates almost surely. -/
 theorem IsPMF_retry (p : SPMF (Option α)) (hmass : p.mass = 1)
     (hprod : 0 < massSome p) : SPMF.IsPMF (retry p) := by
   have hsn : massSome p + massNone p = 1 := by rw [← mass_split p]; exact hmass
@@ -154,8 +154,8 @@ theorem retry_none_eq_zero (p : SPMF (Option α)) (hmass : p.mass = 1)
   exact lt_irrefl _ hlt
 
 /-- **Retry makes a productive generator filter-free.** If `p` terminates almost surely (`mass = 1`)
-  and succeeds with positive probability (`0 < massSome p`), then `retry p` never fails and never
-  diverges: all of its mass is on values. -/
+and succeeds with positive probability (`0 < massSome p`), then `retry p` never fails and never
+diverges: all of its mass is on values. -/
 theorem massSome_retry (p : SPMF (Option α))
     (hmass : p.mass = 1) (hprod : 0 < massSome p) :
     massSome (retry p) = 1 := by
@@ -166,7 +166,7 @@ theorem massSome_retry (p : SPMF (Option α))
   exact hsplit.symm
 
 /-- The success recurrence: a value `a` comes out either on the first draw, or after a failure and a
-  re-entry into the loop. -/
+re-entry into the loop. -/
 theorem retry_some (p : SPMF (Option α)) (a : α) :
     retry p (some a) = p (some a) + massNone p * retry p (some a) := by
   conv_lhs => rw [retry_eq]
@@ -186,8 +186,8 @@ theorem retry_some (p : SPMF (Option α)) (a : α) :
   rfl
 
 /-- **Retry yields the conditional distribution given success.** For a productive,
-  almost-surely-terminating draw, the probability that `retry` outputs `a` is `p (some a)`
-  renormalized by the acceptance rate `massSome`. -/
+almost-surely-terminating draw, the probability that `retry` outputs `a` is `p (some a)`
+renormalized by the acceptance rate `massSome`. -/
 theorem retry_apply (p : SPMF (Option α)) (hmass : p.mass = 1)
     (hprod : 0 < massSome p) (a : α) :
     retry p (some a) = p (some a) / massSome p := by
@@ -209,8 +209,8 @@ theorem retry_apply (p : SPMF (Option α)) (hmass : p.mass = 1)
   rw [ENNReal.eq_div_iff hprod.ne' hs_ne, mul_comm]
   exact hRs
 
-/-- **The expected number of attempts is `1 / massSome`.** For an almost-surely-terminating draw, the
-  retry loop runs `1 / massSome p` draws in expectation. -/
+/-- **The expected number of attempts is `1 / massSome`.** For an almost-surely-terminating draw,
+the retry loop runs `1 / massSome p` draws in expectation. -/
 theorem retry_attempts (p : SPMF (Option α)) (hmass : p.mass = 1) :
     expectedAttempts p = 1 / massSome p := by
   unfold expectedAttempts

@@ -177,13 +177,17 @@ private def countRuns (xs : Array String) : Array (String × Nat) := Id.run do
 private def truncate (s : String) (w : Nat := 90) : String :=
   if s.length ≤ w then s else s!"{s.take (w - 1)}…"
 
+/-- What `#genstats` found for one law slot: the conventional name (`sound_complete`) and whether a
+declaration under it actually proves the law. -/
+abbrev LawStatus := String × Bool
+
 /-- Format draw results as a terse text summary: outcomes, size and choice-count distributions,
-    value diversity, head-constructor histogram, most common values, and a few samples. The
-    optional functions are supplied by the `#genstats` elaborator based on what the output type
-    supports; a `none` simply omits that section. -/
+    value diversity, head-constructor histogram, most common values, a few samples, and the laws
+    the generator carries. The optional functions are supplied by the `#genstats` elaborator based
+    on what the output type supports; a `none` simply omits that section. -/
 def render (label : String) (cfg : Config) (results : Array (Except Error (α × Nat)))
     (size? : Option (α → Nat) := none) (repr? : Option (α → String) := none)
-    (ctor? : Option (α → String) := none) : String := Id.run do
+    (ctor? : Option (α → String) := none) (laws : Array LawStatus := #[]) : String := Id.run do
   let n := results.size
   let oks := results.filterMap fun | .ok p => some p | .error _ => none
   let fuelExhausted := (results.filter fun | .error .outOfFuel => true | _ => false).size
@@ -229,12 +233,31 @@ def render (label : String) (cfg : Config) (results : Array (Except Error (α ×
       lines := lines.push "" |>.push "  samples"
       for s in reprs.take 3 do
         lines := lines.push s!"    {truncate s}"
+  -- Laws last, so the measurements above are read *before* the reminder of what is merely measured.
+  -- A generator with no laws at all prints nothing here: the block exists to put proved next to
+  -- unproved, and with nothing proved there is no contrast to draw.
+  if !laws.isEmpty then
+    let w := laws.foldl (fun acc (n, _) => max acc n.length) 0 + 2
+    let proved := laws.filterMap fun (n, ok) => if ok then some n else none
+    lines := lines.push ""
+    lines := lines.push <|
+      if proved.isEmpty then "  laws: (none proved)"
+      else s!"  laws: {String.intercalate "  " (proved.map (· ++ " ✓")).toList}"
+    for (name, ok) in laws do
+      if !ok then
+        -- The one slot the report can speak to empirically. Naming the measurement next to the
+        -- missing proof is the point: 0 divergences in 1000 draws is not a termination proof.
+        let note :=
+          if name == "terminates" then
+            s!"(not proved; measured {fuelExhausted}/{n} divergences)"
+          else "(not proved)"
+        lines := lines.push s!"        {padR name w}— {note}"
   return String.intercalate "\n" lines.toList
 
 /-- Draw, summarize, print. This is the function that `#genstats` elaborates to a call of. -/
 def report (g : StatGen α) (label : String) (cfg : Config)
     (size? : Option (α → Nat) := none) (repr? : Option (α → String) := none)
-    (ctor? : Option (α → String) := none) : IO Unit :=
-  IO.println (render label cfg (runDraws g cfg) size? repr? ctor?)
+    (ctor? : Option (α → String) := none) (laws : Array LawStatus := #[]) : IO Unit :=
+  IO.println (render label cfg (runDraws g cfg) size? repr? ctor? laws)
 
 end GenStats

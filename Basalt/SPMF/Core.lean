@@ -300,9 +300,9 @@ theorem bind_pick {α β} (x y : SPMF α) (f : α → SPMF β) :
     (pick (fun () => x) (fun () => y) >>= f) = pick (fun _ => x >>= f) (fun _ => y >>= f) := by
   apply SPMF.ext
   intro b
-  simp only [pick_apply, bind, SPMF.bind, Bind.bind]
+  rw [bind_apply, pick_apply, bind_apply, bind_apply]
+  simp_rw [pick_apply]
   simp only [ENNReal.tsum_add, add_mul, ENNReal.tsum_mul_left, mul_assoc]
-  rfl
 
 theorem tsum_pick {x y : SPMF α} :
     ∑' a, (pick (fun () => x) (fun () => y)) a = (1/2 : ℝ≥0∞) * (∑' a, x a) + (1/2 : ℝ≥0∞) * (∑' a, y a) := by
