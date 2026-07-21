@@ -27,7 +27,6 @@ theorem genAllTwos.sound_complete : IsSoundAndComplete genAllTwos AllTwos := by
 theorem genAllTwos.terminates : IsAlmostSurelyTerminating genAllTwos := by
   -- Static seed, mean offspring 1/2: subcritical.
   refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
-  rw [ENNReal.one_sub_half]
   conv_rhs => rw [genAllTwos]
   simp
 

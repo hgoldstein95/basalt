@@ -192,10 +192,10 @@ theorem <GEN>.terminates : IsAlmostSurelyTerminating <GEN> := by
   -- Subcritical, static seed (worked instances: Nat.arbitrary, List.arbitrary, genAllTwos,
   -- genCharList; family form: List.genSortedGt):
   refine SPMF.IsPMF_of_subcritical_mass (m := <M>) (by norm_num) ?_
-  rw [ENNReal.one_sub_half]          -- ⊢ (1 - m) + m * mass ≤ mass; at m = 1/2 this rewrites 1 - m
   conv_rhs => rw [<GEN>]             -- unfold one step, RHS only
   simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
   gcongr                             -- match the non-recursive parts; leaves the recursive branch
+  simp_all
   -- Now one lemma per `←`, reading the do-block top to bottom:
   apply SPMF.mass_bind_ge_of_isPMF <callee>.terminates   -- `← callee` with a known PMF
   intro x

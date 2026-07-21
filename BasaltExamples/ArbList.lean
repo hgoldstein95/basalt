@@ -31,13 +31,13 @@ theorem List.arbitrary.sound_complete : IsSoundAndComplete List.arbitrary ⊤ :=
 theorem List.arbitrary.terminates : IsAlmostSurelyTerminating List.arbitrary := by
   -- Static seed, mean offspring 1/2: subcritical.
   refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
-  rw [ENNReal.one_sub_half]
   conv_rhs => rw [List.arbitrary]
   simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
   gcongr
-  apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates
-  intro x
-  rw [SPMF.mass_bind_pure]
+  · simp_all
+  · apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates
+    intro x
+    rw [SPMF.mass_bind_pure]
 
 theorem List.arbitrary.cost_bounded :
     IsCostBounded List.arbitrary (fun xs => 2 * xs.length + xs.sum + 1) := by

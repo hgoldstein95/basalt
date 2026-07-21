@@ -46,13 +46,13 @@ theorem String.arbitrary.sound_complete :
 theorem genCharList.terminates : IsAlmostSurelyTerminating genCharList := by
   -- Static seed, mean offspring 1/2: subcritical.
   refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
-  rw [ENNReal.one_sub_half]
   conv_rhs => rw [genCharList]
   simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
   gcongr
-  apply SPMF.mass_bind_ge_of_isPMF Char.arbitrary.terminates
-  intro c
-  rw [SPMF.mass_bind_pure]
+  · simp_all
+  · apply SPMF.mass_bind_ge_of_isPMF Char.arbitrary.terminates
+    intro c
+    rw [SPMF.mass_bind_pure]
 
 /-- `String.arbitrary` almost surely terminates -/
 theorem String.arbitrary.terminates : IsAlmostSurelyTerminating String.arbitrary := by

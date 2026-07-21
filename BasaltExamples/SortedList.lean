@@ -78,14 +78,14 @@ theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.
     (fun (m : Nat) => (List.genSortedGt m : SPMF (List Nat)))
     (m := 1 / 2) (by norm_num) ?_ m
   intro n
-  rw [ENNReal.one_sub_half]
   conv_rhs => unfold List.genSortedGt
   simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
   gcongr
-  apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates
-  intro x
-  simp only [SPMF.mass_bind_pure]
-  exact SPMF.mass_ge_iInf _ (n + x)
+  · simp_all
+  · apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates
+    intro x
+    simp only [SPMF.mass_bind_pure]
+    exact SPMF.mass_ge_iInf _ (n + x)
 
 theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=
   List.genSortedGt.terminates 0
