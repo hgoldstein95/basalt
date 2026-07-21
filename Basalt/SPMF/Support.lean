@@ -253,8 +253,7 @@ theorem support_vectorOf
             assumption
         . rfl
 
-/-- `xs` is in the support of `vectorOf n g` iff `xs` has length `n` and all elements of `xs` are in
-`g`'s support -/
+/-- Membership form of `support_vectorOf`. -/
 @[simp]
 theorem mem_support_vectorOf_iff
     {n : Nat}
@@ -369,7 +368,7 @@ theorem support_elements
       simp only [mem_support_pure_iff]
       apply (Eq.symm heq)
 
-/-- `a` is in the support of `elements xs` if and only if `a ∈ xs` -/
+/-- Membership form of `support_elements`. -/
 @[simp]
 theorem mem_support_elements_iff
     [Inhabited α]
@@ -420,7 +419,7 @@ theorem support_oneOf
       subst heq
       assumption
 
-/-- Any element in the support of `oneOf gs` is in the support of some generator in `gs` -/
+/-- Membership form of `support_oneOf`. -/
 @[simp]
 theorem mem_support_oneOf_iff
     {gs : List (Unit → SPMF α)}

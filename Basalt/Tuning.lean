@@ -11,14 +11,14 @@ A generator's branch weights live in `frequency` calls. `tunable def` (see `Basa
 collects those sites and threads a `Tuning` — an ordinary runtime value — through the generator, so
 a different weighting is a function call away instead of an edit-and-recompile away.
 
-Weights are schedules in the recursion depth `d`: an affine `(a, b)` pair denotes `w(d) = a + b·d`,
-and a constant weight is `(a, 0)`.  Depth-indexing is what lets a generator be exploratory near the
-root and subcritical deep in the recursion.
+Weights are schedules in the recursion depth `d`: an affine `(a, b)` pair denotes
+`w(d) = max a 1 + b·d`, and a constant weight is `(a, 0)`.  Depth-indexing is what lets a generator
+be exploratory near the root and subcritical deep in the recursion.
 
 ## Ensuring Positivity
 
-`Tuning.weight` weights so all branches have at least 1 weight. To prune a branch, the user must
-remove it from the `frequency`.
+`Tuning.weight` clamps every branch to a weight of at least 1, so a runtime `θ` can never zero one
+out. To prune a branch, the user must remove it from the `frequency`.
 -/
 
 /-- A weight schedule per branch: entry `(aⱼ, bⱼ)` denotes the depth-indexed weight

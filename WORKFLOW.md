@@ -104,10 +104,9 @@ cosmetic: `#genstats` discovers laws by exactly this naming convention and repor
 generator carries beside the statistics it merely *measured* (`Basalt/GenStats/Command.lean`,
 `lawSlots`). A law under any other name is invisible to the report — the generator will show
 `— (not proved)` for something you proved. The statement is checked too, not just the name, so a
-conventionally-named theorem that says something else cannot be laundered into a ✓. The same
-convention is what Palamedes' `correct def` emits, so synthesized and hand-written generators
-report alike. (`IsFilterFree`/`IsProductive`, for filtering generators, are `.filter_free` and
-`.productive`.)
+conventionally-named theorem that says something else cannot be laundered into a ✓. Automated
+synthesis that emits the same convention reports identically to hand-written generators.
+(`IsFilterFree`/`IsProductive`, for filtering generators, are `.filter_free` and `.productive`.)
 
 ### Unfolding: one idiom per context
 
@@ -210,14 +209,17 @@ finish with `exact SPMF.mass_ge_iInf _ <new index>` (see `List.genSortedGt.termi
 with `SPMF.mass_frequency` / `SPMF.mass_frequency_ge`; for a `chooseNat` pivot,
 `SPMF.mass_bind_chooseNat_ge` (raw `choose`: `SPMF.mass_bind_choose_ge`).
 
-**Shrinking seed** (both BST generators, `BST.lean`) is the one regime with real content: you
-supply a ranking function `φ : Seed → ℝ≥0∞` (with `φ ≥ 1`) whose expected value drops by `ε` at
-every step, and `SPMF.IsPMF_of_ranking` returns termination *plus* `E[#steps] ≤ φ/ε`. The proof
-splits into a `LevelOp` (three algebra laws), a drift lemma (`A φ + ε ≤ φ` — pure arithmetic about
-your rank), and a step lemma (one unfolding, using `ENNReal.one_sub_le_mul_one_sub`,
+**Shrinking seed** (`Tree.genWeightedBST`, `BST/Weighted.lean`) is the one regime with real
+content: you supply a ranking function `φ : Seed → ℝ≥0∞` (with `φ ≥ 1`) whose expected value drops
+by `ε` at every step, and `SPMF.IsPMF_of_ranking` returns termination *plus* `E[#steps] ≤ φ/ε`. The
+proof splits into a `LevelOp` (three algebra laws), a drift lemma (`A φ + ε ≤ φ` — pure arithmetic
+about your rank), and a step lemma (one unfolding, using `ENNReal.one_sub_le_mul_one_sub`,
 `one_sub_sum_div_le`, `one_sub_mul_le_add` to push the deficit through the branches). Follow
-`genBST_drift`/`genBST_step`/`genBST.terminates` in `BST.lean`; both BST generators share one level
-operator and one rank, differing only in the recursion weight. Two things to know:
+`genWeightedBST_drift`/`genWeightedBST_step`/`genWeightedBST.terminates` in `BST/Weighted.lean`.
+(The plain `Tree.genBST` in `BST.lean` is *critical*, not shrinking — a uniform pivot gives mean
+offspring exactly 1 — so it terminates via `IsPMF_of_critical_family` with no ranking function; the
+`frequency`-weighted variant is what tips supercritical under the crude bound and needs the rank.)
+Two things to know:
 
 - Candidate `φ`s, in order: the seed measure; `≡ const` (that's the static-seed case); seed measure
   plus a depth term. Evaluate the drift in the *actual truncated `Nat` arithmetic* — `bstRank`
@@ -226,14 +228,14 @@ operator and one rank, differing only in the recursion weight. Two things to kno
 
 Whatever the regime, the residual ENNReal *arithmetic* (drift inequalities, fixed-point
 bounds) is handled by `ennreal_to_real` + `norm_num`/`linarith`/`nlinarith` — see
-`Basalt/ENNRealAuto.lean`, with worked uses in `genWeightedBST_drift` (`BST.lean`),
+`Basalt/ENNRealAuto.lean`, with worked uses in `genWeightedBST_drift` (`BST/Weighted.lean`),
 `genTree.terminates` (`AllTwoTree.lean`), and `IsPMF_retry` (`Failure.lean`).
 
 ### Recipe 3: Cost
 
 Worked instances: `Nat.arbitrary.cost_bounded` (`ArbNat.lean`) is the minimal case; `Tree.genHeap.cost_bounded`
-(`Heap.lean`) has a callee and two recursive calls; `Tree.genBST.cost_bounded` / `Tree.genWeightedBST.cost_bounded`
-(`BST.lean`) show `dite`, `chooseNat`, and `frequency`.
+(`Heap.lean`) has a callee and two recursive calls; `Tree.genBST.cost_bounded` (`BST.lean`) shows `dite`
+and `chooseNat`, and `Tree.genWeightedBST.cost_bounded` (`BST/Weighted.lean`) adds `frequency`.
 
 ```lean
 theorem <GEN>.cost_bounded : IsCostBounded <GEN> <COST> := by
@@ -299,5 +301,4 @@ inversion path above is uniform and the combinator side conditions just reintrod
 ## Prior Art
 
 For the *theory* behind the termination recipes — the ranking-function theorem, the three seed
-regimes, and why critical generators have infinite expected size — see `Basalt/SPMF/Ranking.lean`
-and the tuning plan it implements.
+regimes, and why critical generators have infinite expected size — see `Basalt/SPMF/Ranking.lean`.

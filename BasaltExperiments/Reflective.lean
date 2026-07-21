@@ -16,8 +16,7 @@ generators with partial inverse functions that undo specific steps of the comput
 generator can automatically be re-interpreted as a mapping from values to sequences of choices.
 
 Here, we take a different approach. Generators are not changed at all; instead, the inverse
-annotations are provided as part of a simple deductive synthesis process (similar to the one
-Palamedes uses).
+annotations are provided as part of a simple deductive synthesis process.
 -/
 
 /-- A generator can be interpreted as a parser of randomness. -/
