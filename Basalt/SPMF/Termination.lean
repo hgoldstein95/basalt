@@ -174,8 +174,8 @@ theorem mass_ge_iInf {ι : Type*} (g : ι → SPMF α) (i : ι) :
     (g i).mass ≥ ⨅ j, (g j).mass :=
   iInf_le (fun j => (g j).mass) i
 
-/-- Lower-bound the mass of a generator that draws a pivot with `choose` and continues:
-  the mass is at least the *average* over the range of a per-pivot lower bound. -/
+/-- Lower-bound the mass of a generator that draws a pivot with `choose` and continues: the mass is
+at least the *average* over the range of a per-pivot lower bound. -/
 theorem mass_bind_choose_ge {lo hi : Nat} (h : lo ≤ hi)
     {f : ULift {x : Nat // lo ≤ x ∧ x ≤ hi} → SPMF α} {m : Nat → ℝ≥0∞}
     (hf : ∀ a, (f a).mass ≥ m a.down.val) :
@@ -228,7 +228,7 @@ theorem mass_frequency
   rw [ENNReal.tsum_mul_right, tsum_map_weighted]
 
 /-- Lower-bound form of `mass_frequency`, for termination proofs: inside a `partial_fixpoint` one
-  only ever has a *lower bound* on a recursive branch's mass, never an equality. -/
+only ever has a *lower bound* on a recursive branch's mass, never an equality. -/
 theorem mass_frequency_ge {gs : List (Nat × (Unit → SPMF α))}
     (h : 0 < (gs.map Prod.fst).sum)
     {f : (Nat × (Unit → SPMF α)) → ℝ≥0∞}
@@ -247,8 +247,8 @@ section is_pmf
 
 /-- An SPMF is a PMF if the mass sums to exactly 1.
 
-We conjecture that, this means that the probability of non-termination is vanishingly small, and
-therefore that the generator almost-surely terminates. -/
+This means that the probability of non-termination is vanishingly small, and therefore that the
+generator almost-surely terminates. -/
 def IsPMF (p : SPMF α) : Prop := p.mass = 1
 
 theorem IsPMF_pick {x y : SPMF α} (hx : IsPMF x) (hy : IsPMF y) : IsPMF (pick (fun () => x) (fun () => y)) := by
@@ -277,18 +277,12 @@ theorem IsPMF_bind {x : SPMF α} {f : α → SPMF β} (hx : IsPMF x) (hf : ∀ a
   unfold IsPMF
   rw [mass_bind hf, hx]
 
-/-- `Map`-ping a function `f` over an SPMF `x` results in an SPMF -/
 theorem IsPMF_map {x : SPMF α} {f : α → β} (hx : IsPMF x) :
     IsPMF (f <$> x) := by
   unfold IsPMF
   rw [mass_map]
   assumption
 
-/-- For a SPMF `x` and a function `f` that returns an SPMF, if `∀ a ∈ x.support`, `f a` is also an SPMF,
-    then `x >>= f` is also an SPMF. This lemma is a weaker version of `IsPMF_bind` that only quantifies
-    `a` in `x.support` (instead of quantifying over all possible `a : α`),
-    i.e. this lemma obviates the need to reason about `a ∉ x.support`.
-    This helper lemma is used in `IsPMF_oneOf`. -/
 theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β}
     (hx : IsPMF x) (hf : ∀ a ∈ x.support, IsPMF (f a)) :
     IsPMF (x >>= f) := by
@@ -300,8 +294,6 @@ theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β}
     _ = ∑' a, x a * (∑' b, f a b) := by
       simp_rw [ENNReal.tsum_mul_left]
     _ = ∑' a, x a * 1 := by
-        -- To show that the sums are equal,
-        -- it suffices to show that they're equal point-wise
         apply tsum_congr
         intro a
         by_cases ha : a ∈ x.support
@@ -315,7 +307,6 @@ theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β}
     _ = ∑' a, x a := by simp
     _ = 1 := by assumption
 
-/-- The combinator `elements` is an SPMF -/
 theorem IsPMF_elements [Inhabited α] (xs : List α) (hne : xs ≠ []) :
     IsPMF (elements xs hne) := by
   simp only [elements]
@@ -326,7 +317,6 @@ theorem IsPMF_elements [Inhabited α] (xs : List α) (hne : xs ≠ []) :
   apply IsPMF_pure
 
 
-/-- If all generators in the list `gs` are SPMFs, then `oneOf gs` is also an SPMF -/
 theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ g ∈ gs, IsPMF (g ())) :
     IsPMF (oneOf gs hne) := by
   unfold oneOf Helpers.oneOfAux
@@ -346,7 +336,6 @@ theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ 
     apply hgs
     apply List.getElem_mem
 
-/-- If every positive-weight branch is a PMF, the weighted masses sum to the total weight. -/
 private theorem sum_weights_of_IsPMF {gs : List (Nat × (Unit → SPMF α))}
     (hgs : ∀ p ∈ gs, 0 < p.1 → IsPMF (p.2 ())) :
     (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()).mass).sum = ((gs.map Prod.fst).sum : ℝ≥0∞) := by
@@ -361,8 +350,6 @@ private theorem sum_weights_of_IsPMF {gs : List (Nat × (Unit → SPMF α))}
     · have hm : (hd.2 ()).mass = 1 := hgs hd List.mem_cons_self hpos
       rw [hm, mul_one]
 
-/-- A weighted choice among PMFs is a PMF. Only *positive-weight* branches need to be
-    PMFs — a zero-weight branch is never selected. -/
 theorem IsPMF_frequency {gs : List (Nat × (Unit → SPMF α))}
     (h : 0 < (gs.map Prod.fst).sum)
     (hgs : ∀ p ∈ gs, 0 < p.1 → IsPMF (p.2 ())) :
@@ -371,7 +358,6 @@ theorem IsPMF_frequency {gs : List (Nat × (Unit → SPMF α))}
   rw [mass_frequency h, sum_weights_of_IsPMF hgs]
   exact ENNReal.div_self (Nat.cast_ne_zero.mpr h.ne') (ENNReal.natCast_ne_top _)
 
-/-- If a generator `g` is an SPMF, then for any `n`, `vectorOf n g` is also an SPMF -/
 theorem IsPMF_vectorOf {g : SPMF α} (hg : IsPMF g) :
     IsPMF (vectorOf n g) := by
   induction n with
@@ -379,7 +365,6 @@ theorem IsPMF_vectorOf {g : SPMF α} (hg : IsPMF g) :
     simp [vectorOf]
     apply IsPMF_pure
   | succ n IH =>
-    -- Unfold one layer of recursion in the body of `vectorOf`
     rw [vectorOf_succ]
     apply IsPMF_bind
     . assumption
@@ -389,7 +374,6 @@ theorem IsPMF_vectorOf {g : SPMF α} (hg : IsPMF g) :
       . intro xs
         apply IsPMF_pure
 
-/-- If a generator `g` is an SPMF, then for any `n`, `listOfMaxLength n g` is also an SPMF -/
 theorem IsPMF_listOfMaxLength {g : SPMF α} (hg : IsPMF g) :
     IsPMF (listOfMaxLength n g) := by
   unfold listOfMaxLength
@@ -403,8 +387,8 @@ theorem IsPMF_listOfMaxLength {g : SPMF α} (hg : IsPMF g) :
 
 /-- A general fixpoint principle for proving almost-sure termination.
 
-  If the mass of each generator satisfies `mass ≥ F(inf mass)` and `F` is such that
-  `c ≤ 1 ∧ c ≥ F c → c = 1`, then all generators are PMFs. -/
+If the mass of each generator satisfies `mass ≥ F(inf mass)` and `F` is such that
+`c ≤ 1 ∧ c ≥ F c → c = 1`, then all generators are PMFs. -/
 theorem IsPMF_of_mass_fixpoint {ι : Type*} {α : Type*} [Nonempty ι]
     (g : ι → SPMF α) (F : ℝ≥0∞ → ℝ≥0∞)
     (hF : ∀ c : ℝ≥0∞, c ≤ 1 → c ≥ F c → c = 1)

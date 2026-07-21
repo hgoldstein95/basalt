@@ -158,9 +158,8 @@ statement must be headed by. Laws are found by **naming convention** — `genFoo
 there is no registry to fall out of sync with.
 
 Only Basalt's own laws appear here. A downstream library that emits laws Basalt has no definition
-for (Palamedes' `total`, which is `Type`-valued, or its `IsSomeSoundAndComplete` for a filtering
-generator) is invisible to this report; that is the cost of not having a registry, and it is
-preferred to a registry that can silently disagree with what was actually proved. -/
+for is invisible to this report; that is the cost of not having a registry, and it is preferred to
+a registry that can silently disagree with what was actually proved. -/
 private def lawSlots : Array (Name × Name) := #[
   (`sound_complete, ``IsSoundAndComplete),
   (`terminates,     ``IsAlmostSurelyTerminating),

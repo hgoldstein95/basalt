@@ -171,9 +171,6 @@ theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n c : Nat} :
   · rintro ⟨⟨h1, h2⟩, rfl⟩
     exact ⟨⟨⟨n, h1, h2⟩⟩, rfl, rfl⟩
 
-/-- Support inversion for `frequency` at the cost interpretation: a draw from `frequency gs`
-  is a draw from one of its positive-weight branches, plus exactly one choice (the branch
-  selection). The cost-side counterpart of `SPMF.support_frequency`. -/
 theorem mem_support_frequency
     {gs : List (Nat × (Unit → SPMF.Cost α))}
     {hne : 0 < (List.map Prod.fst gs).sum}
@@ -191,7 +188,7 @@ theorem mem_support_frequency
   simp only at hrest
   have hlt : x < (List.map Prod.fst gs).sum := by omega
   rw [dif_pos hlt] at hrest
-  obtain ⟨w, g, hwg, hw, heq⟩ := SPMF.frequencySelect_mem hlt
+  obtain ⟨w, g, hwg, hw, heq⟩ := frequencySelect_mem hlt
   rw [heq] at hrest
   exact ⟨w, g, n2, hwg, hw, hrest, by omega⟩
 
@@ -202,7 +199,7 @@ end SPMF.Cost
 open SPMF.Cost
 
 /-- A cost-tracking generator `x` `IsBounded` by a cost function `f` if every output `a` it can
-  produce is produced with at most `f a` random choices. -/
+produce is produced with at most `f a` random choices. -/
 def IsBounded (x : SPMF.Cost α) (f : α → Nat) : Prop :=
   ∀ p ∈ SPMF.support x, p.2 ≤ f p.1
 
@@ -223,8 +220,7 @@ theorem IsBounded_choose : IsBounded (choose lo hi h) (fun _ => 1) := by
   simp only [mem_support_choose_iff] at hmem
   omega
 
-/-- The `default` generator has empty support since it's just the constant function returning 0.
-    Thus, `default` is bounded by any cost function `f`. -/
+/-- The `default` generator has empty support since it's just the constant function returning 0. -/
 theorem IsBounded_default {f : α → Nat} : IsBounded (default : SPMF.Cost α) f := by
   rw [IsBounded_iff]
   intro (x, c) hp
@@ -253,7 +249,6 @@ theorem IsBounded_bind
   show n1 + n2 ≤ c b
   omega
 
--- We add this lemma to make it easier to reason about generators that use `<$>`
 theorem IsBounded_map
     {f : α → β}
     {cx : α → Nat}
@@ -261,9 +256,6 @@ theorem IsBounded_map
     (hx : IsBounded x cx)
     (hg : ∀ p ∈ x.support, cx p.1 ≤ c (f p.1)) :
     IsBounded (f <$> x) c := by
-  -- For any monad, we have that `f <$> x === x >>= (pure ∘ f)`,
-  -- and we use this equational law to change the shape of our goal
-  -- so that we can prove it in terms of `IsBounded_bind`
   show IsBounded (x >>= fun a => pure (f a)) c
   apply IsBounded_bind
   . assumption
@@ -284,14 +276,10 @@ theorem IsBounded_mono
   simp_all only [IsBounded_iff]
   grind
 
-/-- The `elements` combinator makes only one random choice (the index into the list) -/
 theorem IsBounded_elements
     (hne : xs ≠ []) :
     IsBounded (elements xs hne) (fun _ => 1) := by
   unfold elements
-  -- After picking the random index, `elements` no longer performs any more random choices,
-  -- so `cf` (the cost function for the continuation after we bind the result of `choose`)
-  -- is just the constant function returning 0
   apply IsBounded_bind
     (cx := fun _ => 1)
     (cf := fun _ _ => 0)
@@ -321,7 +309,6 @@ theorem IsBounded_pick
     simp only
     split_ifs <;> omega
 
-/-- The cost incurred by `vectorOf n g` is the sum of the costs of generating each element using `g` -/
 theorem IsBounded_vectorOf
     (hx : IsBounded g cost_g) :
     IsBounded (vectorOf n g) (fun xs => List.sum (cost_g <$> xs)) := by
@@ -345,11 +332,11 @@ theorem IsBounded_vectorOf
     have hys_cost : (ys, ys_cost).2 ≤ (cost_g <$> (ys, ys_cost).1).sum := by
       apply IH
       assumption
-    simp only [Functor.map, List.map_cons, List.sum_cons] at *
+    simp only [Functor.map] at *
     omega
 
-/-- The cost function here is 1 more than the cost of `vectorOf`, because
-    `listOfMaxLength` needs to randomly choose a length for the list before invoking `vectorOf` -/
+/-- The cost function here is 1 more than the cost of `vectorOf`, because `listOfMaxLength` needs to
+randomly choose a length for the list before invoking `vectorOf` -/
 theorem IsBounded_listOfMaxLength
     (hx : IsBounded g cost_g) :
     IsBounded (listOfMaxLength n g) (fun xs => 1 + List.sum (cost_g <$> xs)) := by
@@ -369,8 +356,8 @@ theorem IsBounded_listOfMaxLength
     assumption
   · omega
 
-/-- `oneOf`'s cost function is upper-bounded by 1 +
-    the max-valued cost function out of all the sub-generators -/
+/-- `oneOf`'s cost function is upper-bounded by 1 + the max-valued cost function out of all the
+sub-generators -/
 theorem IsBounded_oneOf
     {gs : List (Unit → SPMF.Cost α)}
     (hne : gs ≠ [])
@@ -420,15 +407,14 @@ theorem IsBounded_oneOf
     specialize hcost_le i (hidx ⟨i, hge, hle⟩) g
     omega
 
-/-- `frequency`'s cost function is upper-bounded by 1 +
-    the max-valued cost function out of all the sub-generators -/
+/-- `frequency`'s cost function is upper-bounded by 1 + the max-valued cost function out of all the
+sub-generators -/
 theorem IsBounded_frequency
     {gs : List (Nat × (Unit → SPMF.Cost α))}
     (hne : 0 < (List.map Prod.fst gs).sum)
     (hcost : ∀ g ∈ gs, {cost_g // IsBounded (g.2 ()) cost_g}) :
     IsBounded (frequency gs hne)
       (fun x => 1 + List.foldr (fun ⟨ (w, g), hg ⟩ acc => max ((hcost (w, g) hg).val x) acc) 0 gs.attach) := by
-  -- Every generator's cost is ≤ the max cost over all generators.
   have hcost_le : ∀ (i : Nat) (hi : i < gs.length) (y : α),
       (hcost gs[i] (List.getElem_mem hi)).val y ≤
         List.foldr (fun ⟨ (w, g), hg ⟩ acc => max ((hcost (w, g) hg).val y) acc) 0 gs.attach := by
@@ -443,7 +429,6 @@ theorem IsBounded_frequency
         . rfl
     . constructor
   unfold frequency Helpers.frequencyAux
-  -- We need to instantiate `cx`/`cf` explicitly here, otherwise unification times out
   apply IsBounded_bind
     (cx := fun _ => 1)
     (cf := fun _ x => List.foldr (fun ⟨(w, g), hg⟩ acc => max ((hcost (w, g) hg).val x) acc) 0 gs.attach)
@@ -455,32 +440,14 @@ theorem IsBounded_frequency
   . -- ∀ x, IsBounded (if x < (Prod.fst <$> gs).sum then ... else ...) (List.foldr ... 0 gs)
     rintro ⟨n, hge, hle⟩
     dsimp only
-    -- `frequencySelect` has an `if`-expression that cases on whether `n < (Prod.fst <$> gs).sum`,
-    -- we case on this
     split
-    . -- In this case, we have `n ≤ (List.map Prod.fst gs).sum`, so
-      -- `frequencyAux` calls `frequencySelect`.
-      -- Here we use the fact that `frequencySelect` is bounded...
-      obtain ⟨w, g, hwg, _, heq⟩ := SPMF.frequencySelect_mem (by assumption)
-      -- We name the chosen sub-generator's cost function `cost_g : α → Nat`.
-      -- `set` (not `have`) rewrites every occurrence, including inside `hbounded`,
-      -- so the remaining goal is phrased in terms of `cost_g` throughout.
+    . obtain ⟨w, g, hwg, _, heq⟩ := frequencySelect_mem (by assumption)
       set cost_g : α → Nat := (hcost (w, g) hwg).val with hcost_g
-      -- `frequencySelect` reduces to the chosen generator `g ()`, which `hcost` bounds
       rw [heq]
       have hbounded : IsBounded (g ()) cost_g := (hcost (w, g) hwg).property
-      -- ...along the fact that the `IsBounded` relation is monotonic over `≤`
       apply IsBounded_mono hbounded
-      -- Now we just need to show that `cost_g` is less than
-      -- `List.foldr (fun ... acc => max <some_cost_function> acc) 0 gs.attach`
       intro x
-      -- Now we rewrite the RHS into
-      -- the form `List.foldr max 0 (List.map <cost_function> gs.attach)`
       rw [← List.foldr_map]
-      -- We use the fact that the cost of each sub-generator
-      -- is upper-bounded by the `max` of all sub-generators' costs.
-      -- (We instantiate the variable `x` of the `List.le_max_of_le'` lemma
-      -- here to make subsequent goals clearer.)
       apply List.le_max_of_le' (x := cost_g x)
       . -- `cost_g x ∈ List.map <cost_function> gs`
         apply List.mem_map.mpr
@@ -489,10 +456,7 @@ theorem IsBounded_frequency
         . apply List.mem_attach
         . rfl
       . apply le_refl
-    . -- In this case, we have `¬ n ≤ (List.map Prod.fst gs).sum`,
-      -- so `frequencyAux` ends up using the `default` generator instead.
-      -- The fallback `default` generator has empty support, so it is bounded by anything.
-      apply IsBounded_default
+    . apply IsBounded_default
   . -- The bound for the cost function for the continuation (after the bind) is tight
     dsimp
     intro p hp q hq
@@ -502,7 +466,7 @@ theorem IsBounded_frequency
 open Lean.Order in
 /-- `IsBounded` is an admissible relation.
 
-  This is intended to be used in the construction of partial_fixpoint, and not meant to be used otherwise. -/
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 theorem admissible_IsBounded (f : α → Nat) :
     admissible (fun (x : SPMF.Cost α) => IsBounded x f) := by
   intro c hc ih
@@ -512,11 +476,6 @@ theorem admissible_IsBounded (f : α → Nat) :
   obtain ⟨x, hxc, hxp⟩ := hp
   exact ih x hxc p hxp
 
-/-- Note: this proof is very similar to `List.arbitrary_cost` in `BasaltExamples/ArbList.lean`,
-    except the cost function now comprises the following:
-    - `2 * xs.length`: 2 random choices for each element in `xs` (a call to `pick` and a call to `g`)
-    - `(cost_g <$> xs).sum`: Need to apply `g`'s cost function to each generated element and sum them
-    - `1`: one final call to `pick` to produce the end of the list -/
 theorem IsBounded_listOf
     {g : SPMF.Cost α}
     (hx : IsBounded g cost_g) :

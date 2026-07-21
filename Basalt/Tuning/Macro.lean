@@ -61,10 +61,10 @@ namespace Basalt.Tuning.Macro
 
 /-- Everything the macro learns about one `frequency` site. -/
 structure SiteInfo where
-  name     : Name
-  offset   : Nat
-  arity    : Nat
-  holes    : Array Nat
+  name : Name
+  offset : Nat
+  arity : Nat
+  holes : Array Nat
   defaults : Array (Nat × Nat)
 
 /-- State threaded through the body traversal. -/
@@ -75,18 +75,17 @@ structure TraversalState where
   /-- Positional counter for default site names. -/
   nextSiteIdx : Nat := 0
 
-/-- Does identifier `n` refer to the definition being processed? Syntactic:
-    the user may write `genBST` or `Tree.genBST` for a definition named
-    `Tree.genBST`, so match on name suffixes in either direction. -/
+/-- Does identifier `n` refer to the definition being processed? Syntactic: the user may write
+`genBST` or `Tree.genBST` for a definition named `Tree.genBST`, so match on name suffixes in either
+direction. -/
 def matchesRec (declName n : Name) : Bool :=
   -- `Name.anonymous.isSuffixOf` is `true` for everything, and anonymous idents
   -- occur throughout parsed syntax (`hygieneInfo` nodes) — never match them
   !n.isAnonymous &&
     (n == declName || n.isSuffixOf declName || declName.isSuffixOf n)
 
-/-- Count syntactic occurrences of the definition's name in `stx` — the number
-    of recursive calls (`Site.holes`). Runs before `partial_fixpoint`, so the
-    recursive occurrences are still present. -/
+/-- Count syntactic occurrences of the definition's name in `stx` — the number of recursive calls
+(`Site.holes`). Runs before `partial_fixpoint`, so the recursive occurrences are still present. -/
 partial def countRecCalls (declName : Name) (stx : Syntax) : Nat :=
   match stx with
   | .ident _ _ n _ => if matchesRec declName n then 1 else 0
@@ -135,8 +134,8 @@ partial def stripSiteArgs (stx : Syntax) : Syntax :=
   | _ => stx
 
 /-- The core traversal: find each `frequency` application, record a `SiteInfo`, replace its literal
-  weights with `Tuning.weight $θ i $d` reads, and replace (or install) its positivity proof with one
-  that holds for every `θ`. -/
+weights with `Tuning.weight $θ i $d` reads, and replace (or install) its positivity proof with one
+that holds for every `θ`. -/
 partial def rewriteFrequencies (declName : Name) (θ : Term) (dTerm : Term)
     (stx : Syntax) : StateT TraversalState TermElabM Syntax := do
   match stx with
@@ -219,8 +218,8 @@ where
     return .node info ``Lean.Parser.Term.app
       #[app[0], .node (argsNode.getHeadInfo) nullKind #[newListLit, proofTerm.raw]]
 
-/-- Collect the identifiers of the explicit binders (to apply both sides of
-    `tuned_defaults` to), and whether one of them is named `depth`. -/
+/-- Collect the identifiers of the explicit binders (to apply both sides of `tuned_defaults` to),
+and whether one of them is named `depth`. -/
 def explicitBinderIds (binders : Array Syntax) : Array Ident := Id.run do
   let mut ids : Array Ident := #[]
   for b in binders do
