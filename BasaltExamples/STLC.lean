@@ -316,11 +316,76 @@ theorem genTerm_sound :
   | Bool b =>
     intro h
     unfold genTerm at h
-    simp [genType_support] at h
-    sorry
-  | Var n => sorry
-  | Abs τ e1 IH => sorry
-  | App e1 e2 IH1 IH2 => sorry
+    cases τ with
+    | Bool => exact Typing.TBool Γ b
+    | Fun τ1 τ2 =>
+      -- `Bool b` cannot be produced at a function type, contradiction
+      exfalso
+      support_simp [genZero] at h
+      simp [varsWithType] at h
+  | Var n =>
+    intro h
+    unfold genTerm at h
+    -- A `Var` can only come from the `varsWithType` branch; the `genZero`,
+    -- `App`, and `genBool`/`Abs` branches are all constructor clashes.
+    cases τ with
+    | Bool =>
+      support_simp [genZero, genBool] at h
+      simp at h
+      obtain ⟨_, hv⟩ := h
+      apply varsWithType_sound; assumption
+    | Fun τ1 τ2 =>
+      support_simp [genZero] at h
+      simp at h
+      obtain ⟨_, hv⟩ := h
+      apply varsWithType_sound; assumption
+  | Abs τ' e1 IH =>
+    intro h
+    unfold genTerm at h
+    cases τ with
+    | Bool =>
+      -- Can't have an `Abs` at type `Bool`, a contradiction
+      support_simp [genZero, genBool] at h
+      simp at h
+      obtain ⟨_, hv⟩ := h
+      cases varsWithType_sound hv
+    | Fun τ1 τ2 =>
+      -- An `Abs τ' e1` with type `Fun τ1 τ2` comes from either `genZero` or the
+      -- recursive `Abs` branch
+      support_simp [genZero] at h
+      simp [varsWithType] at h
+      rcases h with ⟨_, hz | hg⟩ | ⟨_, hz | hg⟩
+      · obtain ⟨a, ha, rfl, rfl⟩ := hz
+        apply Typing.TAbs; apply genZero_sound; assumption
+      · obtain ⟨a, ha, rfl, rfl⟩ := hg
+        apply Typing.TAbs; apply IH; assumption
+      · obtain ⟨a, ha, rfl, rfl⟩ := hz
+        apply Typing.TAbs; apply genZero_sound; assumption
+      · obtain ⟨a, ha, rfl, rfl⟩ := hg
+        apply Typing.TAbs; apply IH; assumption
+  | App e1 e2 IH1 IH2 =>
+    intro h
+    unfold genTerm at h
+    -- An `App` only comes from the application branch
+    cases τ with
+    | Bool =>
+      support_simp [genZero, genBool] at h
+      simp [varsWithType] at h
+      rcases h with ⟨_, hf⟩ | ⟨_, hf⟩
+      all_goals
+        obtain ⟨argTy, _, hf, hx⟩ := hf
+        apply Typing.TApp
+        · apply IH2; assumption
+        · apply IH1; assumption
+    | Fun τ1 τ2 =>
+      support_simp [genZero] at h
+      simp [varsWithType] at h
+      rcases h with ⟨_, hf⟩ | ⟨_, hf⟩
+      all_goals
+        obtain ⟨argTy, _, hf, hx⟩ := hf
+        apply Typing.TApp
+        · apply IH2; assumption
+        · apply IH1; assumption
 
 
 
