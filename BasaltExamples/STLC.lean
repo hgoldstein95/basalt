@@ -149,13 +149,6 @@ theorem genType_cost : IsBounded (genType (G := SPMF.Cost)) (fun τ => τ.size) 
       simp only [Ty.size]
       omega
 
--- Note that there is no predicate constraining the random types produced by `genType` here,
--- so we just instantitate the predicate with `⊤`
-instance : LawfulGenerator genType ⊤ (fun τ => τ.size) where
-  support_iff := by simp [genType_support]
-  is_pmf := genType_terminates
-  is_bounded := genType_cost
-
 /-- Generates a term that's a Boolean literal -/
 def genBool [Gen G] : G Term :=
   Term.Bool <$> Bool.arbitrary
@@ -239,69 +232,47 @@ theorem varsWithType_sound :
   assumption
 
 
-/-- Generates a well-typed term of a particular `depth`,
-    at type `τ` in context `Γ`.
+/-- Generates a well-typed term at type `τ` in context `Γ`. -/
+def genTerm [Gen G] (Γ : Ctx) (τ : Ty) : G Term :=
+  let vars := varsWithType Γ τ
+  if hne : vars ≠ [] then
+    oneOf [
+      fun _ => genZero Γ τ,
+      fun _ => elements vars hne,
+      fun _ => do
+        let argTy ← genType
+        let e1 ← genTerm Γ (.Fun argTy τ)
+        let e2 ← genTerm Γ argTy
+        return .App e1 e2,
+      fun _ =>
+        match τ with
+        | .Bool => genBool
+        | .Fun τ1 τ2 => do
+          let e ← genTerm (τ1 :: Γ) τ2
+          return .Abs τ1 e
+    ] (by apply cons_ne_nil)
+  else
+    oneOf [
+      fun _ => genZero Γ τ,
+      fun _ => do
+        let argTy ← genType
+        let e1 ← genTerm Γ (.Fun argTy τ)
+        let e2 ← genTerm Γ argTy
+        return .App e1 e2,
+      fun _ =>
+        match τ with
+        | .Bool => genBool
+        | .Fun τ1 τ2 => do
+          let e ← genTerm (τ1 :: Γ) τ2
+          return .Abs τ1 e
+    ] (by apply cons_ne_nil)
+partial_fixpoint
 
-    TODO: this recurses on `depth`, but ideally we'd like to
-    rewrite this using `partial_fixpoint` instead in order to have a
-    `LawfulGenerator` instance for `genTerm`. -/
-def genTerm [Gen G] (Γ : Ctx) (depth : Nat) (τ : Ty) : G Term :=
-  match depth with
-  | 0 =>
-    let vars := varsWithType Γ τ
-    if hne : vars ≠ [] then
-      oneOf [
-        fun _ => elements vars hne,
-        fun _ => genZero Γ τ
-      ] (by apply cons_ne_nil)
-    else
-      genZero Γ τ
-  | depth' + 1 =>
-    let vars := varsWithType Γ τ
-    if hne : vars ≠ [] then
-      oneOf [
-        fun _ => elements vars hne,
-        fun _ => do
-          let argTy ← genType
-          let e1 ← genTerm Γ depth' (.Fun argTy τ)
-          let e2 ← genTerm Γ depth' argTy
-          return .App e1 e2,
-        fun _ =>
-          match τ with
-          | .Bool => genBool
-          | .Fun τ1 τ2 => do
-            let e ← genTerm (τ1 :: Γ) depth' τ2
-            return .Abs τ1 e
-      ] (by apply cons_ne_nil)
-    else
-      oneOf [
-        fun _ => do
-          let argTy ← genType
-          let e1 ← genTerm Γ depth' (.Fun argTy τ)
-          let e2 ← genTerm Γ depth' argTy
-          return .App e1 e2,
-        fun _ =>
-          match τ with
-          | .Bool => genBool
-          | .Fun τ1 τ2 => do
-            let e ← genTerm (τ1 :: Γ) depth' τ2
-            return .Abs τ1 e
-      ] (by apply cons_ne_nil)
-
-theorem genTerm_sound :
-  e ∈ SPMF.support (genTerm Γ depth τ) → Typing Γ e τ := by
-  induction depth generalizing Γ e τ with
-  | zero =>
-    intro h
-    simp [genTerm] at h
-    rcases h <;> sorry
-  | succ depth' IH =>
-    sorry
 
 #guard_msgs(drop info) in
-#eval (for _ in [0:10] do
-  IO.println <| repr (← genTerm [] 3 .Bool) : IO Unit)
+#eval (for _ in [0:3] do
+  IO.println <| repr (← genTerm [] .Bool) : IO Unit)
 
 #guard_msgs(drop info) in
-#eval (for _ in [0:10] do
-  IO.println <| repr (← genTerm [] 3 (.Fun .Bool .Bool)) : IO Unit)
+#eval (for _ in [0:3] do
+  IO.println <| repr (← genTerm [] (.Fun .Bool .Bool)) : IO Unit)
