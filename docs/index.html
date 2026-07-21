@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Basalt — Random Generators You Can Run and Prove Correct</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="vendor/fontawesome/css/fontawesome.min.css">
+    <link rel="stylesheet" href="vendor/fontawesome/css/solid.min.css">
+  </head>
+  <body>
+
+    <!-- ===================== NAV ===================== -->
+    <header class="nav">
+      <nav class="nav__inner">
+        <a class="brand" href="#top">
+          <span class="brand__mark"></span>
+          <span class="brand__name">Basalt</span>
+        </a>
+        <div class="nav__links">
+          <a class="nav__link" href="#idea">Overview</a>
+          <a class="nav__link" href="#example">Example</a>
+          <a class="nav__link" href="#interpret">Interpretations</a>
+          <a class="nav__link" href="#ideas">Key Ideas</a>
+          <a class="nav__cta" href="https://github.com/hgoldstein95/basalt" target="_blank" rel="noopener">GitHub →</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="top">
+
+      <!-- ===================== HERO ===================== -->
+      <section class="hero">
+        <div class="hero__kicker">
+          <span class="upper">Property-Based Testing</span>
+          <span class="dot"></span>
+          <span class="sub">Lean 4 · Mathlib</span>
+        </div>
+        <h1 class="hero__title">
+          Random generators you can<br>
+          <span class="accent">run and prove correct</span>
+        </h1>
+        <div class="hero__lede">
+          <p>Generators are the foundation of QuickCheck-style property-based testing; it is important that they are correct and efficient.</p>
+          <p>
+            <strong>Basalt</strong> gives a single generator term a precise semantics that you can both run and reason about. We use a typeclass embedding to re-interpret the same generator term as both a standard sampler that you can draw values from <em>and</em> a formal probability distribution, represented using Lean's Mathlib.</p>
+          <p>A Basalt generator can be proved <em>sound</em> and <em>complete</em> (it produces every valid value and only valid values), <em>almost-surely terminating</em>, and <em>cost-bounded</em>, among other things.</p>
+        </div>
+        <div class="hero__actions">
+          <a class="btn btn--primary" href="https://github.com/hgoldstein95/basalt" target="_blank" rel="noopener">
+          View the code <span class="btn__arrow">↗</span>
+          </a>
+          <a class="btn btn--secondary" href="https://github.com/hgoldstein95/basalt/blob/main/WORKFLOW.md" target="_blank" rel="noopener">
+          Read the workflow for AI assistants <span class="btn__arrow">↗</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- ===================== THE IDEA ===================== -->
+      <section id="idea" class="band band--white">
+        <div class="section">
+          <div class="property">
+            <span class="property__tag">A Generator</span>
+            <code>def myGen [Gen G] :&nbsp; G α&nbsp; := …</code>
+          </div>
+          <div class="split">
+            <div>
+              <div class="eyebrow">Core Idea</div>
+              <h2 class="section__head">Mutliple Interpretations for the Same Generator</h2>
+            </div>
+            <div class="lead lead--bound">
+              <p>In Basalt a generator is not a value of some fixed generator type, it is a term that is polymorphic in the monad it runs in. The typeclass <code class="inline-code">Gen</code> bundles exactly the operations a generator needs, and the same term is then interpreted at whichever monad the task calls for.</p>
+              <p>When run at <code class="inline-code">IO</code> you can sample normally. When run at <code class="inline-code">SPMF</code> — a sub-probability mass function — you get a mathematical object you can write proofs about. For example, you can prove things about a generator's support, its total mass, the number of random choices it makes, etc. <strong>The code you run and the object you reason about are the same term.</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== WORKED EXAMPLE ===================== -->
+      <section id="example" class="section section--lg">
+        <div class="example__head">
+          <div class="eyebrow">A Worked Example</div>
+          <h2>Using Basalt</h2>
+          <p>A generator for binary search trees with keys in <code class="inline-code">[lo, hi]</code> — and the three theorems that pin down its behavior.</p>
+        </div>
+
+        <div class="example__grid">
+
+          <!-- LEFT: what you write -->
+          <div>
+            <div class="pane__label">
+              <span>What you write</span></div>
+            <div class="code">
+              <div class="code__bar">
+                <span class="code__dot code__dot--r"></span>
+                <span class="code__dot code__dot--y"></span>
+                <span class="code__dot code__dot--g"></span>
+                <span class="code__file">BST.lean</span>
+              </div>
+              <pre><span class="t-cm">-- what it means to be valid:</span>
+<span class="t-kw">def</span> isBST (lo hi : <span class="t-ty">Nat</span>) : <span class="t-ty">Tree Nat</span> -> <span class="t-ty">Prop</span>
+  | leaf => <span class="t-kw">true</span>
+  | node l x r =>
+      lo &le; x &and; x &le; hi &and;
+      isBST lo (x - 1) l &and;
+      isBST (x + 1) hi r
+
+<span class="t-cm">-- one term, polymorphic in the monad G:</span>
+<span class="t-kw">def</span> genBST [<span class="t-ty">Gen G</span>] (lo hi : <span class="t-ty">Nat</span>) : <span class="t-ty">G (Tree Nat)</span> := <span class="t-kw">do</span>
+  <span class="t-kw">if</span> h : lo &gt; hi <span class="t-kw">then return</span> leaf
+  <span class="t-kw">else</span> <span class="t-fn">pick</span>
+    (<span class="t-kw">fun</span> () => <span class="t-fn">pure</span> leaf)
+    (<span class="t-kw">fun</span> () => <span class="t-kw">do</span>
+      <span class="t-kw">let</span> x &lt;- <span class="t-fn">chooseNat</span> lo hi (<span class="t-kw">by</span> omega)
+      <span class="t-kw">let</span> l &lt;- <span class="t-fn">genBST</span> lo (x - 1)
+      <span class="t-kw">let</span> r &lt;- <span class="t-fn">genBST</span> (x + 1) hi
+      <span class="t-fn">pure</span> (node l x r))
+<span class="t-hi">partial_fixpoint</span></pre>
+            </div>
+          </div>
+
+          <!-- connector -->
+          <div class="connector">
+            <div class="connector__node">&#8866;</div>
+          </div>
+
+          <!-- RIGHT: what you can prove -->
+          <div>
+            <div class="pane__label">
+              <span class="is-accent">What you prove</span></div>
+            <ul class="laws">
+              <li>
+                <span class="laws__check">
+                  <i class="fa-solid fa-check"></i>
+                </span>
+                <div>
+                  <span class="laws__name">sound_complete</span>
+                  <span class="laws__what">
+                    <code class="inline-code">IsSoundAndComplete</code> — the support is <em>exactly</em> the valid BSTs. Nothing invalid is ever produced; nothing valid is ever missed.</span>
+                </div>
+              </li>
+              <li>
+                <span class="laws__check">
+                  <i class="fa-solid fa-check"></i>
+                </span>
+                <div>
+                  <span class="laws__name">terminates</span>
+                  <span class="laws__what">
+                    <code class="inline-code">IsAlmostSurelyTerminating</code> — the generator halts with probability one. (This one is <em>critical</em>: mean offspring is exactly 1.)</span>
+                </div>
+              </li>
+              <li>
+                <span class="laws__check">
+                  <i class="fa-solid fa-check"></i>
+                </span>
+                <div>
+                  <span class="laws__name">cost_bounded</span>
+                  <span class="laws__what">
+                    <code class="inline-code">IsCostBounded</code> — an <em>n</em>-node tree costs at most <code class="inline-code">3n + 1</code> random choices to build.</span>
+                </div>
+              </li>
+            </ul>
+            <p class="example__note">Each law is a plain theorem named <code class="inline-code">genBST.sound_complete</code>, <code class="inline-code">.terminates</code>, <code class="inline-code">.cost_bounded</code> — proved by hand, checked by Lean.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ===================== INTERPRETATIONS ===================== -->
+      <section id="interpret" class="band band--white">
+        <div class="section">
+          <div class="interp__head">
+            <div class="eyebrow">Interpretations</div>
+            <h2>Available Implementations of <code>Gen</code>
+            </h2>
+            <p>
+              <code class="inline-code">RandomChoice.choose</code> is the only source of randomness; every combinator is built on it. That single interface is what lets one generator wear four different hats.</p>
+          </div>
+          <div class="interp">
+            <div class="interp__row">
+              <span class="interp__name">Plausible.Gen / IO</span>
+              <span class="interp__desc">Run it and get values — plug straight into a property-based testing loop.</span>
+            </div>
+            <div class="interp__row">
+              <span class="interp__name">SPMF</span>
+              <span class="interp__desc">A sub-probability mass function. Reason about the distribution and its <code class="inline-code">support</code> — this is where soundness, completeness, and termination live.</span>
+            </div>
+            <div class="interp__row">
+              <span class="interp__name">SPMF.Cost</span>
+              <span class="interp__desc">The distribution, plus a count of the random choices each draw makes — the ground truth for cost bounds.</span>
+            </div>
+            <div class="interp__row">
+              <span class="interp__name">GenStats.StatGen</span>
+              <span class="interp__desc">Seeded, fuel-guarded execution that counts choices — what <code class="inline-code">#genstats</code> draws from.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== KEY IDEAS ===================== -->
+      <section id="ideas" class="band band--tint">
+        <div class="section">
+          <div class="eyebrow">Key Ideas</div>
+          <h2 class="why__head">Why use Basalt?</h2>
+          <div class="cards">
+
+            <div class="card">
+              <div class="card__icon">
+                <i class="fa-solid fa-diagram-project"></i>
+              </div>
+              <h3>Run it or reason about it</h3>
+              <p>There is no separate model to keep in sync. The generator you execute and the mathematical object you prove theorems about are one and the same term, interpreted at different monads.</p>
+            </div>
+
+            <div class="card">
+              <div class="card__icon">
+                <i class="fa-solid fa-circle-check"></i>
+              </div>
+              <h3>A vocabulary of correctness</h3>
+              <p>Soundness and completeness, almost-sure termination, cost bounds, and — for rejection samplers — filter-freedom and productivity. These are plain predicates; a generator states and proves the ones that apply to it.</p>
+            </div>
+
+            <div class="card">
+              <div class="card__icon">
+                <i class="fa-solid fa-chart-column"></i>
+              </div>
+              <h3>Evidence beside proof</h3>
+              <p>
+                <code class="inline-code">#genstats</code> draws hundreds of samples and prints distributions, diversity, and outcomes — then reports, right alongside, which laws are actually proved. A divergence count is evidence; a law is a proof, and the report never confuses the two.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== TERMINATION / DEPTH ===================== -->
+      <section class="section section--lg">
+        <div class="split">
+          <div>
+            <div class="eyebrow">Under the hood</div>
+            <h2 class="section__head">Built on Cutting Edge Lean APIs</h2>
+          </div>
+          <div class="lead lead--bound">
+            <p>Recursive generators are defined by <code class="inline-code">partial_fixpoint</code> over a domain-theoretic order, and almost-sure termination is proved externally. Unlike standard Lean functions, Basalt generators are not required to terminate structurally.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== FOOTER ===================== -->
+      <footer class="footer">
+        <div class="footer__inner">
+          <div class="footer__about">
+            <div class="footer__brand brand brand--sm">
+              <span class="brand__mark"></span>
+              <span class="brand__name">Basalt</span>
+            </div>
+            <div class="status">
+              <span class="status__led"></span>
+              <span>Research Code — APIs Still Unstable</span>
+            </div>
+            <p class="footer__fine">A foundational representation of random data generators for property-based testing, with machine-checked proofs, for the Lean theorem prover. Released under the MIT license.</p>
+            <p class="footer__fine">Interested in this work? Get in touch with Harry Goldstein.</p>
+          </div>
+          <div class="footer__cols">
+            <div class="footer__col">
+              <span>Project</span>
+              <a href="https://github.com/hgoldstein95/basalt" target="_blank" rel="noopener">GitHub Repository</a>
+              <a href="https://github.com/hgoldstein95/basalt/blob/main/WORKFLOW.md" target="_blank" rel="noopener">Generator Workflow</a>
+            </div>
+            <div class="footer__col">
+              <span>Docs</span>
+              <a href="https://github.com/hgoldstein95/basalt/blob/main/README.md" target="_blank" rel="noopener">README</a>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+    </main>
+
+  </body>
+</html>
