@@ -22,9 +22,9 @@ remove it from the `frequency`.
 -/
 
 /-- A weight schedule per branch: entry `(aⱼ, bⱼ)` denotes the depth-indexed weight
-  `wⱼ(d) = max aⱼ 1 + bⱼ · d`; a constant weight is `(a, 0)`. The schedules of all sites of one
-  generator are concatenated into this one flat array; each `Site.offset` says where its block
-  starts.  -/
+`wⱼ(d) = max aⱼ 1 + bⱼ · d`; a constant weight is `(a, 0)`. The schedules of all sites of one
+generator are concatenated into this one flat array; each `Site.offset` says where its block starts.
+-/
 structure Tuning where
   schedules : Array (Nat × Nat)
   deriving Repr, DecidableEq, Inhabited
@@ -32,8 +32,8 @@ structure Tuning where
 /-- Metadata for one `frequency` site collected by `tunable def`. -/
 structure Site where
   /-- A stable label for the site, for diagnostics and reviewable artifacts.  Defaults to the
-    enclosing definition's name plus a positional suffix; override with `frequency (site := `myName)
-    […]`. -/
+  enclosing definition's name plus a positional suffix; override with `frequency (site := `myName)
+  […]`. -/
   name   : Lean.Name
   /-- Index into `Tuning.schedules` of this site's first branch. -/
   offset : Nat
