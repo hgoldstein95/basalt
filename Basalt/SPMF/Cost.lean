@@ -193,7 +193,7 @@ theorem mem_support_frequency
   simp only at hrest
   have hlt : x < (List.map Prod.fst gs).sum := by omega
   rw [dif_pos hlt] at hrest
-  obtain ⟨w, g, hwg, hw, heq⟩ := SPMF.frequencySelect_mem hlt
+  obtain ⟨w, g, hwg, hw, heq⟩ := frequencySelect_mem hlt
   rw [heq] at hrest
   exact ⟨w, g, n2, hwg, hw, hrest, by omega⟩
 
@@ -463,7 +463,7 @@ theorem IsBounded_frequency
     . -- In this case, we have `n ≤ (List.map Prod.fst gs).sum`, so
       -- `frequencyAux` calls `frequencySelect`.
       -- Here we use the fact that `frequencySelect` is bounded...
-      obtain ⟨w, g, hwg, _, heq⟩ := SPMF.frequencySelect_mem (by assumption)
+      obtain ⟨w, g, hwg, _, heq⟩ := frequencySelect_mem (by assumption)
       -- We name the chosen sub-generator's cost function `cost_g : α → Nat`.
       -- `set` (not `have`) rewrites every occurrence, including inside `hbounded`,
       -- so the remaining goal is phrased in terms of `cost_g` throughout.
