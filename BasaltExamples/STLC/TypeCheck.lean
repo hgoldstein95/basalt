@@ -9,13 +9,13 @@ import BasaltExamples.STLC.Syntax
 open List
 
 /-!
-# A Typechecker for the STLC
+# STLC typechecker
 
-A decidable typechecker `typeCheck` for the simply-typed lambda calculus, proved sound and complete
-with respect to the `Typing` judgement (`BasaltExamples/STLC/Syntax.lean`).
+A STLC typechecker, proved sound and complete with respect to the `Typing` judgement.
 -/
 
-/-- Typechecks a term `e` in context `Γ`, return a type if typechecking succeeds -/
+/-- Typechecks a term `e` in context `Γ`, return a type if typechecking succeeds.
+    Adapted from the STLC typechecker in Software Foundations: https://softwarefoundations.cis.upenn.edu/plf-current/Typechecking.html -/
 def typeCheck (Γ : Ctx) (e : Term) : Option Ty :=
   match e with
   | .Bool _ => some .Bool
