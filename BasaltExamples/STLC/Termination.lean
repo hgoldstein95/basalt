@@ -14,24 +14,18 @@ open RandomChoice SPMF List ENNReal
 /-!
 # Almost-Sure Termination for `genTerm`
 
-This file proves `genTerm.terminates`: `genTerm Γ τ` terminates with probability 1.
+This file proves that `genTerm Γ τ` terminates with probability 1.
 
-## The regime
+The mean no. of offspring (recursive calls) is given
 
-`genTerm` (`BasaltExamples/STLC/GenTerm.lean`) is a `oneOf` over up to four branches, and its
-recursion *re-indexes the seed* (the pair `(Γ, τ)`): the `App` branch recurses at `(Γ, argTy.Fun τ)`
-and `(Γ, argTy)`, and the `Abs` branch at `(τ1 :: Γ, τ2)`. So termination uses a `_family` criterion.
+* **Γ ≠ [], `τ = Bool`**  — `[genZero, pick var from context, App, genBool]`, mean offspring = `(0 + 0 + 2 + 0)/4 = 1/2`.
+* **Γ ≠ [], `τ = τ1 → τ2`**   — `[genZero, elements, App, Abs]`, mean offspring = `(0 + 0 + 2 + 1)/4 = 3/4`.
+* **Γ = [], `τ = Bool`** — 3 cases: `[genZero, App, genBool]`,  mean offspring = `(0 + 2 + 0)/3 = 2/3`.
+* **Γ = [], `τ = τ1 → τ2`**  — `[genZero, App, Abs]`, mean offspring = `(0 + 2 + 1)/3 = 1`.
 
-Reading the mean offspring off the branch lists (each branch weighted `1 / #branches`):
-
-* **vars ≠ [], `Bool`**  — `[genZero, elements, App, genBool]`, offspring `(0 + 0 + 2 + 0)/4 = 1/2`.
-* **vars ≠ [], `Fun`**   — `[genZero, elements, App, Abs]`,     offspring `(0 + 0 + 2 + 1)/4 = 3/4`.
-* **vars = [],  `Bool`** — `[genZero, App, genBool]`,           offspring `(0 + 2 + 0)/3 = 2/3`.
-* **vars = [],  `Fun`**  — `[genZero, App, Abs]`,               offspring `(0 + 2 + 1)/3 = 1`.
-
-The last case has mean offspring exactly `1`, so `genTerm` is **critical**: it terminates almost
-surely, but (like `Tree.genHeap` and `AllTwoTree.genTree`) has infinite expected size. Termination
-therefore goes through `SPMF.IsPMF_of_critical_family` rather than the subcritical criterion.
+Since in the last case, the mean offspring is 1, we know that `genTerm` is *critical*: it terminates
+almost surely, but terms generated have infinite expected size (like `Tree.genHeap` and `AllTwoTree.genTree`).
+The termination proof therefore goes through `SPMF.IsPMF_of_critical_family`.
 
 ## The lower-bounding function `F`
 
@@ -46,11 +40,6 @@ which is the exact one-step bound for the critical case above (`genZero`'s mass 
 recursive `App` calls contribute `c²`, and the single `Abs` call contributes `c`). One checks
 `F c ≤ (branch average)` for all four branch lists when `c ≤ 1`, and `F c = c ∧ c ≤ 1 → c = 1`
 (the fixed-point equation is `(c - 1)² = 0`).
-
-`oneOf` has no equality mass lemma, so the lower bound comes from `SPMF.mass_oneOf_ge` (the `oneOf`
-analogue of `mass_frequency_ge`, in `Basalt/SPMF/Termination.lean`): a uniform `oneOf` is bounded
-below by the average of any per-branch lower bounds. Every branch bound is then supplied to it, one
-per index.
 -/
 
 /-- `genBool` terminates with probability 1 (a single coin flip). -/
@@ -59,8 +48,7 @@ theorem genBool_terminates : SPMF.IsPMF (genBool (G := SPMF)) := by
   apply IsPMF_map
   apply IsPMF_pick <;> apply IsPMF_pure
 
-/-- `genZero Γ τ` terminates with probability 1: the `Abs` wrapping is pure and the recursion is
-structural in `τ`, bottoming out at the terminating `genBool`. -/
+/-- `genZero Γ τ` terminates with probability 1 -/
 theorem genZero_terminates (Γ : Ctx) (τ : Ty) : SPMF.IsPMF (genZero (G := SPMF) Γ τ) := by
   induction τ generalizing Γ with
   | Bool => unfold genZero; exact genBool_terminates
@@ -69,13 +57,12 @@ theorem genZero_terminates (Γ : Ctx) (τ : Ty) : SPMF.IsPMF (genZero (G := SPMF
     apply IsPMF_bind_pure
     exact IH2 (τ1 :: Γ)
 
-/-- The seed `(Γ, τ)` is nonempty, as required by the family termination criterion. -/
 instance : Nonempty (Ctx × Ty) := ⟨(([] : Ctx), Ty.Bool)⟩
 
 /-- `genTerm Γ τ` terminates with probability 1.
 
     Proof: critical family termination. The recursion re-indexes the seed `(Γ, τ)`, and the worst
-    case (empty variable set at a function type) has mean offspring exactly `1`, so we use
+    case (`Γ = [], τ = τ1 → τ2`) has mean offspring exactly `1`, so we use
     `SPMF.IsPMF_of_critical_family` with `F c = (1 + c + c²)/3`. One unfolding exposes a `oneOf`;
     `mass_oneOf_ge` reduces its mass to the average of the branch bounds — `genZero`/`genBool`
     (mass `1`), `elements` (mass `1`), the `App` branch (`≥ c²`, two recursive calls after a
@@ -132,7 +119,7 @@ theorem genTerm.terminates (Γ : Ctx) (τ : Ty) :
     conv_lhs => rw [genTerm.eq_def]
     simp only []
     split
-    · -- vars ≠ [] : four branches `[genZero, elements, App, Abs/genBool]`.
+    · -- Γ ≠ [] : four branches `[genZero, elements, App, Abs/genBool]`.
       rename_i hne
       refine le_trans ?_ (mass_oneOf_ge _ (m := fun i => [1, 1, c * c, c].getD i 0) ?_)
       · -- `F c ≤ (1 + 1 + c² + c)/4`, i.e. `(c + 2)(1 - c) ≥ 0`.
@@ -154,7 +141,7 @@ theorem genTerm.terminates (Γ : Ctx) (τ : Ty) :
         | 1, _ => exact (IsPMF_elements (varsWithType Γ τ) hne).ge
         | 2, _ => exact hApp
         | 3, _ => exact hAbs
-    · -- vars = [] : three branches `[genZero, App, Abs/genBool]` — the critical case.
+    · -- Γ = [] : three branches `[genZero, App, Abs/genBool]`
       refine le_trans ?_ (mass_oneOf_ge _ (m := fun i => [1, c * c, c].getD i 0) ?_)
       · -- `F c = (1 + c² + c)/3` exactly.
         have hsum : (∑ i ∈ Finset.Icc 0 (3 - 1), (fun i => [(1 : ENNReal), c * c, c].getD i 0) i)

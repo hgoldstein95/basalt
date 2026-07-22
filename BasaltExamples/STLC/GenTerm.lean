@@ -11,11 +11,10 @@ import BasaltExamples.STLC.GenType
 open RandomChoice SPMF List
 
 /-!
-# Generating Well-Typed STLC Terms
+# A generator for well-typed STLC Terms
 
-The `genTerm` generator produces a well-typed term at a given type in a given context, along with
-the helper generators it is built from (`genBool`, `genZero`, `varsWithType`) and soundness and
-completeness proofs.
+This file contains a generator for well-typed STLC terms `genTerm`, along with
+some helper sub-generators, plus soundness and completeness proofs.
 -/
 
 def Bool.arbitrary [Gen G] : G Bool :=

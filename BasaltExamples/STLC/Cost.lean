@@ -15,47 +15,43 @@ open RandomChoice SPMF List
 /-!
 # Cost Bound for `genTerm`
 
-This file defines the *context-aware* cost function for `genTerm` and proves `genTerm.cost_bounded`:
-`genTerm Γ τ` makes at most `Term.costInCtx Γ` random choices.
+This file defines a cost function for `genTerm` (`Term.costInCtx`)
+that takes the context `Γ` into account,
+and proves that `genTerm Γ τ` makes at most `Term.costInCtx Γ` random choices.
 
 ## Why the bound must mention the context
 
-`IsCostBounded g c` needs `c : Term → Nat` — a function of the *output term*. But the `App` branch
-of `genTerm` (`BasaltExamples/STLC/GenTerm.lean`) spends `argTy.size` choices generating an argument
-type via `genType`, and `argTy` is **not stored** in the produced `.App e1 e2`:
+`IsCostBounded g c` needs a cost function `c : Term → Nat` that only takes
+the term into account. However, the `App` branch of `genTerm` generates a random argument
+type `argTy` for `e2`, but `argTy` isn't apparent in `.App e1 e2`:
 
-```
+```lean
 let argTy ← genType            -- costs `argTy.size` (see `genType_cost`)
 let e1 ← genTerm Γ (.Fun argTy τ)
 let e2 ← genTerm Γ argTy
 return .App e1 e2
 ```
 
-So there is no purely term-structural function that bounds the cost. The escape hatch is that this
-is Church-style STLC, so **typing is unique**: `argTy` is recoverable as the type of `e2`, and
-`e2 : argTy`. Concretely `argTy = typeCheck Γ e2` (the typechecker in `TypeCheck.lean` *is* the
-`typeOf` we need, and `typeCheck_complete` *is* the `typeOf_of_Typing` uniqueness fact). Recovering
-`argTy` requires knowing `Γ`, so the cost function threads the context.
+So there is no purely term-structural function that bounds the cost.
+However, in STLC, types are unique, so `argTy` is unique, and we can use
+an STLC typechecker (that is proven sound & complete with respect to the typing relation)
+to determine that `argTy = typeCheck Γ e2`.
 
-`Term.costInCtx` must be total, so on ill-typed inputs the `App` case falls back to a default type
-via `Option.getD`. That default is never observed by the cost proof: `genTerm`'s support is exactly
-the well-typed terms (`genTerm_sound`), and `typeCheck_getD_of_typing` below is the *theorem* — not
-a comment — witnessing that the `getD` collapses to the real type on every well-typed term,
-regardless of the default. The final `IsCostBounded` guarantee is verified for every term `genTerm`
-can produce; the default is invisible to it.
+This means that in order to recover `argTy`, we need access to the context `Γ`,
+so the cost function takes `Γ` as an argument.
 
 ## The cost function
 
-Charge one choice per `oneOf` selection plus the cost of the chosen branch, reading `genTerm`:
+The cost function charges the folowing depending on the shape of the generated term:
 
-* `.Bool _`   : `oneOf` (1) + `genBool`/`genZero`-at-`Bool` (1)               = 2
-* `.Var _`    : `oneOf` (1) + `elements` (1)                                  = 2
-* `.Abs τ1 e` : `oneOf` (1) + recurse under the extended context `τ1 :: Γ`
-* `.App e1 e2`: `oneOf` (1) + `genType` for `argTy` (`argTy.size`) + recurse on `e1` and `e2`
+* `.Bool _`   : call to `oneOf` (1) + call to `genBool`/`genZero`-at-`Bool` (1) = 2
+* `.Var _`    : call to `oneOf` (1) + call to `elements` (1)  = 2
+* `.Abs τ1 e` : call to `oneOf` (1) + recurse under the extended context `τ1 :: Γ`
+* `.App e1 e2`: call to `oneOf` (1) + call `genType` for `argTy` (`argTy.size`) + recurse on `e1` and `e2`
 
 Note on `.Abs`: an `Abs` can be produced by *either* the recursive `Abs` branch *or* `genZero`.
-The bound below charges the recursive-branch cost, which dominates the `genZero` path (`genZero`
-makes exactly one choice), so it is a valid upper bound for both.
+The cost bound for the `Abs` case charges the recursive-branch cost, since
+it is greater than the `genZero` cost (since `genZero` makes exactly one choice.)
 -/
 
 /-- Context-aware cost bound for `genTerm Γ`. Counts the random choices `genTerm` makes to
@@ -68,20 +64,19 @@ def Term.costInCtx (Γ : Ctx) (e : Term) : Nat :=
   | .App e1 e2 =>
       let e1_cost := Term.costInCtx Γ e1
       let e2_cost := Term.costInCtx Γ e2
+      -- Note: since the typechecker returns an option, we need to call `Option.getD` here
+      -- The lemma below establishes that if `Γ ⊢ e2 : τ2`, we always have `(typeCheck Γ e2).getD ... = τ2`
       let genType_cost := ((typeCheck Γ e2).getD .Bool).size
       1 + genType_cost + e1_cost + e2_cost
 
-/-- On a well-typed term the `Option.getD` in `Term.costInCtx`'s `App` case collapses to the term's
-    actual type, whatever the default `d` is. This is the formal replacement for the "the default is
-    never hit" side remark: `genTerm`'s outputs are well-typed (`genTerm_sound`), so the cost proof
-    only ever evaluates `costInCtx` where this lemma applies. -/
-theorem typeCheck_getD_of_typing {d : Ty} (h : Typing Γ e τ) :
-    (typeCheck Γ e).getD d = τ := by
+/-- If `Γ ⊢ e : τ`, then `Option.getD (typeCheck Γ e) default = τ`,
+    i.e. the default argument supplied to `Option.getD` is never returned. -/
+theorem typeCheck_getD_of_typing {default : Ty} (h : Typing Γ e τ) :
+    (typeCheck Γ e).getD default = τ := by
   rw [typeCheck_complete h]; rfl
 
 /-- Every term costs at least 2 choices to generate (one `oneOf` selection plus at least one more
-    in the cheapest branch). Used to absorb the `genZero` branch, which costs `≤ 1`, into the bound
-    for whatever term it produces. -/
+    in the cheapest branch). -/
 theorem Term.two_le_costInCtx (Γ : Ctx) (e : Term) : 2 ≤ Term.costInCtx Γ e := by
   induction e generalizing Γ with
   | Bool => simp [Term.costInCtx]
@@ -108,10 +103,7 @@ theorem genZero.cost_bounded : IsBounded (genZero (G := SPMF.Cost) Γ τ) (fun _
     · intro e; apply IsBounded_pure
     · intro _ _; simp
 
-/-- One step of `genTerm`'s cost support: every `(v, n)` it can produce comes from one of the four
-    `oneOf` branches. The `genZero`/`elements` branches are folded into their generators; the `App`
-    and `Abs`/`genBool` branches expose the recursive sub-calls (as *real* `genTerm` calls, so that
-    `genTerm_sound` and the structural IH both apply to them). -/
+/-- Inversion lemma for the `SPMF.Cost` interpretation of `genTerm`. -/
 theorem genTerm_cost_inv {Γ τ v n}
     (hmem : (v, n) ∈ SPMF.support (genTerm (G := SPMF.Cost) Γ τ)) :
     (∃ nz, (v, nz) ∈ SPMF.support (genZero (G := SPMF.Cost) Γ τ) ∧ n = 1 + nz) ∨
@@ -213,9 +205,9 @@ theorem genZero_cost_sound {Γ τ e n}
     have htbody : Typing (τ1 :: Γ) body τ2 := IH2 hbody
     apply Typing.TAbs; assumption
 
-/-- Cost-level soundness: any `(e, n)` in `genTerm`'s cost support has `e` well-typed. This mirrors
-    `genTerm_sound` (stated at `SPMF`) but at `SPMF.Cost`, so it can feed `typeCheck_getD_of_typing`
-    inside the cost proof, where the sub-generators run at `SPMF.Cost`. -/
+/-- For any `(e, n)` in the support of the `SPMF.cost` interpretation of `genTerm`,
+    `e` is well-typed. This is similar to  `genTerm_sound` (stated at `SPMF`) but at `SPMF.Cost`,
+    so it can feed `typeCheck_getD_of_typing` inside the cost proof, where the sub-generators run at `SPMF.Cost`. -/
 theorem genTerm_cost_sound {Γ τ e n}
     (hmem : (e, n) ∈ SPMF.support (genTerm (G := SPMF.Cost) Γ τ)) : Typing Γ e τ := by
   induction e generalizing Γ τ n with
@@ -265,17 +257,16 @@ theorem genTerm_cost_sound {Γ τ e n}
 
 /-- `genTerm Γ τ` makes at most `Term.costInCtx Γ` random choices.
 
-    Proof: structural induction on the produced term. `genTerm_cost_inv` inverts one step of the
-    generator into its four `oneOf` branches; each is discharged by a callee bound
-    (`genZero.cost_bounded`, `IsBounded_elements`, `genType_cost`) or the structural IH, with the
-    `App` branch recovering the discarded argument type via `typeCheck_getD_of_typing`. Because the
-    induction is on the *term* (not `fix_induct`), every sub-call is a real `genTerm`, so
-    `genTerm_sound` applies to its outputs. -/
+    This is proven by induction on the generated term.
+    The inversion lemma `genTerm_cost_inv` inverts one step of the
+    generator into its four `oneOf` branches; each is discharged by a cost bound on the sub-generator
+    (`genZero.cost_bounded`, `IsBounded_elements`, `genType_cost`) or the IH, with the
+    `App e1 e2` branch recovering the type of `e2` via the lemma `typeCheck_getD_of_typing`. -/
 theorem genTerm.cost_bounded :
     IsBounded (genTerm (G := SPMF.Cost) Γ τ) (Term.costInCtx Γ) := by
   rw [IsBounded_iff]
-  rintro ⟨v, n⟩
-  induction v generalizing Γ τ n with
+  rintro ⟨e, n⟩
+  induction e generalizing Γ τ n with
   | Bool b =>
     intro hmem
     show n ≤ Term.costInCtx Γ (Term.Bool b)

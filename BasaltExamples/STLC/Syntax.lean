@@ -11,9 +11,7 @@ open List
 # STLC Syntax and Typing
 
 Syntax, contexts, and the typing judgement for the simply-typed lambda calculus extended with
-Bools, along with the bridge lemmas relating the `lookup` judgement to `List` indexing. These
-definitions are shared by the generator (`BasaltExamples/STLC/GenTerm.lean`) and the typechecker
-(`BasaltExamples/STLC/TypeCheck.lean`).
+Bools, along with lemmas relating the `lookup` judgement to `List` indexing.
 -/
 
 /-- Types are just Bool or function types -/
