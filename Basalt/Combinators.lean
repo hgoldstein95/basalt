@@ -133,8 +133,14 @@ def listOf [Gen G] (g : G α) : G (List α) := do
       return x :: xs)
 partial_fixpoint
 
-def biasedOptional [Gen G] (g : G α) : G (Option α) := do
-  sorry
+/-- Lifts a generator of `α`'s into a generator of `Option α`'s,
+  which returns `some <$> g` with probability `r`  -/
+def biasedOptionGen [Gen G] (r : Rat) (g : G α) : G (Option α) := do
+  if ← RandomChoice.coin r then (some <$> g) else pure none
+
+/-- Lifts a generator of `α`'s into a generator of `Option α`'s, which returns `none` with probability 1/2 -/
+def optionGen [Gen G] (g : G α) : G (Option α) :=
+  biasedOptionGen (1 / 2) g
 
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
 - `l1.length = l2.length`

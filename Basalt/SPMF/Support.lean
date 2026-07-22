@@ -213,6 +213,63 @@ theorem mem_support_coin_iff (h0 : 0 < r) (h1 : r < 1) :
   rw [support_coin h0 h1, Set.mem_insert_iff, Set.mem_singleton_iff]
 
 @[simp]
+theorem support_biasedOptionGen
+    {r : Rat}
+    {g : SPMF α}
+    (h0 : 0 < r) (h1 : r < 1) :
+    support (biasedOptionGen r g) = { none } ∪ { some x | x ∈ g.support } := by
+  have hnum : (0 : ℤ) < r.num := Rat.num_pos.mpr h0
+  have hden : r.num < (r.den : ℤ) := Rat.num_lt_denom_iff.mpr h1
+  have hden_pos : 0 < r.den := r.den_pos
+  simp [biasedOptionGen, coin, support_bind, support_choose]
+  ext a
+  simp [Set.mem_setOf_eq]
+  constructor <;> intros h
+  . obtain ⟨a, hge, h⟩ := h
+    rcases h with ⟨hle, rfl⟩ | ⟨hlt, ha⟩
+    . -- none case
+      left; rfl
+    . -- some case
+      obtain ⟨a', ⟨hmem, rfl⟩⟩ := ha
+      right; exists a'
+  . rcases h with rfl | ⟨x, ⟨hmem, rfl⟩⟩
+    . -- none case: coin returns `false`, so pick the maximal index `r.den - 1`
+      exists r.den - 1
+      constructor <;> try omega
+      left
+      constructor <;> try rfl
+      omega
+    . -- some case: coin returns `true`, so pick the minimal index `0`
+      exists 0
+      constructor <;> try omega
+      right
+      constructor
+      . omega
+      . exists x
+
+@[simp]
+theorem mem_support_biasedOptionGen_iff {r : Rat} {g : SPMF α} (h0 : 0 < r) (h1 : r < 1) :
+    x ∈ (biasedOptionGen r g).support ↔ x = none ∨ (∃ a ∈ g.support, x = some a) := by
+  unfold biasedOptionGen
+  simp
+  constructor <;> intro h
+  . rcases h with ⟨hmem, rfl⟩ | ⟨hmem, a, ha, rfl⟩
+    . left; rfl
+    . right; exists a
+  . rcases h with rfl | ⟨a, hmem, rfl⟩
+    . left
+      constructor
+      . apply (mem_support_coin_iff h0 h1).mpr
+        right; rfl
+      . rfl
+    . right
+      constructor
+      . apply (mem_support_coin_iff h0 h1).mpr
+        left; rfl
+      . exists a
+
+
+@[simp]
 theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
     n ∈ (chooseNat lo hi h : SPMF Nat).support ↔ lo ≤ n ∧ n ≤ hi := by
   unfold chooseNat
