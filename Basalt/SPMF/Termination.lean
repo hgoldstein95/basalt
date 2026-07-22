@@ -277,6 +277,14 @@ theorem IsPMF_bind {x : SPMF α} {f : α → SPMF β} (hx : IsPMF x) (hf : ∀ a
   unfold IsPMF
   rw [mass_bind hf, hx]
 
+theorem IsPMF_coin {r : Rat} : IsPMF (RandomChoice.coin r) := by
+  unfold coin
+  apply IsPMF_bind
+  . apply IsPMF_choose
+  . intro ⟨x, ⟨_, hle⟩⟩
+    dsimp
+    split_ifs <;> apply IsPMF_pure
+
 theorem IsPMF_map {x : SPMF α} {f : α → β} (hx : IsPMF x) :
     IsPMF (f <$> x) := by
   unfold IsPMF
@@ -316,6 +324,21 @@ theorem IsPMF_elements [Inhabited α] (xs : List α) (hne : xs ≠ []) :
   intro ⟨ i, ⟨ hge, hle ⟩⟩
   apply IsPMF_pure
 
+theorem IsPMF_biasedOptionGen {r : Rat} (hg : IsPMF g) :
+    IsPMF (biasedOptionGen r g) := by
+  unfold biasedOptionGen
+  apply IsPMF_bind
+  . apply IsPMF_coin
+  . intro b
+    cases b <;> dsimp
+    . apply IsPMF_pure
+    . apply IsPMF_bind_pure
+      assumption
+
+theorem IsPMF_optionGen (hg : IsPMF g) : IsPMF (optionGen g) := by
+  unfold optionGen
+  apply IsPMF_biasedOptionGen
+  assumption
 
 theorem IsPMF_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (hgs : ∀ g ∈ gs, IsPMF (g ())) :
     IsPMF (oneOf gs hne) := by
