@@ -8,6 +8,7 @@ import BasaltExamples.STLC.GenType
 import BasaltExamples.STLC.GenTerm
 import BasaltExamples.STLC.TypeCheck
 import BasaltExamples.STLC.Cost
+import BasaltExamples.STLC.Termination
 
 /-!
 # Simply-Typed Lambda Calculus
@@ -19,4 +20,6 @@ Bools), together with a typechecker. Split across `BasaltExamples/STLC/`:
 * `GenType`   — `genType`, an arbitrary-type generator, with its laws.
 * `GenTerm`   — `genTerm`, a well-typed-term generator, with soundness and completeness.
 * `TypeCheck` — a decidable typechecker, proved sound and complete.
+* `Cost`      — the context-aware cost bound for `genTerm`.
+* `Termination` — `genTerm`'s almost-sure termination proof.
 -/

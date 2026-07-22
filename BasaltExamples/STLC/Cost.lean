@@ -210,7 +210,8 @@ theorem genZero_cost_sound {Γ τ e n}
     unfold genZero at hmem
     cost_support_simp at hmem
     obtain ⟨body, nb, _, hbody, ⟨rfl, rfl⟩, rfl⟩ := hmem
-    exact Typing.TAbs _ _ _ _ (IH2 hbody)
+    have htbody : Typing (τ1 :: Γ) body τ2 := IH2 hbody
+    apply Typing.TAbs; assumption
 
 /-- Cost-level soundness: any `(e, n)` in `genTerm`'s cost support has `e` well-typed. This mirrors
     `genTerm_sound` (stated at `SPMF`) but at `SPMF.Cost`, so it can feed `typeCheck_getD_of_typing`
@@ -224,18 +225,18 @@ theorem genTerm_cost_sound {Γ τ e n}
       ⟨_, rfl, _, _⟩ | ⟨_, _, _, _, _, _, hveq, _⟩
     · exact genZero_cost_sound hz
     · exact varsWithType_sound hv
-    · exact absurd hveq (by simp)
+    · simp at hveq
     · constructor
-    · exact absurd hveq (by simp)
+    · simp at hveq
   | Var x =>
     rcases genTerm_cost_inv hmem with
       ⟨_, hz, _⟩ | ⟨hv, _⟩ | ⟨_, _, _, _, _, _, _, _, _, hveq, _⟩ |
       ⟨_, _, hveq, _⟩ | ⟨_, _, _, _, _, _, hveq, _⟩
     · exact genZero_cost_sound hz
     · exact varsWithType_sound hv
-    · exact absurd hveq (by simp)
-    · exact absurd hveq (by simp)
-    · exact absurd hveq (by simp)
+    · simp at hveq
+    · simp at hveq
+    · simp at hveq
   | App e1 e2 IH1 IH2 =>
     rcases genTerm_cost_inv hmem with
       ⟨_, hz, _⟩ | ⟨hv, _⟩ |
@@ -244,20 +245,23 @@ theorem genTerm_cost_sound {Γ τ e n}
     · exact genZero_cost_sound hz
     · exact varsWithType_sound hv
     · obtain ⟨rfl, rfl⟩ : e1 = f1 ∧ e2 = f2 := by simpa using heq
-      exact Typing.TApp _ _ _ argTy _ (IH2 h2) (IH1 h1)
-    · exact absurd hveq (by simp)
-    · exact absurd hveq (by simp)
+      have htf : Typing Γ e1 (argTy.Fun τ) := IH1 h1
+      have hta : Typing Γ e2 argTy := IH2 h2
+      apply Typing.TApp <;> assumption
+    · simp at hveq
+    · simp at hveq
   | Abs τ1 e IH =>
     rcases genTerm_cost_inv hmem with
       ⟨_, hz, _⟩ | ⟨hv, _⟩ | ⟨_, _, _, _, _, _, _, _, _, hveq, _⟩ |
       ⟨_, _, hveq, _⟩ | ⟨σ1, σ2, f, _, hτ, he, heq, _⟩
     · exact genZero_cost_sound hz
     · exact varsWithType_sound hv
-    · exact absurd hveq (by simp)
-    · exact absurd hveq (by simp)
+    · simp at hveq
+    · simp at hveq
     · obtain ⟨rfl, rfl⟩ : τ1 = σ1 ∧ e = f := by simpa using heq
       subst hτ
-      exact Typing.TAbs _ _ _ _ (IH he)
+      have htbody : Typing (τ1 :: Γ) e σ2 := IH he
+      apply Typing.TAbs; assumption
 
 /-- `genTerm Γ τ` makes at most `Term.costInCtx Γ` random choices.
 
@@ -278,24 +282,27 @@ theorem genTerm.cost_bounded :
     rcases genTerm_cost_inv hmem with
       ⟨nz, hz, rfl⟩ | ⟨hv, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, hveq, _⟩ |
       ⟨b', _, _, rfl⟩ | ⟨_, _, _, _, _, _, hveq, _⟩
-    · have := IsBounded_iff.mp genZero.cost_bounded (Term.Bool b, nz) hz
-      have := Term.two_le_costInCtx Γ (Term.Bool b); omega
-    · have := Term.two_le_costInCtx Γ (Term.Bool b); omega
-    · exact absurd hveq (by simp)
+    · have hzc : nz ≤ 1 := IsBounded_iff.mp genZero.cost_bounded (Term.Bool b, nz) hz
+      have hlo : 2 ≤ Term.costInCtx Γ (Term.Bool b) := Term.two_le_costInCtx Γ (Term.Bool b)
+      omega
+    · have hlo : 2 ≤ Term.costInCtx Γ (Term.Bool b) := Term.two_le_costInCtx Γ (Term.Bool b)
+      omega
+    · simp at hveq
     · simp [Term.costInCtx]
-    · exact absurd hveq (by simp)
+    · simp at hveq
   | Var x =>
     intro hmem
     show n ≤ Term.costInCtx Γ (Term.Var x)
     rcases genTerm_cost_inv hmem with
       ⟨nz, hz, rfl⟩ | ⟨hv, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, hveq, _⟩ |
       ⟨b', _, hveq, _⟩ | ⟨_, _, _, _, _, _, hveq, _⟩
-    · have := IsBounded_iff.mp genZero.cost_bounded (Term.Var x, nz) hz
-      have := Term.two_le_costInCtx Γ (Term.Var x); omega
+    · have hzc : nz ≤ 1 := IsBounded_iff.mp genZero.cost_bounded (Term.Var x, nz) hz
+      have hlo : 2 ≤ Term.costInCtx Γ (Term.Var x) := Term.two_le_costInCtx Γ (Term.Var x)
+      omega
     · simp [Term.costInCtx]
-    · exact absurd hveq (by simp)
-    · exact absurd hveq (by simp)
-    · exact absurd hveq (by simp)
+    · simp at hveq
+    · simp at hveq
+    · simp at hveq
   | App e1 e2 IH1 IH2 =>
     intro hmem
     show n ≤ Term.costInCtx Γ (e1.App e2)
@@ -303,9 +310,11 @@ theorem genTerm.cost_bounded :
       ⟨nz, hz, rfl⟩ | ⟨hv, rfl⟩ |
       ⟨argTy, f1, f2, nT, n1, n2, hT, h1, h2, heq, rfl⟩ |
       ⟨b', _, hveq, _⟩ | ⟨_, _, _, _, _, _, hveq, _⟩
-    · have := IsBounded_iff.mp genZero.cost_bounded (e1.App e2, nz) hz
-      have := Term.two_le_costInCtx Γ (e1.App e2); omega
-    · have := Term.two_le_costInCtx Γ (e1.App e2); omega
+    · have hzc : nz ≤ 1 := IsBounded_iff.mp genZero.cost_bounded (e1.App e2, nz) hz
+      have hlo : 2 ≤ Term.costInCtx Γ (e1.App e2) := Term.two_le_costInCtx Γ (e1.App e2)
+      omega
+    · have hlo : 2 ≤ Term.costInCtx Γ (e1.App e2) := Term.two_le_costInCtx Γ (e1.App e2)
+      omega
     · obtain ⟨rfl, rfl⟩ : e1 = f1 ∧ e2 = f2 := by simpa using heq
       have hTy : nT ≤ argTy.size := IsBounded_iff.mp genType_cost (argTy, nT) hT
       have hb1 : n1 ≤ Term.costInCtx Γ e1 := IH1 n1 h1
@@ -314,19 +323,21 @@ theorem genTerm.cost_bounded :
         typeCheck_getD_of_typing (genTerm_cost_sound h2)
       simp only [Term.costInCtx, harg]
       omega
-    · exact absurd hveq (by simp)
-    · exact absurd hveq (by simp)
+    · simp at hveq
+    · simp at hveq
   | Abs τ1 e IH =>
     intro hmem
     show n ≤ Term.costInCtx Γ (Term.Abs τ1 e)
     rcases genTerm_cost_inv hmem with
       ⟨nz, hz, rfl⟩ | ⟨hv, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, hveq, _⟩ |
       ⟨b', _, hveq, _⟩ | ⟨σ1, σ2, f, ne, hτ, he, heq, rfl⟩
-    · have := IsBounded_iff.mp genZero.cost_bounded (Term.Abs τ1 e, nz) hz
-      have := Term.two_le_costInCtx Γ (Term.Abs τ1 e); omega
-    · have := Term.two_le_costInCtx Γ (Term.Abs τ1 e); omega
-    · exact absurd hveq (by simp)
-    · exact absurd hveq (by simp)
+    · have hzc : nz ≤ 1 := IsBounded_iff.mp genZero.cost_bounded (Term.Abs τ1 e, nz) hz
+      have hlo : 2 ≤ Term.costInCtx Γ (Term.Abs τ1 e) := Term.two_le_costInCtx Γ (Term.Abs τ1 e)
+      omega
+    · have hlo : 2 ≤ Term.costInCtx Γ (Term.Abs τ1 e) := Term.two_le_costInCtx Γ (Term.Abs τ1 e)
+      omega
+    · simp at hveq
+    · simp at hveq
     · obtain ⟨rfl, rfl⟩ : τ1 = σ1 ∧ e = f := by simpa using heq
       have hb : ne ≤ Term.costInCtx (τ1 :: Γ) e := IH ne he
       simp only [Term.costInCtx]
