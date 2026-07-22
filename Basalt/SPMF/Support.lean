@@ -176,6 +176,42 @@ theorem mem_support_pick_iff
     a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
   simp
 
+/-- Note that the support of `RandomChoice.coin r` only includes both `true` and `false`
+    when the bias is strictly in-between 0 and 1, otherwise it will only include one outcome. -/
+@[simp]
+theorem support_coin (h0 : 0 < r) (h1 : r < 1) :
+    SPMF.support (RandomChoice.coin r) = {true, false} := by
+  have hnum : (0 : ℤ) < r.num := Rat.num_pos.mpr h0
+  have hden : r.num < (r.den : ℤ) := Rat.num_lt_denom_iff.mpr h1
+  simp [coin, support_bind, support_choose, support_pure]
+  ext b
+  simp only [Set.mem_setOf_eq]
+  constructor
+  · rintro _
+    cases b <;> simp
+  · intro h
+    cases b
+    · -- b = false
+      exists r.den - 1
+      constructor
+      . apply le_refl
+      . right
+        constructor <;> try rfl
+        have hden_pos : 0 < r.den := r.den_pos
+        omega
+    · -- b = true
+      exists 0
+      constructor
+      . apply Nat.zero_le
+      . left
+        constructor <;> try rfl
+        omega
+
+@[simp]
+theorem mem_support_coin_iff (h0 : 0 < r) (h1 : r < 1) :
+    b ∈ SPMF.support (RandomChoice.coin r) ↔ b = true ∨ b = false := by
+  rw [support_coin h0 h1, Set.mem_insert_iff, Set.mem_singleton_iff]
+
 @[simp]
 theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
     n ∈ (chooseNat lo hi h : SPMF Nat).support ↔ lo ≤ n ∧ n ≤ hi := by

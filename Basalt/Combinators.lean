@@ -133,6 +133,9 @@ def listOf [Gen G] (g : G α) : G (List α) := do
       return x :: xs)
 partial_fixpoint
 
+def biasedOptional [Gen G] (g : G α) : G (Option α) := do
+  sorry
+
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
 - `l1.length = l2.length`
 - `l1[i] ⊑ l2[i]` for all list elements (here we are comparing them using the `PartialOrder` on `α`) -/
