@@ -356,6 +356,58 @@ theorem IsBounded_listOfMaxLength
     assumption
   · omega
 
+/-- `coin r` costs a single random choice -/
+theorem IsBounded_coin {r : Rat} : IsBounded (RandomChoice.coin r) (fun _ => 1) := by
+  unfold RandomChoice.coin
+  -- The continuation `cf` doesn't perform any random choices, so `cf` is the constant 0 function
+  apply IsBounded_bind (cx := fun _ => 1) (cf := fun _ _ => 0)
+  · apply IsBounded_choose
+  · intro c
+    split_ifs <;> apply IsBounded_pure
+  · intro p _ q _
+    dsimp
+    omega
+
+/-- `biasedOptionGen r g` costs 1 (a call to `coin`) plus, in the `some a` case, the cost of calling `g`   -/
+theorem IsBounded_biasedOptionGen
+    {r : Rat}
+    {g : SPMF.Cost α}
+    (hg : IsBounded g cost_g) :
+    IsBounded (biasedOptionGen r g) (fun a_opt => 1 + Option.elim a_opt 0 cost_g) := by
+  unfold biasedOptionGen
+  apply IsBounded_bind
+    (cx := fun _ => 1)                          -- the coin flip
+    (cf := fun _ a_opt => a_opt.elim 0 cost_g)          -- `some a` costs `cost_g a`; `none` costs 0
+  · apply IsBounded_coin
+  · intro b
+    cases b
+    · -- `b = false`, `biasedOptionGen` returns `pure none`
+      apply IsBounded_mono (c₁ := fun _ => 0)
+      · apply IsBounded_pure
+      · intro o; positivity
+    · -- `b = true`, `biasedOptionGen` becomes `g >>= fun x => pure (some x)`
+      apply IsBounded_bind (cx := cost_g) (cf := fun _ _ => 0)
+      · assumption
+      · intro a
+        apply IsBounded_pure
+      · intro (a, _) _ (a_opt, _) ha_opt
+        simp only [mem_support_pure_iff] at ha_opt
+        obtain ⟨rfl, _⟩ := ha_opt
+        dsimp
+        omega
+  · intro (b, _) _ (a_opt, _) _
+    dsimp
+    omega
+
+/-- `optionGen g` costs 1 (a call to `coin`) plus, in the `some a` case, the cost of calling `g`   -/
+theorem IsBounded_optionGen
+    {g : SPMF.Cost α}
+    (hg : IsBounded g cost_g) :
+    IsBounded (optionGen g) (fun a_opt => 1 + Option.elim a_opt 0 cost_g) := by
+  unfold optionGen
+  apply IsBounded_biasedOptionGen
+  assumption
+
 /-- `oneOf`'s cost function is upper-bounded by 1 + the max-valued cost function out of all the
 sub-generators -/
 theorem IsBounded_oneOf

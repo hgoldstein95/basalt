@@ -133,6 +133,22 @@ def listOf [Gen G] (g : G α) : G (List α) := do
       return x :: xs)
 partial_fixpoint
 
+/-- Lifts a generator of `α`'s into a generator of `Option α`'s,
+  which returns `some <$> g` with probability `r`.
+
+  Note: we explicitly use `bind` instead of `<$>` in the body of this combinator,
+  as there is no monotonicity lemma for `<$>` in `Lean.Order`. -/
+def biasedOptionGen [Gen G] (r : Rat) (g : G α) : G (Option α) := do
+  if ← RandomChoice.coin r then do
+    let x ← g
+    pure (some x)
+  else
+    pure none
+
+/-- Lifts a generator of `α`'s into a generator of `Option α`'s, which returns `none` with probability 1/2 -/
+def optionGen [Gen G] (g : G α) : G (Option α) :=
+  biasedOptionGen (1 / 2) g
+
 /-- Generates a *non-empty* list with unbounded length,
     where each element is produced using `g`. -/
 def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
@@ -573,6 +589,30 @@ theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
       apply MonoBind.bind_mono_left
       assumption
 
+/-- Lemma allowing us to use `biasedOptionGen` in functions marked as `partial_fixpoint` -/
+@[partial_fixpoint_monotone]
+theorem monotone_biasedOptionGen [Gen G] [PartialOrder γ]
+    (g : γ → G α) (hg : monotone g) :
+    monotone (fun x => biasedOptionGen r (g x)) := by
+  unfold biasedOptionGen
+  apply monotone_bind
+  . apply monotone_const
+  . apply monotone_of_monotone_apply
+    intro b
+    cases b <;> simp
+    . apply monotone_const
+    . apply monotone_bind
+      . assumption
+      . apply monotone_const
+
+/-- Lemma allowing us to use `optionGen` in functions marked as `partial_fixpoint` -/
+@[partial_fixpoint_monotone]
+theorem monotone_optionGen [Gen G] [PartialOrder γ]
+    (g : γ → G α) (hg : monotone g) :
+    monotone (fun x => optionGen (g x)) := by
+  unfold optionGen
+  apply monotone_biasedOptionGen
+  assumption
 
 /-- Lemma allowing us to use `nonEmptyListOf` in functions marked as `partial_fixpoint`
     (the `monotonicity` tactic is used under the hood by `partial_fixpoint`).

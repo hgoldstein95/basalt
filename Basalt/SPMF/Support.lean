@@ -176,6 +176,98 @@ theorem mem_support_pick_iff
     a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
   simp
 
+/-- Note that the support of `RandomChoice.coin r` only includes both `true` and `false`
+    when the bias is strictly in-between 0 and 1, otherwise it will only include one outcome. -/
+@[simp]
+theorem support_coin (h0 : 0 < r) (h1 : r < 1) :
+    SPMF.support (RandomChoice.coin r) = {true, false} := by
+  have hnum : (0 : ℤ) < r.num := Rat.num_pos.mpr h0
+  have hden : r.num < (r.den : ℤ) := Rat.num_lt_denom_iff.mpr h1
+  simp [coin, support_bind, support_choose, support_pure]
+  ext b
+  simp only [Set.mem_setOf_eq]
+  constructor
+  · rintro _
+    cases b <;> simp
+  · intro h
+    cases b
+    · -- b = false
+      exists r.den - 1
+      constructor
+      . apply le_refl
+      . right
+        constructor <;> try rfl
+        have hden_pos : 0 < r.den := r.den_pos
+        omega
+    · -- b = true
+      exists 0
+      constructor
+      . apply Nat.zero_le
+      . left
+        constructor <;> try rfl
+        omega
+
+@[simp]
+theorem mem_support_coin_iff (h0 : 0 < r) (h1 : r < 1) :
+    b ∈ SPMF.support (RandomChoice.coin r) ↔ b = true ∨ b = false := by
+  rw [support_coin h0 h1, Set.mem_insert_iff, Set.mem_singleton_iff]
+
+@[simp]
+theorem support_biasedOptionGen
+    {r : Rat}
+    {g : SPMF α}
+    (h0 : 0 < r) (h1 : r < 1) :
+    support (biasedOptionGen r g) = { none } ∪ { some x | x ∈ g.support } := by
+  have hnum : (0 : ℤ) < r.num := Rat.num_pos.mpr h0
+  have hden : r.num < (r.den : ℤ) := Rat.num_lt_denom_iff.mpr h1
+  have hden_pos : 0 < r.den := r.den_pos
+  simp [biasedOptionGen, coin, support_bind, support_choose]
+  ext a
+  simp [Set.mem_setOf_eq]
+  constructor <;> intros h
+  . obtain ⟨a, hge, h⟩ := h
+    rcases h with ⟨hle, rfl⟩ | ⟨hlt, ha⟩
+    . -- none case
+      left; rfl
+    . -- some case
+      obtain ⟨a', ⟨hmem, rfl⟩⟩ := ha
+      right; exists a'
+  . rcases h with rfl | ⟨x, ⟨hmem, rfl⟩⟩
+    . -- none case: coin returns `false`, so pick the maximal index `r.den - 1`
+      exists r.den - 1
+      constructor <;> try omega
+      left
+      constructor <;> try rfl
+      omega
+    . -- some case: coin returns `true`, so pick the minimal index `0`
+      exists 0
+      constructor <;> try omega
+      right
+      constructor
+      . omega
+      . exists x
+
+@[simp]
+theorem mem_support_biasedOptionGen_iff {r : Rat} {g : SPMF α} (h0 : 0 < r) (h1 : r < 1) :
+    x ∈ (biasedOptionGen r g).support ↔ x = none ∨ (∃ a ∈ g.support, x = some a) := by
+  unfold biasedOptionGen
+  simp
+  constructor <;> intro h
+  . rcases h with ⟨hmem, rfl⟩ | ⟨hmem, a, ha, rfl⟩
+    . left; rfl
+    . right; exists a
+  . rcases h with rfl | ⟨a, hmem, rfl⟩
+    . left
+      constructor
+      . apply (mem_support_coin_iff h0 h1).mpr
+        right; rfl
+      . rfl
+    . right
+      constructor
+      . apply (mem_support_coin_iff h0 h1).mpr
+        left; rfl
+      . exists a
+
 @[simp]
 theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
     n ∈ (chooseNat lo hi h : SPMF Nat).support ↔ lo ≤ n ∧ n ≤ hi := by
@@ -186,6 +278,20 @@ theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
     exact a.down.property
   · rintro ⟨h1, h2⟩
     exact ⟨⟨⟨n, h1, h2⟩⟩, rfl⟩
+
+@[simp]
+theorem support_optionGen
+    {g : SPMF α} :
+    support (optionGen g) = {none} ∪ {some x | x ∈ g.support} := by
+  unfold optionGen
+  apply support_biasedOptionGen <;> norm_num
+
+@[simp]
+theorem mem_support_optionGen_iff
+    {g : SPMF α} :
+    x ∈ support (optionGen g) ↔ x = none ∨ (∃ a ∈ g.support, x = some a) := by
+  unfold optionGen
+  apply mem_support_biasedOptionGen_iff <;> norm_num
 
 /-- The support of `vectorOf n g` is the set of all length-`n` list where each element is in `g`'s
 support. -/
