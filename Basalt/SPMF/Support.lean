@@ -268,7 +268,6 @@ theorem mem_support_biasedOptionGen_iff {r : Rat} {g : SPMF α} (h0 : 0 < r) (h1
         left; rfl
       . exists a
 
-
 @[simp]
 theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
     n ∈ (chooseNat lo hi h : SPMF Nat).support ↔ lo ≤ n ∧ n ≤ hi := by
@@ -279,6 +278,20 @@ theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
     exact a.down.property
   · rintro ⟨h1, h2⟩
     exact ⟨⟨⟨n, h1, h2⟩⟩, rfl⟩
+
+@[simp]
+theorem support_optionGen
+    {g : SPMF α} :
+    support (optionGen g) = {none} ∪ {some x | x ∈ g.support} := by
+  unfold optionGen
+  apply support_biasedOptionGen <;> norm_num
+
+@[simp]
+theorem mem_support_optionGen_iff
+    {g : SPMF α} :
+    x ∈ support (optionGen g) ↔ x = none ∨ (∃ a ∈ g.support, x = some a) := by
+  unfold optionGen
+  apply mem_support_biasedOptionGen_iff <;> norm_num
 
 /-- The support of `vectorOf n g` is the set of all length-`n` list where each element is in `g`'s
 support. -/
