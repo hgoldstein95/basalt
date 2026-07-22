@@ -12,3 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: leanprover/lean-action@v1
+
+      # `lake build` exits 0 on warnings, so anything short of an error ships green. Rebuild just
+      # this package's modules with `--wfail` to catch them. `lake clean basalt` drops only the root
+      # package's outputs, so Mathlib stays cached and cannot trip the flag with warnings of its own.
+      - name: Rebuild project modules, failing on warnings
+        run: |
+          lake clean basalt
+          lake build --wfail

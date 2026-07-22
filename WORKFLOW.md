@@ -99,6 +99,15 @@ Each has a fixed recipe. All three start the same way — unfold one step of the
 what one step can produce, then do logic/arithmetic — and they differ only in which interpretation
 they invert at.
 
+**Name the laws `<GEN>.sound_complete`, `<GEN>.terminates`, `<GEN>.cost_bounded`.** The dot is not
+cosmetic: `#genstats` discovers laws by exactly this naming convention and reports which ones a
+generator carries beside the statistics it merely *measured* (`Basalt/GenStats/Command.lean`,
+`lawSlots`). A law under any other name is invisible to the report — the generator will show
+`— (not proved)` for something you proved. The statement is checked too, not just the name, so a
+conventionally-named theorem that says something else cannot be laundered into a ✓. Automated
+synthesis that emits the same convention reports identically to hand-written generators.
+(`IsFilterFree`/`IsProductive`, for filtering generators, are `.filter_free` and `.productive`.)
+
 ### Unfolding: one idiom per context
 
 `partial_fixpoint` definitions unfold four ways, and picking the wrong one gives confusing errors:
@@ -112,11 +121,11 @@ they invert at.
 
 ### Recipe 1: Support
 
-Worked instances: `Tree.genHeap_support` (`Heap.lean`) is the recipe verbatim;
-`genAllTwos_support` (`AllTwoList.lean`) is the short form where `simp` finishes outright.
+Worked instances: `Tree.genHeap.sound_complete` (`Heap.lean`) is the recipe verbatim;
+`genAllTwos.sound_complete` (`AllTwoList.lean`) is the short form where `simp` finishes outright.
 
 ```lean
-theorem <GEN>_support : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) := by
+theorem <GEN>.sound_complete : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) := by
   intro x
   -- 1. Induct on the generated value, generalizing any index the recursion changes.
   induction x generalizing <IDX> with
@@ -144,17 +153,17 @@ Notes:
 - `support_simp [extra, lemmas]` is `simp only` with the `mem_support_*_iff` set (`pick`, `bind`,
   `pure`, `map`, `chooseNat`, `ite`/`dite`, `elements`, `oneOf`, `frequency`, …). It fires on real
   generator goals — the set is stated on monad notation. It also takes `at h`.
-- **A callee's `_support` law is not a `simp` lemma.** `IsSoundAndComplete` is a semireducible
+- **A callee's `.sound_complete` law is not a `simp` lemma.** `IsSoundAndComplete` is a semireducible
   `def`, so `simp` cannot see the `↔` inside it. A generator whose support fact is consumed by
   *other* proofs therefore states both: `<callee>_mem_support` (the raw `↔`, what you pass to
-  `support_simp`) and `<callee>_support` (the law, a one-line corollary). See `Nat.arbitrary`
+  `support_simp`) and `<callee>.sound_complete` (the law, a one-line corollary). See `Nat.arbitrary`
   (`ArbNat.lean`) and `Char.arbitrary` (`ArbChar.lean`).
 - An *alternative* opener when the predicate (not the value) drives the case split:
-  `fun_induction <PRED> <;> rw [<GEN>] <;> split <;> simp <;> grind` — see `Tree.genBST_support`
+  `fun_induction <PRED> <;> rw [<GEN>] <;> split <;> simp <;> grind` — see `Tree.genBST.sound_complete`
   (`BST.lean`). Elegant when it works; when it doesn't, fall back to the explicit recipe, which
   fails at a specific step with a specific goal.
 - `grind` is the documented *fallback for the endgame* (after `support_simp`), never the whole
-  proof. `List.genSortedGt_support` (`SortedList.lean`) shows endgame grinds that must find
+  proof. `List.genSortedGt.sound_complete` (`SortedList.lean`) shows endgame grinds that must find
   witnesses.
 
 ### Recipe 2: Termination
@@ -178,36 +187,39 @@ The step obligation is the same in every regime: *unfold once and lower-bound th
 per `←` in the do-block*.
 
 ```lean
-theorem <GEN>_terminates : IsAlmostSurelyTerminating <GEN> := by
+theorem <GEN>.terminates : IsAlmostSurelyTerminating <GEN> := by
   -- Subcritical, static seed (worked instances: Nat.arbitrary, List.arbitrary, genAllTwos,
   -- genCharList; family form: List.genSortedGt):
   refine SPMF.IsPMF_of_subcritical_mass (m := <M>) (by norm_num) ?_
-  rw [ENNReal.one_sub_half]          -- ⊢ (1 - m) + m * mass ≤ mass; at m = 1/2 this rewrites 1 - m
   conv_rhs => rw [<GEN>]             -- unfold one step, RHS only
   simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
   gcongr                             -- match the non-recursive parts; leaves the recursive branch
+  simp_all
   -- Now one lemma per `←`, reading the do-block top to bottom:
-  apply SPMF.mass_bind_ge_of_isPMF <callee>_terminates   -- `← callee` with a known PMF
+  apply SPMF.mass_bind_ge_of_isPMF <callee>.terminates   -- `← callee` with a known PMF
   intro x
   rw [SPMF.mass_bind_pure]           -- trailing `return f x` — done if the recursive call is last
 ```
 
 For the *family* forms (`IsPMF_of_subcritical_mass_family`, `IsPMF_of_critical_family`) the
 recursive occurrence recurses at a *different index*, so it is bounded by the family's infimum:
-finish with `exact SPMF.mass_ge_iInf _ <new index>` (see `List.genSortedGt_terminates`,
-`Tree.genHeap_terminates`). For a branch making two recursive calls, chain
-`SPMF.mass_bind_ge_mul` (see `Tree.genHeap_terminates`). For a `frequency`, replace `mass_pick`
+finish with `exact SPMF.mass_ge_iInf _ <new index>` (see `List.genSortedGt.terminates`,
+`Tree.genHeap.terminates`). For a branch making two recursive calls, chain
+`SPMF.mass_bind_ge_mul` (see `Tree.genHeap.terminates`). For a `frequency`, replace `mass_pick`
 with `SPMF.mass_frequency` / `SPMF.mass_frequency_ge`; for a `chooseNat` pivot,
 `SPMF.mass_bind_chooseNat_ge` (raw `choose`: `SPMF.mass_bind_choose_ge`).
 
-**Shrinking seed** (both BST generators, `BST.lean`) is the one regime with real content: you
-supply a ranking function `φ : Seed → ℝ≥0∞` (with `φ ≥ 1`) whose expected value drops by `ε` at
-every step, and `SPMF.IsPMF_of_ranking` returns termination *plus* `E[#steps] ≤ φ/ε`. The proof
-splits into a `LevelOp` (three algebra laws), a drift lemma (`A φ + ε ≤ φ` — pure arithmetic about
-your rank), and a step lemma (one unfolding, using `ENNReal.one_sub_le_mul_one_sub`,
+**Shrinking seed** (`Tree.genWeightedBST`, `BST/Weighted.lean`) is the one regime with real
+content: you supply a ranking function `φ : Seed → ℝ≥0∞` (with `φ ≥ 1`) whose expected value drops
+by `ε` at every step, and `SPMF.IsPMF_of_ranking` returns termination *plus* `E[#steps] ≤ φ/ε`. The
+proof splits into a `LevelOp` (three algebra laws), a drift lemma (`A φ + ε ≤ φ` — pure arithmetic
+about your rank), and a step lemma (one unfolding, using `ENNReal.one_sub_le_mul_one_sub`,
 `one_sub_sum_div_le`, `one_sub_mul_le_add` to push the deficit through the branches). Follow
-`genBST_drift`/`genBST_step`/`genBST_terminates` in `BST.lean`; both BST generators share one level
-operator and one rank, differing only in the recursion weight. Two things to know:
+`genWeightedBST_drift`/`genWeightedBST_step`/`genWeightedBST.terminates` in `BST/Weighted.lean`.
+(The plain `Tree.genBST` in `BST.lean` is *critical*, not shrinking — a uniform pivot gives mean
+offspring exactly 1 — so it terminates via `IsPMF_of_critical_family` with no ranking function; the
+`frequency`-weighted variant is what tips supercritical under the crude bound and needs the rank.)
+Two things to know:
 
 - Candidate `φ`s, in order: the seed measure; `≡ const` (that's the static-seed case); seed measure
   plus a depth term. Evaluate the drift in the *actual truncated `Nat` arithmetic* — `bstRank`
@@ -216,17 +228,17 @@ operator and one rank, differing only in the recursion weight. Two things to kno
 
 Whatever the regime, the residual ENNReal *arithmetic* (drift inequalities, fixed-point
 bounds) is handled by `ennreal_to_real` + `norm_num`/`linarith`/`nlinarith` — see
-`Basalt/ENNRealAuto.lean`, with worked uses in `genWeightedBST_drift` (`BST.lean`),
-`genTree_terminates` (`AllTwoTree.lean`), and `IsPMF_retry` (`Failure.lean`).
+`Basalt/ENNRealAuto.lean`, with worked uses in `genWeightedBST_drift` (`BST/Weighted.lean`),
+`genTree.terminates` (`AllTwoTree.lean`), and `IsPMF_retry` (`Failure.lean`).
 
 ### Recipe 3: Cost
 
-Worked instances: `Nat.arbitrary_cost` (`ArbNat.lean`) is the minimal case; `Tree.genHeap_cost`
-(`Heap.lean`) has a callee and two recursive calls; `Tree.genBST_cost` / `Tree.genWeightedBST_cost`
-(`BST.lean`) show `dite`, `chooseNat`, and `frequency`.
+Worked instances: `Nat.arbitrary.cost_bounded` (`ArbNat.lean`) is the minimal case; `Tree.genHeap.cost_bounded`
+(`Heap.lean`) has a callee and two recursive calls; `Tree.genBST.cost_bounded` (`BST.lean`) shows `dite`
+and `chooseNat`, and `Tree.genWeightedBST.cost_bounded` (`BST/Weighted.lean`) adds `frequency`.
 
 ```lean
-theorem <GEN>_cost : IsCostBounded <GEN> <COST> := by
+theorem <GEN>.cost_bounded : IsCostBounded <GEN> <COST> := by
   open Lean.Order in
   delta <GEN>                        -- 1. expose the `fix`
   apply fix_induct (motive := fun (g : SPMF.Cost <α>) => IsBounded g <COST>) _ ?admissible ?step
@@ -246,7 +258,7 @@ theorem <GEN>_cost : IsCostBounded <GEN> <COST> := by
       simp [<COST>]
     · obtain ⟨x, n1, n2, hx, ⟨...⟩, hm⟩ := h  -- recursive branch
       -- 4. One line per callee / recursive call: bring its bound into scope.
-      have hhead : n1 ≤ <callee bound> := IsBounded_iff.mp <callee>_cost (x, n1) hx
+      have hhead : n1 ≤ <callee bound> := IsBounded_iff.mp <callee>.cost_bounded (x, n1) hx
       have htail : n3 ≤ <COST> tl := ih (tl, n3) htl
       -- 5. State the goal in constructor form and finish with omega.
       show 1 + m ≤ <COST> (<CTOR> x tl)
@@ -260,7 +272,7 @@ and re-run; nothing else in the proof changes.
 
 For straight-line (non-recursive) generators skip `fix_induct` entirely and use the compositional
 algebra: `IsBounded_pure`, `IsBounded_choose`, `IsBounded_pick`, `IsBounded_bind`,
-`IsBounded_elements`, `IsBounded_map`, `IsBounded_mono` — see `Char.arbitrary_cost`
+`IsBounded_elements`, `IsBounded_map`, `IsBounded_mono` — see `Char.arbitrary.cost_bounded`
 (`ArbChar.lean`). Don't use the combinator path for recursive generators: under `fix_induct` the
 inversion path above is uniform and the combinator side conditions just reintroduce the same work.
 
@@ -289,5 +301,4 @@ inversion path above is uniform and the combinator side conditions just reintrod
 ## Prior Art
 
 For the *theory* behind the termination recipes — the ranking-function theorem, the three seed
-regimes, and why critical generators have infinite expected size — see `Basalt/SPMF/Ranking.lean`
-and the tuning plan it implements.
+regimes, and why critical generators have infinite expected size — see `Basalt/SPMF/Ranking.lean`.

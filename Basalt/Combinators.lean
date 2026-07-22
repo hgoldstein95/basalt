@@ -13,7 +13,10 @@ open Lean.Order
 /-!
 # Generator Combinators
 
-This file defines various generator combinators:
+This file defines various generator combinators.
+
+## Main Definitions
+
 - `elements`: generates an element from a non-empty list at random
 - `oneOf`: picks from a list of generators uniformly at random
 - `frequency`: like `oneOf`, but performs weighted random selection
@@ -26,11 +29,10 @@ open List
 
 namespace Helpers
 
-/-- Helper function for the `frequency` combinator:
-    `frequencySelect xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
-     This function expects a proof `h : n < sum(xs)`, which makes the empty-list case in
-     the pattern-match irrefutable, since `n < 0` is `False` (this is discharged
-     immediately by `contradiction`). -/
+/-- Helper function for the `frequency` combinator: `frequencySelect xs n` chooses a weight & a
+generator `(k, gen)` from the list `xs` such that `n < k`.  This function expects a proof `h : n <
+sum(xs)`, which makes the empty-list case in the pattern-match irrefutable, since `n < 0` is `False`
+(this is discharged immediately by `contradiction`). -/
 def frequencySelect [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
     (h : n < List.sum (List.map Prod.fst xs)) : G α :=
   match xs with
@@ -41,28 +43,23 @@ def frequencySelect [Gen G] (xs : List (Nat × (Unit → G α))) (n : Nat)
     else
       frequencySelect xs (n - k) (by simp only [List.map_cons, List.sum_cons] at h; omega)
 
-/-- Implementation of the `oneOf` combinator, parameterized by an upper bound `n`
-    for the random index. The caller is required to supply a proof that `n`
-    is strictly less than the list's length.
-    (`oneOf` instantiates `n` with `gs.length - 1`).
-    Making the upper bound a parameter allows us to use the `oneOfAux_congr` lemma below
-    to propogate equalities about the bound via `subst`, which
-    is used in the monotonicity proof for `oneOf` (`oneOf_le`). -/
+/-- Implementation of the `oneOf` combinator, parameterized by an upper bound `n` for the random
+index. The caller is required to supply a proof that `n` is strictly less than the list's length.
+(`oneOf` instantiates `n` with `gs.length - 1`).  Making the upper bound a parameter allows us to
+use the `oneOfAux_congr` lemma below to propogate equalities about the bound via `subst`, which is
+used in the monotonicity proof for `oneOf` (`oneOf_le`). -/
 def oneOfAux [Gen G] (l : List (Unit → G α)) (n : Nat)
     (hlt : ∀ i, i ≤ n → i < l.length) : G α := do
   let ⟨i, _, hle_i⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
   (l[i]'(hlt i hle_i)) ()
 
-/-- Implementation of the `frequency` combinator, parameterized by the total
-    weight `total`, which serves as the (exclusive) upper bound for the random
-    weight `n` sampled via `RandomChoice.choose`.
-    The caller supplies a proof `htotal` that `total` is the sum of
-    the weights in `gs`. (`frequency` instantiates `total` with
-    `List.sum (List.map Prod.fst gs)`.)
+/-- Implementation of the `frequency` combinator, parameterized by the total weight `total`, which
+serves as the (exclusive) upper bound for the random weight `n` sampled via `RandomChoice.choose`.
+The caller supplies a proof `htotal` that `total` is the sum of the weights in `gs`. (`frequency`
+instantiates `total` with `List.sum (List.map Prod.fst gs)`.)
 
-    Making `total` a parameter lets us use the `frequencyAux_congr`
-    lemma to propagate equalities about the total via `subst`, which is used in
-    the monotonicity proof for `frequency` (`frequency_le`). -/
+Making `total` a parameter lets us use the `frequencyAux_congr` lemma to propagate equalities about
+the total via `subst`, which is used in the monotonicity proof for `frequency` (`frequency_le`). -/
 def frequencyAux [Gen G] (gs : List (Nat × (Unit → G α))) (total : Nat)
     (htotal : total = List.sum (List.map Prod.fst gs)) : G α := do
   let n ← ULift.down <$> RandomChoice.choose 0 (total - 1) (Nat.zero_le _)
@@ -73,13 +70,13 @@ def frequencyAux [Gen G] (gs : List (Nat × (Unit → G α))) (total : Nat)
 
 end Helpers
 
-/-- Choose a plain `Nat` uniformly from `[lo, hi]` (inclusive). Prefer this over raw `choose`
-    in generators: it hides `choose`'s `ULift` subtype from bodies and proofs. -/
+/-- Choose a plain `Nat` uniformly from `[lo, hi]` (inclusive). Prefer this over raw `choose` in
+generators: it hides `choose`'s `ULift` subtype from bodies and proofs. -/
 def chooseNat [Gen G] (lo hi : Nat) (h : lo ≤ hi) : G Nat :=
   (·.down.val) <$> RandomChoice.choose lo hi h
 
-/-- Generates an element of the list `xs` at random.
-    This combinator takes as input a proof that `xs` is non-empty. -/
+/-- Generates an element of the list `xs` at random.  This combinator takes as input a proof that
+`xs` is non-empty. -/
 def elements [Gen G] (xs : List α) (hne : xs ≠ []) : G α := do
   let ⟨i, ⟨ hge, hle ⟩⟩ ← ULift.down <$> RandomChoice.choose 0 (xs.length - 1) (by omega)
   -- Obtain a proof that the list indexing is in-bounds
@@ -89,47 +86,44 @@ def elements [Gen G] (xs : List α) (hne : xs ≠ []) : G α := do
   have hlt : i < xs.length := by omega
   return xs[i]'hlt
 
-/-- Picks one of the generators in `gs` at random.
-    This combinator takes as input a proof that `gs` is non-empty. -/
+/-- Picks one of the generators in `gs` at random.  This combinator takes as input a proof that `gs`
+is non-empty. -/
 def oneOf [Gen G] (gs : List (Unit → G α)) (hne : gs ≠ []) : G α :=
   Helpers.oneOfAux gs (gs.length - 1) (by
     intro i hi
     have hlen : 0 < gs.length := length_pos_iff.mpr hne
     omega)
 
-/-- `frequency` picks a generator from the list `gs` according to the weights in `gs`.
-    This combinators also takes an additional hypothesis that the sum of the weights
-    in the list is non-zero (this is discharged via `omega` by default). -/
+/-- `frequency` picks a generator from the list `gs` according to the weights in `gs`.  This
+combinators also takes an additional hypothesis that the sum of the weights in the list is non-zero
+(this is discharged via `omega` by default). -/
 def frequency [Gen G] (gs : List (Nat × (Unit → G α)))
   (_h : 0 < List.sum (List.map Prod.fst gs) := by omega) : G α :=
   Helpers.frequencyAux gs (List.sum (List.map Prod.fst gs)) rfl
 
-/-- Generates a length-`n` list, where each element is generated
-    by the generator `g` -/
+/-- Generates a length-`n` list, where each element is generated by the generator `g` -/
 def vectorOf [Gen G] (n : Nat) (g : G α) : G (List α) :=
   List.foldr (fun m acc => do
     let x ← m
     let xs ← acc
     pure (x :: xs)) (pure []) (List.replicate n g)
 
-/-- Helper lemma that unfolds one layer of recursion in `vectorOf (n + 1) g`.
-    This is needed for the lemmas `support_vectorOf`, `IsPMF_vectorOf`. -/
+/-- Helper lemma that unfolds one layer of recursion in `vectorOf (n + 1) g`.  This is needed for
+the lemmas `support_vectorOf`, `IsPMF_vectorOf`. -/
 theorem vectorOf_succ [Gen G] {n : Nat} {g : G α} :
     vectorOf (n + 1) g = (do let x ← g; let xs ← vectorOf n g; pure (x :: xs)) :=
   rfl
 
-/-- `listOfMaxLength n g` generates a list whose length is unformly distributed
-     across `[0, n]`, (i.e. the list may be empty and its maximum possible length
-     is `n` inclusive). Each list element is produced by the generator `g`. -/
+/-- `listOfMaxLength n g` generates a list whose length is unformly distributed across `[0, n]`,
+(i.e. the list may be empty and its maximum possible length is `n` inclusive). Each list element is
+produced by the generator `g`. -/
 def listOfMaxLength [Gen G] (n : Nat) (g : G α) : G (List α) := do
   let ⟨k, _⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
   vectorOf k g
 
-/-- Generates a (possibly empty) list with unbounded length
-    where each element is produced using `g`.
-    Note: this produces the empty list 50% of the time, so for production
-    generators, you should consider using other combinators,
-    e.g. `listOfMaxLength`. -/
+/-- Generates a (possibly empty) list with unbounded length where each element is produced using
+`g`.  Note: this produces the empty list 50% of the time, so for production generators, you should
+consider using other combinators, e.g. `listOfMaxLength`. -/
 def listOf [Gen G] (g : G α) : G (List α) := do
   RandomChoice.pick
     (fun () => pure [])
@@ -155,8 +149,8 @@ def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
 partial_fixpoint
 
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
-    - `l1.length = l2.length`
-    - `l1[i] ⊑ l2[i]` for all list elements (here we are comparing them using the `PartialOrder` on `α`) -/
+- `l1.length = l2.length`
+- `l1[i] ⊑ l2[i]` for all list elements (here we are comparing them using the `PartialOrder` on `α`) -/
 instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     PartialOrder (List α) where
   rel l1 l2 :=
@@ -193,33 +187,33 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
     . apply helem_yx
 
 /-- Define a partial order on `Nat × α` where `(w1, g1) ⊑ (w2, g2)` iff `w1 = w2 ∧ g1 ⊑ g2`.
-    (Here we are using the `PartialOrder` on `α` to compare `g1 ⊑ g2`.)
-    This partial order is needed in order to prove monotonicity of the `frequency` combinator.
+(Here we are using the `PartialOrder` on `α` to compare `g1 ⊑ g2`.)
+This partial order is needed in order to prove monotonicity of the `frequency` combinator.
 
-    Note: we require the two weights `w1 = w2` to be equal (equality on `Nat`s) instead of `≤`.
-    If we instead had `w1 ≤ w2`, `frequency` would no longer be monotone.
+Note: we require the two weights `w1 = w2` to be equal (equality on `Nat`s) instead of `≤`.
+If we instead had `w1 ≤ w2`, `frequency` would no longer be monotone.
 
-    As a counterexample, assume towards a contradiction that we
-    (erroneously) define `(w1, g1) ⊑ (w2, g2)` as `w1 ≤ w2 ∧ g1 ⊑ g2`.
-    Now, consider the case where we want to show `frequency l1 ⊑ frequency l2`,
-    where the weights of the two lists are as follows:
+As a counterexample, assume towards a contradiction that we
+(erroneously) define `(w1, g1) ⊑ (w2, g2)` as `w1 ≤ w2 ∧ g1 ⊑ g2`.
+Now, consider the case where we want to show `frequency l1 ⊑ frequency l2`,
+where the weights of the two lists are as follows:
 
-    ```lean
-    l1 = [(1, pure true), (1, pure false)]
-    l2 = [(2, pure true), (1, pure false)]
-    ```
+```lean
+l1 = [(1, pure true), (1, pure false)]
+l2 = [(2, pure true), (1, pure false)]
+```
 
-    Note that we increased the weight of the `pure true` sub-generator when we go from `l1` to `l2`,
-    but as a result, the probability of generating `false` decreases!
+Note that we increased the weight of the `pure true` sub-generator when we go from `l1` to `l2`,
+but as a result, the probability of generating `false` decreases!
 
-    P(generating `false` via `frequency l1`) = 1/2
-    P(generating `false` using `frequency l2`) = 1/3
+P(generating `false` via `frequency l1`) = 1/2
+P(generating `false` using `frequency l2`) = 1/3
 
-    This violates the ⊑ order on `SPMF α`, since the probability mass of `false` has decreased
-    even though we have `l1 ⊑ l2`!
+This violates the ⊑ order on `SPMF α`, since the probability mass of `false` has decreased
+even though we have `l1 ⊑ l2`!
 
-    As a result, we cannot define `(w1, g1) ⊑ (w2, g2)` as `w1 ≤ w2 ∧ g1 ⊑ g2`,
-    and instead must have `w1 = w2 ∧ g1 ⊑ g2` as the definition of this order. -/
+As a result, we cannot define `(w1, g1) ⊑ (w2, g2)` as `w1 ≤ w2 ∧ g1 ⊑ g2`,
+and instead must have `w1 = w2 ∧ g1 ⊑ g2` as the definition of this order. -/
 instance {α : Type u} [PartialOrder α] : PartialOrder (Nat × α) where
   rel p q := p.1 = q.1 ∧ p.2 ⊑ q.2
   -- Reflexivity
@@ -246,8 +240,9 @@ instance {α : Type u} [PartialOrder α] : PartialOrder (Nat × α) where
     . apply PartialOrder.rel_antisymm <;> assumption
 
 /- This lemma lets the `monotonicity` tactic (invoked by `partial_fixpoint` under the hood)
-   decompose a list literal `[e₁, e₂, …]` into `e₁ :: (e₂ :: …)`
-   when all the `eᵢ` are functions. -/
+decompose a list literal `[e₁, e₂, …]` into `e₁ :: (e₂ :: …)` when all the `eᵢ` are functions.
+
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem List.monotone_cons
     {α : Type u} {γ : Sort w} [PartialOrder α] [PartialOrder γ]
@@ -339,6 +334,41 @@ private theorem frequencySelect_le [Gen G] {l1 l2 : List (Nat × (Unit → G α)
         apply IH
         assumption
 
+/-- If `n < sum (fst <$> gs)`, then `frequencySelect gs n h` picks a sub-generator from `gs` that
+has non-zero weight `w`. -/
+theorem frequencySelect_mem [Gen G]
+    {gs : List (Nat × (Unit → G α))}
+    {n : Nat}
+    (h : n < (List.map Prod.fst gs).sum) :
+    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ Helpers.frequencySelect gs n h = g () := by
+  induction gs generalizing n with
+  | nil => simp at h
+  | cons hd tl ih =>
+    unfold Helpers.frequencySelect
+    obtain ⟨ w, g ⟩ := hd
+    split
+    · -- n < w
+      exists w, g
+      constructor
+      . -- (w, g) ∈ (w, g) :: tl
+        apply List.Mem.head
+      . -- 0 < w ∧ fst (w, g) () = g ()
+        constructor
+        . omega
+        . rfl
+    · -- n >= w
+      have h_remaining_weight : n - w < List.sum (List.map Prod.fst tl) := by
+        simp only [List.map_cons, List.sum_cons] at h
+        omega
+      obtain ⟨w', g', hwg_mem, hwg_pos, hwg_eq⟩ := ih h_remaining_weight
+      exists w', g'
+      constructor
+      . -- (w', g') ∈ (w, g) :: tl
+        apply List.mem_cons_of_mem
+        assumption
+      . -- 0 < w' ∧ frequencySelect tl (n - w) = g'
+        constructor <;> assumption
+
 /-- If two lists `l1, l2 : List (Nat × α)` satisfy `l1 ⊑ l2`, then the sum of their weights
     must be equal -/
 private theorem sumOfWeights_le {α : Type u} [PartialOrder α] {l1 l2 : List (Nat × α)}
@@ -382,10 +412,11 @@ theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) (h1 : l1
     apply le_of_eq
     apply oneOfAux_congr <;> omega
 
-/-- Single general `@[partial_fixpoint_monotone]` lemma.
-    The `monotonicity` tactic (invoked by `partial_fixpoint` under the hood)
-    sees `fun x => oneOf (gens x)` and uses this lemma,
-    having already established `monotone gens` via `List.monotone_cons`. -/
+/-- Single general `@[partial_fixpoint_monotone]` lemma.  The `monotonicity` tactic (invoked by
+`partial_fixpoint` under the hood) sees `fun x => oneOf (gens x)` and uses this lemma, having
+already established `monotone gens` via `List.monotone_cons`.
+
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (gs : γ → List (Unit → G α)) (hne : ∀ x, gs x ≠ []) (hmono : monotone gs) :
@@ -396,10 +427,11 @@ theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
   apply hmono
   assumption
 
-/-- This lemma allows the `monotonicity` tactic to reason about pairs of the form
-    `(w, g x)` that appear in the list supplied to the `frequency` combinator.
-    Here, the weight `w` is a constant `Nat` and the generator `g`
-    assumed to be monotone. -/
+/-- This lemma allows the `monotonicity` tactic to reason about pairs of the form `(w, g x)` that
+appear in the list supplied to the `frequency` combinator.  Here, the weight `w` is a constant `Nat`
+and the generator `g` assumed to be monotone.
+
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_pair_snd {α : Type u} {γ : Sort w} [PartialOrder α] [PartialOrder γ]
     (w : Nat) (g : γ → α) (hg : monotone g) :
@@ -407,9 +439,8 @@ theorem monotone_pair_snd {α : Type u} {γ : Sort w} [PartialOrder α] [Partial
   intro x y hxy
   exact ⟨rfl, hg x y hxy⟩
 
-/-- Monotonicity of `frequency`: if `l1 ⊑ l2` (equal weights, pointwise-related
-    generators) and both have positive total weight (`h1, h2`), then
-    `frequency l1 h1 ⊑ frequency l2 h2`. -/
+/-- Monotonicity of `frequency`: if `l1 ⊑ l2` (equal weights, pointwise-related generators) and both
+have positive total weight (`h1, h2`), then `frequency l1 h1 ⊑ frequency l2 h2`. -/
 theorem frequency_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} (h : l1 ⊑ l2)
     (h1 : 0 < List.sum (List.map Prod.fst l1))
     (h2 : 0 < List.sum (List.map Prod.fst l2)) :
@@ -438,8 +469,10 @@ theorem frequency_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} (h : l1 ⊑
     apply sumOfWeights_le
     assumption
 
-/-- Lemma allowing us to use `frequency` in functions marked as `partial_fixpoint`
-    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
+/-- Lemma allowing us to use `frequency` in functions marked as `partial_fixpoint` (the
+`monotonicity` tactic is used under the hood by `partial_fixpoint`)
+
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_frequency [Gen G] {γ : Sort w} [PartialOrder γ]
     (gs : γ → List (Nat × (Unit → G α)))
@@ -452,8 +485,10 @@ theorem monotone_frequency [Gen G] {γ : Sort w} [PartialOrder γ]
   apply hmono
   assumption
 
-/-- Lemma allowing us to use `vectorOf` in functions marked as `partial_fixpoint`
-    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
+/-- Lemma allowing us to use `vectorOf` in functions marked as `partial_fixpoint` (the
+`monotonicity` tactic is used under the hood by `partial_fixpoint`).
+
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_vectorOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (n : Nat) (g : γ → G α) (hg : monotone g) :
@@ -476,8 +511,10 @@ theorem monotone_vectorOf [Gen G] {γ : Sort w} [PartialOrder γ]
     . dsimp
       apply PartialOrder.rel_refl
 
-/-- Lemma allowing us to use `listOfMaxLength` in functions marked as `partial_fixpoint`
-    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`) -/
+/-- Lemma allowing us to use `listOfMaxLength` in functions marked as `partial_fixpoint` (the
+`monotonicity` tactic is used under the hood by `partial_fixpoint`).
+
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_listOfMaxLength [Gen G] {γ : Sort w} [PartialOrder γ]
     (n : Nat) (g : γ → G α) (hg : monotone g) :
@@ -492,13 +529,14 @@ theorem monotone_listOfMaxLength [Gen G] {γ : Sort w} [PartialOrder γ]
     apply monotone_vectorOf
     assumption
 
-/-- Lemma allowing us to use `listOf` in functions marked as `partial_fixpoint`
-    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`).
+/-- Lemma allowing us to use `listOf` in functions marked as `partial_fixpoint` (the `monotonicity`
+tactic is used under the hood by `partial_fixpoint`).
 
-    Unlike `vectorOf`/`listOfMaxLength`, `listOf` is itself defined by `partial_fixpoint`
-    (`listOf g = fix (F (g))`), so we have to prove `listOf (g x) ⊑ listOf (g y)` via
-    fixpoint induction (`fix_induct`) on the left-hand fixpoint,
-    with the motive being `fun z => z ⊑ listOf (g y)`. -/
+Unlike `vectorOf`/`listOfMaxLength`, `listOf` is itself defined by `partial_fixpoint`
+(`listOf g = fix (F (g))`), so we have to prove `listOf (g x) ⊑ listOf (g y)` via fixpoint induction
+(`fix_induct`) on the left-hand fixpoint, with the motive being `fun z => z ⊑ listOf (g y)`.
+
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (g : γ → G α) (hg : monotone g) :

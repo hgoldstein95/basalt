@@ -1,9 +1,23 @@
+/-
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein
+-/
 import Basalt
 import Batteries.Data.Char
 import BasaltExamples.ArbChar
 import BasaltExamples.ArbString.Def
 
 open RandomChoice ArbChar
+
+/-!
+# Arbitrary Strings
+
+Correctness proofs for `String.arbitrary` (defined in `BasaltExamples/ArbString.Def`), an arbitrary
+alphanumeric string. Each property is proved first for the underlying `genCharList` and then
+transported across `String.ofList`. The `genCharList` proofs mirror `List.arbitrary`'s, with
+`Char.arbitrary` in place of `Nat.arbitrary`.
+-/
 
 namespace ArbString
 
@@ -67,8 +81,7 @@ theorem NonEmptyString.arbitrary_support :
         assumption
     . rw [String.ofList_toList]
 
-/-- `String.arbitrary` almost surely terminates -/
-theorem String.arbitrary_terminates : IsAlmostSurelyTerminating String.arbitrary := by
+theorem String.arbitrary.terminates : IsAlmostSurelyTerminating String.arbitrary := by
   unfold String.arbitrary IsAlmostSurelyTerminating SPMF.IsPMF
   rw [SPMF.mass_map]
   rw [SPMF.IsPMF_listOf]
