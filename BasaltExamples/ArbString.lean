@@ -21,87 +21,113 @@ transported across `String.ofList`. The `genCharList` proofs mirror `List.arbitr
 
 namespace ArbString
 
-theorem genCharList_mem_support :
-    cs ∈ SPMF.support genCharList ↔ ∀ c ∈ cs, c.isAlphanum = true := by
-  induction cs with
-  | nil =>
-    unfold genCharList
-    simp
-  | cons c cs ih =>
-    unfold genCharList
-    simp [Char.arbitrary_mem_support, ih]
-
-theorem genCharList.sound_complete :
-    IsSoundAndComplete genCharList (fun cs => ∀ c ∈ cs, c.isAlphanum = true) :=
-  fun _ => genCharList_mem_support
-
-theorem String.arbitrary.sound_complete :
+/-- `String.arbitrary`'s support is exactly the set of alphanumeric strings -/
+theorem String.arbitrary_support :
     IsSoundAndComplete String.arbitrary (fun s => ∀ c ∈ s.toList, c.isAlphanum = true) := by
   intro s
   simp only [String.arbitrary, SPMF.mem_support_map_iff]
   constructor
-  · rintro ⟨cs, hcs, heq⟩
-    rw [genCharList_mem_support] at hcs
-    subst heq
-    simpa using hcs
+  · rintro ⟨cs, hcs, rfl⟩
+    rw [SPMF.mem_support_listOf, Set.mem_setOf_eq] at hcs
+    intro c hc
+    rw [String.toList_ofList] at hc
+    specialize hcs c hc
+    simpa [Char.arbitrary_mem_support] using hcs
   · intro h
-    let cs := s.toList
+    set cs := s.toList
     exists cs
     constructor
-    . apply genCharList_mem_support.mpr
+    . rw [SPMF.mem_support_listOf, Set.mem_setOf_eq]
+      intro c hmem
+      simp [Char.arbitrary_mem_support]
+      apply h
       assumption
     . rw [String.ofList_toList]
 
-theorem genCharList.terminates : IsAlmostSurelyTerminating genCharList := by
-  -- Static seed, mean offspring 1/2: subcritical.
-  refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
-  conv_rhs => rw [genCharList]
-  simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-  gcongr
-  · simp_all
-  · apply SPMF.mass_bind_ge_of_isPMF Char.arbitrary.terminates
-    intro c
-    rw [SPMF.mass_bind_pure]
+/-- `NonEmptyString.arbitrary`'s support is exactly the set of
+    *non-empty* alphanumeric strings -/
+theorem NonEmptyString.arbitrary_support :
+    IsSoundAndComplete NonEmptyString.arbitrary (fun s => !s.isEmpty ∧ ∀ c ∈ s.toList, c.isAlphanum = true) := by
+  intro s
+  simp only [NonEmptyString.arbitrary, SPMF.mem_support_map_iff]
+  constructor
+  · rintro ⟨cs, hcs, rfl⟩
+    rw [SPMF.mem_support_nonEmptylistOf] at hcs
+    rw [Set.mem_setOf_eq] at hcs
+    obtain ⟨h1, h2⟩ := hcs
+    constructor
+    . rw [Bool.not_eq_true_eq_eq_false]
+      simp [String.isEmpty]
+      assumption
+    . intro c hc
+      rw [String.toList_ofList] at hc
+      specialize h2 c hc
+      simp [Char.arbitrary_mem_support] at h2
+      assumption
+  · intro h
+    set cs := s.toList
+    exists cs
+    constructor
+    . obtain ⟨hne, hc⟩ := h
+      simp at hne
+      subst cs
+      rw [SPMF.support_nonEmptyListOf]
+      rw [Set.mem_setOf_eq]
+      constructor
+      . simpa [String.isEmpty, String.toList_eq_nil_iff] using hne
+      . intro c hmem
+        simp [Char.arbitrary_mem_support]
+        apply hc
+        assumption
+    . rw [String.ofList_toList]
 
 theorem String.arbitrary.terminates : IsAlmostSurelyTerminating String.arbitrary := by
   unfold String.arbitrary IsAlmostSurelyTerminating SPMF.IsPMF
   rw [SPMF.mass_map]
-  apply genCharList.terminates
+  rw [SPMF.IsPMF_listOf]
+  apply Char.arbitrary.terminates
 
-/-- Producing `cs` costs at most `2 * cs.length + 1` choices: one `pick` and one `Char.arbitrary`
-(cost 1) per cons cell, plus the final `pick` that ends the list. -/
-theorem genCharList.cost_bounded :
-    IsCostBounded genCharList (fun cs => 2 * cs.length + 1) := by
-  open Lean.Order in
-  delta genCharList
-  apply fix_induct (motive := fun (g : SPMF.Cost (List Char)) =>
-    IsBounded g (fun cs => 2 * cs.length + 1)) _ ?admissible ?step
-  case admissible =>
-    apply admissible_IsBounded
-  case step =>
-    intro arbitrary_rec ih
-    rw [IsBounded_iff]
-    rintro ⟨cs, c⟩ hmem
-    cost_support_simp at hmem
-    obtain ⟨m, rfl, h | h⟩ := hmem
-    · obtain ⟨rfl, rfl⟩ := h
-      simp
-    · obtain ⟨ch, n1, n2, hch, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, hn2⟩, hm⟩ := h
-      have hhead : n1 ≤ 1 := IsBounded_iff.mp Char.arbitrary.cost_bounded (ch, n1) hch
-      have htail : n3 ≤ 2 * tl.length + 1 := ih (tl, n3) htl
-      show 1 + m ≤ 2 * (ch :: tl).length + 1
-      simp only [List.length_cons]
-      omega
+/-- `NonEmptyString.arbitrary` almost surely terminates -/
+theorem NonEmptyString.arbitrary_terminates : IsAlmostSurelyTerminating NonEmptyString.arbitrary := by
+  unfold NonEmptyString.arbitrary IsAlmostSurelyTerminating SPMF.IsPMF
+  rw [SPMF.mass_map]
+  rw [SPMF.IsPMF_nonEmptyListOf]
+  apply Char.arbitrary.terminates
 
-/-- Producing a string of length `n` costs at most `2 * n + 1` choices. -/
-theorem String.arbitrary.cost_bounded :
+/-- The cost bound comes from the generic `IsBounded_listOf` combinator lemma
+    applied to `Char.arbitrary` (whose per-element cost is `1`):
+    - `s.length` calls to `pick`
+    - a cost of `(fun _ => 1) <$> s = s.length` for generating each element of the list,
+    - plus `1` for the final `pick` to generate the end of the list,
+    resulting in a total `2 * s.length + 1`. -/
+theorem String.arbitrary_cost :
     IsCostBounded String.arbitrary (fun s => 2 * s.length + 1) := by
   unfold String.arbitrary IsCostBounded
   simp [IsBounded_iff]
   intro s cost cs hcs heq
   subst heq
-  have hcost : cost ≤ 2 * cs.length + 1 :=
-    IsBounded_iff.mp genCharList.cost_bounded (cs, cost) hcs
-  simpa [String.length_ofList] using hcost
+  simp [String.length_ofList]
+  have hcost : cost ≤ cs.length + ((fun _ => 1) <$> cs).sum + 1 := by
+    apply IsBounded_iff.mp (IsBounded_listOf Char.arbitrary.cost_bounded) (cs, cost)
+    assumption
+  simp only [Functor.map, List.map_const', List.sum_replicate, smul_eq_mul, mul_one] at hcost
+  omega
+
+/-- The cost bound is the same as `String.arbitrary`, except its value is always 1 less
+    since `NonEmptyString` doesn't need to call `pick` at the end
+    to terminate the list after all elements have been generated
+    (strings produced by this generator are always guaranteed to be non-empty). -/
+theorem NonEmptyString.arbitrary_cost :
+    IsCostBounded NonEmptyString.arbitrary (fun s => 2 * s.length) := by
+  unfold NonEmptyString.arbitrary IsCostBounded
+  simp [IsBounded_iff]
+  intro s cost cs hcs heq
+  subst heq
+  simp [String.length_ofList]
+  have hcost : cost ≤ cs.length + ((fun _ => 1) <$> cs).sum := by
+    apply IsBounded_iff.mp (IsBounded_nonEmptyListOf Char.arbitrary.cost_bounded) (cs, cost)
+    assumption
+  simp only [Functor.map, List.map_const', List.sum_replicate, smul_eq_mul, mul_one] at hcost
+  omega
 
 end ArbString

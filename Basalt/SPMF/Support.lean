@@ -326,12 +326,84 @@ theorem support_listOf
         apply List.mem_cons_of_mem
         assumption
 
+/-- The support of `nonEmptyListOf g` is the set of all *non-empty* lists where each element
+    is in `g`'s support -/
+theorem support_nonEmptyListOf
+    {g : SPMF α} :
+    support (nonEmptyListOf g) = { xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support } := by
+  ext xs
+  induction xs with
+  | nil =>
+    dsimp
+    constructor
+    . intro h
+      unfold nonEmptyListOf at h
+      simp [support_pick] at h
+    . intro ⟨hneq, hmem⟩
+      contradiction
+  | cons x xs' IH =>
+    constructor
+    . dsimp
+      intro hy
+      constructor
+      . apply List.cons_ne_nil
+      . intro y hy
+        -- Case on y ∈ x :: xs' (whether y = x or y ∈ xs')
+        cases hy with
+        | head =>
+          -- y = x
+          unfold nonEmptyListOf at hy
+          simp [support_pick] at hy
+          rcases hy with ⟨h, _⟩ | ⟨h, _⟩ <;> assumption
+        | tail =>
+          -- y ∈ xs'
+          rename_i hmem
+          unfold nonEmptyListOf at hy
+          simp [support_pick] at hy
+          rcases hy with ⟨_, hxs⟩ | ⟨_, hxs⟩
+          · -- xs' = [], so y ∈ xs' is vacuous
+            subst hxs
+            contradiction
+          · -- y ∈ g'.support
+            apply (IH.mp hxs).2
+            assumption
+    . intro h
+      rw [Set.mem_setOf_eq] at h
+      unfold nonEmptyListOf
+      simp [support_pick]
+      obtain ⟨h1, h2⟩ := h
+      have hx : x ∈ g.support := by
+        apply h2
+        apply List.mem_cons_self
+      by_cases he : xs' = []
+      · left
+        constructor <;> assumption
+      · right
+        constructor
+        . assumption
+        . apply IH.mpr
+          apply Set.mem_setOf.mpr
+          constructor
+          . assumption
+          . intro w hw
+            apply h2
+            apply List.mem_cons_of_mem
+            assumption
+
+
 @[simp]
 theorem mem_support_listOf
     {xs : List α}
     {g : SPMF α} :
     xs ∈ (listOf g).support ↔ xs ∈ {xs | ∀ x ∈ xs, x ∈ g.support} := by
   simp [support_listOf]
+
+@[simp]
+theorem mem_support_nonEmptylistOf
+    {xs : List α}
+    {g : SPMF α} :
+    xs ∈ (nonEmptyListOf g).support ↔ xs ∈ {xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support} := by
+  simp [support_nonEmptyListOf]
 
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]

@@ -34,6 +34,10 @@ def exercise (n : Nat) (gen : IO α) : IO Unit := do
 /-- info: drew 10 samples -/
 #guard_msgs in #eval exercise 10 ArbString.String.arbitrary
 
+#guard_msgs(drop info) in
+#eval (for _ in [0:10] do
+  IO.println <| repr (← ArbString.NonEmptyString.arbitrary) : IO Unit)
+
 /- `genBST` can be run in `IO`. -/
 /-- info: drew 10 samples -/
 #guard_msgs in #eval exercise 10 (BST.Tree.genBST 0 10)
