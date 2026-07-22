@@ -85,14 +85,14 @@ theorem String.arbitrary.terminates : IsAlmostSurelyTerminating String.arbitrary
   unfold String.arbitrary IsAlmostSurelyTerminating SPMF.IsPMF
   rw [SPMF.mass_map]
   rw [SPMF.IsPMF_listOf]
-  apply Char.arbitrary_terminates
+  apply Char.arbitrary.terminates
 
 /-- `NonEmptyString.arbitrary` almost surely terminates -/
 theorem NonEmptyString.arbitrary_terminates : IsAlmostSurelyTerminating NonEmptyString.arbitrary := by
   unfold NonEmptyString.arbitrary IsAlmostSurelyTerminating SPMF.IsPMF
   rw [SPMF.mass_map]
   rw [SPMF.IsPMF_nonEmptyListOf]
-  apply Char.arbitrary_terminates
+  apply Char.arbitrary.terminates
 
 /-- The cost bound comes from the generic `IsBounded_listOf` combinator lemma
     applied to `Char.arbitrary` (whose per-element cost is `1`):
@@ -108,7 +108,7 @@ theorem String.arbitrary_cost :
   subst heq
   simp [String.length_ofList]
   have hcost : cost ≤ cs.length + ((fun _ => 1) <$> cs).sum + 1 := by
-    apply IsBounded_iff.mp (IsBounded_listOf Char.arbitrary_cost) (cs, cost)
+    apply IsBounded_iff.mp (IsBounded_listOf Char.arbitrary.cost_bounded) (cs, cost)
     assumption
   simp only [Functor.map, List.map_const', List.sum_replicate, smul_eq_mul, mul_one] at hcost
   omega
@@ -125,7 +125,7 @@ theorem NonEmptyString.arbitrary_cost :
   subst heq
   simp [String.length_ofList]
   have hcost : cost ≤ cs.length + ((fun _ => 1) <$> cs).sum := by
-    apply IsBounded_iff.mp (IsBounded_nonEmptyListOf Char.arbitrary_cost) (cs, cost)
+    apply IsBounded_iff.mp (IsBounded_nonEmptyListOf Char.arbitrary.cost_bounded) (cs, cost)
     assumption
   simp only [Functor.map, List.map_const', List.sum_replicate, smul_eq_mul, mul_one] at hcost
   omega

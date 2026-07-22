@@ -373,7 +373,7 @@ theorem IsPMF_nonEmptyListOf {g : SPMF α} (hg : IsPMF g) :
     IsPMF (nonEmptyListOf g) := by
   -- Total probability of non-recursive branches is 1/2, hence `m := 1/2`
   refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
-  rw [ENNReal.one_sub_half]
+  rw [show ((1 : ℝ≥0∞) - 1 / 2 = 1 / 2) by rw [one_div, ENNReal.one_sub_inv_two]]
   conv_rhs => rw [nonEmptyListOf]
   -- In the base case, we have `g >>= fun x => pure [x]`,
   -- whose mass is `g.mass = 1` by assumption
