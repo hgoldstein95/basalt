@@ -9,5 +9,4 @@ import BasaltExamples.STLC.GenTerm
 import BasaltExamples.STLC.TypeCheck
 import BasaltExamples.STLC.Cost
 import BasaltExamples.STLC.Termination
-import BasaltExample.STLC.Shrink
-import BasaltExample.STLC.Mutate
+import BasaltExamples.STLC.Shrink

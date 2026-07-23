@@ -6,26 +6,17 @@ import BasaltExamples.STLC.GenType
 open RandomChoice SPMF List
 
 /-!
-# A shrinker for well-typed STLC terms
-
-`shrinkTerm` returns a list of structurally smaller terms. Every candidate is
-well-typed in the same context (though possibly at a *different* type), which is
-exactly what the property-based testing loop needs to keep shrinking a
-counterexample while preserving the "is well-typed" precondition.
+# Shrinker for well-typed STLC terms
 -/
 
 /-- Produces structurally smaller terms. Each candidate stays well-typed in the
     same context, but its type may change (see `shrinkTerm_sound`). -/
-def shrinkTerm : Term → List Term
+def shrinkTerm (e : Term) : List Term :=
+  match e with
   | .Bool _  => []
   | .Var _      => []
-  -- An application can be replaced by either well-typed subterm.
-  -- (We do *not* shrink `e1`/`e2` in place: the function/argument positions are
-  -- type-constrained, so a type-changing shrink there would be ill-typed.)
   | .App e1 e2  => [e1, e2]
-  -- A lambda can collapse to a constant, or we can shrink the body in place.
-  -- Shrinking the body is safe: re-wrapping in `.Abs τ` gives `.Fun τ _` for
-  -- whatever type the shrunk body has.
+  -- Shrink only the body but keep the binder
   | .Abs τ e    => (Term.Abs τ ·) <$> shrinkTerm e
 
 /-- Every term produced by `shrinkTerm` is well-typed in the same context,
