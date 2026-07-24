@@ -176,8 +176,8 @@ theorem mem_support_pick_iff
     a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
   simp
 
-/-- Note that the support of `RandomChoice.coin r` only includes both `true` and `false`
-    when the bias is strictly in-between 0 and 1, otherwise it will only include one outcome. -/
+/-- Note that the support of `RandomChoice.coin r` only includes both `true` and `false` when the
+bias is strictly in-between 0 and 1, otherwise it will only include one outcome. -/
 @[simp]
 theorem support_coin (h0 : 0 < r) (h1 : r < 1) :
     SPMF.support (RandomChoice.coin r) = {true, false} := by

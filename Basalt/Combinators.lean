@@ -133,11 +133,11 @@ def listOf [Gen G] (g : G α) : G (List α) := do
       return x :: xs)
 partial_fixpoint
 
-/-- Lifts a generator of `α`'s into a generator of `Option α`'s,
-  which returns `some <$> g` with probability `r`.
+/-- Lifts a generator of `α`'s into a generator of `Option α`'s, which returns `some <$> g` with
+probability `r`.
 
-  Note: we explicitly use `bind` instead of `<$>` in the body of this combinator,
-  as there is no monotonicity lemma for `<$>` in `Lean.Order`. -/
+Note: we explicitly use `bind` instead of `<$>` in the body of this combinator, as there is no
+monotonicity lemma for `<$>` in `Lean.Order`. -/
 def biasedOptionGen [Gen G] (r : Rat) (g : G α) : G (Option α) := do
   if ← RandomChoice.coin r then do
     let x ← g
@@ -149,8 +149,7 @@ def biasedOptionGen [Gen G] (r : Rat) (g : G α) : G (Option α) := do
 def optionGen [Gen G] (g : G α) : G (Option α) :=
   biasedOptionGen (1 / 2) g
 
-/-- Generates a *non-empty* list with unbounded length,
-    where each element is produced using `g`. -/
+/-- Generates a *non-empty* list with unbounded length, where each element is produced using `g`. -/
 def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
   -- Ideally, one would write the first sub-generator as `fun _ => List.singleton <$> g`,
   -- but there are no monotonicity lemmas for `<$>` in `Lean.Order` and
@@ -204,6 +203,7 @@ instance List.instPartialOrder {α : Type u} [PartialOrder α] :
 
 /-- Define a partial order on `Nat × α` where `(w1, g1) ⊑ (w2, g2)` iff `w1 = w2 ∧ g1 ⊑ g2`.
 (Here we are using the `PartialOrder` on `α` to compare `g1 ⊑ g2`.)
+
 This partial order is needed in order to prove monotonicity of the `frequency` combinator.
 
 Note: we require the two weights `w1 = w2` to be equal (equality on `Nat`s) instead of `≤`.
@@ -548,10 +548,6 @@ theorem monotone_listOfMaxLength [Gen G] {γ : Sort w} [PartialOrder γ]
 /-- Lemma allowing us to use `listOf` in functions marked as `partial_fixpoint` (the `monotonicity`
 tactic is used under the hood by `partial_fixpoint`).
 
-Unlike `vectorOf`/`listOfMaxLength`, `listOf` is itself defined by `partial_fixpoint`
-(`listOf g = fix (F (g))`), so we have to prove `listOf (g x) ⊑ listOf (g y)` via fixpoint induction
-(`fix_induct`) on the left-hand fixpoint, with the motive being `fun z => z ⊑ listOf (g y)`.
-
 This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
@@ -589,7 +585,9 @@ theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
       apply MonoBind.bind_mono_left
       assumption
 
-/-- Lemma allowing us to use `biasedOptionGen` in functions marked as `partial_fixpoint` -/
+/-- Lemma allowing us to use `biasedOptionGen` in functions marked as `partial_fixpoint`.
+
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_biasedOptionGen [Gen G] [PartialOrder γ]
     (g : γ → G α) (hg : monotone g) :
@@ -605,7 +603,9 @@ theorem monotone_biasedOptionGen [Gen G] [PartialOrder γ]
       . assumption
       . apply monotone_const
 
-/-- Lemma allowing us to use `optionGen` in functions marked as `partial_fixpoint` -/
+/-- Lemma allowing us to use `optionGen` in functions marked as `partial_fixpoint`
+
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_optionGen [Gen G] [PartialOrder γ]
     (g : γ → G α) (hg : monotone g) :
@@ -614,10 +614,10 @@ theorem monotone_optionGen [Gen G] [PartialOrder γ]
   apply monotone_biasedOptionGen
   assumption
 
-/-- Lemma allowing us to use `nonEmptyListOf` in functions marked as `partial_fixpoint`
-    (the `monotonicity` tactic is used under the hood by `partial_fixpoint`).
+/-- Lemma allowing us to use `nonEmptyListOf` in functions marked as `partial_fixpoint` (the
+`monotonicity` tactic is used under the hood by `partial_fixpoint`).
 
-    Note: the body of this proof is very similar to `monotone_listOf`. -/
+This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
 @[partial_fixpoint_monotone]
 theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (g : γ → G α) (hg : monotone g) :

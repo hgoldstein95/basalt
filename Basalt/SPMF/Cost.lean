@@ -562,6 +562,7 @@ theorem IsBounded_listOf
         apply ih (tl, n3)
         assumption
       dsimp
+      simp only [List.map_cons, List.sum_cons]
       omega
 
 /-- The value of `nonEmptyListOf`'s cost function is always one less than `listOf`'s cost
@@ -593,6 +594,7 @@ theorem IsBounded_nonEmptyListOf
       have hm : m ≤ cost_g a := by
         apply IsBounded_iff.mp hx (a, m)
         assumption
+      simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]
       omega
     · -- Recursive case
       obtain ⟨hd, n1, n2, hhd, ⟨tl, n3, n4, htl, ⟨rfl, rfl⟩, hn2⟩, rfl⟩ := h
@@ -602,4 +604,5 @@ theorem IsBounded_nonEmptyListOf
         assumption
       simp only [List.length_cons]
       dsimp
+      simp only [List.map_cons, List.sum_cons]
       omega
