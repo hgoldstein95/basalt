@@ -55,18 +55,44 @@ info: #[{ name := `Tree.genWeightedBST.site0, offset := 0, arity := 2, holes := 
 #guard_msgs in
 #eval Tree.genWeightedBST.sites
 
-/-- The defaults are the literal weights from the source. -/
-example : Tree.genWeightedBST.defaults = ⟨#[(1, 0), (5, 0)]⟩ := rfl
+/-- `defaults` is the weights record with every field at its source weight (the record `{}`); its
+fields are named after the constructors (`leaf`, `node`). -/
+example : Tree.genWeightedBST.defaults = { leaf := (1, 0), node := (5, 0) } := rfl
+
+/-- …and it flattens to the source `Tuning`. -/
+example : Tree.genWeightedBST.defaults.toTuning = ⟨#[(1, 0), (5, 0)]⟩ := rfl
+
+/-! ## 4a. Weights by constructor name
+
+The macro emits a `genFoo.Weights` record with one field per `frequency` branch,
+named after the constructor that branch produces. A caller sets weights by name
+— no need to recall the constructor order — and unset fields keep their source
+weight, so `{ node := … }` reweights `node` alone. -/
+
+/-- Overriding one field leaves the other at its source weight. -/
+example : ({ node := (2, 0) } : Tree.genWeightedBST.Weights)
+    = { leaf := (1, 0), node := (2, 0) } := rfl
+
+/-- A named override flattens to the expected `Tuning`. -/
+example : ({ node := (2, 0) } : Tree.genWeightedBST.Weights).toTuning
+    = ⟨#[(1, 0), (2, 0)]⟩ := rfl
+
+/-- A weighting held as a flat `Tuning` still drives `.tuned`: `Tuning` coerces to
+the weights record (field `i` reads schedule entry `i`), so nothing that used the
+old positional API breaks. -/
+example : ((⟨#[(5, 0), (1, 0)]⟩ : Tuning) : Tree.genWeightedBST.Weights)
+    = { leaf := (5, 0), node := (1, 0) } := rfl
 
 /-! ## 2. Two weightings, one compiled generator, one file
 
 `θ` is an ordinary runtime value: evaluating a new candidate weighting is a
-function call, not an edit-and-recompile. With the leaf/node weights flipped
-from 1:5 to 5:1, the distribution collapses toward leaves (compare `p50` and
-the head-constructor split). -/
+function call, not an edit-and-recompile. Weights are named by constructor, so
+flipping leaf/node from 1:5 to 5:1 is `{ leaf := (5, 0), node := (1, 0) }` — no
+need to recall the constructor order. The distribution collapses toward leaves
+(compare `p50` and the head-constructor split). -/
 
 /--
-info: Tree.genWeightedBST.tuned ⟨#[(1, 0), (5, 0)]⟩ 0 10 — 200 draws (seed 0, fuel 10000)
+info: Tree.genWeightedBST.tuned { leaf := (1, 0), node := (5, 0) } 0 10 — 200 draws (seed 0, fuel 10000)
 
   outcomes    ok 200 (100.0%)
   size        mean 18.2   p50 17   p95 43   max 87
@@ -90,10 +116,10 @@ info: Tree.genWeightedBST.tuned ⟨#[(1, 0), (5, 0)]⟩ 0 10 — 200 draws (seed
     BST.Tree.leaf
 -/
 #guard_msgs in
-#genstats (draws := 200) Tree.genWeightedBST.tuned ⟨#[(1, 0), (5, 0)]⟩ 0 10
+#genstats (draws := 200) Tree.genWeightedBST.tuned { leaf := (1, 0), node := (5, 0) } 0 10
 
 /--
-info: Tree.genWeightedBST.tuned ⟨#[(5, 0), (1, 0)]⟩ 0 10 — 200 draws (seed 0, fuel 10000)
+info: Tree.genWeightedBST.tuned { leaf := (5, 0), node := (1, 0) } 0 10 — 200 draws (seed 0, fuel 10000)
 
   outcomes    ok 200 (100.0%)
   size        mean 1.5   p50 1   p95 3   max 7
@@ -117,7 +143,7 @@ info: Tree.genWeightedBST.tuned ⟨#[(5, 0), (1, 0)]⟩ 0 10 — 200 draws (seed
     BST.Tree.leaf
 -/
 #guard_msgs in
-#genstats (draws := 200) Tree.genWeightedBST.tuned ⟨#[(5, 0), (1, 0)]⟩ 0 10
+#genstats (draws := 200) Tree.genWeightedBST.tuned { leaf := (5, 0), node := (1, 0) } 0 10
 
 /-! ## 3. Depth-indexed schedules
 
@@ -147,13 +173,14 @@ example [Gen G] (depth : Nat) :
   genTree.tuned_defaults depth
 
 /-- With constant weights 1:2 the mean offspring is `2·(2/3) = 4/3 > 1` — the
-    generator is *supercritical* and most draws exhaust the fuel budget. -/
-def constantTuning : Tuning := ⟨#[(1, 0), (2, 0)]⟩
+    generator is *supercritical* and most draws exhaust the fuel budget. Weights
+    are given by constructor name, as a `genTree.Weights` record. -/
+def constantTuning : genTree.Weights := { leaf := (1, 0), node := (2, 0) }
 
 /-- Same base weights, but the leaf weight grows by 8 per level of depth:
     `w_leaf(d) = 1 + 8·d`, `w_node(d) = 2`. Supercritical at the root, forced
     subcritical by depth 1. -/
-def decayingTuning : Tuning := ⟨#[(1, 8), (2, 0)]⟩
+def decayingTuning : genTree.Weights := { leaf := (1, 8), node := (2, 0) }
 
 /--
 info: genTree.tuned constantTuning 0 — 200 draws (seed 0, fuel 10000)

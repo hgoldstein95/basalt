@@ -25,13 +25,25 @@ partial_fixpoint
 
 and, alongside `genBST` itself (elaborated exactly as written), the macro emits:
 
-- `genBST.tuned (θ : Tuning) …` — the same generator reading its weights from `θ` (`Tuning.weight`),
-  with recursive calls threading `θ`;
-- `genBST.defaults : Tuning` — the inline literal weights;
+- `genBST.Weights` — a record with one `Nat × Nat` field per `frequency` branch, named after the
+  constructor that branch produces (`leaf`, `node`, …) and defaulting to the source weight. This is
+  what lets a caller write `genBST.tuned { node := (2, 0) }` — weights *by constructor name* — rather
+  than a positional `Tuning`. A `Tuning` still coerces in (`Coe Tuning genBST.Weights`), so a
+  weighting held as a flat `Tuning` keeps working;
+- `genBST.tuned (θ : genBST.Weights) …` — the same generator reading its weights from `θ`
+  (via `θ.toTuning` and `Tuning.weight`), with recursive calls threading `θ`;
+- `genBST.defaults : genBST.Weights` — the record `{}` (every field at its source weight);
 - `genBST.sites : Array Site` — the site metadata (offsets, arities, holes);
 - `theorem genBST.tuned_defaults : genBST.tuned genBST.defaults … = genBST …` — definitional (`rfl`
   after unsealing `partial_fixpoint`'s `@[irreducible]`), so adopting tuning changes no existing
   proof.
+
+## Field naming
+
+Fields are named after the constructor each branch produces, inferred syntactically from the branch
+body (`branchResultName?`): `fun _ => pure leaf` ↦ `leaf`, `… return node l x r` ↦ `node`. A branch
+whose result constructor cannot be read off (it ends in a `match`, say) gets a positional field name
+`field<i>`; a constructor that names two branches is disambiguated with a numeric suffix (`leaf_1`).
 
 ## Conventions
 
@@ -66,6 +78,10 @@ structure SiteInfo where
   arity : Nat
   holes : Array Nat
   defaults : Array (Nat × Nat)
+  /-- The constructor each branch is inferred to produce (see `branchResultName?`), for naming the
+  fields of the generator's weights record. `none` when no constructor could be read off the branch;
+  a positional field name is used in that case. -/
+  fields : Array (Option Name)
 
 /-- State threaded through the body traversal. -/
 structure TraversalState where
@@ -91,6 +107,50 @@ partial def countRecCalls (declName : Name) (stx : Syntax) : Nat :=
   | .ident _ _ n _ => if matchesRec declName n then 1 else 0
   | .node _ _ args => args.foldl (init := 0) fun acc a => acc + countRecCalls declName a
   | _ => 0
+
+/-- Is `n` a monadic wrapper whose argument, not itself, carries the result value? A branch body
+`fun _ => pure leaf` or `… return (node l x r)` produces a `leaf`/`node`, not a `pure`/`return`. -/
+def isResultWrapper (n : Name) : Bool :=
+  let l := n.eraseMacroScopes.componentsRev.head?.getD n
+  l == `pure || l == `return
+
+/-- Infer the constructor a `frequency` branch produces, by walking to the branch's result
+expression and reading its head identifier. Used to name the fields of the generated weights record
+after the datatype's constructors, so a user can write `{ leaf := …, node := … }`. Returns the last
+name component (`BST.Tree.node ↦ `node`); `none` if no head identifier can be read (e.g. the branch
+ends in a `match` or a bare variable), in which case the field falls back to a positional name.
+
+Syntactic and best-effort: it descends `fun`/`do`/`return`/`pure`/parens to the tail expression. -/
+partial def branchResultName? (stx : Syntax) : Option Name :=
+  let last (n : Name) : Name := n.eraseMacroScopes.componentsRev.head?.getD n
+  let rec go (s : Syntax) : Option Name :=
+    match s with
+    | .ident _ _ n _ => if n.isAnonymous then none else some (last n)
+    | .node _ kind args =>
+      let descLast (a : Array Syntax) : Option Name := a.back?.bind go
+      if kind == ``Lean.Parser.Term.fun then (args[1]?).bind go
+      else if kind == ``Lean.Parser.Term.basicFun then descLast args
+      else if kind == ``Lean.Parser.Term.paren then (args[1]?).bind go
+      else if kind == ``Lean.Parser.Term.do then (args[1]?).bind go
+      else if kind == ``Lean.Parser.Term.doSeqIndent
+           || kind == ``Lean.Parser.Term.doSeqBracketed then (args[0]?).bind fun s => descLast s.getArgs
+      else if kind == ``Lean.Parser.Term.doSeqItem then (args[0]?).bind go
+      else if kind == ``Lean.Parser.Term.doReturn then (args[1]?).bind go
+      else if kind == ``Lean.Parser.Term.doExpr then (args[0]?).bind go
+      else if kind == ``Lean.Parser.Term.dotIdent then (args[1]?).bind go
+      else if kind == ``Lean.Parser.Term.app then
+        match args[0]? with
+        | some head =>
+          let headName := head.getId
+          -- `pure x` / `return x`: the result is `x`, one level in
+          if !headName.isAnonymous && isResultWrapper headName then
+            ((args[1]?).map Syntax.getArgs).bind fun a => (a[0]?).bind go
+          else go head
+        | none => none
+      else if kind == nullKind then descLast args
+      else none
+    | _ => none
+  go stx
 
 /-- Rewrite recursive calls: `genBST args…` becomes `genBST.tuned θ args ...`. -/
 partial def rewriteRecCalls (declName : Name) (tunedId : Ident) (θ : Ident)
@@ -170,6 +230,7 @@ where
     let elems := listLit[1].getArgs
     let mut defaults : Array (Nat × Nat) := #[]
     let mut holes : Array Nat := #[]
+    let mut fields : Array (Option Name) := #[]
     let mut newElems : Array Syntax := #[]
     for elem in elems do
       if elem.getKind == nullKind || elem.isOfKind `null then
@@ -191,13 +252,14 @@ where
       let j := defaults.size
       defaults := defaults.push (w, 0)
       holes := holes.push (countRecCalls declName branchGen)
+      fields := fields.push (branchResultName? branchGen)
       let idx : Nat := offset + j
       let weightTerm ← `(Tuning.weight $θ $(quote idx) $dTerm)
       let elem := elem.setArg 1 (inner.setArg 0 weightTerm.raw)
       newElems := newElems.push elem
     -- record this site before recursing into branches, so offsets read outside-in
     set { st with
-      sites := st.sites.push ⟨siteName, offset, defaults.size, holes, defaults⟩
+      sites := st.sites.push ⟨siteName, offset, defaults.size, holes, defaults, fields⟩
       nextOffset := offset + defaults.size
       nextSiteIdx := siteIdx + 1 }
     let mut recElems : Array Syntax := #[]
@@ -272,35 +334,76 @@ elab_rules : command
         originalDecl.setArg 0 (declStx[0].setArg 0 (mkNullNode #[doc]))
       else originalDecl
     elabCommand originalDecl
-    -- 2. the tuned definition
+    -- 2. traverse the body: collect the sites and produce the tuned body, which reads its weights
+    --    from `θ.toTuning` (`θ` is the weights record emitted in step 3, threaded through recursion)
     let θ : Ident := mkIdent (Name.mkSimple "θ")
     let dTerm : Term ← if hasDepth then `($(mkIdent `depth)) else `(0)
     let tunedName := declName ++ `tuned
     let tunedId := mkIdent tunedName
+    let weightsName := declName ++ `Weights
+    let weightsId := mkIdent weightsName
+    let toTuningName := weightsName ++ `toTuning
+    -- weight reads and positivity proofs see the flat `Tuning`, via `θ.toTuning`
+    let θT : Term ← `($(mkIdent toTuningName) $θ)
     let recRepl ← `(($tunedId $θ))
     let (tunedBody, st) ← liftTermElabM <|
-      (rewriteFrequencies declName θ dTerm body).run {}
+      (rewriteFrequencies declName θT dTerm body).run {}
     if st.sites.isEmpty then
       throwErrorAt declStx "tunable: no `frequency` site found in the body — nothing to tune"
     let tunedBody := rewriteRecCalls declName tunedId θ recRepl.raw tunedBody
-    let θBinder ← `(Lean.Parser.Term.bracketedBinderF| ($θ:ident : Tuning))
+    -- 3. the weights record: one field per branch (in the flat schedule order), named after the
+    --    constructor the branch produces (inferred by `branchResultName?`), defaulting to the
+    --    source weight. This is what lets a user write `genFoo.tuned { leaf := …, node := … }`
+    --    instead of a positional `Tuning`. Ambiguous or unreadable branches fall back to a
+    --    positional field name (`field<i>`); a repeated constructor name is suffixed (`leaf_1`).
+    let flatFields := st.sites.flatMap (·.fields)
+    let flatDefaults := st.sites.flatMap (·.defaults)
+    let mut usedNames : Array String := #[]
+    let mut fieldIds : Array Ident := #[]
+    for i in [0:flatFields.size] do
+      let base : String := match flatFields[i]! with
+        | some n => n.toString
+        | none => s!"field{i}"
+      let mut nm := base
+      let mut k := 1
+      while usedNames.contains nm do
+        nm := s!"{base}_{k}"; k := k + 1
+      usedNames := usedNames.push nm
+      fieldIds := fieldIds.push (mkIdent (Name.mkSimple nm))
+    let fieldDefaults : Array Term ← flatDefaults.mapM fun (a, b) => `(($(quote a), $(quote b)))
+    elabCommand (← `(/-- Per-constructor weights for `$(mkIdent declName)`, one field per
+      `frequency` branch named after the constructor it produces. Each field defaults to the
+      source weight, so `{}` reproduces `$(mkIdent declName)`. Passed to `$tunedId`. -/
+      structure $weightsId where
+        $[$fieldIds:ident : Nat × Nat := $fieldDefaults]*
+        deriving Repr, DecidableEq, Inhabited))
+    let wId := mkIdent (Name.mkSimple "w")
+    let accesses : Array Term ← fieldIds.mapM fun f => `($wId.$f:ident)
+    elabCommand (← `(/-- The flat `Tuning` this weights record denotes: its fields in branch order. -/
+      def $(mkIdent toTuningName) ($wId : $weightsId) : Tuning := ⟨#[$accesses,*]⟩))
+    -- a `Tuning` still coerces in, so weightings held as `Tuning` values keep working with `.tuned`;
+    -- fields past the array's end fall back to the source default (never the `getD` fallback)
+    let tId := mkIdent (Name.mkSimple "t")
+    let coeArgs : Array Term ← (flatDefaults.zipIdx).mapM fun ((a, b), i) =>
+      `(($tId).schedules.getD $(quote i) ($(quote a), $(quote b)))
+    elabCommand (← `(instance : Coe Tuning $weightsId := ⟨fun $tId => ⟨$coeArgs,*⟩⟩))
+    -- 4. the tuned definition, taking the weights record
+    let θBinder ← `(Lean.Parser.Term.bracketedBinderF| ($θ:ident : $weightsId))
     let tunedSig := optDeclSig.setArg 0
       (.node (optDeclSig[0].getHeadInfo) nullKind (#[θBinder.raw] ++ binders))
     let tunedDeclId := declId.setArg 0 (mkIdent tunedName)
     let tunedDefn := ((defn.setArg 1 tunedDeclId).setArg 2 tunedSig).setArg 3
       (declVal.setArg 1 tunedBody)
     elabCommand (declStx.setArg 1 tunedDefn)
-    -- 3. defaults and site table
+    -- 5. defaults (the record with every field at its source weight) and site table
     let defaultsName := declName ++ `defaults
     let sitesName := declName ++ `sites
-    let defaultEntries : Array Term ← (st.sites.flatMap (·.defaults)).mapM
-      fun (a, b) => `(($(quote a), $(quote b)))
     let siteTerms : Array Term ← st.sites.mapM fun s => do
       let holeLits : Array Term := s.holes.map fun h => quote h
       `((⟨$(quote s.name), $(quote s.offset), $(quote s.arity), #[$holeLits,*]⟩ : Site))
-    elabCommand (← `(def $(mkIdent defaultsName):ident : Tuning := ⟨#[$defaultEntries,*]⟩))
+    elabCommand (← `(def $(mkIdent defaultsName):ident : $weightsId := {}))
     elabCommand (← `(def $(mkIdent sitesName):ident : Array Site := #[$siteTerms,*]))
-    -- 4. tuned_defaults: definitional, but `partial_fixpoint` marks both
+    -- 6. tuned_defaults: definitional, but `partial_fixpoint` marks both
     --    definitions `@[irreducible]`, so `rfl` needs full transparency
     let thmName := declName ++ `tuned_defaults
     let bs : TSyntaxArray ``Lean.Parser.Term.bracketedBinder := binders.map (⟨·⟩)
