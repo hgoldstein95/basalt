@@ -513,16 +513,6 @@ theorem mem_support_nonEmptylistOf
     xs ∈ (nonEmptyListOf g).support ↔ xs ∈ {xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support} := by
   simp [support_nonEmptyListOf]
 
-/-- Inserting an element at the join index of an append lands it in the middle:
-    `(s ++ t).insertIdx s.length x = s ++ x :: t`.  This is the arithmetic fact that inverts one
-    step of `permutationOf`, letting us reconstruct the insertion index from a decomposed target
-    permutation. -/
-private theorem insertIdx_length_append {α} (s t : List α) (x : α) :
-    (s ++ t).insertIdx s.length x = s ++ x :: t := by
-  induction s with
-  | nil => simp
-  | cons hd tl ih => simpa using ih
-
 /-- The support of `permutationOf xs` is the set of all values of the subtype `{ys // xs ~ ys}`,
     i.e. all possible permutations of `xs`.  -/
 theorem support_permutationOf {α} {xs : List α} :
@@ -538,17 +528,22 @@ theorem support_permutationOf {α} {xs : List α} :
     simp
   | cons x xs ih =>
     obtain ⟨zs, hz⟩ := z
-    -- `x` occurs somewhere in `zs`, so split `zs = s ++ x :: t`.
-    have hxmem : x ∈ zs := hz.mem_iff.mp List.mem_cons_self
-    obtain ⟨s, t, rfl⟩ := List.append_of_mem hxmem
+    -- `x` occurs at some index `n` of `zs`.
+    obtain ⟨n, hn, hxn⟩ := List.mem_iff_getElem.mp (hz.mem_iff.mp List.mem_cons_self)
+    -- Erasing that index and reinserting `x` there recovers `zs` (the inverse of one step).
+    have hinv : (zs.eraseIdx n).insertIdx n x = zs := hxn ▸ List.insertIdx_eraseIdx_getElem hn
+    have hle : n ≤ (zs.eraseIdx n).length := by rw [List.length_eraseIdx_of_lt hn]; omega
     -- Peel the head off both sides to get a permutation of the tail.
-    have htail : xs.Perm (s ++ t) := List.Perm.cons_inv (hz.trans List.perm_middle)
-    have hle : s.length ≤ (s ++ t).length := by simp
+    have hzperm : zs.Perm (x :: zs.eraseIdx n) := by
+      conv_lhs => rw [← hinv]
+      exact List.perm_insertIdx x (zs.eraseIdx n) hle
+    have htail : xs.Perm (zs.eraseIdx n) := List.Perm.cons_inv (hz.trans hzperm)
     rw [permutationOf]
     simp only [mem_support_bind_iff, mem_support_map_iff, mem_support_choose_iff, true_and]
-    refine ⟨⟨s ++ t, htail⟩, ih _, ⟨s.length, by omega, hle⟩,
-      ⟨ULift.up ⟨s.length, by omega, hle⟩, rfl⟩, ?_⟩
-    exact mem_support_pure_iff.mpr (Subtype.ext (insertIdx_length_append s t x).symm)
+    -- Witnesses: the recursive result `⟨zs.eraseIdx n, htail⟩` and the insertion index `n`.
+    refine ⟨⟨zs.eraseIdx n, htail⟩, ih _, ⟨n, by omega, hle⟩,
+      ⟨ULift.up ⟨n, by omega, hle⟩, rfl⟩, ?_⟩
+    exact mem_support_pure_iff.mpr (Subtype.ext hinv.symm)
 
 /-- Membership form of `support_permutationOf` -/
 @[simp]

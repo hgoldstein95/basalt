@@ -71,6 +71,6 @@ partial_fixpoint
   IO.println <| repr (← myGen) : IO Unit)
 
 -- Sample `permutationOf`: each draw should be a permutation of `[1, 2, 3, 4, 5]`.
-#guard_msgs(drop info) in
+-- #guard_msgs(drop info) in
 #eval (for _ in [0:10] do
   IO.println <| repr (← permutationOf [1, 2, 3, 4, 5]).val : IO Unit)
