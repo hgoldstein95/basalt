@@ -523,10 +523,8 @@ private theorem insertIdx_length_append {α} (s t : List α) (x : α) :
   | nil => simp
   | cons hd tl ih => simpa using ih
 
-/-- Every permutation of `xs` is reachable: the support of `permutationOf xs` is the whole subtype
-    `{ys // xs ~ ys}`.  There is nothing to constrain — the returned value carries a proof that it is
-    a permutation of `xs`, so the subtype already *is* the set of valid outputs, and this says the
-    generator hits all of them (completeness) and nothing else (soundness, which is automatic). -/
+/-- The support of `permutationOf xs` is the set of all values of the subtype `{ys // xs ~ ys}`,
+    i.e. all possible permutations of `xs`.  -/
 theorem support_permutationOf {α} {xs : List α} :
     support (permutationOf xs) = Set.univ := by
   ext z
@@ -547,18 +545,12 @@ theorem support_permutationOf {α} {xs : List α} :
     have htail : xs.Perm (s ++ t) := List.Perm.cons_inv (hz.trans List.perm_middle)
     have hle : s.length ≤ (s ++ t).length := by simp
     rw [permutationOf]
-    -- Invert one step: a bind over the recursive draw and the uniform index draw.
-    -- (`support_simp` is unavailable here — `Basalt.Tactics` is downstream of this file — so we
-    -- fire the underlying `mem_support_*_iff` set directly.)
     simp only [mem_support_bind_iff, mem_support_map_iff, mem_support_choose_iff, true_and]
-    -- Witnesses: the recursive result `⟨s ++ t, htail⟩` and the insertion index `s.length`.
     refine ⟨⟨s ++ t, htail⟩, ih _, ⟨s.length, by omega, hle⟩,
       ⟨ULift.up ⟨s.length, by omega, hle⟩, rfl⟩, ?_⟩
-    -- The `pure` membership reduces to the `insertIdx` identity on the underlying lists.
     exact mem_support_pure_iff.mpr (Subtype.ext (insertIdx_length_append s t x).symm)
 
-/-- Membership form of `support_permutationOf`: every element of the subtype `{ys // xs ~ ys}` is in
-    the support. -/
+/-- Membership form of `support_permutationOf` -/
 @[simp]
 theorem mem_support_permutationOf_iff {α} {xs : List α} {z : { ys // xs.Perm ys }} :
     z ∈ support (permutationOf xs : SPMF _) ↔ True := by
