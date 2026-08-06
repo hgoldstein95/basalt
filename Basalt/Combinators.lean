@@ -165,16 +165,10 @@ def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
       return x :: xs)
 partial_fixpoint
 
-/-- Generates a random permutation of the list `xs`.  The returned value is packaged with a proof
-    that it really is a permutation of `xs`, so the generator is *correct by construction*.
+/-- Generates a random permutation of the list `xs`, along with a proof
+    that the resultant list is indeed a permutation of `xs`.
 
-    This mirrors `Plausible.Gen.permutationOf`: recurse on the tail to obtain a permutation `ys`,
-    then insert the head `x` at a uniformly-random position in `ys`.  Note that we sample the
-    insertion index with raw `RandomChoice.choose` rather than `chooseNat`, since we need to retain
-    the proof `n ≤ ys.length` in order to build the permutation witness (via `List.perm_insertIdx`).
-
-    Unlike `listOf` / `nonEmptyListOf`, this generator recurses structurally on `xs` (a decreasing
-    argument), so it needs no `partial_fixpoint`. -/
+    Implementation closely mirrors `Plausible.Gen.permutationOf`. -/
 def permutationOf [Gen G] : (xs : List α) → G { ys // xs ~ ys }
   | [] => pure ⟨[], Perm.nil⟩
   | x :: xs => do
