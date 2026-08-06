@@ -27,7 +27,8 @@ macro_rules
         SPMF.mem_support_chooseNat_iff, SPMF.mem_support_ite_iff, SPMF.mem_support_dite_iff,
         SPMF.mem_support_elements_iff, SPMF.mem_support_oneOf_iff,
         SPMF.mem_support_frequency_iff, SPMF.mem_support_vectorOf_iff,
-        SPMF.mem_support_listOfMaxLength_iff, SPMF.mem_support_listOf, Set.mem_setOf_eq,
+        SPMF.mem_support_listOfMaxLength_iff, SPMF.mem_support_listOf,
+        SPMF.mem_support_permutationOf_iff, Set.mem_setOf_eq,
         $args,*] $[$loc]?)
 
 /-- `simp only` with the standard `SPMF.Cost` support-inversion set

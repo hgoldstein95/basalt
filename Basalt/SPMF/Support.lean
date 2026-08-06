@@ -28,6 +28,8 @@ of its support as an explicit set, packaged as the `mem_support_*_iff` `simp` le
 - `mem_support_pick_iff`, `mem_support_vectorOf_iff`, `mem_support_listOfMaxLength_iff`,
   `mem_support_listOf`, `mem_support_elements_iff`, `mem_support_oneOf_iff`,
   `mem_support_frequency_iff` — the derived combinators.
+- `support_permutationOf` / `mem_support_permutationOf_iff` — the support of `permutationOf xs` is
+  the whole subtype `{ys // xs ~ ys}` (every permutation is reachable).
 - `frequency_apply` — the exact branch probability `wⱼ / Σᵢ wᵢ` (a mass computation, not a support
   fact; the engine behind `support_frequency`, and reused by `Basalt/SPMF/Termination.lean`).
 - `mem_support_csup` — support of a `CCPO` supremum, for `partial_fixpoint` generators.
@@ -510,6 +512,57 @@ theorem mem_support_nonEmptylistOf
     {g : SPMF α} :
     xs ∈ (nonEmptyListOf g).support ↔ xs ∈ {xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support} := by
   simp [support_nonEmptyListOf]
+
+/-- Inserting an element at the join index of an append lands it in the middle:
+    `(s ++ t).insertIdx s.length x = s ++ x :: t`.  This is the arithmetic fact that inverts one
+    step of `permutationOf`, letting us reconstruct the insertion index from a decomposed target
+    permutation. -/
+private theorem insertIdx_length_append {α} (s t : List α) (x : α) :
+    (s ++ t).insertIdx s.length x = s ++ x :: t := by
+  induction s with
+  | nil => simp
+  | cons hd tl ih => simpa using ih
+
+/-- Every permutation of `xs` is reachable: the support of `permutationOf xs` is the whole subtype
+    `{ys // xs ~ ys}`.  There is nothing to constrain — the returned value carries a proof that it is
+    a permutation of `xs`, so the subtype already *is* the set of valid outputs, and this says the
+    generator hits all of them (completeness) and nothing else (soundness, which is automatic). -/
+theorem support_permutationOf {α} {xs : List α} :
+    support (permutationOf xs) = Set.univ := by
+  ext z
+  simp only [Set.mem_univ, iff_true]
+  induction xs with
+  | nil =>
+    obtain ⟨zs, hz⟩ := z
+    have : zs = [] := List.Perm.eq_nil hz.symm
+    subst this
+    rw [permutationOf]
+    simp
+  | cons x xs ih =>
+    obtain ⟨zs, hz⟩ := z
+    -- `x` occurs somewhere in `zs`, so split `zs = s ++ x :: t`.
+    have hxmem : x ∈ zs := hz.mem_iff.mp List.mem_cons_self
+    obtain ⟨s, t, rfl⟩ := List.append_of_mem hxmem
+    -- Peel the head off both sides to get a permutation of the tail.
+    have htail : xs.Perm (s ++ t) := List.Perm.cons_inv (hz.trans List.perm_middle)
+    have hle : s.length ≤ (s ++ t).length := by simp
+    rw [permutationOf]
+    -- Invert one step: a bind over the recursive draw and the uniform index draw.
+    -- (`support_simp` is unavailable here — `Basalt.Tactics` is downstream of this file — so we
+    -- fire the underlying `mem_support_*_iff` set directly.)
+    simp only [mem_support_bind_iff, mem_support_map_iff, mem_support_choose_iff, true_and]
+    -- Witnesses: the recursive result `⟨s ++ t, htail⟩` and the insertion index `s.length`.
+    refine ⟨⟨s ++ t, htail⟩, ih _, ⟨s.length, by omega, hle⟩,
+      ⟨ULift.up ⟨s.length, by omega, hle⟩, rfl⟩, ?_⟩
+    -- The `pure` membership reduces to the `insertIdx` identity on the underlying lists.
+    exact mem_support_pure_iff.mpr (Subtype.ext (insertIdx_length_append s t x).symm)
+
+/-- Membership form of `support_permutationOf`: every element of the subtype `{ys // xs ~ ys}` is in
+    the support. -/
+@[simp]
+theorem mem_support_permutationOf_iff {α} {xs : List α} {z : { ys // xs.Perm ys }} :
+    z ∈ support (permutationOf xs : SPMF _) ↔ True := by
+  rw [support_permutationOf]; exact iff_of_true (Set.mem_univ z) trivial
 
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]

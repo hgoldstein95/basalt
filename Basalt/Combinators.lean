@@ -23,6 +23,7 @@ This file defines various generator combinators.
 - `frequencySelect`: helper function that traverses the list of weights
    to select a generator for a given random index
 - `oneofAux`, `frequencyAux`: internal implementations of the `oneOf` / `frequency` combinators
+- `permutationOf`: generates a random permutation of a list, correct by construction
 -/
 
 open List
@@ -163,6 +164,23 @@ def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
       let xs ← nonEmptyListOf g
       return x :: xs)
 partial_fixpoint
+
+/-- Generates a random permutation of the list `xs`.  The returned value is packaged with a proof
+    that it really is a permutation of `xs`, so the generator is *correct by construction*.
+
+    This mirrors `Plausible.Gen.permutationOf`: recurse on the tail to obtain a permutation `ys`,
+    then insert the head `x` at a uniformly-random position in `ys`.  Note that we sample the
+    insertion index with raw `RandomChoice.choose` rather than `chooseNat`, since we need to retain
+    the proof `n ≤ ys.length` in order to build the permutation witness (via `List.perm_insertIdx`).
+
+    Unlike `listOf` / `nonEmptyListOf`, this generator recurses structurally on `xs` (a decreasing
+    argument), so it needs no `partial_fixpoint`. -/
+def permutationOf [Gen G] : (xs : List α) → G { ys // xs ~ ys }
+  | [] => pure ⟨[], Perm.nil⟩
+  | x :: xs => do
+    let ⟨ys, h1⟩ ← permutationOf xs
+    let ⟨n, _, h3⟩ ← ULift.down <$> RandomChoice.choose 0 ys.length (Nat.zero_le _)
+    return ⟨ys.insertIdx n x, (Perm.cons x h1).trans (List.perm_insertIdx x ys h3).symm⟩
 
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
 - `l1.length = l2.length`
