@@ -28,8 +28,8 @@ of its support as an explicit set, packaged as the `mem_support_*_iff` `simp` le
 - `mem_support_pick_iff`, `mem_support_vectorOf_iff`, `mem_support_listOfMaxLength_iff`,
   `mem_support_listOf`, `mem_support_elements_iff`, `mem_support_oneOf_iff`,
   `mem_support_frequency_iff` — the derived combinators.
-- `support_permutationOf` / `mem_support_permutationOf_iff` — the support of `permutationOf xs` is
-  the whole subtype `{ys // xs ~ ys}` (every permutation is reachable).
+- `support_permutationOf` / `mem_support_permutationOf_iff` — the support of `permutationOf xs`
+  consists of all possible permutaitons of `xs`
 - `frequency_apply` — the exact branch probability `wⱼ / Σᵢ wᵢ` (a mass computation, not a support
   fact; the engine behind `support_frequency`, and reused by `Basalt/SPMF/Termination.lean`).
 - `mem_support_csup` — support of a `CCPO` supremum, for `partial_fixpoint` generators.
