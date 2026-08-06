@@ -531,7 +531,8 @@ theorem support_permutationOf {α} {xs : List α} :
     -- `x` occurs at some index `n` of `zs`.
     obtain ⟨n, hn, hxn⟩ := List.mem_iff_getElem.mp (hz.mem_iff.mp List.mem_cons_self)
     -- Erasing that index and reinserting `x` there recovers `zs` (the inverse of one step).
-    have hinv : (zs.eraseIdx n).insertIdx n x = zs := hxn ▸ List.insertIdx_eraseIdx_getElem hn
+    have hinv : (zs.eraseIdx n).insertIdx n x = zs := by
+      rw [← hxn]; exact List.insertIdx_eraseIdx_getElem hn
     have hle : n ≤ (zs.eraseIdx n).length := by rw [List.length_eraseIdx_of_lt hn]; omega
     -- Peel the head off both sides to get a permutation of the tail.
     have hzperm : zs.Perm (x :: zs.eraseIdx n) := by
