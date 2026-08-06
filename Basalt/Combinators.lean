@@ -23,6 +23,7 @@ This file defines various generator combinators.
 - `frequencySelect`: helper function that traverses the list of weights
    to select a generator for a given random index
 - `oneofAux`, `frequencyAux`: internal implementations of the `oneOf` / `frequency` combinators
+- `permutationOf`: generates a random permutation of a list, correct by construction
 -/
 
 open List
@@ -163,6 +164,17 @@ def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
       let xs ← nonEmptyListOf g
       return x :: xs)
 partial_fixpoint
+
+/-- Generates a random permutation of the list `xs`, along with a proof
+    that the resultant list is indeed a permutation of `xs`.
+
+    Implementation closely mirrors `Plausible.Gen.permutationOf`. -/
+def permutationOf [Gen G] : (xs : List α) → G { ys // xs ~ ys }
+  | [] => pure ⟨[], Perm.nil⟩
+  | x :: xs => do
+    let ⟨ys, h1⟩ ← permutationOf xs
+    let ⟨n, _, h3⟩ ← ULift.down <$> RandomChoice.choose 0 ys.length (Nat.zero_le _)
+    return ⟨ys.insertIdx n x, (Perm.cons x h1).trans (List.perm_insertIdx x ys h3).symm⟩
 
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
 - `l1.length = l2.length`
