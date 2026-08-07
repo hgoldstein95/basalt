@@ -32,7 +32,7 @@ of its support as an explicit set, packaged as the `mem_support_*_iff` `simp` le
   fact; the engine behind `support_frequency`, and reused by `Basalt/SPMF/Termination.lean`).
 - `mem_support_csup` — support of a `CCPO` supremum, for `partial_fixpoint` generators.
 - `support_frequency_reweight` / `support_frequency_congr_weights` — support is unchanged when a
-  uniform choice is reweighted, the shape a `tunable def` rewrite takes.
+  uniform choice is reweighted, the shape a `@[tunable]` rewrite takes.
 -/
 
 namespace SPMF
@@ -765,7 +765,7 @@ theorem support_frequency_reweight
     cases hg
     exact ⟨w, g', hmem, hpos _ hmem, ha⟩
 
-/-- The same, between two `frequency`s. This is the shape a tuning rewrite has: `tunable def`
+/-- The same, between two `frequency`s. This is the shape a tuning rewrite has: `@[tunable]`
 replaces literal weights by `Tuning.weight θ i d` in place, so both sides are already `frequency`s
 and only the weights differ. -/
 theorem support_frequency_congr_weights

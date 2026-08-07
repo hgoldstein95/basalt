@@ -7,7 +7,7 @@ Authors: Harrison Goldstein
 /-!
 # Tuning: runtime-addressable generator weights
 
-A generator's branch weights live in `frequency` calls. `tunable def` (see `Basalt.Tuning.Macro`)
+A generator's branch weights live in `frequency` calls. `@[tunable]` (see `Basalt.Tuning.Attr`)
 collects those sites and threads a `Tuning` — an ordinary runtime value — through the generator, so
 a different weighting is a function call away instead of an edit-and-recompile away.
 
@@ -29,11 +29,10 @@ structure Tuning where
   schedules : Array (Nat × Nat)
   deriving Repr, DecidableEq, Inhabited
 
-/-- Metadata for one `frequency` site collected by `tunable def`. -/
+/-- Metadata for one `frequency` site collected by `@[tunable]`. -/
 structure Site where
-  /-- A stable label for the site, for diagnostics and reviewable artifacts.  Defaults to the
-  enclosing definition's name plus a positional suffix; override with `frequency (site := `myName)
-  […]`. -/
+  /-- A stable label for the site, for diagnostics and reviewable artifacts: the enclosing
+  definition's name plus a positional suffix, in outside-in traversal order. -/
   name   : Lean.Name
   /-- Index into `Tuning.schedules` of this site's first branch. -/
   offset : Nat
@@ -44,7 +43,7 @@ structure Site where
   deriving Repr, DecidableEq, Inhabited
 
 /-- The weight of the branch whose schedule lives at flat index `i` (that is, `Site.offset + j` for
-  branch `j` of a site), at recursion depth `d`.  `tunable def` emits the flat index as a literal,
+  branch `j` of a site), at recursion depth `d`.  `@[tunable]` emits the flat index as a literal,
   so terms and proof goals stay small; `Site` carries the structure for diagnostics.  -/
 def Tuning.weight (θ : Tuning) (i : Nat) (d : Nat) : Nat :=
   let p := θ.schedules.getD i (1, 0)
@@ -55,4 +54,16 @@ def Tuning.weight (θ : Tuning) (i : Nat) (d : Nat) : Nat :=
 theorem Tuning.weight_pos (θ : Tuning) (i d : Nat) :
     0 < θ.weight i d := by
   simp only [Tuning.weight]
+  omega
+
+/-- `frequency`'s side condition, for a branch list whose head weight is a `Tuning` read.  One
+  positive summand is enough, and `Tuning.weight` is positive unconditionally, so this discharges the
+  obligation for *every* `θ` — which is what `@[tunable]` needs, since it rewrites the weights before
+  any `θ` exists.  Stated on `List.sum (List.map Prod.fst …)` so it matches `frequency`'s autoParam
+  goal syntactically. -/
+theorem Tuning.sum_map_fst_pos {β : Type u} (θ : Tuning) (i d : Nat) (g : β)
+    (tl : List (Nat × β)) :
+    0 < List.sum (List.map Prod.fst ((θ.weight i d, g) :: tl)) := by
+  simp only [List.map_cons, List.sum_cons]
+  have := Tuning.weight_pos θ i d
   omega

@@ -77,7 +77,7 @@ Guidelines that make the proofs go smoothly:
   (`pick`, `oneOf`, `frequency`, `vectorOf`, `listOfMaxLength`, `listOf`) are covered, and
   combinators that don't mention the recursive call (like `chooseNat`) need nothing.
 - **Weighted choices go through `frequency`**, one n-ary choice per site, with the weights inline.
-  Prefix the definition with `tunable` to make the weights runtime-addressable later (see
+  Tag the definition `@[tunable]` to make the weights runtime-addressable later (see
   `CLAUDE.md` and `BasaltTest/Tuning.lean`); it changes nothing about the proofs below.
 - Sample it (`#eval`, or `#genstats` for distribution statistics) before proving anything. A
   generator whose median output is trivial passes every proof below and is still useless.

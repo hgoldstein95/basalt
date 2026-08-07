@@ -16,7 +16,7 @@ then recurse on the two subintervals. Like `genTree` and `genHeap` it is *critic
 probability `1/2`, otherwise a node with two recursive children, so mean offspring is exactly `1` —
 and termination follows from the same `IsPMF_of_critical_family` criterion, with no ranking function.
 
-The `frequency`-weighted, `tunable` variant `genWeightedBST` lives in `BasaltExamples/BST/Weighted`.
+The `frequency`-weighted, `@[tunable]` variant `genWeightedBST` lives in `BasaltExamples/BST/Weighted`.
 Weighting `node` five times as heavily makes it *supercritical* under that crude bound, so it does
 need a ranking function that exploits the shrinking interval — that machinery lives with it.
 -/

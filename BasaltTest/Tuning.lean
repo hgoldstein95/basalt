@@ -12,10 +12,10 @@ import BasaltExamples.BST.Weighted
 open RandomChoice
 
 /-!
-# `tunable def` Examples
+# `@[tunable]` Examples
 
-`Tree.genWeightedBST` (`BasaltExamples/BST.lean`) is declared `tunable`, so the
-macro emitted `Tree.genWeightedBST.tuned/.defaults/.sites/.tuned_defaults`
+`Tree.genWeightedBST` (`BasaltExamples/BST/Weighted.lean`) is tagged `@[tunable]`,
+so the attribute emitted `Tree.genWeightedBST.tuned/.defaults/.sites/.tuned_defaults`
 alongside it. This file exercises the whole contract:
 
 1. `genWeightedBST.tuned genWeightedBST.defaults` and `genWeightedBST` are
@@ -34,7 +34,7 @@ open BST
 
 /-! ## 1. The defaults are the generator as written -/
 
-/-- `tuned_defaults` is proved by the macro — definitionally. -/
+/-- `tuned_defaults` is emitted by the attribute — `Eq.refl`, checked by the kernel. -/
 example [Gen G] (lo hi : Nat) :
     (Tree.genWeightedBST.tuned Tree.genWeightedBST.defaults lo hi : G (BST.Tree Nat)) =
       Tree.genWeightedBST lo hi :=
@@ -50,7 +50,7 @@ example (lo hi : Nat) (t : BST.Tree Nat) :
 /-! ## 4. The site table -/
 
 /--
-info: #[{ name := `Tree.genWeightedBST.site0, offset := 0, arity := 2, holes := #[0, 2] }]
+info: #[{ name := `BST.Tree.genWeightedBST.site0, offset := 0, arity := 2, holes := #[0, 2] }]
 -/
 #guard_msgs in
 #eval Tree.genWeightedBST.sites
@@ -128,8 +128,9 @@ weight grows with depth (`w(d) = 1 + 8·d`), the
 node branch's stays constant, so recursion is likely at the root and is forced
 closed a few levels down — never forbidden, so the support is unchanged. -/
 
-tunable def genTree [Gen G] (depth : Nat) : G (BST.Tree Nat) :=
-  frequency (site := `genTree.spine) [
+@[tunable]
+def genTree [Gen G] (depth : Nat) : G (BST.Tree Nat) :=
+  frequency [
     (1, fun _ => pure .leaf),
     (2, fun _ => do
       let l ← genTree (depth + 1)
@@ -138,8 +139,8 @@ tunable def genTree [Gen G] (depth : Nat) : G (BST.Tree Nat) :=
   ] (by simp)
 partial_fixpoint
 
-/-- The site override names the site; one site, holes `#[0, 2]`. -/
-example : genTree.sites = #[⟨`genTree.spine, 0, 2, #[0, 2]⟩] := rfl
+/-- One site, positionally named, with holes `#[0, 2]`. -/
+example : genTree.sites = #[⟨`TunableExamples.genTree.site0, 0, 2, #[0, 2]⟩] := rfl
 
 /-- `tuned_defaults` is definitional for depth-threaded generators too. -/
 example [Gen G] (depth : Nat) :
@@ -210,10 +211,11 @@ info: genTree.tuned decayingTuning 0 — 200 draws (seed 0, fuel 10000)
 /-! ## 5. A zero weight is rejected at elaboration -/
 
 /--
-error: tunable def: a literal weight of 0 is rejected: a zero weight removes its branch from the generator's support (see `SPMF.support_frequency`), breaking support-completeness (`IsSoundAndComplete`). To prune a branch, remove it from the source instead.
+error: tunable: a literal weight of 0 is rejected: a zero weight removes its branch from the generator's support (see `SPMF.support_frequency`), breaking support-completeness (`IsSoundAndComplete`). To prune a branch, remove it from the source instead.
 -/
 #guard_msgs in
-tunable def genZero [Gen G] : G Nat := do
+@[tunable]
+def genZero [Gen G] : G Nat := do
   frequency [
     (0, fun _ => pure 0),
     (1, fun _ => pure 1)
@@ -229,6 +231,117 @@ example (depth d : Nat) :
   simp [Tuning.weight]
   rcases d with _ | _ | d <;> simp
 
+/-! ## 6. Every recursion form, not just `partial_fixpoint`
+
+The attribute rewrites the elaborated body, so the equation compiler never runs
+a second time and the tuned generator scrutinises through the *same* matcher
+constants as the original. `tuned_defaults` is therefore `Eq.refl` under
+structural and well-founded recursion too. -/
+
+@[tunable]
+def genStruct [Gen G] (size : Nat) : G (BST.Tree Nat) :=
+  match size with
+  | 0 => pure .leaf
+  | n + 1 =>
+    frequency [
+      (1, fun _ => pure .leaf),
+      (5, fun _ => do
+        let l ← genStruct n
+        let r ← genStruct n
+        return .node l 0 r)
+    ] (by simp)
+
+/-- Structural recursion hands its recursive results to the branch as a `below`
+    bundle; the two projections of it are the two holes. -/
+example : genStruct.sites = #[⟨`TunableExamples.genStruct.site0, 0, 2, #[0, 2]⟩] := rfl
+
+example [Gen G] (size : Nat) :
+    (genStruct.tuned genStruct.defaults size : G (BST.Tree Nat)) = genStruct size :=
+  genStruct.tuned_defaults size
+
+@[tunable]
+def genWF [Gen G] (fuel : Nat) : G (BST.Tree Nat) :=
+  if h : fuel = 0 then pure .leaf
+  else
+    frequency [
+      (1, fun _ => pure .leaf),
+      (5, fun _ => do
+        let l ← genWF (fuel - 1)
+        let r ← genWF (fuel - 1)
+        return .node l 0 r)
+    ] (by simp)
+termination_by fuel
+decreasing_by all_goals omega
+
+/-- Well-founded recursion passes an `ih` landing in the generator's own monad;
+    the two applications of it are the two holes. -/
+example : genWF.sites = #[⟨`TunableExamples.genWF.site0, 0, 2, #[0, 2]⟩] := rfl
+
+example [Gen G] (fuel : Nat) :
+    (genWF.tuned genWF.defaults fuel : G (BST.Tree Nat)) = genWF fuel :=
+  genWF.tuned_defaults fuel
+
+/-! A tuned structurally recursive generator is executable, and a `θ` that
+flips the weights changes the distribution it draws from. -/
+
+/--
+info: genStruct.tuned ⟨#[(5, 0), (1, 0)]⟩ 4 — 200 draws (seed 0, fuel 10000)
+
+  outcomes    ok 200 (100.0%)
+  size        mean 1.4   p50 1   p95 3   max 9
+  choices     mean 1.4   p50 1   p95 3   max 7
+  distinct    7 / 200
+
+  head constructor
+    leaf    84.0%  (168)
+    node    16.0%   (32)
+
+  most common
+     84.0%  (168)  BST.Tree.leaf
+     12.0%   (24)  BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)
+      1.5%    (3)  BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf))
+      1.0%    (2)  BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 0 (BST.Tree.leaf)
+
+  samples
+    BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)
+    BST.Tree.leaf
+    BST.Tree.leaf
+-/
+#guard_msgs in
+#genstats (draws := 200) genStruct.tuned ⟨#[(5, 0), (1, 0)]⟩ 4
+
+/-! ## 7. Naming the depth binder
+
+`depth` is the default; `(depth := …)` names any other `Nat` binder. -/
+
+@[tunable (depth := lvl)]
+def genLvl [Gen G] (lvl : Nat) : G (BST.Tree Nat) :=
+  frequency [
+    (1, fun _ => pure .leaf),
+    (2, fun _ => do
+      let l ← genLvl (lvl + 1)
+      let r ← genLvl (lvl + 1)
+      return .node l 0 r)
+  ] (by simp)
+partial_fixpoint
+
+/-- Reading weights at `lvl` reproduces `genTree`'s depth-indexed behaviour under
+    a differently named binder: the same decaying schedule terminates. -/
+example [Gen G] (lvl : Nat) :
+    (genLvl.tuned genLvl.defaults lvl : G (BST.Tree Nat)) = genLvl lvl :=
+  genLvl.tuned_defaults lvl
+
+/--
+error: tunable: `TunableExamples.genNoLvl` has no `Nat` binder named `lvl` in scope at one of its `frequency` sites — `(depth := lvl)` names the binder whose value each site reads its weight schedules at
+-/
+#guard_msgs in
+@[tunable (depth := lvl)]
+def genNoLvl [Gen G] : G Nat :=
+  frequency [
+    (1, fun _ => pure 0),
+    (1, fun _ => pure 1)
+  ] (by simp)
+
 end TunableExamples
 
 section ReweightObligation
@@ -242,7 +355,7 @@ example (gs : List (Unit → SPMF α)) (gs' : List (Nat × (Unit → SPMF α)))
     SPMF.support (frequency gs' h') = SPMF.support (oneOf gs hne) :=
   SPMF.support_frequency_reweight hsnd hpos hne h'
 
--- Changing weights in place: `frequency` to `frequency`, the shape `tunable def` rewrites.
+-- Changing weights in place: `frequency` to `frequency`, the shape `@[tunable]` rewrites.
 example (gs gs' : List (Nat × (Unit → SPMF α)))
     (hsnd : gs'.map Prod.snd = gs.map Prod.snd)
     (hpos : ∀ p ∈ gs', 0 < p.1) (hpos' : ∀ p ∈ gs, 0 < p.1)

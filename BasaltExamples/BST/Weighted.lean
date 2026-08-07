@@ -13,7 +13,7 @@ open scoped NNReal ENNReal
 /-!
 # Weighted Binary Search Trees
 
-`Tree.genWeightedBST` is a `frequency`-weighted, `tunable` variant of `genBST`
+`Tree.genWeightedBST` is a `frequency`-weighted, `@[tunable]` variant of `genBST`
 (`BasaltExamples/BST`) that makes `node` five times as likely as `leaf`. It produces the same trees
 with the same cost bound; only the distribution differs.
 
@@ -27,8 +27,9 @@ is used nowhere else, instantiated at recursion weight `w = 5/6` and drift `ε =
 namespace BST
 
 /-- Like `genBST` but `frequency`-weighted so `node` is five times as likely as `leaf`, and
-`tunable` so the weights are runtime-addressable (see `BasaltTest/Tuning.lean`). -/
-tunable def Tree.genWeightedBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
+`@[tunable]` so the weights are runtime-addressable (see `BasaltTest/Tuning.lean`). -/
+@[tunable]
+def Tree.genWeightedBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
   if h : lo > hi then
     return leaf
   else

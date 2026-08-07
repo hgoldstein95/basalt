@@ -15,7 +15,7 @@ import Basalt.Tactics
 import Basalt.Laws
 import Basalt.Combinators
 import Basalt.Tuning
-import Basalt.Tuning.Macro
+import Basalt.Tuning.Attr
 import Basalt.GenStats
 import Basalt.GenStats.Command
 
