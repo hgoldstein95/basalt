@@ -49,7 +49,7 @@ theorem support_bind
     {f : α → SPMF β} :
     (x >>= f).support = {b | ∃ a, a ∈ x.support ∧ b ∈ (f a).support} := by
   ext b
-  simp only [support, Function.mem_support, Set.mem_setOf_eq]
+  simp only [support, Function.mem_support, Set.mem_ofPred_eq]
   constructor
   · intro h
     by_contra hc
@@ -142,7 +142,7 @@ theorem support_pick
     (pick (fun () => x) (fun () => y)).support = x.support ∪ y.support := by
   simp only [pick, support_bind, support_choose]
   ext a
-  simp only [Set.mem_univ, true_and, Set.mem_setOf_eq, Set.mem_union]
+  simp only [Set.mem_univ, true_and, Set.mem_ofPred_eq, Set.mem_union]
   constructor
   · rintro ⟨n, ha⟩
     rcases Nat.le_one_iff_eq_zero_or_eq_one.mp n.down.property.2 with h0 | h1
@@ -168,7 +168,7 @@ theorem support_coin (h0 : 0 < r) (h1 : r < 1) :
   have hden : r.num < (r.den : ℤ) := Rat.num_lt_denom_iff.mpr h1
   simp [coin, support_bind, support_choose, support_pure]
   ext b
-  simp only [Set.mem_setOf_eq]
+  simp only [Set.mem_ofPred_eq]
   constructor
   · rintro _
     cases b <;> simp
@@ -204,7 +204,7 @@ theorem support_biasedOptionGen
   have hden_pos : 0 < r.den := r.den_pos
   simp [biasedOptionGen, coin, support_bind, support_choose]
   ext a
-  simp [Set.mem_setOf_eq]
+  simp
   constructor <;> intros h
   . obtain ⟨a, hge, h⟩ := h
     rcases h with ⟨hle, rfl⟩ | ⟨hlt, ha⟩
@@ -280,7 +280,6 @@ theorem support_vectorOf
   | zero =>
     simp [vectorOf]
     ext a
-    dsimp only [Set.mem_setOf_eq]
     constructor
     . intro h
       rw [Set.mem_singleton_iff] at h
@@ -296,7 +295,7 @@ theorem support_vectorOf
   | succ n' IH =>
     rw [vectorOf_succ]
     ext xs
-    simp [Set.mem_setOf_eq]
+    simp
     constructor
     . intro h
       obtain ⟨x, ⟨hmem, ⟨xs, ⟨hxs, hcons⟩⟩⟩⟩ := h
@@ -388,14 +387,14 @@ theorem support_listOf
         apply h2
         assumption
     . intro h
-      rw [Set.mem_setOf_eq] at h
+      rw [Set.mem_ofPred_eq] at h
       unfold listOf
       simp [support_pick]
       constructor
       . apply h
         apply List.mem_cons_self
       . apply IH.mpr
-        rw [Set.mem_setOf_eq]
+        rw [Set.mem_ofPred_eq]
         intro x hx
         apply h
         apply List.mem_cons_of_mem
@@ -438,7 +437,7 @@ theorem support_nonEmptyListOf
           · apply (IH.mp hxs).2
             assumption
     . intro h
-      rw [Set.mem_setOf_eq] at h
+      rw [Set.mem_ofPred_eq] at h
       unfold nonEmptyListOf
       simp [support_pick]
       obtain ⟨h1, h2⟩ := h
@@ -452,7 +451,7 @@ theorem support_nonEmptyListOf
         constructor
         . assumption
         . apply IH.mpr
-          apply Set.mem_setOf.mpr
+          apply Set.mem_ofPred.mpr
           constructor
           . assumption
           . intro w hw
@@ -483,7 +482,6 @@ theorem support_elements
     support (elements xs hne) = { x | x ∈ xs } := by
   simp only [elements, support_bind, support_map, support_choose]
   ext a
-  dsimp only [Set.mem_setOf_eq]
   constructor
   . intro h
     obtain ⟨ ⟨i, ⟨ hi_gt, hi_lt⟩⟩, h_idx, ha ⟩ := h
@@ -525,7 +523,6 @@ theorem support_oneOf
     support (oneOf gs hne) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
   simp only [oneOf, Helpers.oneOfAux, support_bind, support_map, support_choose]
   ext a
-  dsimp only [Set.mem_setOf_eq]
   constructor
   . intro h
     obtain ⟨ ⟨i, ⟨ hi_gt, hi_lt⟩⟩, h_idx, ha ⟩ := h
@@ -650,7 +647,7 @@ theorem support_frequency
     (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
     support (frequency gs h_pos) = {a | ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support} := by
   ext a
-  rw [mem_support_iff, frequency_apply gs h_pos a, Set.mem_setOf_eq, ne_eq,
+  rw [mem_support_iff, frequency_apply gs h_pos a, Set.mem_ofPred_eq, ne_eq,
     ENNReal.div_eq_zero_iff]
   simp only [ENNReal.natCast_ne_top, or_false, List.sum_eq_zero_iff, List.forall_mem_map,
     mul_eq_zero, Nat.cast_eq_zero, not_forall, Prod.exists, mem_support_iff,
@@ -712,7 +709,7 @@ theorem support_frequency_reweight
   subst hsnd
   rw [support_frequency, support_oneOf]
   ext a
-  simp only [Set.mem_setOf_eq, List.mem_map]
+  simp only [Set.mem_ofPred_eq, List.mem_map]
   constructor
   · rintro ⟨w, g, hmem, _, ha⟩
     exact ⟨g, ⟨(w, g), hmem, rfl⟩, ha⟩
@@ -731,7 +728,7 @@ theorem support_frequency_congr_weights
     support (frequency gs' h') = support (frequency gs h) := by
   rw [support_frequency, support_frequency]
   ext a
-  simp only [Set.mem_setOf_eq]
+  simp only [Set.mem_ofPred_eq]
   constructor
   · rintro ⟨w, g, hmem, _, ha⟩
     have : g ∈ gs.map Prod.snd := hsnd ▸ List.mem_map.mpr ⟨(w, g), hmem, rfl⟩

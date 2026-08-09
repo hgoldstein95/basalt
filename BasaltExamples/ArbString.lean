@@ -28,7 +28,7 @@ theorem String.arbitrary_support :
   simp only [String.arbitrary, SPMF.mem_support_map_iff]
   constructor
   · rintro ⟨cs, hcs, rfl⟩
-    rw [SPMF.mem_support_listOf, Set.mem_setOf_eq] at hcs
+    rw [SPMF.mem_support_listOf, Set.mem_ofPred_eq] at hcs
     intro c hc
     rw [String.toList_ofList] at hc
     specialize hcs c hc
@@ -37,7 +37,7 @@ theorem String.arbitrary_support :
     set cs := s.toList
     exists cs
     constructor
-    . rw [SPMF.mem_support_listOf, Set.mem_setOf_eq]
+    . rw [SPMF.mem_support_listOf, Set.mem_ofPred_eq]
       intro c hmem
       simp [Char.arbitrary_mem_support]
       apply h
@@ -53,7 +53,7 @@ theorem NonEmptyString.arbitrary_support :
   constructor
   · rintro ⟨cs, hcs, rfl⟩
     rw [SPMF.mem_support_nonEmptylistOf] at hcs
-    rw [Set.mem_setOf_eq] at hcs
+    rw [Set.mem_ofPred_eq] at hcs
     obtain ⟨h1, h2⟩ := hcs
     constructor
     . rw [Bool.not_eq_true_eq_eq_false]
@@ -72,7 +72,7 @@ theorem NonEmptyString.arbitrary_support :
       simp at hne
       subst cs
       rw [SPMF.support_nonEmptyListOf]
-      rw [Set.mem_setOf_eq]
+      rw [Set.mem_ofPred_eq]
       constructor
       . simpa [String.isEmpty, String.toList_eq_nil_iff] using hne
       . intro c hmem

@@ -332,7 +332,7 @@ satisfies `F g.mass ≤ g.mass` for an `F` whose only fixed-or-below point in `[
 theorem IsPMF_of_critical {α : Type*} {g : SPMF α} (F : ℝ≥0∞ → ℝ≥0∞)
     (hF : ∀ c : ℝ≥0∞, c ≤ 1 → F c ≤ c → c = 1)
     (hstep : F g.mass ≤ g.mass) : IsPMF g := by
-  haveI : Nonempty Unit := ⟨()⟩
+  have : Nonempty Unit := ⟨()⟩
   refine IsPMF_of_mass_fixpoint (fun _ : Unit => g) F ?_ ?_ ()
   · intro c hle hge
     exact hF c hle hge
