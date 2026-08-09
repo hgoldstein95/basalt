@@ -45,6 +45,8 @@ the attribute emits:
   Because the search is over the local context at the site, it finds the binder wherever the
   recursion form happens to put it — including inside a `partial_fixpoint` functional, where it is
   not one of the declaration's own lambda binders at all.
+- **`partial_fixpoint` bodies**: the attribute rebuilds `Lean.Order.fix`'s monotonicity proof for
+  the tuned body, so a combinator used there still needs its `@[partial_fixpoint_monotone]` lemma.
 -/
 
 open Lean Meta Elab

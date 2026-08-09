@@ -1,7 +1,18 @@
+/-
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein
+-/
 import BasaltExamples.BST
 import BasaltExamples.Heap
 import BasaltExamples.ArbString
 import BasaltExamples.ArbNat
+
+/-!
+# Exercising the `Plausible.Gen` Interpretation
+
+Samples from generators at `Plausible.Gen`, just to make sure the interpretation runs.
+-/
 
 /- `genBST` can be run in `PlausibleGen`. -/
 #guard_msgs(drop info) in

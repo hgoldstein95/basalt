@@ -11,28 +11,11 @@ open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 /-!
 # SPMF Support
 
-This file sets up basic definitions for working with the support of `SPMF`s.
-
-## Main Definitions
-
-- `SPMF.support` — Defines the set of values that have nonzero mass in the distribution.
-
-## Main Statements
-
-The bulk of the file is the support-inversion lemma family: for each combinator, a characterization
-of its support as an explicit set, packaged as the `mem_support_*_iff` `simp` lemmas that
-`support_simp` (`Basalt/Tactics.lean`) fires on real generator goals.
-
-- `mem_support_bind_iff` / `mem_support_pure_iff` / `mem_support_map_iff` — the monad primitives.
-- `mem_support_choose_iff` / `mem_support_chooseNat_iff` — the sole source of randomness.
-- `mem_support_pick_iff`, `mem_support_vectorOf_iff`, `mem_support_listOfMaxLength_iff`,
-  `mem_support_listOf`, `mem_support_elements_iff`, `mem_support_oneOf_iff`,
-  `mem_support_frequency_iff` — the derived combinators.
-- `frequency_apply` — the exact branch probability `wⱼ / Σᵢ wᵢ` (a mass computation, not a support
-  fact; the engine behind `support_frequency`, and reused by `Basalt/SPMF/Termination.lean`).
-- `mem_support_csup` — support of a `CCPO` supremum, for `partial_fixpoint` generators.
-- `support_frequency_reweight` / `support_frequency_congr_weights` — support is unchanged when a
-  uniform choice is reweighted, the shape a `@[tunable]` rewrite takes.
+`SPMF.support` (the set of values with nonzero mass) and the support-inversion lemma family: for
+each combinator, a characterization of its support as an explicit set, packaged as the
+`mem_support_*_iff` `simp` lemmas that `support_simp` (`Basalt/Tactics.lean`) fires on real
+generator goals. Stated on monad notation (`>>=`/`Pure.pure`), which is what do-notation
+elaborates to.
 -/
 
 namespace SPMF
@@ -191,16 +174,14 @@ theorem support_coin (h0 : 0 < r) (h1 : r < 1) :
     cases b <;> simp
   · intro h
     cases b
-    · -- b = false
-      exists r.den - 1
+    · exists r.den - 1
       constructor
       . apply le_refl
       . right
         constructor <;> try rfl
         have hden_pos : 0 < r.den := r.den_pos
         omega
-    · -- b = true
-      exists 0
+    · exists 0
       constructor
       . apply Nat.zero_le
       . left
@@ -227,20 +208,16 @@ theorem support_biasedOptionGen
   constructor <;> intros h
   . obtain ⟨a, hge, h⟩ := h
     rcases h with ⟨hle, rfl⟩ | ⟨hlt, ha⟩
-    . -- none case
-      left; rfl
-    . -- some case
-      obtain ⟨a', ⟨hmem, rfl⟩⟩ := ha
+    . left; rfl
+    . obtain ⟨a', ⟨hmem, rfl⟩⟩ := ha
       right; exists a'
   . rcases h with rfl | ⟨x, ⟨hmem, rfl⟩⟩
-    . -- none case: coin returns `false`, so pick the maximal index `r.den - 1`
-      exists r.den - 1
+    . exists r.den - 1
       constructor <;> try omega
       left
       constructor <;> try rfl
       omega
-    . -- some case: coin returns `true`, so pick the minimal index `0`
-      exists 0
+    . exists 0
       constructor <;> try omega
       right
       constructor
@@ -321,8 +298,7 @@ theorem support_vectorOf
     ext xs
     simp [Set.mem_setOf_eq]
     constructor
-    . -- Forwards direction
-      intro h
+    . intro h
       obtain ⟨x, ⟨hmem, ⟨xs, ⟨hxs, hcons⟩⟩⟩⟩ := h
       subst hcons
       rw [IH] at hxs
@@ -331,17 +307,13 @@ theorem support_vectorOf
       constructor
       . simp
         assumption
-      . -- ∀ y ∈ x :: xs, y ∈ g.support
-        intro y hy
+      . intro y hy
         rw [List.mem_cons] at hy
         obtain ⟨heq, hy⟩ := hy
         . assumption
         . apply hsupp
           assumption
-    . -- Backwards direction
-      intro ⟨hlen, hmem⟩
-      -- Since we know `hlen: xs.length = n' + 1`,
-      -- we must have `xs = y :: ys` for some `y, ys`
+    . intro ⟨hlen, hmem⟩
       obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hlen
       exists y
       constructor
@@ -401,16 +373,13 @@ theorem support_listOf
     constructor
     . dsimp
       intro h y hy
-      -- Case on y ∈ x :: xs' (whether y = x or y ∈ xs')
       cases hy with
       | head =>
-        -- y = x
         unfold listOf at h
         simp [support_pick] at h
         obtain ⟨h1, _⟩ := h
         assumption
       | tail =>
-        -- y ∈ xs'
         rename_i hy
         unfold listOf at h
         simp [support_pick] at h
@@ -454,24 +423,19 @@ theorem support_nonEmptyListOf
       constructor
       . apply List.cons_ne_nil
       . intro y hy
-        -- Case on y ∈ x :: xs' (whether y = x or y ∈ xs')
         cases hy with
         | head =>
-          -- y = x
           unfold nonEmptyListOf at hy
           simp [support_pick] at hy
           rcases hy with ⟨h, _⟩ | ⟨h, _⟩ <;> assumption
         | tail =>
-          -- y ∈ xs'
           rename_i hmem
           unfold nonEmptyListOf at hy
           simp [support_pick] at hy
           rcases hy with ⟨_, hxs⟩ | ⟨_, hxs⟩
-          · -- xs' = [], so y ∈ xs' is vacuous
-            subst hxs
+          · subst hxs
             contradiction
-          · -- y ∈ g'.support
-            apply (IH.mp hxs).2
+          · apply (IH.mp hxs).2
             assumption
     . intro h
       rw [Set.mem_setOf_eq] at h
@@ -521,8 +485,7 @@ theorem support_elements
   ext a
   dsimp only [Set.mem_setOf_eq]
   constructor
-  . -- (∃ i ≤ xs.length - 1, a = xs[i]?.getD default) → a ∈ xs
-    intro h
+  . intro h
     obtain ⟨ ⟨i, ⟨ hi_gt, hi_lt⟩⟩, h_idx, ha ⟩ := h
     obtain ⟨ ⟨ n, ⟨ hgt, hlt ⟩⟩, ⟨ h_lowerbound, h_upperbound ⟩, hi ⟩ := h_idx
     have h_pos : 0 < xs.length := by
@@ -532,8 +495,7 @@ theorem support_elements
     dsimp at ha
     simp only [mem_support_pure_iff] at ha
     apply List.mem_of_getElem (id (Eq.symm ha))
-  . -- a ∈ xs → ∃ i ≤ xs.length - 1, a = xs[i]?.getD default
-    intro hmem
+  . intro hmem
     obtain ⟨ i, hlt, heq ⟩ := List.mem_iff_getElem.mp hmem
     have hle : i ≤ xs.length - 1 := by omega
     exists ⟨ i, ⟨by omega, hle⟩⟩
@@ -565,8 +527,7 @@ theorem support_oneOf
   ext a
   dsimp only [Set.mem_setOf_eq]
   constructor
-  . -- ∃ i ∈ [0, gs.length -1], a ∈ (gs[i]! ()).support → ∃ g ∈ gs, a ∈ (g ()).support
-    intro h
+  . intro h
     obtain ⟨ ⟨i, ⟨ hi_gt, hi_lt⟩⟩, h_idx, ha ⟩ := h
     obtain ⟨ ⟨ n, ⟨ hgt, hlt ⟩⟩, ⟨ h_lowerbound, h_upperbound ⟩, hi ⟩ := h_idx
     have h_pos : 0 < gs.length := by
@@ -574,14 +535,10 @@ theorem support_oneOf
       assumption
     have h_lt : i < gs.length := by omega
     refine ⟨ gs[i], ?_, ?_ ⟩
-    . -- Goal: `gs[i] ∈ gs`
-      apply List.getElem_mem
-    . -- Goal: `a ∈ (gs[i] ()).support`
-      -- To do this, rewrite `gs[i]!` in terms of `gs[i]`
-      dsimp at ha
+    . apply List.getElem_mem
+    . dsimp at ha
       assumption
-  . -- ∃ g ∈ gs, a ∈ (g ()).support → ∃ i ∈ [0, gs.length - 1], a ∈ (gs[i]! ()).support
-    intros h
+  . intros h
     obtain ⟨ g, hg, ha ⟩ := h
     obtain ⟨ i, hi, heq ⟩ := List.mem_iff_getElem.mp hg
     have hge : 0 ≤ i := by
@@ -590,10 +547,8 @@ theorem support_oneOf
       apply Nat.le_sub_one_of_lt
       assumption
     refine ⟨ ⟨i, hge, hle ⟩, ?_, ?_ ⟩
-    . -- 0 ≤ i ≤ gs.length - 1
-      exists ⟨ i, ⟨hge, hle⟩ ⟩
-    . -- a ∈ (gs[i]! ()).support
-      dsimp
+    . exists ⟨ i, ⟨hge, hle⟩ ⟩
+    . dsimp
       subst heq
       assumption
 

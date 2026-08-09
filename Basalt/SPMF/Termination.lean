@@ -11,13 +11,9 @@ open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 /-!
 # SPMF Mass and Termination
 
-This file contains theorems and definitions for proving almost-sure termination of `SPMF`s.
-
-## Main Definitions
-
-- `SPMF.mass` — The mass of an `SPMF` is the total probability that is assigned to values (as
-  opposed to divergence). This will always be at most 1, but it may be lower.
-- `SPMF.IsPMF` — When the mass of an `SPMF` is 1, it is a true `PMF`.
+`SPMF.mass` (the total probability assigned to values, as opposed to divergence — always ≤ 1) and
+`SPMF.IsPMF` (mass exactly 1), together with the mass lower-bound lemmas that almost-sure
+termination proofs chain through.
 -/
 
 namespace SPMF
@@ -296,7 +292,6 @@ theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β}
     IsPMF (x >>= f) := by
   unfold IsPMF mass at *
   simp only [Bind.bind, bind, DFunLike.coe]
-  -- Swap the order of the sums
   rw [ENNReal.tsum_comm]
   calc ∑' a, ∑' b, x a * f a b
     _ = ∑' a, x a * (∑' b, f a b) := by
@@ -305,10 +300,8 @@ theorem IsPMF_bind_of_support {x : SPMF α} {f : α → SPMF β}
         apply tsum_congr
         intro a
         by_cases ha : a ∈ x.support
-        · -- a ∈ x.support
-          rw [hf a ha]
-        · -- a ∉ x.support
-          have h_zero_mass : x a = 0 := by
+        · rw [hf a ha]
+        · have h_zero_mass : x a = 0 := by
             apply (apply_eq_zero_iff x a).mpr
             assumption
           simp [h_zero_mass]

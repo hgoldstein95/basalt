@@ -69,7 +69,7 @@
           <div class="split">
             <div>
               <div class="eyebrow">Core Idea</div>
-              <h2 class="section__head">Mutliple Interpretations for the Same Generator</h2>
+              <h2 class="section__head">Multiple Interpretations for the Same Generator</h2>
             </div>
             <div class="lead lead--bound">
               <p>In Basalt a generator is not a value of some fixed generator type, it is a term that is polymorphic in the monad it runs in. The typeclass <code class="inline-code">Gen</code> bundles exactly the operations a generator needs, and the same term is then interpreted at whichever monad the task calls for.</p>
@@ -221,7 +221,7 @@
                 <i class="fa-solid fa-circle-check"></i>
               </div>
               <h3>A vocabulary of correctness</h3>
-              <p>Soundness and completeness, almost-sure termination, cost bounds, and — for rejection samplers — filter-freedom and productivity. These are plain predicates; a generator states and proves the ones that apply to it.</p>
+              <p>Five laws: soundness and completeness (<code class="inline-code">IsSoundAndComplete</code>), almost-sure termination (<code class="inline-code">IsAlmostSurelyTerminating</code>), cost bounds (<code class="inline-code">IsCostBounded</code>), and — for rejection samplers — filter-freedom (<code class="inline-code">IsFilterFree</code>) and productivity (<code class="inline-code">IsProductive</code>). These are plain predicates; a generator states and proves the ones that apply to it.</p>
             </div>
 
             <div class="card">
@@ -262,6 +262,7 @@
               <span>Research Code — APIs Still Unstable</span>
             </div>
             <p class="footer__fine">A foundational representation of random data generators for property-based testing, with machine-checked proofs, for the Lean theorem prover. Released under the MIT license.</p>
+            <p class="footer__fine">Basalt is the substrate for <a href="https://github.com/hgoldstein95/palamedes-lean" target="_blank" rel="noopener">Palamedes</a>, its flagship client, which synthesizes Basalt generators from logical predicates.</p>
             <p class="footer__fine">Interested in this work? Get in touch with Harry Goldstein.</p>
           </div>
           <div class="footer__cols">
@@ -269,6 +270,7 @@
               <span>Project</span>
               <a href="https://github.com/hgoldstein95/basalt" target="_blank" rel="noopener">GitHub Repository</a>
               <a href="https://github.com/hgoldstein95/basalt/blob/main/WORKFLOW.md" target="_blank" rel="noopener">Generator Workflow</a>
+              <a href="https://github.com/hgoldstein95/palamedes-lean" target="_blank" rel="noopener">Palamedes (Flagship Client)</a>
             </div>
             <div class="footer__col">
               <span>Docs</span>

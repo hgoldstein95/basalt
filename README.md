@@ -57,8 +57,11 @@ lake build BasaltTest     # regression tests
 ## Repository layout
 
 - `Basalt/` — the library.
-- `BasaltExamples/` — worked generators with correctness proofs.
-- `BasaltTest/` — regression tests (`BasaltTest/Foo.lean` guards `Basalt/Foo.lean`).
+- `BasaltExamples/` — worked generators with correctness proofs. Because each file proves its
+  generator's laws, this directory is also most of the effective regression suite for the library's
+  lemma sets and tactics.
+- `BasaltTest/` — regression tests, named for the library module they guard when one exists;
+  `LawLine.lean` has no library counterpart (it pins the `#genstats` law-reporting contract).
 - `BasaltExperiments/` — spikes; the only place with `sorry`s, and not built by default.
 
 ## License
