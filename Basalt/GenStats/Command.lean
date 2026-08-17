@@ -10,28 +10,9 @@ import Basalt.Laws
 /-!
 # The `#genstats` Command
 
-`#genstats g` draws from the generator `g` many times and prints a summary of the results.
-
-```
-#genstats Tree.genBST 0 10
-#genstats (draws := 2000) (seed := 7) Tree.genBST 0 10
-#genstats (size := fun t => t.size) Tree.genBST 0 10
-```
-
-Options (all optional, in any order, before the generator term):
-- `(draws := n)` — number of draws (default 1000)
-- `(fuel := n)` — max `choose` calls per draw (default 10000); draws that exceed it are reported
-  as `fuel-exhausted`, which is what keeps a divergent generator from hanging the elaborator
-- `(seed := n)` — RNG seed (default 0, so output is deterministic and `#guard_msgs`-testable)
-- `(size := f)` — size function `α → Nat` used for the size distribution
-
-When no `size` is given and the output type is a plain (non-indexed) inductive, a structural size
-is derived automatically: the number of constructors of the *same* type in the value, so payloads
-do not distort it (`sizeOf (n : Nat)` is `n`-ish, which would make a BST's "size" track its node
-*values*; the structural count does not). Fields of other types — including nested occurrences
-like `List (Tree α)` — count 0. If the type is not a plain inductive, `SizeOf` is used when
-available; otherwise the size section is omitted. The head-constructor histogram and the
-`Repr`-based sections degrade gracefully in the same way.
+`#genstats g` draws from the generator `g` many times and prints a summary of the results:
+outcomes, size and choice-count distributions, diversity, samples, and which correctness laws `g`
+carries. The options are documented on `genStatsCmd`.
 -/
 
 open Lean Elab Command Meta
@@ -42,8 +23,16 @@ namespace GenStats.Command
     (e.g. `#genstats (g : StatGen Nat)`) fail this parser cleanly and parse as the term. -/
 syntax genStatsArg := atomic("(" ident " := ") term ")"
 
-/-- Draw from a generator and print distribution statistics. See the module docstring of
-    `Basalt.GenStats.Command` for the options. -/
+/-- Draw from a generator and print distribution statistics.
+
+```
+#genstats Tree.genBST 0 10
+#genstats (draws := 2000) (seed := 7) Tree.genBST 0 10
+#genstats (size := fun t => t.size) Tree.genBST 0 10
+```
+
+Options (all optional, in any order, before the generator term): `(draws := n)`, `(fuel := n)`,
+and `(seed := n)`. -/
 syntax (name := genStatsCmd) "#genstats " genStatsArg* term : command
 
 private structure Opts where
@@ -119,7 +108,12 @@ private def mkCtorPattern (shape : CtorShape) (fields : Array Term) : CommandEla
   return ⟨Syntax.mkApp head (args ++ fields)⟩
 
 /-- Emit `private partial def <fnId> : <α> → Nat` counting the constructors of type `α` in a
-    value (recursive fields recurse, everything else counts 0). -/
+    value (recursive fields recurse, everything else counts 0).
+
+    This is the size `#genstats` derives when the output type is a plain (non-indexed) inductive:
+    counting only constructors of the *same* type keeps payloads from distorting it (`sizeOf`
+    on a `Nat` payload is `n`-ish, which would make a BST's "size" track its node *values*).
+    Fields of other types — including nested occurrences like `List (Tree α)` — count 0. -/
 private def emitSizeDef (fnId : Ident) (αStx : Term) (shapes : Array CtorShape) :
     CommandElabM Unit := do
   let mut alts : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]

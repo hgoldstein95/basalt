@@ -10,24 +10,9 @@ open Lean.Order
 /-!
 # Generator Statistics
 
-This file enables empirical measurements to back up the proofs that appear in the rest of the
-repository.  We provide `#genstats` (see `Basalt.GenStats.Command`), a diagnostic that draws from a
-generator many times and summarizes the results.
-
-Note that since we do not require a generator to be a true PBT (i.e., AST) to use this command, we
-need to add fuel to the generation process. Fuel truncates the tail of the distribution being
-measured: a draw that would have made more than `fuel` choices is reported as `fuel-exhausted`
-rather than completed. The summary reports how many draws hit the budget, so a nonzero count is a
-signal to raise `Config.fuel` --- or, more likely, a signal that the generator's recursion is
-critical or supercritical.
-
-## Main Definitions
-
-- `GenStats.StatGen` — A choice-counting, fuel-guarded, seedable interpretation of `Gen`.
-- `GenStats.Config` — Draw count, fuel budget, and seed for a `#genstats` run.
-- `GenStats.runDraws` — Draw repeatedly, splitting the RNG per draw.
-- `GenStats.render` — Format draw results as a terse, deterministic text summary.
-- `GenStats.report` — `runDraws` + `render` + `IO.println`; the entry point `#genstats` emits.
+Empirical measurements to back up the proofs in the rest of the repository: `GenStats.StatGen` is a
+seeded, fuel-guarded, choice-counting interpretation of `Gen`, and `GenStats.report` renders draws
+from it as the deterministic text summary that `#genstats` (`Basalt.GenStats.Command`) prints.
 -/
 
 namespace GenStats
@@ -94,8 +79,7 @@ example : Gen StatGen := inferInstance
 structure Config where
   /-- Number of values to draw. -/
   draws : Nat := 1000
-  /-- Maximum number of `choose` calls per draw. A draw that exceeds this is reported as
-      `fuel-exhausted`; this is what keeps a divergent generator from hanging the elaborator. -/
+  /-- Maximum number of `choose` calls per draw. -/
   fuel : Nat := 10000
   /-- RNG seed. -/
   seed : Nat := 0

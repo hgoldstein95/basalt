@@ -11,14 +11,9 @@ open RandomChoice
 /-!
 # Cost-Tracking SPMF
 
-This file provides a modified interpretation of a `Gen` that ascribes cost to each choice a
-generator makes. This allows us to prove things like "a list generator makes `O(|xs|)` choices when
-generating a list `xs`."
-
-## Main Definitions
-
-- `SPMF.Cost` — A cost interpretation for a generator.
-- `IsBounded` — A proposition that says a generator makes a bounded number of choices.
+`SPMF.Cost` interprets a generator as a distribution over (value, number of random choices) pairs,
+and `IsBounded` says every value is produced within a given choice budget — enabling proofs like "a
+list generator makes `O(|xs|)` choices to generate `xs`."
 -/
 
 namespace SPMF
@@ -340,18 +335,16 @@ randomly choose a length for the list before invoking `vectorOf` -/
 theorem IsBounded_listOfMaxLength
     (hx : IsBounded g cost_g) :
     IsBounded (listOfMaxLength n g) (fun xs => 1 + List.sum (cost_g <$> xs)) := by
-  -- Note: we have to explicitly instantiate `cx` & `cf` here, otherwise we will get a heartbeat timeout
-  -- when we do `lake build`
+  -- `cx` and `cf` must be given explicitly. Leaving them for unification has hit a heartbeat
+  -- timeout in `lake build`.
   apply IsBounded_bind
-    (cx := fun _ => 1)                            -- 1 random choice to pick length of list
-    (cf := fun _ xs => List.sum (cost_g <$> xs))  -- Sum all the cost incurred from generating each list element
-  · -- IsBounded (ULift.down <$> choose 0 n ⋯) (fun x => 1)
-    apply IsBounded_map
+    (cx := fun _ => 1)
+    (cf := fun _ xs => List.sum (cost_g <$> xs))
+  · apply IsBounded_map
     . apply IsBounded_choose
     . intro (k, k_cost) hk
       constructor
-  · -- ∀ k, IsBounded (vectorOf k g) (fun xs => (cost_g <$> xs).sum)
-    intro ⟨k, ⟨hge, hle⟩⟩
+  · intro ⟨k, ⟨hge, hle⟩⟩
     apply IsBounded_vectorOf
     assumption
   · omega
@@ -359,7 +352,6 @@ theorem IsBounded_listOfMaxLength
 /-- `coin r` costs a single random choice -/
 theorem IsBounded_coin {r : Rat} : IsBounded (RandomChoice.coin r) (fun _ => 1) := by
   unfold RandomChoice.coin
-  -- The continuation `cf` doesn't perform any random choices, so `cf` is the constant 0 function
   apply IsBounded_bind (cx := fun _ => 1) (cf := fun _ _ => 0)
   · apply IsBounded_choose
   · intro c
@@ -376,17 +368,15 @@ theorem IsBounded_biasedOptionGen
     IsBounded (biasedOptionGen r g) (fun a_opt => 1 + Option.elim a_opt 0 cost_g) := by
   unfold biasedOptionGen
   apply IsBounded_bind
-    (cx := fun _ => 1)                          -- the coin flip
-    (cf := fun _ a_opt => a_opt.elim 0 cost_g)          -- `some a` costs `cost_g a`; `none` costs 0
+    (cx := fun _ => 1)
+    (cf := fun _ a_opt => a_opt.elim 0 cost_g)
   · apply IsBounded_coin
   · intro b
     cases b
-    · -- `b = false`, `biasedOptionGen` returns `pure none`
-      apply IsBounded_mono (c₁ := fun _ => 0)
+    · apply IsBounded_mono (c₁ := fun _ => 0)
       · apply IsBounded_pure
       · intro o; positivity
-    · -- `b = true`, `biasedOptionGen` becomes `g >>= fun x => pure (some x)`
-      apply IsBounded_bind (cx := cost_g) (cf := fun _ _ => 0)
+    · apply IsBounded_bind (cx := cost_g) (cf := fun _ _ => 0)
       · assumption
       · intro a
         apply IsBounded_pure
@@ -416,12 +406,10 @@ theorem IsBounded_oneOf
     (hcost : ∀ g ∈ gs, {cost_g // IsBounded (g ()) cost_g}) :
     IsBounded (oneOf gs hne)
       (fun x => 1 + List.foldr (fun ⟨ g, hg ⟩ acc => max ((hcost g hg).val x) acc) 0 gs.attach) := by
-  -- Every generator's cost is ≤ the max cost over all generators.
   have hcost_le : ∀ (i : Nat) (hi : i < gs.length) (y : α),
       (hcost gs[i] (List.getElem_mem hi)).val y ≤
         List.foldr (fun g acc => max ((hcost g.val g.property).val y) acc) 0 gs.attach := by
     intro i hi y
-    -- Rewrite `foldr` over `attach` as a `foldr` plus a `map` via `List.foldr_map`
     rw [← List.foldr_map]
     apply List.le_max_of_le'
     . apply List.mem_map.mpr
@@ -430,7 +418,6 @@ theorem IsBounded_oneOf
         . apply List.mem_attach
         . rfl
     . constructor
-  -- Any index chosen by `choose 0 (gs.length - 1)` is in bounds
   have hidx : ∀ (idx : {i : Nat // 0 ≤ i ∧ i ≤ gs.length - 1}), idx.val < gs.length := by
     intro idx
     have hle : idx.val ≤ gs.length - 1 :=
@@ -446,15 +433,12 @@ theorem IsBounded_oneOf
     · apply IsBounded_choose
     · intro p _
       constructor
-  · -- For each `i`, `gs[i]` is bounded by its own cost function
-    rintro ⟨i, hge, hle⟩
-    -- Reduce the `match` on the index subtype and the `↑⟨i, ⋯⟩` coercion down to `i`
+  · rintro ⟨i, hge, hle⟩
     dsimp only
     have hlt : i < gs.length := hidx ⟨i, hge, hle⟩
     have h_bounded := (hcost gs[i] (List.getElem_mem hlt)).property
     assumption
-  · -- The chosen generator's cost is ≤ the max cost, so 1 + it ≤ 1 + the max
-    rintro ⟨⟨i, hge, hle⟩, _⟩ _ ⟨g, _⟩ _
+  · rintro ⟨⟨i, hge, hle⟩, _⟩ _ ⟨g, _⟩ _
     dsimp
     specialize hcost_le i (hidx ⟨i, hge, hle⟩) g
     omega
@@ -471,7 +455,6 @@ theorem IsBounded_frequency
       (hcost gs[i] (List.getElem_mem hi)).val y ≤
         List.foldr (fun ⟨ (w, g), hg ⟩ acc => max ((hcost (w, g) hg).val y) acc) 0 gs.attach := by
     intro i hi y
-    -- Rewrite `foldr` over `attach` as a `foldr` plus a `map` via `List.foldr_map`
     rw [← List.foldr_map]
     apply List.le_max_of_le'
     . apply List.mem_map.mpr
@@ -484,13 +467,11 @@ theorem IsBounded_frequency
   apply IsBounded_bind
     (cx := fun _ => 1)
     (cf := fun _ x => List.foldr (fun ⟨(w, g), hg⟩ acc => max ((hcost (w, g) hg).val x) acc) 0 gs.attach)
-  . -- IsBounded (ULift.down <$> choose 0 ((List.map Prod.fst gs).sum - 1) ⋯) (fun _ => 1)
-    apply IsBounded_map
+  . apply IsBounded_map
     . apply IsBounded_choose
     . intro (i, w) hi
       apply le_refl
-  . -- ∀ x, IsBounded (if x < (Prod.fst <$> gs).sum then ... else ...) (List.foldr ... 0 gs)
-    rintro ⟨n, hge, hle⟩
+  . rintro ⟨n, hge, hle⟩
     dsimp only
     split
     . obtain ⟨w, g, hwg, _, heq⟩ := frequencySelect_mem (by assumption)
@@ -501,24 +482,20 @@ theorem IsBounded_frequency
       intro x
       rw [← List.foldr_map]
       apply List.le_max_of_le' (x := cost_g x)
-      . -- `cost_g x ∈ List.map <cost_function> gs`
-        apply List.mem_map.mpr
+      . apply List.mem_map.mpr
         exists ⟨(w, g), hwg⟩
         constructor
         . apply List.mem_attach
         . rfl
       . apply le_refl
     . apply IsBounded_default
-  . -- The bound for the cost function for the continuation (after the bind) is tight
-    dsimp
+  . dsimp
     intro p hp q hq
     apply le_refl
 
 
 open Lean.Order in
-/-- `IsBounded` is an admissible relation.
-
-This is intended to be used in the construction of a `partial_fixpoint`, and not meant to be used otherwise. -/
+/-- `IsBounded` is an admissible relation. -/
 theorem admissible_IsBounded (f : α → Nat) :
     admissible (fun (x : SPMF.Cost α) => IsBounded x f) := by
   intro c hc ih
@@ -528,11 +505,8 @@ theorem admissible_IsBounded (f : α → Nat) :
   obtain ⟨x, hxc, hxp⟩ := hp
   exact ih x hxc p hxp
 
-/-- Note: this proof is very similar to `List.arbitrary_cost` in `BasaltExamples/ArbList.lean`,
-    except the cost function now comprises the following:
-    - `xs.length`: Each element in `xs` requires a call to `pick`
-    - `(cost_g <$> xs).sum`: Need to apply `g`'s cost function to each generated element and sum them
-    - `1`: one final call to `pick` to produce the end of the list -/
+/-- The bound: one `pick` per element (`xs.length`), each element's own cost, and one final `pick`
+    to produce the end of the list. -/
 theorem IsBounded_listOf
     {g : SPMF.Cost α}
     (hx : IsBounded g cost_g) :
@@ -562,12 +536,8 @@ theorem IsBounded_listOf
       dsimp
       omega
 
-/-- The value of `nonEmptyListOf`'s cost function is always one less than `listOf`'s cost
-    function, since `listOf` needs to incur 1 random choice at the end (a call to `pick`
-    to produce the empty list in its base case),
-    whereas `nonEmptyListOf` doesn't need to do this since it never generates the random list.
-
-    Otherwise, this proof is largely similar to `IsBounded_listOf`. -/
+/-- One less than `listOf`'s bound: the base case draws its single element directly, so there is no
+final `pick` for the empty list. -/
 theorem IsBounded_nonEmptyListOf
     {g : SPMF.Cost α}
     (hx : IsBounded g cost_g) :
@@ -585,15 +555,13 @@ theorem IsBounded_nonEmptyListOf
     simp only [SPMF.Cost.mem_support_pick_iff, SPMF.Cost.mem_support_bind_iff,
       SPMF.Cost.mem_support_pure_iff] at hxs
     obtain ⟨m, rfl, h | h⟩ := hxs
-    · -- Base case
-      obtain ⟨a, n1, n2, hmem, ⟨rfl, rfl⟩, rfl⟩ := h
+    · obtain ⟨a, n1, n2, hmem, ⟨rfl, rfl⟩, rfl⟩ := h
       dsimp
       have hm : m ≤ cost_g a := by
         apply IsBounded_iff.mp hx (a, m)
         assumption
       omega
-    · -- Recursive case
-      obtain ⟨hd, n1, n2, hhd, ⟨tl, n3, n4, htl, ⟨rfl, rfl⟩, hn2⟩, rfl⟩ := h
+    · obtain ⟨hd, n1, n2, hhd, ⟨tl, n3, n4, htl, ⟨rfl, rfl⟩, hn2⟩, rfl⟩ := h
       have hhead : n1 ≤ cost_g hd := IsBounded_iff.mp hx (hd, n1) hhd
       have htail : n3 ≤ tl.length + (List.map cost_g tl).sum := by
         apply IH (tl, n3)
