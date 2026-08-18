@@ -237,6 +237,22 @@ theorem mass_frequency_ge {gs : List (Nat × (Unit → SPMF α))}
   gcongr
   exact hgs p hp
 
+/-- **Lower bound on the mass of a `oneOf`.** A uniform choice among `gs` has mass at least the
+average of any per-branch lower bounds `m i`. This is the `oneOf` analogue of `mass_frequency_ge`;
+it is what a termination proof reads off after unfolding a `oneOf`-based recursive generator. -/
+theorem mass_oneOf_ge {gs : List (Unit → SPMF α)} (hne : gs ≠ [])
+    {m : ℕ → ℝ≥0∞}
+    (hb : ∀ (i : ℕ) (h : i < gs.length), (gs[i] ()).mass ≥ m i) :
+    mass (oneOf gs hne)
+      ≥ (∑ i ∈ Finset.Icc 0 (gs.length - 1), m i) / ((gs.length : ℕ) : ℝ≥0∞) := by
+  have hlen : 0 < gs.length := List.length_pos_iff.mpr hne
+  rw [show ((gs.length : ℕ) : ℝ≥0∞) = ((gs.length - 1 - 0 + 1 : ℕ) : ℝ≥0∞) by
+    congr 1; omega]
+  unfold oneOf Helpers.oneOfAux
+  rw [bind_map_left]
+  exact mass_bind_choose_ge (lo := 0) (hi := gs.length - 1) (Nat.zero_le _) (m := m)
+    (by rintro ⟨⟨i, hge, hle⟩⟩; exact hb i (by omega))
+
 end mass
 
 section is_pmf
