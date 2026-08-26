@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+# Released under MIT license as described in the file LICENSE.
+# Authors: Michael Hicks
+
 # Guards `basalt-fuzz` on macOS and Linux. `lake build` elaborates the fuzz *modules* but
 # never emits their C, instruments it, or links the fuzzer runtime (BasaltFuzz/DESIGN.md §6), so a
 # change to `Basalt/Gen.lean`, `fuzz-run/build.sh`, or the toolchain pin can break the executable

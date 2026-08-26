@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+# Released under MIT license as described in the file LICENSE.
+# Authors: Michael Hicks
+
 # Build the opt-in `basalt-fuzz` executable: elaborate the Mathlib-free property/generator closure
 # with Lake, SanitizerCoverage-instrument its C, and link it against libFuzzer with Lean owning
 # `main` (which calls Fuzz.go -> libFuzzer's driver). See BasaltFuzz/DESIGN.md §6.

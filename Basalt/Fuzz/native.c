@@ -1,3 +1,8 @@
+/*
+Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Michael Hicks
+*/
 #include <lean/lean.h>
 #include <stdint.h>
 #include <string.h>

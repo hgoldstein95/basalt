@@ -1,3 +1,9 @@
+<!--
+Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Michael Hicks
+-->
+
 # `basalt-fuzz`: coverage-guided property testing
 
 The opt-in executable that drives Basalt generators from libFuzzer (parametric fuzzing). It is

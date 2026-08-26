@@ -1,3 +1,9 @@
+<!--
+Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Michael Hicks
+-->
+
 # Coverage-Guided (Parametric) Fuzzing for Basalt
 
 This document describes `FuzzGen`, an executable interpretation of Basalt's `Gen` that drives generators from a coverage-guided fuzzer (libFuzzer) instead of from a PRNG, together with the C bridge, build, and worked example that make it run. Everything here is implemented and validated on exactly two platforms — macOS (arm64) and Amazon Linux 2 (x86_64) — and notably *not* on any current Linux distribution; [Appendix A](#appendix-a--platforms) covers what differs between the two, how the build detects it, and what is untested.

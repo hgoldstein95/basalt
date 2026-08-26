@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+# Released under MIT license as described in the file LICENSE.
+# Authors: Michael Hicks
+
 # Build a libFuzzer runtime archive from compiler-rt source into fuzz-run/vendor/.
 #
 # Needed where the toolchain's clang can instrument (`-fsanitize=fuzzer-no-link`) but ships no

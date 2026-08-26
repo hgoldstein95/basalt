@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+# Released under MIT license as described in the file LICENSE.
+# Authors: Michael Hicks
+
 # Per-machine overrides for fuzz-run/build.sh. Copy to `fuzz-run/env.sh` (git-ignored) on a box
 # whose toolchain the script's detection cannot handle on its own; it is sourced before detection,
 # and every variable it sets suppresses the corresponding probe.
