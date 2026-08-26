@@ -3,10 +3,22 @@
 #include <string.h>
 #include <stdlib.h>
 
-/* libFuzzer's driver. clang 11 exposes no C entry LLVMFuzzerRunDriver, so we call the C++ symbol
-   fuzzer::FuzzerDriver by its mangled name (verified present in libclang_rt.fuzzer_no_main). */
+/* libFuzzer's driver entry point. Two spellings, selected at compile time:
+
+   - Default (LLVM >= 12): the stable C entry `LLVMFuzzerRunDriver`.
+   - `-DBASALT_FUZZ_LEGACY_DRIVER`: clang 11 and earlier expose no C entry, so we call the C++
+     symbol `fuzzer::FuzzerDriver` by its mangled name.
+
+   `fuzz-run/build.sh` picks the spelling by probing the runtime archive for the C entry. */
+#ifdef BASALT_FUZZ_LEGACY_DRIVER
 extern int _ZN6fuzzer12FuzzerDriverEPiPPPcPFiPKhmE(
     int *argc, char ***argv, int (*cb)(const uint8_t *, size_t));
+#define BASALT_FUZZER_RUN_DRIVER _ZN6fuzzer12FuzzerDriverEPiPPPcPFiPKhmE
+#else
+extern int LLVMFuzzerRunDriver(
+    int *argc, char ***argv, int (*cb)(const uint8_t *, size_t));
+#define BASALT_FUZZER_RUN_DRIVER LLVMFuzzerRunDriver
+#endif
 
 static lean_object *g_run = NULL;   /* the Lean closure `ByteArray -> IO UInt8`, held for the run */
 
@@ -14,7 +26,7 @@ static lean_object *g_run = NULL;   /* the Lean closure `ByteArray -> IO UInt8`,
    returns code 1, and we abort(). libFuzzer's signal handler then saves the crashing input as an
    artifact (reproduce with `basalt-fuzz replay`) and exits with its error code. This is the proven
    in-process libFuzzer contract; the campaign result is the exit code + artifact, not a value
-   returned to Lean (see FUZZING-DESIGN.md for the subprocess model that would return one). */
+   returned to Lean (see BasaltFuzz/DESIGN.md for the subprocess model that would return one). */
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   lean_object *arr = lean_alloc_sarray(1, Size, Size);
   memcpy(lean_sarray_cptr(arr), Data, Size);
@@ -46,7 +58,7 @@ LEAN_EXPORT lean_object *basalt_fuzz_go(lean_object *run, lean_object *argv, lea
   av[n + 1] = NULL;
   int argc = (int)n + 1;
 
-  _ZN6fuzzer12FuzzerDriverEPiPPPcPFiPKhmE(&argc, &av, LLVMFuzzerTestOneInput);
+  BASALT_FUZZER_RUN_DRIVER(&argc, &av, LLVMFuzzerTestOneInput);
 
   lean_dec(g_run);
   lean_dec(argv);

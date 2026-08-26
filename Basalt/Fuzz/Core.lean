@@ -143,7 +143,7 @@ def prop [Gen G] : G TestOutcome := do
 ```
 
 The same term runs at any `Gen` (e.g. `Plausible.Gen`), not just `FuzzGen`. See
-`BasaltFuzz/BST.lean` for worked, runnable examples. -/
+`BasaltFuzz/BuggyBST.lean` for worked, runnable examples. -/
 def forAll [Repr α] [Gen G] (gen : G α) (p : α → Bool) : G TestOutcome := do
   let a ← gen
   checkWith (p a) (fun () => reprStr a)

@@ -4,7 +4,10 @@ Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
 import Basalt.Gen
-import Plausible
+-- `Plausible.Gen`, not `Plausible`: the instance needs only the monad and `Gen.choose`, and the
+-- umbrella import drags in the tactic frontend and deriving handlers — which the `basalt-fuzz`
+-- executable would then link (`BasaltFuzz/DESIGN.md` §6).
+import Plausible.Gen
 
 /-!
 # Plausible Gen as a Basalt Generator

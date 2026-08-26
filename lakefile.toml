@@ -18,8 +18,7 @@ globs = ["BasaltTest.+"]
 name = "BasaltExperiments"
 globs = ["BasaltExperiments.+"]
 
-# Root of the opt-in `basalt-fuzz` executable. Deliberately excluded from `defaultTargets` so the
-# default `lake build` never touches it; `fuzz-run/build.sh` elaborates it and links the fuzzer.
+# Root of the opt-in `basalt-fuzz` executable. `fuzz-run/build.sh` elaborates it and links the fuzzer.
 [[lean_lib]]
 name = "BasaltFuzzMain"
 globs = ["BasaltFuzzMain", "BasaltFuzz.+"]
