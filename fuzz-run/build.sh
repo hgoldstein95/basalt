@@ -48,11 +48,18 @@ TC=$(lean --print-prefix)
 UNAME=$(uname -s)
 
 # Extra include flags for compiling `native.c`. Lean's emitted IR needs only Lean's own sysroot,
-# but the bridge includes <string.h>/<stdlib.h>, and on macOS `leanc` sets `-isysroot` to the Lean
-# toolchain (which has no libc headers) and suppresses the platform default. Feed it the SDK's
-# include dir explicitly. Override with BRIDGE_INCLUDES.
-if [ "$UNAME" = "Darwin" ] && [ -z "${BRIDGE_INCLUDES+x}" ]; then
-  BRIDGE_INCLUDES="-isystem $(xcrun --show-sdk-path)/usr/include"
+# but the bridge includes <string.h>/<stdlib.h>, and `leanc`'s vendored clang sets `-isysroot` to
+# the Lean toolchain (which has no libc headers) and suppresses the platform default, so those
+# headers are not found unless fed in: the SDK's include dir on macOS, `/usr/include` on Linux.
+# (The Amazon Linux 2 box did not need this because its LEAN_CC wrapper drove the *system* clang,
+# whose default sysroot already carries /usr/include; a modern distro's leanc uses the vendored
+# clang and does need it.) Override with BRIDGE_INCLUDES.
+if [ -z "${BRIDGE_INCLUDES+x}" ]; then
+  if [ "$UNAME" = "Darwin" ]; then
+    BRIDGE_INCLUDES="-isystem $(xcrun --show-sdk-path)/usr/include"
+  else
+    BRIDGE_INCLUDES="-isystem /usr/include"
+  fi
 fi
 : "${BRIDGE_INCLUDES:=}"
 
@@ -65,10 +72,16 @@ fi
 # ourselves from Lean's `main`.
 if [ -z "${FUZZER_LIB_FLAGS+x}" ]; then
   found=""
+  # Two runtime-dir layouts coexist: the legacy `.../lib/linux/libclang_rt.fuzzer_no_main-<arch>.a`
+  # (clang <= 13, the Amazon Linux 2 box) and the per-target-triple
+  # `.../lib/<triple>/libclang_rt.fuzzer_no_main.a` (clang >= 14, e.g. Amazon Linux 2023's
+  # `/usr/lib/clang/22/lib/x86_64-amazon-linux-gnu/`). Search both under every prefix; the `-d`
+  # guard below skips the non-directory expansions.
   for d in ${FUZZER_LIB_SEARCH:-} \
            "$TC"/lib/clang/*/lib/linux "$TC"/lib/clang/*/lib/* \
            /usr/lib64/clang/*/lib/linux /usr/lib/clang/*/lib/linux \
-           /usr/lib/llvm-*/lib/clang/*/lib/linux; do
+           /usr/lib64/clang/*/lib/* /usr/lib/clang/*/lib/* \
+           /usr/lib/llvm-*/lib/clang/*/lib/linux /usr/lib/llvm-*/lib/clang/*/lib/*; do
     [ -d "$d" ] || continue
     for a in "$d"/libclang_rt.fuzzer_no_main*.a; do
       [ -f "$a" ] || continue
@@ -83,10 +96,24 @@ if [ -z "${FUZZER_LIB_FLAGS+x}" ]; then
   fi
 fi
 
-# The C++ runtime libFuzzer itself needs. libc++ on macOS, libstdc++ with GNU toolchains.
-# Override with CXXLIB_FLAGS (Appendix A's box needs a -L for it).
+# The C++ runtime libFuzzer itself needs: libc++ on macOS, GNU libstdc++ with a toolchain-provided
+# runtime on Linux (its symbols are the `__cxx11` GNU ABI). Two Linux wrinkles, both worked around
+# by naming the newest libstdc++.so by *full path*:
+#   - A bare `-lstdc++` is silently dropped: leanc's vendored clang already appends `-lc++`, so lld
+#     never links a second C++ runtime by `-l`, and the archive's std:: symbols stay undefined.
+#     A `.so` given by path is an unconditional input and always contributes its symbols.
+#   - The runtime is built by a recent clang against a recent libstdc++, so an older one leaves
+#     undefined symbols (gcc 11's lacks `std::__glibcxx_assert_fail`, added in gcc 12). Newer
+#     libstdc++ is ABI-forward-compatible, so the newest installed is always the safe choice — the
+#     same one the system clang that built the runtime would pick.
+# Override with CXXLIB_FLAGS (Appendix A's Amazon Linux 2 box pins its own -L/-lstdc++).
 if [ -z "${CXXLIB_FLAGS+x}" ]; then
-  if [ "$UNAME" = "Darwin" ]; then CXXLIB_FLAGS="-lc++"; else CXXLIB_FLAGS="-lstdc++"; fi
+  if [ "$UNAME" = "Darwin" ]; then
+    CXXLIB_FLAGS="-lc++"
+  else
+    newest_libstdcxx=$(ls /usr/lib/gcc/*/*/libstdc++.so 2>/dev/null | grep -v '/32/' | sort -V | tail -1)
+    CXXLIB_FLAGS="${newest_libstdcxx:--lstdc++}"
+  fi
 fi
 
 # Which driver symbol the bridge calls. LLVM >= 12 has the stable C entry `LLVMFuzzerRunDriver`;

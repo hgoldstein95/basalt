@@ -16,12 +16,14 @@ design and Appendix A for the supported platforms.
 fuzz-run/build.sh          # elaborates the Mathlib-free closure, instruments it, links libFuzzer
 ```
 
-Runs with no arguments on the platforms in `BasaltFuzz/DESIGN.md`'s Appendix A — macOS (arm64) and
-Amazon Linux 2 (x86_64), the only two anyone has built on; no current Linux distribution has been
-tried. The script detects the C driver, the libFuzzer runtime, the C++ runtime, and which driver
-entry point the bridge should call, so an unlisted platform is likely to need nothing. Where a
-machine's toolchain defeats detection, put overrides in `fuzz-run/env.sh` (git-ignored, sourced
-first) — `env.example.sh` documents every knob and carries the settings the Appendix A box needs.
+Runs with no arguments on the platforms in `BasaltFuzz/DESIGN.md`'s Appendix A — macOS (arm64),
+Amazon Linux 2 (x86_64, the legacy clang-11 box), and Amazon Linux 2023 (x86_64, clang 22 via
+`dnf install clang22 compiler-rt22`). The script detects the C driver, the libFuzzer runtime (in
+both the legacy and clang-≥14 per-triple layouts), the libc headers the C bridge needs, the C++
+runtime, and which driver entry point the bridge should call, so an unlisted platform is likely to
+need nothing. Where a machine's toolchain defeats detection, put overrides in `fuzz-run/env.sh`
+(git-ignored, sourced first) — `env.example.sh` documents every knob and carries the settings the
+Amazon Linux 2 box needs.
 
 If no toolchain-provided libFuzzer runtime is found — the macOS case, since neither Apple's clang
 nor Lean's vendored clang ships one — the build calls `get-libfuzzer.sh`, which builds the archive

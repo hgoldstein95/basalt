@@ -53,14 +53,17 @@ concurrency:
 
 jobs:
   fuzz:
-    # NOTE: the `ubuntu-latest` leg has never been run. The Linux configuration validated by hand is
-    # Amazon Linux 2 with clang 11 (BasaltFuzz/DESIGN.md Appendix A), which is a different build path
-    # in three ways: the runner has a modern glibc (so the `LEAN_CC` wrapper AL2 needs should be
-    # unnecessary and Lean's vendored clang should run), its clang is recent enough to expose
-    # `LLVMFuzzerRunDriver` rather than the mangled legacy entry, and its
-    # `libclang_rt.fuzzer_no_main*.a` comes from a clang several major versions below the clang 22
-    # that does the instrumenting. `fuzz-run/build.sh` detects all three, so this is expected to work
-    # — but expected is not measured, and the first run on this leg is the measurement.
+    # NOTE: this specific `ubuntu-latest` runner has not been run in CI, but its build path — a modern
+    # Linux: recent glibc, clang >= 14, PIE-by-default — was validated by hand on Amazon Linux 2023
+    # (clang 22, glibc 2.34; BasaltFuzz/DESIGN.md Appendix A). That exposed differences from the
+    # Amazon Linux 2 (clang 11) box, all now handled generically by the build scripts: the runner
+    # needs no `LEAN_CC` wrapper (glibc is new enough for Lean's vendored clang); its clang exposes
+    # `LLVMFuzzerRunDriver`, not the mangled legacy entry; `libclang_rt.fuzzer_no_main*.a` lives in a
+    # per-target-triple dir (`fuzz-run/build.sh` globs both layouts); `native.c` needs `/usr/include`
+    # fed in explicitly; and libstdc++ must be named by full path (a bare `-lstdc++` is dropped). If
+    # the runner ships no system runtime at all, `fuzz-run/build.sh` builds one from source via
+    # `get-libfuzzer.sh` (needs `clang++`, present here) — a path that itself needed `-fPIC` to link
+    # into the PIE. Both runtime sources were exercised by hand on AL2023.
     # `fail-fast: false` is deliberate: a failure here must not hide a passing macOS leg.
     strategy:
       fail-fast: false

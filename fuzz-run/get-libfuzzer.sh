@@ -6,9 +6,11 @@
 # Build a libFuzzer runtime archive from compiler-rt source into fuzz-run/vendor/.
 #
 # Needed where the toolchain's clang can instrument (`-fsanitize=fuzzer-no-link`) but ships no
-# runtime to link against — the macOS case: Apple's clang has no libFuzzer at all, and Lean's
-# vendored clang 22 ships only `libclang_rt.osx.a`. compiler-rt's `lib/fuzzer` is standalone C++17
-# by design (it has its own `build.sh`), so building it needs no LLVM checkout or CMake.
+# runtime to link against. That is always macOS (Apple's clang has no libFuzzer at all, and Lean's
+# vendored clang 22 ships only `libclang_rt.osx.a`), and any Linux without a system compiler-rt
+# fuzzer archive (e.g. a runner with clang but no `libclang-rt`/`compiler-rt` runtimes package).
+# compiler-rt's `lib/fuzzer` is standalone C++17 by design (it has its own `build.sh`), so building
+# it needs no LLVM checkout or CMake.
 #
 # `build.sh` calls this automatically when it finds no runtime; run it directly only to re-fetch.
 # The archive excludes `FuzzerMain.cpp` because Lean owns `main` (BasaltFuzz/DESIGN.md §5).
@@ -46,7 +48,10 @@ for f in "$SRC"/Fuzzer*.cpp; do
     # cheaper than replicating compiler-rt's platform selection here.
   esac
   o="${f%.cpp}.o"
-  "$CXX" -g -O2 -fno-omit-frame-pointer -std=c++17 -c "$f" -o "$o"
+  # -fPIC is required on Linux: `leanc` links the final executable as a PIE (the modern default), and
+  # a non-PIC object triggers `relocation R_X86_64_32 cannot be used against local symbol`. It is a
+  # no-op on macOS (PIC by default), so it is unconditional here.
+  "$CXX" -fPIC -g -O2 -fno-omit-frame-pointer -std=c++17 -c "$f" -o "$o"
   objs+=("$o")
 done
 

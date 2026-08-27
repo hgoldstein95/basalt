@@ -6,7 +6,7 @@ Authors: Michael Hicks
 
 # Coverage-Guided (Parametric) Fuzzing for Basalt
 
-This document describes `FuzzGen`, an executable interpretation of Basalt's `Gen` that drives generators from a coverage-guided fuzzer (libFuzzer) instead of from a PRNG, together with the C bridge, build, and worked example that make it run. Everything here is implemented and validated on exactly two platforms — macOS (arm64) and Amazon Linux 2 (x86_64) — and notably *not* on any current Linux distribution; [Appendix A](#appendix-a--platforms) covers what differs between the two, how the build detects it, and what is untested.
+This document describes `FuzzGen`, an executable interpretation of Basalt's `Gen` that drives generators from a coverage-guided fuzzer (libFuzzer) instead of from a PRNG, together with the C bridge, build, and worked example that make it run. Everything here is implemented and validated on three platforms — macOS (arm64), Amazon Linux 2 (x86_64, the legacy clang-11 box), and Amazon Linux 2023 (x86_64, the modern clang-22 case) — spanning both a very old and a current Linux; [Appendix A](#appendix-a--platforms) covers what differs between them and how the build detects each difference.
 
 ## 1. Goal
 
@@ -248,7 +248,7 @@ The reason is worth stating precisely, because the obvious explanation is wrong.
 ## 9. Alternatives and future work
 
 - **In-process campaign result via a subprocess model.** Today a failure `abort()`s, so `go` can't return a `TestOutcome`. FuzzChick shows the trade-off: you can return a value only if you own the loop. The clean way to get both the proven per-process behavior *and* an in-process value is a subprocess model — a Lean parent spawns a libFuzzer child that aborts like bolero, and the parent reads the child's exit code / artifact / stderr to reconstruct a `TestOutcome`. Cost: a process boundary. (We prototyped an in-process `setjmp`/`longjmp` return path; it worked but left no artifact and had to `_exit` past libFuzzer's `atexit` handler, so it was dropped in favor of matching bolero.)
-- **~~Support a more recent Clang/LLVM (≥ 12)~~ — done (macOS).** On macOS the vendored LLVM-22 `clang` runs natively, so the bridge calls the stable C entry `LLVMFuzzerRunDriver` and the build needs no `LEAN_CC` wrapper or hand-supplied `libstdc++` path; `fuzz-run/build.sh` now detects driver, runtime, and C++ library per platform (Appendix A). What remains: the Appendix A Linux box still needs its `LEAN_CC` wrapper (a property of *that host's* glibc, not of the design), and a newer system LLVM there would remove it. Lean's own LLVM backend is still unevaluated as an instrumentation path.
+- **~~Support a more recent Clang/LLVM (≥ 12)~~ — done (macOS and Amazon Linux 2023).** On both the vendored LLVM-22 `clang` runs natively, so the bridge calls the stable C entry `LLVMFuzzerRunDriver` and the build needs no `LEAN_CC` wrapper; `fuzz-run/build.sh` detects driver, runtime, and C++ library per platform (Appendix A). The `LEAN_CC` wrapper is now confirmed to be a property of *Amazon Linux 2's* old glibc, not of the design: AL2023 (glibc 2.34, clang 22) needs no wrapper, as predicted. Lean's own LLVM backend is still unevaluated as an instrumentation path.
 - **A second platform's runtime is built from source.** macOS has no shipped `libclang_rt.fuzzer_no_main`, so `fuzz-run/get-libfuzzer.sh` builds one from compiler-rt (pinned by `LLVM_TAG`). It is standalone C++17, so this is cheap and stable, but it does mean the fuzzing runtime's version is decoupled from the instrumenting compiler's; a large skew between them is the thing to watch, and installing a system LLVM with the runtime avoids it.
 - **Value-level shrinking.** v1 relies on libFuzzer's byte-level minimization (`-minimize_crash=1`) and reports the first counterexample. A Basalt value-level shrinker would give smaller, more readable counterexamples but is net-new (Basalt has no shrinker today).
 - **Stop-on-first vs. run-to-completion mode.** A `--all`/`StopMode` flag could keep going past the first failure to collect multiple counterexamples or pass/fail statistics — either in-process (print + `return -1` to continue, accumulating) or libFuzzer-native (`-fork=N -ignore_crashes=1`, parent records every crash).
@@ -259,21 +259,23 @@ The reason is worth stating precisely, because the obvious explanation is wrong.
 
 ## Appendix A — Platforms
 
-`fuzz-run/build.sh` builds with no arguments on the two platforms below. Four things vary between
+`fuzz-run/build.sh` builds with no arguments on the three platforms below. Five things vary between
 platforms, and the script detects each one; every probe can be overridden from `fuzz-run/env.sh`
 (git-ignored, sourced first), which `fuzz-run/env.example.sh` documents. Because the probes are
-generic, a platform not listed here is *likely* to work — but only these two have been run.
+generic, a platform not listed here is *likely* to work — but only these three have been run.
 
 | what varies | how it is resolved |
 |---|---|
 | C compile/link driver | `leanc`, which already knows Lean's include path, clang resource headers, sysroot, and rpaths (`CC`) |
-| libFuzzer runtime | a toolchain `libclang_rt.fuzzer_no_main*.a` if one exists, else the compiler-rt build in `fuzz-run/vendor/` (`FUZZER_LIB_FLAGS`) |
+| libFuzzer runtime | a toolchain `libclang_rt.fuzzer_no_main*.a` under any `.../lib/linux` (legacy) or `.../lib/<triple>` (clang ≥ 14) dir, else the compiler-rt build in `fuzz-run/vendor/` (`FUZZER_LIB_FLAGS`) |
 | driver entry point | `nm` on the runtime archive: `LLVMFuzzerRunDriver` if present, else the mangled `fuzzer::FuzzerDriver` (`DRIVER_DEFINE`) |
-| C++ runtime | `-lc++` on macOS, `-lstdc++` elsewhere (`CXXLIB_FLAGS`) |
+| libc headers for `native.c` | the platform SDK's include dir on macOS, `/usr/include` on Linux, because `leanc`'s vendored clang has no libc in its sysroot (`BRIDGE_INCLUDES`) |
+| C++ runtime | `-lc++` on macOS; on Linux the newest installed `libstdc++.so` named by full path, since a bare `-lstdc++` is dropped alongside `leanc`'s own `-lc++` (`CXXLIB_FLAGS`) |
 
 Using `leanc` as the driver is what makes the script portable: the hand-supplied toolchain include
-path, `libstdc++` path, and system-clang wrapper the Linux box needed are now either detected or
-unnecessary.
+path and system-clang wrapper the Amazon Linux 2 box needed are now either detected or unnecessary.
+The one thing `leanc` does *not* solve on Linux is the C++ runtime — it appends its own `-lc++`, so
+the GNU libstdc++ that a toolchain-provided libFuzzer runtime needs has to be named by full path.
 
 ### macOS (arm64, macOS 15, Lean `4.33.0-rc2`)
 
@@ -304,27 +306,51 @@ unnecessary.
   where `$TC` is `lean --print-prefix`. The same wrapper is needed to build the Mathlib olean cache (`lake exe cache get`), which compiles C.
 - **`libstdc++`** (needed by the libFuzzer C++ runtime) is not on the default link path; set `CXXLIB_FLAGS="-L/usr/lib/gcc/x86_64-redhat-linux/7 -lstdc++"`.
 
-### Not yet tested: a current Linux distribution
+### Amazon Linux 2023 (x86_64, `clang 22` / `compiler-rt22`, Lean `4.33.0-rc2`)
 
-Amazon Linux 2 above is the *only* Linux configuration anyone has built on, and it is an old one —
-glibc 2.26, clang 11. Nothing here has been run on a current distribution (Ubuntu 24.04, the
-`ubuntu-latest` leg of the `basalt-fuzz` CI workflow, or any comparably recent Fedora/Debian), and
-that platform differs from Amazon Linux 2 in every row of the table above except the driver:
+The "current Linux distribution" case, now built and validated. Toolchain: `dnf install clang22
+compiler-rt22` for the system runtime, Lean via `elan`. It builds with **no `env.sh`** — every
+difference from Amazon Linux 2 is handled by the script's detection — but three of those detections
+had to be generalized past what the two original platforms exercised (all in `fuzz-run/build.sh`;
+no source changed):
 
-- Its glibc is new enough for Lean's vendored clang, so the `LEAN_CC` wrapper should be unnecessary
-  and `leanc` should work unmodified. That removes the AL2 hazard rather than replacing it.
-- Its system clang is ≥12, so the runtime archive exposes `LLVMFuzzerRunDriver` and the probe takes
-  the macOS branch, not AL2's `-DBASALT_FUZZ_LEGACY_DRIVER` one.
-- `libclang_rt.fuzzer_no_main-x86_64.a` lives under `/usr/lib/llvm-<N>/lib/clang/<N>/lib/linux/`,
-  which is on the script's search path — so the *runtime* comes from system clang while the
-  *instrumentation* comes from Lean's clang 22. libFuzzer's sancov ABI has been stable across that
-  range, but this is the one combination with a real skew and no measurement behind it.
-- `libstdc++` is on the default link path, so `CXXLIB_FLAGS` should need no override.
+- **No `LEAN_CC` wrapper.** glibc 2.34 is new enough for Lean's vendored clang 22, so `leanc` runs
+  unmodified. This is the AL2 hazard removed rather than replaced, as predicted.
+- **Modern driver.** System clang 22 ships `LLVMFuzzerRunDriver`, so the archive probe takes the
+  macOS branch (no `-DBASALT_FUZZ_LEGACY_DRIVER`), and instrumentation and runtime are the *same*
+  clang 22 — the skew a mixed system-clang/Lean-clang box would have is absent here.
+- **Runtime lives in a per-target-triple dir.** `libclang_rt.fuzzer_no_main.a` is at
+  `/usr/lib/clang/22/lib/x86_64-amazon-linux-gnu/` (clang ≥ 14's layout, and note the name has *no*
+  `-x86_64` suffix), not the legacy `.../lib/linux/`. The search now globs `.../lib/*` under each
+  prefix, not just `.../lib/linux`.
+- **`native.c` needs libc headers explicitly**, exactly as on macOS: `leanc`'s vendored clang points
+  `-isysroot` at the Lean toolchain (no libc there), so `<string.h>` is not found without
+  `-isystem /usr/include`. AL2 dodged this only because its `LEAN_CC` wrapper drove the *system*
+  clang, whose default sysroot has `/usr/include`.
+- **`libstdc++` must be named by full path, and be recent.** Two link-time surprises correct the
+  Appendix-A guess that `CXXLIB_FLAGS` would need no override: a bare `-lstdc++` is silently dropped
+  (leanc already appends `-lc++`, so lld never links a second C++ runtime by `-l`, leaving the
+  runtime archive's `__cxx11` symbols undefined), and gcc 11's libstdc++ is too old for the
+  clang-22-built runtime (it lacks `std::__glibcxx_assert_fail`, added in gcc 12). The script now
+  links the *newest* installed `libstdc++.so` by full path — here gcc 14's, the same one system
+  clang 22 selects.
 
-The failure mode to expect if the skew does bite is not a link error but a *silent* one: an
-instrumented binary whose coverage feedback never reaches the runtime still links and still runs,
-and every property that has a shallow bug still fails. The workflow's `chain-4` assertion is what
-distinguishes that case, because only coverage guidance can reach a bug behind four nested guards.
+- **The from-source fallback also works here.** With `compiler-rt22` installed the build links the
+  system archive, but forcing the `get-libfuzzer.sh` path (as on a Linux box with clang but no
+  runtime package — e.g. a bare CI runner) also links and runs, once its objects are built `-fPIC`:
+  `leanc` links the executable as a PIE, and a non-PIC runtime object fails with
+  `relocation R_X86_64_32 cannot be used against local symbol`. This is why `get-libfuzzer.sh`
+  compiles with `-fPIC` unconditionally (a no-op on macOS).
+
+Coverage feedback is confirmed live, not merely linked: `chain-4` (a bug behind four nested guards)
+is found by the fuzz backend in ~1.3k runs and by neither random backend in millions — the exact
+canary below.
+
+The failure mode to watch for on an *untested* Linux, where instrumentation (Lean's clang 22) and a
+system runtime may skew, is not a link error but a *silent* one: an instrumented binary whose
+coverage feedback never reaches the runtime still links and still runs, and every property with a
+shallow bug still fails. The workflow's `chain-4` assertion distinguishes that case, because only
+coverage guidance can reach a bug behind four nested guards.
 
 ## Appendix B — Key source references
 
