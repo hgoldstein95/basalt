@@ -342,6 +342,13 @@ no source changed):
   `relocation R_X86_64_32 cannot be used against local symbol`. This is why `get-libfuzzer.sh`
   compiles with `-fPIC` unconditionally (a no-op on macOS).
 
+- **A newer-glibc caveat, not seen on AL2023 (glibc 2.34) but on Ubuntu 24.04 (glibc 2.39).** glibc
+  ≥ 2.38 redirects `strtol`/`strtoul` (and `std::stoul`) to the ISO C23 symbols `__isoc23_strtol`/
+  `_strtoul`, which the libFuzzer runtime then references but `leanc`'s older-baseline libc does not
+  export — so the link fails with `undefined symbol: __isoc23_strtol` while every classic libc symbol
+  resolves. `fuzz-run/isoc23_compat.c` (compiled into the link on Linux) supplies them as weak
+  aliases to the classic functions; it owns the full explanation and is inert on glibc < 2.38.
+
 Coverage feedback is confirmed live, not merely linked: `chain-4` (a bug behind four nested guards)
 is found by the fuzz backend in ~1.3k runs and by neither random backend in millions — the exact
 canary below.

@@ -60,8 +60,10 @@ jobs:
     # run surfaced: no `LEAN_CC` wrapper (glibc new enough for Lean's vendored clang); clang exposes
     # `LLVMFuzzerRunDriver`, not the legacy mangled entry; `native.c` needs `/usr/include` fed in, and
     # on Debian multiarch also `/usr/include/<triple>` for its `bits/` headers; libstdc++ must be named
-    # by full path (a bare `-lstdc++` is dropped); and the host-arch archive must be chosen, not the
-    # 32-bit `-i386` sibling in the legacy `.../lib/linux` layout.
+    # by full path (a bare `-lstdc++` is dropped); the host-arch archive must be chosen, not the
+    # 32-bit `-i386` sibling in the legacy `.../lib/linux` layout; and on glibc >= 2.38 (24.04's 2.39)
+    # the runtime's `__isoc23_strtol`/`_strtoul` references, absent from leanc's older-baseline libc,
+    # are supplied by fuzz-run/isoc23_compat.c.
     #
     # `ubuntu-latest` does ship a system runtime, but from a clang several majors below the clang 22
     # that instruments. Rather than trust that skew, `fuzz-run/build.sh` selects a *version-matched*

@@ -194,12 +194,31 @@ done
 $CC -O1 $BRIDGE_INCLUDES $DRIVER_DEFINE -c Basalt/Fuzz/native.c -o "$OUT/native.o"
 OBJS+=("$OUT/native.o")
 
+# On glibc >= 2.38 (Ubuntu 24.04, etc.) the runtime references `__isoc23_strtol`/`_strtoul` that
+# leanc's older-baseline libc does not export; this shim supplies them (fuzz-run/isoc23_compat.c).
+# Linux-only: its `__asm__` symbol labels assume no leading underscore, and glibc's redirect is what
+# it targets. Inert where those symbols already resolve (its defs are weak).
+if [ "$UNAME" != "Darwin" ]; then
+  $CC -O1 -c fuzz-run/isoc23_compat.c -o "$OUT/isoc23_compat.o"
+  OBJS+=("$OUT/isoc23_compat.o")
+fi
+
 # `-fsanitize=fuzzer-no-link` is deliberately absent here: it is a *compile-time* instrumentation
 # flag, and at link time it also pulls in a ubsan dylib that Lean's vendored clang does not ship
 # (the link fails with "cannot open ... libclang_rt.ubsan_osx_dynamic.dylib"). The runtime archive
 # supplies every symbol the link actually needs.
 echo "== link =="
-$CC "${OBJS[@]}" -o fuzz-run/basalt-fuzz \
-  $FUZZER_LIB_FLAGS $CXXLIB_FLAGS 2>&1 | grep -viE 'unused|-Wl' || true
+# Capture rather than pipe: a previous `... | grep -v ... || true` swallowed the linker's exit code,
+# so a *failed* link still printed "built" and left no binary — the failure only surfaced later as
+# `fuzz-run/basalt-fuzz: No such file or directory`. Filter the noise for display, but fail loudly on
+# a nonzero status or a missing binary.
+rm -f fuzz-run/basalt-fuzz
+if ! $CC "${OBJS[@]}" -o fuzz-run/basalt-fuzz $FUZZER_LIB_FLAGS $CXXLIB_FLAGS > "$OUT/link.log" 2>&1; then
+  grep -viE 'unused|-Wl' "$OUT/link.log" >&2 || true
+  echo "== link FAILED (runtime: $FUZZER_LIB_FLAGS; cxxlib: $CXXLIB_FLAGS) ==" >&2
+  exit 1
+fi
+grep -viE 'unused|-Wl' "$OUT/link.log" || true
+[ -x fuzz-run/basalt-fuzz ] || { echo "== link reported success but produced no binary ==" >&2; exit 1; }
 
 echo "== built: fuzz-run/basalt-fuzz =="
