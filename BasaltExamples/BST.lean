@@ -42,19 +42,20 @@ def Tree.isBST (lo hi : Nat) : Tree Nat → Prop
     isBST lo (x - 1) l ∧
     isBST (x + 1) hi r
 
-/-- Generates a BST with keys in `[lo, hi]`: return `leaf` when the interval is empty, else `pick`
-between a leaf and a node built from a uniform pivot and two recursive subtrees. -/
+/-- Generates a BST with keys in `[lo, hi]`: return `leaf` when the interval is empty, else choose
+with equal weight between a leaf and a node built from a uniform pivot and two recursive subtrees. -/
 def Tree.genBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
   if h : lo > hi then
     return leaf
   else
-    pick
-      (fun () => pure leaf)
-      (fun () => do
+    frequency [
+      (1, fun () => pure leaf),
+      (1, fun () => do
         let x ← chooseNat lo hi (by omega)
         let l ← Tree.genBST lo (x - 1)
         let r ← Tree.genBST (x + 1) hi
         return node l x r)
+    ] (by simp)
 partial_fixpoint
 
 theorem Tree.genBST.sound_complete :
@@ -64,7 +65,20 @@ theorem Tree.genBST.sound_complete :
     <;> rw [Tree.genBST]
     <;> split
     <;> simp
-    <;> grind
+  · exact ⟨1, fun _ => Pure.pure .leaf, Or.inl ⟨rfl, rfl⟩, one_pos, by simp⟩
+  · intros
+    omega
+  · constructor
+    · rintro ⟨w, g, hbr, hw, hmem⟩
+      rcases hbr with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+      · simp at hmem
+      · revert hmem
+        simp
+        grind
+    · rintro ⟨h1, h2, hl, hr⟩
+      refine ⟨1, _, Or.inr ⟨rfl, rfl⟩, one_pos, ?_⟩
+      simp
+      grind
 
 /-! ## Termination -/
 
@@ -90,7 +104,12 @@ theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) :
         _ = 1 := by rw [one_pow, mul_one, ENNReal.add_halves]
     · conv_rhs => rw [Tree.genBST]
       rw [dif_neg hgt]
-      simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
+      rw [SPMF.mass_frequency]
+      simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, SPMF.mass_pure,
+        Nat.cast_one, add_zero, one_mul]
+      rw [show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num, ENNReal.add_div, ENNReal.div_eq_inv_mul,
+        ENNReal.div_eq_inv_mul]
+      simp only [mul_one]
       gcongr
       rw [sq]
       refine SPMF.mass_bind_ge_of_isPMF (SPMF.mass_chooseNat lo hi (by omega)) (fun x => ?_)
@@ -102,8 +121,8 @@ end termination
 
 /-! ## Cost -/
 
-/-- Producing a tree of `n` nodes costs at most `3 * n + 1` choices: one `pick` and two recursive
-calls per node. -/
+/-- Producing a tree of `n` nodes costs at most `3 * n + 1` choices: one `frequency` choice, one
+pivot, and two recursive calls per node. -/
 theorem Tree.genBST.cost_bounded :
     IsCostBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
   open Lean.Order in
@@ -116,13 +135,20 @@ theorem Tree.genBST.cost_bounded :
     intro genBST_rec ih lo hi
     rw [IsBounded_iff]
     rintro ⟨t, n⟩ hmem
-    cost_support_simp at hmem
-    obtain ⟨_, rfl, rfl⟩ | ⟨_, m, hn, hmem⟩ := hmem
-    · simp [Tree.size]
-    · obtain ⟨rfl, rfl⟩ | ⟨x, n1, n2, ⟨⟨hxlo, hxhi⟩, hn1⟩, hmem, hm⟩ := hmem
-      · simp only [Tree.size]
-        omega
-      · obtain ⟨l, n3, n4, hl, hmem, hn2⟩ := hmem
+    rw [SPMF.mem_support_dite_iff] at hmem
+    obtain ⟨_, hmem⟩ | ⟨_, hmem⟩ := hmem
+    · cost_support_simp at hmem
+      obtain ⟨rfl, rfl⟩ := hmem
+      simp [Tree.size]
+    · obtain ⟨w, g, m, hbr, hw, hmem, rfl⟩ := SPMF.Cost.mem_support_frequency hmem
+      simp only [List.mem_cons, List.not_mem_nil, or_false, Prod.mk.injEq] at hbr
+      obtain ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ := hbr
+      · cost_support_simp at hmem
+        obtain ⟨rfl, rfl⟩ := hmem
+        simp [Tree.size]
+      · cost_support_simp at hmem
+        obtain ⟨x, n1, n2, ⟨⟨hxlo, hxhi⟩, hn1⟩, hmem, hm⟩ := hmem
+        obtain ⟨l, n3, n4, hl, hmem, hn2⟩ := hmem
         obtain ⟨r, n5, n6, hr, ⟨rfl, hn6⟩, hn4⟩ := hmem
         have hL : n3 ≤ 3 * l.size + 1 := ih lo (x - 1) (l, n3) hl
         have hR : n5 ≤ 3 * r.size + 1 := ih (x + 1) hi (r, n5) hr
