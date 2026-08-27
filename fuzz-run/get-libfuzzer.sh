@@ -12,8 +12,10 @@
 # compiler-rt's `lib/fuzzer` is standalone C++17 by design (it has its own `build.sh`), so building
 # it needs no LLVM checkout or CMake.
 #
-# `build.sh` calls this automatically when it finds no runtime; run it directly only to re-fetch.
-# The archive excludes `FuzzerMain.cpp` because Lean owns `main` (BasaltFuzz/DESIGN.md §5).
+# `build.sh` calls this automatically when it finds no runtime whose clang major matches the
+# instrumenting clang (so `ubuntu-latest`, whose system runtime is a different clang, builds here too);
+# run it directly only to re-fetch. The archive excludes `FuzzerMain.cpp` because Lean owns `main`
+# (BasaltFuzz/DESIGN.md §5).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -21,6 +23,17 @@ LLVM_TAG="${LLVM_TAG:-llvmorg-22.1.8}"      # pinned; any >= 12 exposes LLVMFuzz
 VENDOR="$(pwd)/vendor"
 SRC="$VENDOR/fuzzer-src"
 OUT="$VENDOR/libFuzzerNoMain.a"
+
+# build.sh builds this precisely because no *version-matched* system runtime exists, so the source
+# major must equal the instrumenting clang's, which build.sh passes as FUZZ_LLVM_MAJOR. LLVM's tag
+# scheme changed mid-stream (`llvmorg-16.0.y` vs `llvmorg-22.1.y`), so we do not synthesize a tag
+# from the major — we keep a known-good pinned LLVM_TAG and warn when it drifts, which is the signal
+# to bump it (or pass LLVM_TAG explicitly). A warned build still links; it just may carry sancov skew.
+tag_major=$(printf '%s' "$LLVM_TAG" | sed -n 's/^llvmorg-\([0-9][0-9]*\).*/\1/p')
+if [ -n "${FUZZ_LLVM_MAJOR:-}" ] && [ -n "$tag_major" ] && [ "$FUZZ_LLVM_MAJOR" != "$tag_major" ]; then
+  echo "== WARNING: building libFuzzer from LLVM $tag_major ($LLVM_TAG) but the instrumenting clang is"
+  echo "==          $FUZZ_LLVM_MAJOR; set LLVM_TAG to a matching release to avoid SanitizerCoverage skew. =="
+fi
 
 # The C++ compiler that builds the runtime. libFuzzer is ordinary C++17 with no Lean involvement,
 # so the platform's own clang++ is the right tool — `leanc` is a C driver for Lean's emitted code.

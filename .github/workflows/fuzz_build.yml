@@ -53,17 +53,24 @@ concurrency:
 
 jobs:
   fuzz:
-    # NOTE: this specific `ubuntu-latest` runner has not been run in CI, but its build path — a modern
-    # Linux: recent glibc, clang >= 14, PIE-by-default — was validated by hand on Amazon Linux 2023
-    # (clang 22, glibc 2.34; BasaltFuzz/DESIGN.md Appendix A). That exposed differences from the
-    # Amazon Linux 2 (clang 11) box, all now handled generically by the build scripts: the runner
-    # needs no `LEAN_CC` wrapper (glibc is new enough for Lean's vendored clang); its clang exposes
-    # `LLVMFuzzerRunDriver`, not the mangled legacy entry; `libclang_rt.fuzzer_no_main*.a` lives in a
-    # per-target-triple dir (`fuzz-run/build.sh` globs both layouts); `native.c` needs `/usr/include`
-    # fed in explicitly; and libstdc++ must be named by full path (a bare `-lstdc++` is dropped). If
-    # the runner ships no system runtime at all, `fuzz-run/build.sh` builds one from source via
-    # `get-libfuzzer.sh` (needs `clang++`, present here) — a path that itself needed `-fPIC` to link
-    # into the PIE. Both runtime sources were exercised by hand on AL2023.
+    # NOTE: a modern-Linux build path (recent glibc, PIE-by-default) was validated by hand on Amazon
+    # Linux 2023 (clang 22, glibc 2.34; BasaltFuzz/DESIGN.md Appendix A); `ubuntu-latest` then exposed
+    # the Debian-family variations on top of it, and each is now handled generically by the build
+    # scripts. Confirmed here (Fedora-family) plus the Debian-specific deltas the first `ubuntu-latest`
+    # run surfaced: no `LEAN_CC` wrapper (glibc new enough for Lean's vendored clang); clang exposes
+    # `LLVMFuzzerRunDriver`, not the legacy mangled entry; `native.c` needs `/usr/include` fed in, and
+    # on Debian multiarch also `/usr/include/<triple>` for its `bits/` headers; libstdc++ must be named
+    # by full path (a bare `-lstdc++` is dropped); and the host-arch archive must be chosen, not the
+    # 32-bit `-i386` sibling in the legacy `.../lib/linux` layout.
+    #
+    # `ubuntu-latest` does ship a system runtime, but from a clang several majors below the clang 22
+    # that instruments. Rather than trust that skew, `fuzz-run/build.sh` selects a *version-matched*
+    # runtime: it will bypass the mismatched system archive and build one from source via
+    # `get-libfuzzer.sh` (needs `clang++`, present here; the build needs `-fPIC`), pinned to the
+    # instrumenting clang's major. So this leg exercises the matched-from-source path; both the
+    # matched-system and matched-from-source paths were validated by hand on AL2023. The `chain-4`
+    # step remains the backstop: if coverage feedback ever failed to reach the runtime, only it —
+    # not the shallow-bug steps — would notice.
     # `fail-fast: false` is deliberate: a failure here must not hide a passing macOS leg.
     strategy:
       fail-fast: false

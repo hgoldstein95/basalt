@@ -59,40 +59,77 @@ if [ -z "${BRIDGE_INCLUDES+x}" ]; then
     BRIDGE_INCLUDES="-isystem $(xcrun --show-sdk-path)/usr/include"
   else
     BRIDGE_INCLUDES="-isystem /usr/include"
+    # Debian/Ubuntu multiarch puts the arch-specific libc headers (e.g. `bits/libc-header-start.h`,
+    # which `<stdint.h>` pulls in) under `/usr/include/<triple>`, not `/usr/include/bits`. So on
+    # Ubuntu `-isystem /usr/include` alone fails with "bits/libc-header-start.h file not found".
+    # `gcc -print-multiarch` names that triple (empty on Fedora/Amazon Linux, whose /usr/include is
+    # self-contained), making this a no-op there. Override the whole thing with BRIDGE_INCLUDES.
+    ma=$(gcc -print-multiarch 2>/dev/null || true)
+    [ -n "$ma" ] && [ -d "/usr/include/$ma" ] && BRIDGE_INCLUDES="$BRIDGE_INCLUDES -isystem /usr/include/$ma"
   fi
 fi
 : "${BRIDGE_INCLUDES:=}"
 
-# The libFuzzer runtime to link, and which driver entry the bridge should call. Preference order:
+# The libFuzzer runtime to link. Preference order:
 #   1. FUZZER_LIB_FLAGS from the environment / env.sh (an explicit choice wins).
-#   2. A toolchain-provided `libclang_rt.fuzzer_no_main-*.a` (the Linux case).
-#   3. fuzz-run/vendor/libFuzzerNoMain.a, built from compiler-rt source by ./get-libfuzzer.sh
-#      (the macOS case: no toolchain ships the runtime there).
+#   2. A toolchain `libclang_rt.fuzzer_no_main*.a` whose clang major MATCHES the instrumenting clang.
+#   3. fuzz-run/vendor/libFuzzerNoMain.a, built from compiler-rt source by ./get-libfuzzer.sh, pinned
+#      to Lean's clang major — so it is version-matched too (macOS; and any Linux whose only system
+#      runtime is a different clang, e.g. `ubuntu-latest`'s clang 16 vs Lean's clang 22).
+#   4. Last resort: a version-*mismatched* system runtime, with a warning (see below).
 # `fuzzer_no_main` (not `fuzzer`) is required: we provide LLVMFuzzerTestOneInput and call the driver
 # ourselves from Lean's `main`.
+#
+# Why the major must match: the runtime implements the SanitizerCoverage ABI that the instrumenting
+# clang emits calls against. That ABI is broadly stable, but a large skew can leave an
+# instrumented-but-uninstrumented-feeling binary — it links and runs, and shallow bugs still fail,
+# yet coverage never reaches the runtime (BasaltFuzz/DESIGN.md Appendix A). Matching the major closes
+# that gap by construction rather than by trusting cross-version stability.
 if [ -z "${FUZZER_LIB_FLAGS+x}" ]; then
-  found=""
+  arch=$(uname -m)
+  # The major of the clang `leanc` actually drives — via `$CC`, so it honors LEAN_CC (on the Amazon
+  # Linux 2 box this is the system clang 11, not Lean's vendored 22). $CC emits __clang_major__.
+  instr_major=$(echo | $CC -dM -E - 2>/dev/null | sed -n 's/^#define __clang_major__ \([0-9][0-9]*\).*/\1/p')
+
   # Two runtime-dir layouts coexist: the legacy `.../lib/linux/libclang_rt.fuzzer_no_main-<arch>.a`
   # (clang <= 13, the Amazon Linux 2 box) and the per-target-triple
   # `.../lib/<triple>/libclang_rt.fuzzer_no_main.a` (clang >= 14, e.g. Amazon Linux 2023's
   # `/usr/lib/clang/22/lib/x86_64-amazon-linux-gnu/`). Search both under every prefix; the `-d`
-  # guard below skips the non-directory expansions.
+  # guard below skips the non-directory expansions. `matched` takes the first archive whose clang
+  # major equals the instrumenting one; `any_host` remembers the first host-arch archive of any
+  # version, used only as a last resort.
+  matched=""; any_host=""
   for d in ${FUZZER_LIB_SEARCH:-} \
            "$TC"/lib/clang/*/lib/linux "$TC"/lib/clang/*/lib/* \
            /usr/lib64/clang/*/lib/linux /usr/lib/clang/*/lib/linux \
            /usr/lib64/clang/*/lib/* /usr/lib/clang/*/lib/* \
            /usr/lib/llvm-*/lib/clang/*/lib/linux /usr/lib/llvm-*/lib/clang/*/lib/*; do
     [ -d "$d" ] || continue
-    for a in "$d"/libclang_rt.fuzzer_no_main*.a; do
+    # Only the *host-arch* archive: the unsuffixed name (per-triple dirs encode the arch in the dir)
+    # or the `-<arch>` legacy name. A bare `*.a` glob would also match the 32-bit `-i386` sibling
+    # that ships alongside on Debian/Ubuntu and pick it by enumeration order — a 32-bit runtime then
+    # fails to link into the 64-bit executable.
+    for a in "$d/libclang_rt.fuzzer_no_main.a" "$d/libclang_rt.fuzzer_no_main-$arch.a"; do
       [ -f "$a" ] || continue
-      found="$a"; break 2
+      [ -n "$any_host" ] || any_host="$a"
+      amaj=$(printf '%s' "$a" | sed -n 's#.*/clang/\([0-9][0-9]*\).*#\1#p')
+      if [ -n "$instr_major" ] && [ "$amaj" = "$instr_major" ]; then matched="$a"; break 2; fi
     done
   done
-  if [ -n "$found" ]; then
-    FUZZER_LIB_FLAGS="$found"
-  else
-    [ -f fuzz-run/vendor/libFuzzerNoMain.a ] || fuzz-run/get-libfuzzer.sh
+
+  if [ -n "$matched" ]; then
+    FUZZER_LIB_FLAGS="$matched"
+  elif [ -f fuzz-run/vendor/libFuzzerNoMain.a ] || FUZZ_LLVM_MAJOR="$instr_major" fuzz-run/get-libfuzzer.sh; then
+    # No version-matched system runtime — build one from source (get-libfuzzer.sh targets Lean's clang
+    # major, so the archive is matched and skew-free). Preferred over the mismatched `any_host`.
     FUZZER_LIB_FLAGS="$ROOT/fuzz-run/vendor/libFuzzerNoMain.a"
+  elif [ -n "$any_host" ]; then
+    echo "== WARNING: no libFuzzer runtime matches the instrumenting clang ${instr_major:-?} and none"
+    echo "==          could be built from source; falling back to $any_host. If chain-n coverage is"
+    echo "==          degraded, this skew is why — install a matching compiler-rt or set FUZZER_LIB_FLAGS. =="
+    FUZZER_LIB_FLAGS="$any_host"
+  else
+    echo "no libFuzzer runtime found and none could be built" >&2; exit 1
   fi
 fi
 
