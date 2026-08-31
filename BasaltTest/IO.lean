@@ -10,6 +10,7 @@ import BasaltExamples.ArbString
 import BasaltExamples.BST
 import BasaltExamples.BST.Weighted
 import BasaltExamples.Heap
+import BasaltExamples.RedBlackTree.SpecialSized
 
 /-! # Exercising `IO` Interpretations
 
@@ -103,3 +104,23 @@ def exerciseOptionT (n : Nat) (gen : OptionT IO α) : IO Unit := do
 
 /-- info: 10/10 some -/
 #guard_msgs in #eval exerciseOptionT 10 (BST.Tree.genBST 0 10 : OptionT IO (BST.Tree Int))
+
+/-! ## Generators whose branches must all be productive
+
+`genBlackUpTo` and `genSpecialUpTo` union a size-indexed generator over the index pairs a tree can
+have, and every branch of that union and of the recursion beneath it is guarded by the room it
+needs. Nothing proves those guards are tight — a guard that admits an empty branch still gives the
+right support, and the only symptom is a draw that silently fails — so the counts below are the
+fence. -/
+
+/-- info: 20/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (RedBlackTree.genBlackUpTo 10 0 10 : OptionT IO RedBlackTree.RBTree)
+
+/-- info: 20/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (RedBlackTree.genSpecialUpTo 5 10 0 10 : OptionT IO RedBlackTree.RBTree)
+
+/-- info: 20/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (RedBlackTree.genSpecialUpTo 0 20 0 20 : OptionT IO RedBlackTree.RBTree)
