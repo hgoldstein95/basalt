@@ -2,6 +2,7 @@ import Basalt
 import BasaltExamples.BST
 import BasaltExamples.BST.Weighted
 import BasaltExamples.AllTwoTree
+import BasaltExamples.SplayTree.Unsplay
 
 open RandomChoice
 
@@ -138,5 +139,106 @@ info: genDiverge — 50 draws (seed 0, fuel 100)
 -/
 #guard_msgs in
 #genstats (draws := 50) (fuel := 100) genDiverge
+
+
+/-! ## A filtering generator's acceptance rate
+
+`SplayTree.Tree.genSpecial` is the cookbook's one generate-and-test generator, and the argument for
+that choice (`BasaltExamples/SplayTree/Special.lean`, "Why this one filters") rests on rejection
+being cheap and getting *cheaper* as the node budget grows. The `none`/`some` splits below are that
+claim, pinned: going from the paper's medium splay bound to its large one nearly triples the
+acceptance rate, because deep trees come to dominate the search trees on `n` keys while `splayBound`
+grows only logarithmically. The third report is `Tree.genSpecialMixed`, whose acceptance rate is not
+merely measured but proved — `productive_at_rate ✓`. -/
+
+/--
+info: (SplayTree.Tree.genSpecial 6 0 6) — 500 draws (seed 0, fuel 10000)
+
+  outcomes    ok 500 (100.0%)
+  size        mean 1.0   p50 1   p95 1   max 1
+  choices     mean 9.9   p50 10   p95 19   max 19
+  distinct    77 / 500
+
+  head constructor
+    none    83.4%  (417)
+    some    16.6%   (83)
+
+  most common
+     83.4%  (417)  none
+      1.0%    (5)  some (SplayTree.Tree.node (SplayTree.Tree.leaf) 2 (SplayTree.Tree.node (SplayTree.Tree.le…
+      0.4%    (2)  some (SplayTree.Tree.node (SplayTree.Tree.leaf) 1 (SplayTree.Tree.node (SplayTree.Tree.no…
+      0.4%    (2)  some (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.leaf)…
+      0.4%    (2)  some (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.node …
+
+  samples
+    none
+    none
+    none
+
+  laws: sound_complete ✓  terminates ✓  productive ✓
+        cost_bounded        — (not proved)
+        filter_free         — (not proved)
+        productive_at_rate  — (not proved)
+-/
+#guard_msgs in
+#genstats (draws := 500) (SplayTree.Tree.genSpecial 6 0 6)
+
+/--
+info: (SplayTree.Tree.genSpecial 12 0 12) — 500 draws (seed 0, fuel 10000)
+
+  outcomes    ok 500 (100.0%)
+  size        mean 1.0   p50 1   p95 1   max 1
+  choices     mean 19.5   p50 19   p95 37   max 37
+  distinct    234 / 500
+
+  head constructor
+    none    53.4%  (267)
+    some    46.6%  (233)
+
+  most common
+     53.4%  (267)  none
+
+  samples
+    some (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.node …
+    some (SplayTree.Tree.node (SplayTree.Tree.leaf) 3 (SplayTree.Tree.node (SplayTree.Tree.no…
+    some (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.leaf) 1 (SplayTree.Tree.no…
+
+  laws: sound_complete ✓  terminates ✓  productive ✓
+        cost_bounded        — (not proved)
+        filter_free         — (not proved)
+        productive_at_rate  — (not proved)
+-/
+#guard_msgs in
+#genstats (draws := 500) (SplayTree.Tree.genSpecial 12 0 12)
+
+/--
+info: (SplayTree.Tree.genSpecialMixed 12 0 12 (by omega)) — 500 draws (seed 0, fuel 10000)
+
+  outcomes    ok 500 (100.0%)
+  size        mean 1.0   p50 1   p95 1   max 1
+  choices     mean 19.7   p50 19   p95 35   max 38
+  distinct    363 / 500
+
+  head constructor
+    some    73.0%  (365)
+    none    27.0%  (135)
+
+  most common
+     27.0%  (135)  none
+      0.4%    (2)  some (SplayTree.Tree.node (SplayTree.Tree.leaf) 1 (SplayTree.Tree.node (SplayTree.Tree.no…
+      0.4%    (2)  some (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.leaf) 0 (SplayTree.Tree.le…
+      0.4%    (2)  some (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.leaf) 0 (SplayTree.Tree.le…
+
+  samples
+    some (SplayTree.Tree.node (SplayTree.Tree.leaf) 6 (SplayTree.Tree.node (SplayTree.Tree.le…
+    some (SplayTree.Tree.node (SplayTree.Tree.leaf) 0 (SplayTree.Tree.node (SplayTree.Tree.no…
+    some (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.node (SplayTree.Tree.leaf)…
+
+  laws: sound_complete ✓  terminates ✓  productive ✓  productive_at_rate ✓
+        cost_bounded        — (not proved)
+        filter_free         — (not proved)
+-/
+#guard_msgs in
+#genstats (draws := 500) (SplayTree.Tree.genSpecialMixed 12 0 12 (by omega))
 
 end GenStatsExamples
