@@ -65,6 +65,15 @@ theorem expect_mono {p : SPMF α} {f g : α → ℝ≥0∞} (h : ∀ a, f a ≤ 
     expect p f ≤ expect p g :=
   ENNReal.tsum_le_tsum fun a => by gcongr; exact h a
 
+theorem expect_mono_support {p : SPMF α} {f g : α → ℝ≥0∞}
+    (h : ∀ a ∈ p.support, f a ≤ g a) : expect p f ≤ expect p g := by
+  unfold expect
+  refine ENNReal.tsum_le_tsum fun a => ?_
+  by_cases ha : a ∈ p.support
+  · exact mul_le_mul_right (h a ha) _
+  · rw [(apply_eq_zero_iff p a).mpr ha]
+    simp
+
 theorem expect_add (p : SPMF α) (f g : α → ℝ≥0∞) :
     expect p (fun a => f a + g a) = expect p f + expect p g := by
   unfold expect
@@ -86,6 +95,13 @@ theorem expect_congr_support {p : SPMF α} {f g : α → ℝ≥0∞}
   by_cases ha : a ∈ p.support
   · rw [h a ha]
   · rw [(apply_eq_zero_iff p a).mpr ha, zero_mul, zero_mul]
+
+theorem expect_le_of_support {p : SPMF α} {f : α → ℝ≥0∞} {c : ℝ≥0∞}
+    (h : ∀ a ∈ p.support, f a ≤ c) : expect p f ≤ c :=
+  calc expect p f ≤ expect p (fun _ => c) := expect_mono_support h
+    _ = p.mass * c := expect_const p c
+    _ ≤ 1 * c := mul_le_mul_left (mass_le_one p) c
+    _ = c := one_mul c
 
 /-- Expectation over a uniform `choose` is the average over the range. The summand is taken in
 `Nat` form `m` (with `hm` bridging) so callers avoid `choose`'s `ULift` subtype. -/
@@ -121,6 +137,35 @@ theorem expect_pick (x y : SPMF α) (f : α → ℝ≥0∞) :
   norm_num
   rw [ENNReal.add_div]
   congr 1 <;> rw [ENNReal.div_eq_inv_mul]
+
+private theorem tsum_sum_weighted_mul (gs : List (Nat × (Unit → SPMF α))) (f : α → ℝ≥0∞) :
+    ∑' a, (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum * f a
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * expect (p.2 ()) f).sum := by
+  induction gs with
+  | nil => simp
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.sum_cons]
+    simp_rw [add_mul]
+    rw [ENNReal.tsum_add, ih]
+    congr 1
+    unfold expect
+    rw [← ENNReal.tsum_mul_left]
+    congr 1; ext a; ring
+
+/-- The expectation over a weighted choice is the weighted average of the branch expectations. -/
+theorem expect_frequency {gs : List (Nat × (Unit → SPMF α))}
+    (h : 0 < (gs.map Prod.fst).sum) (f : α → ℝ≥0∞) :
+    expect (frequency gs h) f
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * expect (p.2 ()) f).sum
+          / (((gs.map Prod.fst).sum : ℕ) : ℝ≥0∞) := by
+  calc expect (frequency gs h) f
+      = ∑' a, (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum * f a
+          * ((((gs.map Prod.fst).sum : ℕ) : ℝ≥0∞))⁻¹ := by
+        refine tsum_congr fun a => ?_
+        rw [frequency_apply, div_eq_mul_inv, mul_right_comm]
+    _ = (∑' a, (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum * f a)
+          * ((((gs.map Prod.fst).sum : ℕ) : ℝ≥0∞))⁻¹ := ENNReal.tsum_mul_right
+    _ = _ := by rw [tsum_sum_weighted_mul, ← div_eq_mul_inv]
 
 end expect
 
@@ -161,6 +206,14 @@ theorem prob_pick (x y : SPMF α) (E : Set α) :
   unfold prob
   rw [expect_pick]
 
+theorem prob_frequency {gs : List (Nat × (Unit → SPMF α))}
+    (h : 0 < (gs.map Prod.fst).sum) (E : Set α) :
+    prob (frequency gs h) E
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * prob (p.2 ()) E).sum
+          / (((gs.map Prod.fst).sum : ℕ) : ℝ≥0∞) := by
+  unfold prob
+  exact expect_frequency h _
+
 theorem prob_le_mass (p : SPMF α) (E : Set α) : prob p E ≤ p.mass := by
   rw [← expect_one]
   refine expect_mono fun a => ?_
@@ -198,6 +251,13 @@ theorem mul_prob_le_expect (p : SPMF α) (f : α → ℝ≥0∞) (c : ℝ≥0∞
   by_cases h : c ≤ f a
   · simp [Set.indicator, h]
   · simp [Set.indicator, h]
+
+/-- Markov's inequality, division form. -/
+theorem prob_le_expect_div (p : SPMF α) (f : α → ℝ≥0∞) {c : ℝ≥0∞}
+    (hc0 : c ≠ 0) (hct : c ≠ ⊤) :
+    prob p {a | c ≤ f a} ≤ expect p f / c := by
+  rw [ENNReal.le_div_iff_mul_le (Or.inl hc0) (Or.inl hct), mul_comm]
+  exact mul_prob_le_expect p f c
 
 end prob
 
@@ -312,6 +372,46 @@ theorem admissible_expect_le (f : α → ℝ≥0∞) (B : ℝ≥0∞) :
 end admissibility
 
 section combinators
+
+/-- A fixed-length draw lands entirely in `E` with probability `prob g E ^ n`. -/
+theorem prob_vectorOf_all {g : SPMF α} (E : Set α) (n : Nat) :
+    prob (vectorOf n g) {xs | ∀ x ∈ xs, x ∈ E} = prob g E ^ n := by
+  classical
+  induction n with
+  | zero =>
+    rw [show vectorOf 0 g = (Pure.pure [] : SPMF (List α)) from rfl, prob_pure,
+      if_pos (by intro y hy; simp at hy), pow_zero]
+  | succ n ih =>
+    rw [vectorOf_succ, prob_bind]
+    have hpt : ∀ (x : α) (xs : List α),
+        prob (Pure.pure (x :: xs) : SPMF (List α)) {xs | ∀ y ∈ xs, y ∈ E}
+          = E.indicator 1 x * ({xs : List α | ∀ y ∈ xs, y ∈ E}).indicator 1 xs := by
+      intro x xs
+      rw [prob_pure]
+      by_cases hx : x ∈ E <;> by_cases hxs : ∀ y ∈ xs, y ∈ E <;>
+        simp [Set.indicator, hx, hxs]
+    calc expect g (fun x =>
+            prob (vectorOf n g >>= fun xs => Pure.pure (x :: xs)) {xs | ∀ y ∈ xs, y ∈ E})
+        = expect g (fun x => E.indicator 1 x * prob g E ^ n) := by
+          refine expect_congr_support fun x _ => ?_
+          rw [prob_bind]
+          calc expect (vectorOf n g)
+                (fun xs => prob (Pure.pure (x :: xs) : SPMF (List α)) {xs | ∀ y ∈ xs, y ∈ E})
+              = expect (vectorOf n g)
+                  (fun xs => E.indicator 1 x
+                    * ({xs : List α | ∀ y ∈ xs, y ∈ E}).indicator 1 xs) :=
+                expect_congr_support fun xs _ => hpt x xs
+            _ = E.indicator 1 x
+                  * expect (vectorOf n g) (({xs : List α | ∀ y ∈ xs, y ∈ E}).indicator 1) :=
+                expect_mul_left _ _ _
+            _ = E.indicator 1 x * prob g E ^ n := by
+                exact congrArg (E.indicator 1 x * ·) ih
+      _ = expect g (fun x => prob g E ^ n * E.indicator 1 x) := by
+          congr 1
+          funext x
+          ring
+      _ = prob g E ^ n * expect g (E.indicator 1) := expect_mul_left _ _ _
+      _ = prob g E ^ (n + 1) := (pow_succ _ _).symm
 
 /-- The length of a `listOf` draw is geometrically distributed. -/
 theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :

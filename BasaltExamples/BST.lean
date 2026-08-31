@@ -155,4 +155,53 @@ theorem Tree.genBST.cost_bounded :
         simp only [Tree.size]
         omega
 
+/-! ## Distribution -/
+
+section distribution
+open scoped ENNReal
+
+/-- Half of the trees generated on a nonempty interval are `leaf`. -/
+theorem Tree.genBST.prob_leaf {lo hi : Int} (h : lo ≤ hi) :
+    SPMF.prob (Tree.genBST lo hi) {Tree.leaf} = 1/2 := by
+  conv_lhs => rw [Tree.genBST]
+  rw [dif_neg (by omega), SPMF.prob_frequency]
+  have hleaf : SPMF.prob (Pure.pure Tree.leaf : SPMF (Tree Int)) {Tree.leaf} = 1 := by
+    rw [SPMF.prob_singleton]
+    simp
+  have hnode : SPMF.prob
+      ((chooseInt lo hi (by omega) >>= fun x =>
+        Tree.genBST lo (x - 1) >>= fun l =>
+        Tree.genBST (x + 1) hi >>= fun r =>
+        Pure.pure (Tree.node l x r)) : SPMF (Tree Int)) {Tree.leaf} = 0 := by
+    rw [SPMF.prob_eq_zero_iff]
+    intro t ht
+    support_simp at ht
+    obtain ⟨x, hx, l, hl, r, hr, rfl⟩ := ht
+    simp
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, Nat.cast_one, one_mul,
+    add_zero, hleaf, hnode]
+  rw [show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
+
+/-- Every key appears at most once, so a BST on `[lo, hi]` has at most `hi + 1 - lo` nodes. -/
+theorem Tree.size_le_of_isBST {lo hi : Int} {t : Tree Int} (h : Tree.isBST lo hi t) :
+    t.size ≤ (hi + 1 - lo).toNat := by
+  induction t generalizing lo hi with
+  | leaf => simp [Tree.size]
+  | node l x r ihl ihr =>
+    obtain ⟨h1, h2, hl, hr⟩ := h
+    have hL := ihl hl
+    have hR := ihr hr
+    simp only [Tree.size]
+    omega
+
+/-- The expected size is at most the number of available keys — the support law plus the
+deterministic size bound, no distributional reasoning about the recursion. -/
+theorem Tree.genBST.expect_size_le {lo hi : Int} :
+    SPMF.expect (Tree.genBST lo hi) (fun t => (t.size : ℝ≥0∞))
+      ≤ (((hi + 1 - lo).toNat : ℕ) : ℝ≥0∞) := by
+  refine SPMF.expect_le_of_support fun t ht => ?_
+  exact_mod_cast Tree.size_le_of_isBST ((Tree.genBST.sound_complete t).mp ht)
+
+end distribution
+
 end BST
