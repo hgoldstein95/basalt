@@ -16,7 +16,7 @@ generator definition:
 
 ```lean
 @[tunable]
-def genBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
+def genBST [Gen G] (lo hi : Int) : G (Tree Int) := do
   if h : lo > hi then return leaf
   else frequency [
     (1, fun _ => pure leaf),

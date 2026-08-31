@@ -168,6 +168,17 @@ theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n c : Nat} :
   · rintro ⟨⟨h1, h2⟩, rfl⟩
     exact ⟨⟨⟨n, h1, h2⟩⟩, rfl, rfl⟩
 
+@[simp]
+theorem mem_support_chooseInt_iff {lo hi : Int} {h : lo ≤ hi} {n : Int} {c : Nat} :
+    (n, c) ∈ (chooseInt lo hi h : SPMF.Cost Int).support ↔ (lo ≤ n ∧ n ≤ hi) ∧ c = 1 := by
+  unfold chooseInt
+  simp only [mem_support_bind_iff, mem_support_pure_iff, mem_support_chooseNat_iff]
+  constructor
+  · rintro ⟨k, n1, n2, ⟨⟨-, hk⟩, rfl⟩, ⟨rfl, rfl⟩, rfl⟩
+    exact ⟨by omega, rfl⟩
+  · rintro ⟨⟨h1, h2⟩, rfl⟩
+    exact ⟨(n - lo).toNat, 1, 0, ⟨⟨Nat.zero_le _, by omega⟩, rfl⟩, ⟨by omega, rfl⟩, rfl⟩
+
 theorem mem_support_frequency
     {gs : List (Nat × (Unit → SPMF.Cost α))}
     {hne : 0 < (List.map Prod.fst gs).sum}
@@ -215,6 +226,13 @@ theorem IsBounded_choose : IsBounded (choose lo hi h) (fun _ => 1) := by
   rw [IsBounded_iff]
   rintro ⟨n, c⟩ hmem
   simp only [mem_support_choose_iff] at hmem
+  omega
+
+theorem IsBounded_chooseInt {lo hi : Int} {h : lo ≤ hi} :
+    IsBounded (chooseInt lo hi h : SPMF.Cost Int) (fun _ => 1) := by
+  rw [IsBounded_iff]
+  rintro ⟨n, c⟩ hmem
+  simp only [mem_support_chooseInt_iff] at hmem
   omega
 
 /-- The `default` generator has empty support since it's just the constant function returning 0. -/

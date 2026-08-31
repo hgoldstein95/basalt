@@ -257,6 +257,17 @@ theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
     exact ⟨⟨⟨n, h1, h2⟩⟩, rfl⟩
 
 @[simp]
+theorem mem_support_chooseInt_iff {lo hi : Int} {h : lo ≤ hi} {n : Int} :
+    n ∈ (chooseInt lo hi h : SPMF Int).support ↔ lo ≤ n ∧ n ≤ hi := by
+  unfold chooseInt
+  simp only [mem_support_bind_iff, mem_support_pure_iff, mem_support_chooseNat_iff]
+  constructor
+  · rintro ⟨k, ⟨-, hk⟩, rfl⟩
+    omega
+  · rintro ⟨h1, h2⟩
+    exact ⟨(n - lo).toNat, ⟨Nat.zero_le _, by omega⟩, by omega⟩
+
+@[simp]
 theorem support_optionGen
     {g : SPMF α} :
     support (optionGen g) = {none} ∪ {some x | x ∈ g.support} := by

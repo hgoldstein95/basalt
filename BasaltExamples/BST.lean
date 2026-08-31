@@ -35,7 +35,7 @@ def Tree.size : Tree α → Nat
   | node l _ r => l.size + r.size + 1
 
 /-- The validity predicate: a binary search tree with every key in `[lo, hi]`. -/
-def Tree.isBST (lo hi : Nat) : Tree Nat → Prop
+def Tree.isBST (lo hi : Int) : Tree Int → Prop
   | leaf => true
   | node l x r =>
     lo ≤ x ∧ x ≤ hi ∧
@@ -44,14 +44,14 @@ def Tree.isBST (lo hi : Nat) : Tree Nat → Prop
 
 /-- Generates a BST with keys in `[lo, hi]`: return `leaf` when the interval is empty, else choose
 with equal weight between a leaf and a node built from a uniform pivot and two recursive subtrees. -/
-def Tree.genBST [Gen G] (lo hi : Nat) : G (Tree Nat) := do
+def Tree.genBST [Gen G] (lo hi : Int) : G (Tree Int) := do
   if h : lo > hi then
     return leaf
   else
     frequency [
       (1, fun () => pure leaf),
       (1, fun () => do
-        let x ← chooseNat lo hi (by omega)
+        let x ← chooseInt lo hi (by omega)
         let l ← Tree.genBST lo (x - 1)
         let r ← Tree.genBST (x + 1) hi
         return node l x r)
@@ -87,7 +87,7 @@ open scoped ENNReal
 
 theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) := by
   refine SPMF.IsPMF_of_critical_family
-    (fun p : Nat × Nat => (Tree.genBST p.1 p.2 : SPMF (Tree Nat)))
+    (fun p : Int × Int => (Tree.genBST p.1 p.2 : SPMF (Tree Int)))
     (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
     (fun c hle hge => ?_) ?_ (lo, hi)
   · rw [← ENNReal.toReal_eq_one_iff]
@@ -96,7 +96,7 @@ theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) :
     norm_num at hge hle
     nlinarith [sq_nonneg (c.toReal - 1)]
   · rintro ⟨lo, hi⟩
-    set b := ⨅ p : Nat × Nat, (Tree.genBST p.1 p.2 : SPMF (Tree Nat)).mass
+    set b := ⨅ p : Int × Int, (Tree.genBST p.1 p.2 : SPMF (Tree Int)).mass
     by_cases hgt : lo > hi
     · rw [Tree.genBST, dif_pos hgt, SPMF.mass_pure]
       have hb1 : b ≤ 1 := le_trans (SPMF.mass_ge_iInf _ (lo, hi)) (SPMF.mass_le_one _)
@@ -112,10 +112,10 @@ theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) :
       simp only [mul_one]
       gcongr
       rw [sq]
-      refine SPMF.mass_bind_ge_of_isPMF (SPMF.mass_chooseNat lo hi (by omega)) (fun x => ?_)
+      refine SPMF.mass_bind_ge_of_isPMF (SPMF.mass_chooseInt lo hi (by omega)) (fun x => ?_)
       refine SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo, x - 1)) (fun l => ?_)
       simpa [SPMF.mass_bind_pure] using
-        SPMF.mass_ge_iInf (fun p : Nat × Nat => (Tree.genBST p.1 p.2 : SPMF (Tree Nat))) (x + 1, hi)
+        SPMF.mass_ge_iInf (fun p : Int × Int => (Tree.genBST p.1 p.2 : SPMF (Tree Int))) (x + 1, hi)
 
 end termination
 
@@ -127,7 +127,7 @@ theorem Tree.genBST.cost_bounded :
     IsCostBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
   open Lean.Order in
   delta genBST
-  apply (fix_induct (motive := fun (g : Nat → Nat → SPMF.Cost (Tree Nat)) =>
+  apply (fix_induct (motive := fun (g : Int → Int → SPMF.Cost (Tree Int)) =>
     ∀ lo hi, IsBounded (g lo hi) (fun t => 3 * t.size + 1)) _ ?admissible ?step)
   case admissible =>
     exact admissible_pi_apply _ fun _ => admissible_pi_apply _ fun _ => admissible_IsBounded _
