@@ -38,8 +38,9 @@ info: BST.Tree.genBST 0 10 — 200 draws (seed 0, fuel 10000)
     BST.Tree.leaf
 
   laws: sound_complete ✓  terminates ✓  cost_bounded ✓
-        filter_free     — (not proved)
-        productive      — (not proved)
+        filter_free         — (not proved)
+        productive          — (not proved)
+        productive_at_rate  — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 200) BST.Tree.genBST 0 10
@@ -69,8 +70,9 @@ info: BST.Tree.genWeightedBST 0 10 — 200 draws (seed 0, fuel 10000)
     BST.Tree.leaf
 
   laws: sound_complete ✓  terminates ✓  cost_bounded ✓
-        filter_free     — (not proved)
-        productive      — (not proved)
+        filter_free         — (not proved)
+        productive          — (not proved)
+        productive_at_rate  — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 200) (size := BST.Tree.size) BST.Tree.genWeightedBST 0 10
@@ -87,8 +89,9 @@ info: AllTwoTree.genTree — 1000 draws (seed 0, fuel 10000)
     node    49.4%  (492)
 
   laws: sound_complete ✓  terminates ✓  cost_bounded ✓
-        filter_free     — (not proved)
-        productive      — (not proved)
+        filter_free         — (not proved)
+        productive          — (not proved)
+        productive_at_rate  — (not proved)
 -/
 #guard_msgs in
 #genstats AllTwoTree.genTree
@@ -112,10 +115,11 @@ info: AllTwoTree.genWeightedTree — 200 draws (seed 0, fuel 10000)
     node    34.5%   (69)
 
   laws: terminates ✓
-        sound_complete  — (not proved)
-        cost_bounded    — (not proved)
-        filter_free     — (not proved)
-        productive      — (not proved)
+        sound_complete      — (not proved)
+        cost_bounded        — (not proved)
+        filter_free         — (not proved)
+        productive          — (not proved)
+        productive_at_rate  — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 200) (size := fun t => 2 * t.size + 1) AllTwoTree.genWeightedTree

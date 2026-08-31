@@ -61,6 +61,35 @@ theorem IsProductive_of_mem_support {g : SPMF (Option α)} {a : α}
     (h : some a ∈ SPMF.support g) : IsProductive g :=
   IsProductive_of_apply_pos ((SPMF.apply_pos_iff g (some a)).mpr h)
 
+/-- We say that a partial generator `g` `IsProductiveAtRate r` if it succeeds with probability at
+least `r`. This is `IsProductive` with a witness: productivity alone makes rejection sampling
+*safe*, but only a rate makes it *affordable*, because the retry loop's expected draw count is
+`1 / massSome` (`SPMF.retry_attempts`) and a bound on that needs `massSome` bounded below. -/
+def IsProductiveAtRate (g : SPMF (Option α)) (r : ENNReal) : Prop :=
+  r ≤ SPMF.massSome g
+
+/-- A positive rate is a productivity proof. -/
+theorem IsProductive_of_IsProductiveAtRate {g : SPMF (Option α)} {r : ENNReal} (hr : 0 < r)
+    (h : IsProductiveAtRate g r) : IsProductive g :=
+  lt_of_lt_of_le hr h
+
+/-- **A rate bounds the cost of rejection sampling.** For an almost-surely-terminating draw that
+succeeds with probability at least `r`, the retry loop runs at most `1 / r` draws in expectation.
+This is the payoff of proving a rate rather than bare productivity. -/
+theorem IsProductiveAtRate.expectedAttempts_le {g : SPMF (Option α)} {r : ENNReal}
+    (hmass : g.mass = 1) (h : IsProductiveAtRate g r) :
+    SPMF.expectedAttempts g ≤ 1 / r := by
+  rw [SPMF.retry_attempts g hmass]
+  gcongr
+  exact h
+
+/-- Filter-freedom is the rate `1`. -/
+theorem IsProductiveAtRate_one_iff_IsFilterFree {g : SPMF (Option α)} :
+    IsProductiveAtRate g 1 ↔ IsFilterFree g := by
+  refine ⟨fun h => le_antisymm ?_ h, fun h => h.ge⟩
+  simpa [SPMF.massSome_eq_prob] using
+    (SPMF.prob_le_mass g {o | o.isSome = true}).trans g.mass_le_one
+
 /-- Filter-freedom is strictly stronger than productivity. -/
 theorem IsProductive_of_IsFilterFree {g : SPMF (Option α)} (h : IsFilterFree g) :
     IsProductive g := by

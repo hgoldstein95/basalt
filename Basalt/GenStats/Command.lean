@@ -159,7 +159,8 @@ private def lawSlots : Array (Name × Name) := #[
   (`terminates,     ``IsAlmostSurelyTerminating),
   (`cost_bounded,   ``IsCostBounded),
   (`filter_free,    ``IsFilterFree),
-  (`productive,     ``IsProductive)]
+  (`productive,     ``IsProductive),
+  (`productive_at_rate, ``IsProductiveAtRate)]
 
 /-- Does `declName.suffix` exist *and* actually state the law?
 
