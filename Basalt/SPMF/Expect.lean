@@ -138,6 +138,34 @@ theorem expect_pick (x y : SPMF α) (f : α → ℝ≥0∞) :
   rw [ENNReal.add_div]
   congr 1 <;> rw [ENNReal.div_eq_inv_mul]
 
+/-- Expectation through a uniform `chooseNat` pivot is the average of the per-pivot
+expectations. -/
+theorem expect_bind_chooseNat {lo hi : Nat} (h : lo ≤ hi)
+    {g : Nat → SPMF α} (f : α → ℝ≥0∞) :
+    expect (chooseNat lo hi h >>= g) f
+      = (∑ x ∈ Finset.Icc lo hi, expect (g x) f) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
+  unfold chooseNat
+  rw [bind_map_left, expect_bind]
+  exact expect_choose h _ (fun x => expect (g x) f) (fun a => rfl)
+
+/-- `chooseInt` form of `expect_bind_chooseNat`. -/
+theorem expect_bind_chooseInt {lo hi : Int} (h : lo ≤ hi)
+    {g : Int → SPMF α} (f : α → ℝ≥0∞) :
+    expect (chooseInt lo hi h >>= g) f
+      = (∑ x ∈ Finset.Icc lo hi, expect (g x) f) / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞) := by
+  have hreindex : ∑ k ∈ Finset.Icc 0 (hi - lo).toNat, expect (g (lo + (k : Int))) f
+      = ∑ x ∈ Finset.Icc lo hi, expect (g x) f := by
+    refine Finset.sum_nbij' (fun k => lo + (k : Int)) (fun x => (x - lo).toNat)
+      (fun k hk => ?_) (fun x hx => ?_) (fun k hk => ?_) (fun x hx => ?_) (fun k hk => rfl)
+    · simp only [Finset.mem_Icc] at hk ⊢; omega
+    · simp only [Finset.mem_Icc] at hx ⊢; omega
+    · simp only [Finset.mem_Icc] at hk; omega
+    · simp only [Finset.mem_Icc] at hx; omega
+  have hcard : ((hi - lo).toNat - 0 + 1 : ℕ) = ((hi - lo + 1).toNat : ℕ) := by omega
+  unfold chooseInt
+  simp only [LawfulMonad.bind_assoc, LawfulMonad.pure_bind]
+  rw [expect_bind_chooseNat (Nat.zero_le _) f, hreindex, hcard]
+
 private theorem tsum_sum_weighted_mul (gs : List (Nat × (Unit → SPMF α))) (f : α → ℝ≥0∞) :
     ∑' a, (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum * f a
       = (gs.map fun p => (p.1 : ℝ≥0∞) * expect (p.2 ()) f).sum := by
