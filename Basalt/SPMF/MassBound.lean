@@ -173,6 +173,16 @@ theorem le_mass_frequency {gs : List (Nat × (Unit → SPMF α))}
   rw [mass_frequency hw, h.weights]
   exact ENNReal.div_le_div_right h.sum_le _
 
+@[gen_rule]
+theorem le_mass_stopOrGo {n : Nat} {x y : Unit → SPMF α} {c d : ℝ≥0∞}
+    (hx : c ≤ (x ()).mass) (hy : d ≤ (y ()).mass) :
+    (c + ((n + 1 : ℕ) : ℝ≥0∞) * d) / ((1 + (n + 1) : ℕ) : ℝ≥0∞)
+      ≤ (stopOrGo n x y : SPMF α).mass := by
+  have h := le_mass_frequency (gs := [(1, x), (n + 1, y)])
+    (hw := by simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]; omega)
+    (.cons hx (.cons hy .nil))
+  simpa [stopOrGo] using h
+
 end SPMF
 
 namespace Basalt.MassBound

@@ -197,6 +197,12 @@ theorem always_frequency {gs : List (Nat × (Unit → SPMF.Cost α))} {hw : 0 < 
     exact h.always (w, g) hg
   · exact fun _ hp => absurd rfl hp
 
+@[gen_rule]
+theorem always_stopOrGo {n : Nat} {x y : Unit → SPMF.Cost α} {Q : α → Nat → Prop}
+    (hx : Always (x ()) (fun a m => Q a (1 + m))) (hy : Always (y ()) (fun a m => Q a (1 + m))) :
+    Always (stopOrGo n x y : SPMF.Cost α) Q :=
+  always_frequency (.cons hx (.cons hy .nil))
+
 end SPMF.Cost
 
 namespace Basalt.CostBound
@@ -447,6 +453,12 @@ theorem isBounded_frequency {gs : List (Nat × (Unit → SPMF.Cost α))}
     {hw : 0 < (gs.map Prod.fst).sum} {k : Nat} (h : WeightedMaxBound k gs) :
     IsBounded (frequency gs hw : SPMF.Cost α) fun _ => 1 + k :=
   isBounded_iff_always.mpr (always_frequency (h.allWeighted fun _ _ _ => by omega))
+
+@[gen_rule]
+theorem isBounded_stopOrGo {n : Nat} {x y : Unit → SPMF.Cost α} {k₁ k₂ : Nat}
+    (hx : IsBounded (x ()) fun _ => k₁) (hy : IsBounded (y ()) fun _ => k₂) :
+    IsBounded (stopOrGo n x y : SPMF.Cost α) fun _ => 1 + max k₁ k₂ := by
+  cost_bound <;> omega
 
 @[gen_rule]
 theorem isBounded_vectorOf {n : Nat} {g : SPMF.Cost α} {k : Nat} (hg : IsBounded g fun _ => k) :

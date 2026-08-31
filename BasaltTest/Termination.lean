@@ -114,6 +114,13 @@ example : SPMF.IsPMF (frequency [(1, fun _ => Pure.pure 0), (1, fun _ => Pure.pu
     (by simp) : SPMF Nat) := by
   mass_fixpoint using SPMF.LfpIsOne.one
 
+/-- A budget-weighted stop leaves a bound whose weights cancel. -/
+def stopAfter [Gen G] (n : Nat) : G Nat := stopOrGo n (fun _ => pure 0) (fun _ => pure 1)
+
+example (n : Nat) : IsAlmostSurelyTerminating (stopAfter n) := by
+  mass_fixpoint using SPMF.LfpIsOne.one
+  simp [ENNReal.div_self]
+
 /-- Matching on an argument makes it no seed when nothing recurses, so an argument whose type
 depends on it is harmless. -/
 def byCases [Gen G] (n : Nat) (_h : 0 < n) : G Nat :=
