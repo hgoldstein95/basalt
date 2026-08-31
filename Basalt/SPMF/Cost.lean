@@ -228,6 +228,13 @@ theorem IsBounded_choose : IsBounded (choose lo hi h) (fun _ => 1) := by
   simp only [mem_support_choose_iff] at hmem
   omega
 
+theorem IsBounded_chooseNat {lo hi : Nat} {h : lo ≤ hi} :
+    IsBounded (chooseNat lo hi h : SPMF.Cost Nat) (fun _ => 1) := by
+  rw [IsBounded_iff]
+  rintro ⟨n, c⟩ hmem
+  simp only [mem_support_chooseNat_iff] at hmem
+  omega
+
 theorem IsBounded_chooseInt {lo hi : Int} {h : lo ≤ hi} :
     IsBounded (chooseInt lo hi h : SPMF.Cost Int) (fun _ => 1) := by
   rw [IsBounded_iff]
@@ -462,6 +469,23 @@ theorem IsBounded_oneOf
     dsimp
     specialize hcost_le i (hidx ⟨i, hge, hle⟩) g
     omega
+
+/-- The common case of `IsBounded_oneOf`: every branch shares one bound, so the `oneOf` costs that
+bound plus the single choice of a branch. -/
+theorem IsBounded_oneOf_const
+    {gs : List (Unit → SPMF.Cost α)}
+    {c : α → Nat}
+    (hne : gs ≠ [])
+    (hcost : ∀ g ∈ gs, IsBounded (g ()) c) :
+    IsBounded (oneOf gs hne) (fun a => 1 + c a) := by
+  refine IsBounded_mono (IsBounded_oneOf hne fun g hg => ⟨c, hcost g hg⟩) fun a => ?_
+  have hfold : ∀ l : List {g // g ∈ gs},
+      List.foldr (fun _ acc => max (c a) acc) 0 l ≤ c a := by
+    intro l
+    induction l with
+    | nil => exact Nat.zero_le _
+    | cons _ _ ih => exact Nat.max_le.mpr ⟨Nat.le_refl _, ih⟩
+  exact Nat.add_le_add_left (hfold gs.attach) 1
 
 /-- `frequency`'s cost function is upper-bounded by 1 + the max-valued cost function out of all the
 sub-generators -/
