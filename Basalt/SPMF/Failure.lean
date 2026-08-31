@@ -71,6 +71,23 @@ theorem massSome_eq_prob (p : SPMF (Option α)) :
   rw [tsum_option (fun o => p o * ({o : Option α | o.isSome = true}).indicator 1 o)]
   simp [massSome, Set.indicator]
 
+/-- A generator that never fails accepts everything it terminates on. -/
+theorem massSome_map_some (g : SPMF α) :
+    massSome ((fun a => some a) <$> g) = g.mass := by
+  rw [massSome_eq_prob, prob, expect_map]
+  rw [show ({o : Option α | o.isSome = true}.indicator 1 ∘ fun a => some a) = fun _ => (1 : ℝ≥0∞) by
+    funext a; simp [Set.indicator]]
+  exact expect_one g
+
+/-- **The acceptance rate of a uniform binary choice is the average of the two rates.** This is what
+lets a filtering generator borrow a rate from a branch that cannot fail: mixing a complete-but-
+filtering draw with a sound-but-partial constructive one keeps the support of the first and inherits
+half the acceptance of the second. -/
+theorem massSome_pick (x y : SPMF (Option α)) :
+    massSome (RandomChoice.pick (fun () => x) (fun () => y))
+      = (1/2 : ℝ≥0∞) * massSome x + (1/2 : ℝ≥0∞) * massSome y := by
+  rw [massSome_eq_prob, massSome_eq_prob, massSome_eq_prob, prob_pick]
+
 /-- The acceptance rate of a biased filter: `biasedOptionGen r g` succeeds with probability
 `r · mass g`. Feeds `retry_attempts` to bound the cost of rejection sampling. -/
 theorem massSome_biasedOptionGen {r : Rat} {g : SPMF α} (h0 : 0 ≤ r) (h1 : r ≤ 1) :

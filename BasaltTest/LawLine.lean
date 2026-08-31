@@ -97,10 +97,11 @@ info: genCoin — 5 draws (seed 0, fuel 10000)
     true
 
   laws: sound_complete ✓
-        terminates      — (not proved; measured 0/5 divergences)
-        cost_bounded    — (not proved)
-        filter_free     — (not proved)
-        productive      — (not proved)
+        terminates          — (not proved; measured 0/5 divergences)
+        cost_bounded        — (not proved)
+        filter_free         — (not proved)
+        productive          — (not proved)
+        productive_at_rate  — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 5) genCoin
@@ -138,10 +139,11 @@ info: genMaybe — 5 draws (seed 0, fuel 10000)
     none
 
   laws: productive ✓
-        sound_complete  — (not proved)
-        terminates      — (not proved; measured 0/5 divergences)
-        cost_bounded    — (not proved)
-        filter_free     — (not proved)
+        sound_complete      — (not proved)
+        terminates          — (not proved; measured 0/5 divergences)
+        cost_bounded        — (not proved)
+        filter_free         — (not proved)
+        productive_at_rate  — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 5) genMaybe
@@ -160,6 +162,10 @@ theorem genSurely.filter_free : IsFilterFree (genSurely (G := SPMF)) := by
 
 theorem genSurely.productive : IsProductive (genSurely (G := SPMF)) :=
   IsProductive_of_IsFilterFree genSurely.filter_free
+
+/-- The rate slot, at its top value: a filter-free generator succeeds with probability `1`. -/
+theorem genSurely.productive_at_rate : IsProductiveAtRate (genSurely (G := SPMF)) 1 :=
+  IsProductiveAtRate_one_iff_IsFilterFree.mpr genSurely.filter_free
 
 /--
 info: genSurely — 5 draws (seed 0, fuel 10000)
@@ -181,10 +187,10 @@ info: genSurely — 5 draws (seed 0, fuel 10000)
     some 0
     some 0
 
-  laws: filter_free ✓  productive ✓
-        sound_complete  — (not proved)
-        terminates      — (not proved; measured 0/5 divergences)
-        cost_bounded    — (not proved)
+  laws: filter_free ✓  productive ✓  productive_at_rate ✓
+        sound_complete      — (not proved)
+        terminates          — (not proved; measured 0/5 divergences)
+        cost_bounded        — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 5) genSurely

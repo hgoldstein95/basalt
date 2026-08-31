@@ -37,7 +37,9 @@ depends on the generator, and you prove the ones that do:
 - `IsSoundAndComplete g P` — the support of `g` is exactly `P` (nothing invalid, nothing missed).
 - `IsAlmostSurelyTerminating g` — `g` terminates with probability 1.
 - `IsCostBounded g c` — producing `v` takes at most `c v` random choices.
-- `IsFilterFree g` / `IsProductive g` — for filtering (`Option`-valued) generators.
+- `IsFilterFree g` / `IsProductive g` / `IsProductiveAtRate g r` — for filtering (`Option`-valued)
+  generators: never fails / succeeds with positive probability / succeeds with probability at least
+  `r`, which bounds the retry loop's expected draw count by `1 / r`.
 
 `BasaltExamples/` is a cookbook of worked generators, each carrying proofs of the properties that
 apply to it. `WORKFLOW.md` walks through writing a generator and proving it correct, with a recipe
