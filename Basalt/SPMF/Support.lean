@@ -687,7 +687,7 @@ theorem bind_congr_support
   · simp only [support, Function.notMem_support] at hsupport
     simp_all [DFunLike.coe]
 
-private theorem csup_apply {c : SPMF α → Prop} (hc : chain c) (a : α) :
+theorem csup_apply {c : SPMF α → Prop} (hc : chain c) (a : α) :
     (CCPO.csup hc) a = ⨆ f, ⨆ (_ : c f), f a := by
   have hge : ∀ b, ⨆ f, ⨆ (_ : c f), f b ≤ (CCPO.csup hc) b :=
     fun b => iSup₂_le (fun f hf => le_csup hc hf b)

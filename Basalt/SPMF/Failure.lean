@@ -64,6 +64,38 @@ theorem mass_split (p : SPMF (Option α)) :
   rw [SPMF.tsum_option]
   rw [add_comm]
 
+/-- `massSome` is the probability of the success event. -/
+theorem massSome_eq_prob (p : SPMF (Option α)) :
+    massSome p = prob p {o | o.isSome = true} := by
+  unfold prob expect
+  rw [tsum_option (fun o => p o * ({o : Option α | o.isSome = true}).indicator 1 o)]
+  simp [massSome, Set.indicator]
+
+/-- The acceptance rate of a biased filter: `biasedOptionGen r g` succeeds with probability
+`r · mass g`. Feeds `retry_attempts` to bound the cost of rejection sampling. -/
+theorem massSome_biasedOptionGen {r : Rat} {g : SPMF α} (h0 : 0 ≤ r) (h1 : r ≤ 1) :
+    massSome (biasedOptionGen r g)
+      = (r.num.toNat : ℝ≥0∞) / (r.den : ℝ≥0∞) * g.mass := by
+  rw [massSome_eq_prob]
+  unfold biasedOptionGen
+  rw [prob_bind, expect_coin h0 h1]
+  have htrue : prob ((g >>= fun x => Pure.pure (some x)) : SPMF (Option α))
+      {o | o.isSome = true} = g.mass := by
+    rw [prob_bind]
+    calc expect g (fun x => prob (Pure.pure (some x) : SPMF (Option α)) {o | o.isSome = true})
+        = expect g (fun _ => 1) := expect_congr_support fun x _ => by rw [prob_pure]; simp
+      _ = g.mass := expect_one g
+  have hfalse : prob (Pure.pure none : SPMF (Option α)) {o | o.isSome = true} = 0 := by
+    rw [prob_pure]
+    simp
+  rw [if_pos (by trivial), if_neg (by simp), htrue, hfalse, mul_zero, add_zero]
+
+theorem massSome_optionGen {g : SPMF α} : massSome (optionGen g) = g.mass / 2 := by
+  unfold optionGen
+  rw [massSome_biasedOptionGen (by norm_num) (by norm_num)]
+  rw [one_div, Rat.inv_ofNat_num, Rat.inv_ofNat_den, Int.toNat_one, Nat.cast_one,
+    Nat.cast_ofNat, one_div, ENNReal.div_eq_inv_mul]
+
 /-!
 ## Retry
 

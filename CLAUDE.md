@@ -34,6 +34,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   the `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactics.lean](Basalt/Tactics.lean).
 - **Termination theory** (seed regimes, ranking functions, expected size) —
   [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean); the practical entry is WORKFLOW.md's Recipe 2.
+- **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
+  [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean).
 - **Cost** (`SPMF.Cost`, `IsBounded` and its algebra) — [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean).
 - **ENNReal arithmetic** — `ennreal_to_real` in [Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean).
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
