@@ -709,6 +709,50 @@ theorem mem_support_csup {c : SPMF α → Prop} (hc : chain c) {a : α} :
   · rintro ⟨f, hcf, haf⟩ h
     simp_all
 
+/-- **A two-branch `frequency` with positive weights reaches exactly what the matching `pick`
+does.** This is the shape a generator has when its weights are chosen to shape a *distribution* —
+a stop/continue choice tuned so the length comes out uniform, say — and the point of the lemma is
+that such a choice cannot narrow the support: `support_simp` reduces the reweighted generator to
+the same disjunction the uniform one gives, so the completeness proof does not notice the
+weights. -/
+theorem support_frequency_pair {x y : SPMF α} {v w : Nat} (hv : 0 < v) (hw : 0 < w)
+    (h_pos : 0 < List.sum (List.map Prod.fst [(v, fun _ : Unit => x), (w, fun _ : Unit => y)])) :
+    support (frequency [(v, fun _ : Unit => x), (w, fun _ : Unit => y)] h_pos)
+      = x.support ∪ y.support := by
+  rw [support_frequency]
+  ext a
+  simp only [Set.mem_ofPred_eq, List.mem_cons, List.not_mem_nil, or_false, Prod.mk.injEq,
+    Set.mem_union]
+  constructor
+  · rintro ⟨w', g, (⟨rfl, rfl⟩ | ⟨rfl, rfl⟩), -, ha⟩
+    · exact Or.inl ha
+    · exact Or.inr ha
+  · rintro (ha | ha)
+    · exact ⟨v, _, Or.inl ⟨rfl, rfl⟩, hv, ha⟩
+    · exact ⟨w, _, Or.inr ⟨rfl, rfl⟩, hw, ha⟩
+
+/-- Membership form of `support_frequency_pair`. -/
+theorem mem_support_frequency_pair_iff {x y : SPMF α} {v w : Nat} (hv : 0 < v) (hw : 0 < w)
+    (h_pos : 0 < List.sum (List.map Prod.fst [(v, fun _ : Unit => x), (w, fun _ : Unit => y)])) :
+    a ∈ (frequency [(v, fun _ : Unit => x), (w, fun _ : Unit => y)] h_pos).support
+      ↔ a ∈ x.support ∨ a ∈ y.support := by
+  simp [support_frequency_pair hv hw]
+
+/-- **Weighting a stop-or-continue choice cannot narrow its support.** `_root_.stopOrGo`
+reaches exactly what the uniform `pick` over the same two branches reaches, which is what lets a
+generator shape its length distribution without touching its completeness proof. -/
+@[simp]
+theorem support_stopOrGo {x y : SPMF α} {n : Nat} :
+    (_root_.stopOrGo n (fun _ => x) (fun _ => y)).support = x.support ∪ y.support := by
+  rw [_root_.stopOrGo, support_frequency_pair Nat.one_pos n.succ_pos]
+
+/-- Membership form of `support_stopOrGo`. -/
+@[simp]
+theorem mem_support_stopOrGo_iff {x y : SPMF α} {n : Nat} :
+    a ∈ (_root_.stopOrGo n (fun _ => x) (fun _ => y)).support
+      ↔ a ∈ x.support ∨ a ∈ y.support := by
+  simp
+
 /-- Reweighting a uniform choice preserves its support. Replacing `oneOf gs` by a `frequency`
 over the same branches leaves the set of reachable values unchanged, provided every weight is
 positive. -/

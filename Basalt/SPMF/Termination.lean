@@ -407,6 +407,17 @@ theorem IsPMF_frequency {gs : List (Nat × (Unit → SPMF α))}
   rw [mass_frequency h, sum_weights_of_IsPMF hgs]
   exact ENNReal.div_self (Nat.cast_ne_zero.mpr h.ne') (ENNReal.natCast_ne_top _)
 
+/-- A weighted stop-or-continue choice terminates when both branches do. -/
+theorem IsPMF_stopOrGo {x y : SPMF α} {n : Nat} (hx : IsPMF x) (hy : IsPMF y) :
+    IsPMF (_root_.stopOrGo n (fun _ => x) (fun _ => y)) := by
+  rw [_root_.stopOrGo]
+  refine IsPMF_frequency _ ?_
+  rintro ⟨w, g⟩ hmem -
+  simp only [List.mem_cons, List.not_mem_nil, or_false, Prod.mk.injEq] at hmem
+  rcases hmem with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+  · exact hx
+  · exact hy
+
 theorem IsPMF_vectorOf {g : SPMF α} (hg : IsPMF g) :
     IsPMF (vectorOf n g) := by
   induction n with
