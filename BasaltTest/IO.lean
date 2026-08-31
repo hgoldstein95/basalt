@@ -10,6 +10,7 @@ import BasaltExamples.ArbString
 import BasaltExamples.BST
 import BasaltExamples.BST.Weighted
 import BasaltExamples.Heap
+import BasaltExamples.BTree.SpecialSized
 import BasaltExamples.RedBlackTree.SpecialSized
 
 /-! # Exercising `IO` Interpretations
@@ -107,11 +108,16 @@ def exerciseOptionT (n : Nat) (gen : OptionT IO α) : IO Unit := do
 
 /-! ## Generators whose branches must all be productive
 
-`genBlackUpTo` and `genSpecialUpTo` union a size-indexed generator over the index pairs a tree can
-have, and every branch of that union and of the recursion beneath it is guarded by the room it
-needs. Nothing proves those guards are tight — a guard that admits an empty branch still gives the
-right support, and the only symptom is a draw that silently fails — so the counts below are the
-fence. -/
+`genBlackUpTo`, `genSpecialUpTo`, `genBTreeUpTo` and `genSplittingUpTo` union a size-indexed
+generator over the index pairs a tree can have, and every branch of that union and of the recursion
+beneath it is guarded by the room it needs. A guard that admits an empty branch still gives the
+right support — `sound_complete` cannot see it — and the only symptom is a draw that silently
+fails, so the counts below are the fence.
+
+For the red-black generators no counterexample is known: a sweep of every admitted index pair for
+`N ≤ 15` over every interval `[0, hi]` with `hi ≤ 15` failed no draw. For the B-tree generators the
+guards are *known* not to be tight, and the failing index pairs are pinned in
+"An admitted index pair that generates nothing" below. -/
 
 /-- info: 20/20 some -/
 #guard_msgs in
@@ -124,3 +130,55 @@ fence. -/
 /-- info: 20/20 some -/
 #guard_msgs in
 #eval exerciseOptionT 20 (RedBlackTree.genSpecialUpTo 0 20 0 20 : OptionT IO RedBlackTree.RBTree)
+
+/-- info: 20/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (BTree.genBTreeUpTo 2 2 0 2 : OptionT IO BTree.Tree)
+
+/-- info: 20/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (BTree.genBTreeUpTo 2 4 0 4 : OptionT IO BTree.Tree)
+
+/-- info: 20/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (BTree.genBTreeUpTo 2 10 0 20 : OptionT IO BTree.Tree)
+
+/-- info: 20/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (BTree.genSplittingUpTo 2 4 0 0 4 : OptionT IO BTree.Tree)
+
+/-- info: 20/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (BTree.genSplittingUpTo 2 10 0 0 20 : OptionT IO BTree.Tree)
+
+/-- info: 20/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (BTree.genSplittingUpTo 3 20 0 0 20 : OptionT IO BTree.Tree)
+
+/-! ## An admitted index pair that generates nothing
+
+These three calls are the located form of the B-tree guard gap documented on `BTree.sizeIndices`:
+each `(height, node count)` pair is admitted by the guard and each generates nothing at all, so
+every draw fails. `0/20` here is not a flaky count — the branch is empty, so the failure is
+deterministic, and any of these turning into a nonzero count means the guard was tightened and this
+fence should move. -/
+
+/-- info: 0/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (BTree.genBTreeSized 2 3 20 0 20 : OptionT IO BTree.Tree)
+
+/-- info: 0/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (BTree.genSplittingSized 2 3 17 0 0 20 : OptionT IO BTree.Tree)
+
+/-- info: 0/20 some -/
+#guard_msgs in
+#eval exerciseOptionT 20 (BTree.genSplittingSized 2 3 18 0 0 20 : OptionT IO BTree.Tree)
+
+/-- The pairs above really are admitted by the guards — that is what makes them a gap rather than a
+correctly refused draw. -/
+example : (3, 20) ∈ BTree.sizeIndices 2 20 0 20 := by decide
+
+example : (3, 17) ∈ BTree.xSizeIndices 2 20 0 20 := by decide
+
+example : (3, 18) ∈ BTree.xSizeIndices 2 20 0 20 := by decide
