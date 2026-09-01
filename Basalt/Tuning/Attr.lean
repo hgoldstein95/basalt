@@ -31,7 +31,10 @@ the attribute emits:
 - `genBST.defaults : Tuning` — the inline literal weights;
 - `genBST.sites : Array Site` — the site metadata (offsets, arities, holes);
 - `theorem genBST.tuned_defaults : genBST.tuned genBST.defaults … = genBST …` — proved by `Eq.refl`,
-  checked by the kernel, so adopting tuning changes no existing proof.
+  checked by the kernel, so adopting tuning changes no existing proof;
+- `theorem genBST.tuned.eq_def : genBST.tuned θ … = <body, recursing through genBST.tuned θ>` —
+  the unfold equation, for a `partial_fixpoint` body only (the other recursion forms leave
+  `genBST.tuned` with no equations, as an `addDecl`'d definition otherwise has).
 
 ## Conventions
 
@@ -304,7 +307,34 @@ private def tuneUnsafeRec (declName tunedName : Name) (depthName? : Option Name)
        safety := match uci with | .defnInfo di => di.safety | _ => .unsafe }]
   return true
 
-/-- The whole emission: `<def>.tuned`, `.defaults`, `.sites`, `.tuned_defaults`. -/
+/-- `<def>.tuned.eq_def`: the unfold equation, for a tuned body that is a `Lean.Order.fix`.
+
+The other recursion forms are left alone: their untuned unfold equations are the structural and
+well-founded modules' own constructions, not one lemma. -/
+private def mkTunedUnfoldEq (tunedName : Name) : MetaM Unit := do
+  let some ci := (← getEnv).find? tunedName | return
+  let some value := ci.value? | return
+  lambdaTelescope value fun ys body => do
+    unless body.isAppOfArity ``Lean.Order.fix 4 do return
+    let args := body.getAppArgs
+    let f := args[2]!
+    -- `f`'s binders are `fun rec x … => …`, so they carry the source's own argument names.
+    let arity := f.getNumHeadLambdas
+    if arity == 0 then return
+    lambdaBoundedTelescope f arity fun fs inner => do
+      let lvlArgs := ci.levelParams.map mkLevelParam
+      let self := mkAppN (mkConst tunedName lvlArgs) ys
+      let zs := fs.extract 1 fs.size
+      let type ← mkForallFVars (ys ++ zs) (← mkEq (mkAppN self zs) (inner.replaceFVar fs[0]! self))
+      let mut prf := mkAppN (mkConst ``Lean.Order.fix_eq body.getAppFn.constLevels!)
+        #[args[0]!, args[1]!, f, args[3]!]
+      for z in zs do
+        prf ← mkCongrFun prf z
+      addDecl <| .thmDecl
+        { name := mkEqLikeNameFor (← getEnv) tunedName unfoldThmSuffix
+          levelParams := ci.levelParams, type, value := ← mkLambdaFVars (ys ++ zs) prf }
+
+/-- The whole emission: `<def>.tuned`, `.defaults`, `.sites`, `.tuned_defaults`, `.tuned.eq_def`. -/
 def tuneDecl (declName : Name) (depthName? : Option Name) : MetaM Unit := do
   let some ci := (← getEnv).find? declName
     | throwError "tunable: unknown declaration `{declName}`"
@@ -354,6 +384,7 @@ def tuneDecl (declName : Name) (depthName? : Option Name) : MetaM Unit := do
     return (← mkForallFVars targs (← mkEq lhs rhs), ← mkLambdaFVars targs (← mkEqRefl rhs))
   addDecl <| .thmDecl
     { name := declName ++ `tuned_defaults, levelParams := lvls, type := thmType, value := thmVal }
+  mkTunedUnfoldEq tunedName
   -- keep `.tuned` as unfoldable as the original, so `simp`/`rw` behave the same on both
   if (← getReducibilityStatus declName) matches .irreducible then
     setIrreducibleAttribute tunedName

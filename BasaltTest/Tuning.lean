@@ -342,6 +342,38 @@ def genNoLvl [Gen G] : G Nat :=
     (1, fun _ => pure 1)
   ] (by simp)
 
+/-! ## 8. The unfold equation
+
+A `partial_fixpoint` body's tuned form gets `eq_def`, with the recursion re-tied through
+`.tuned θ` rather than left as `Lean.Order.fix`. That is what `rw` and any consumer reading
+bodies through `getUnfoldEqnFor?` see. -/
+
+/--
+info: @genTree.tuned.eq_def : ∀ {G : Type → Type u_1} [inst : Gen G] (θ : Tuning) (depth : ℕ),
+  genTree.tuned θ depth =
+    frequency
+      [(θ.weight 0 depth, fun x => pure Tree.leaf),
+        (θ.weight 1 depth, fun x => do
+          let l ← genTree.tuned θ (depth + 1)
+          let r ← genTree.tuned θ (depth + 1)
+          pure (l.node 0 r))]
+      ⋯
+-/
+#guard_msgs in
+#check @genTree.tuned.eq_def
+
+/-- The equation unfolds the tuned generator the way `genTree`'s own does the untuned one. -/
+example [Gen G] (θ : Tuning) (depth : Nat) :
+    (genTree.tuned θ depth : G (BST.Tree Nat)) =
+      frequency [
+        (θ.weight 0 depth, fun _ => pure .leaf),
+        (θ.weight 1 depth, fun _ => do
+          let l ← genTree.tuned θ (depth + 1)
+          let r ← genTree.tuned θ (depth + 1)
+          return .node l 0 r)
+      ] (Tuning.sum_map_fst_pos θ 0 depth _ _) := by
+  rw [genTree.tuned.eq_def]
+
 end TunableExamples
 
 section ReweightObligation
