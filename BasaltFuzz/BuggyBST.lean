@@ -24,19 +24,19 @@ namespace BasaltFuzz.BuggyBST
 
 open Basalt.PBT RandomChoice
 
-/-- A binary tree with `Nat` keys. -/
+/-- A binary tree with `Int` keys. -/
 inductive Tree where
   | leaf
-  | node (l : Tree) (x : Nat) (r : Tree)
+  | node (l : Tree) (x : Int) (r : Tree)
 deriving Repr, Inhabited
 
 /-- In-order traversal. A tree is a valid BST with distinct keys iff this is strictly increasing. -/
-def Tree.toList : Tree → List Nat
+def Tree.toList : Tree → List Int
   | leaf => []
   | node l x r => l.toList ++ x :: r.toList
 
-/-- Strictly-increasing check on a list of naturals. -/
-def sortedStrict : List Nat → Bool
+/-- Strictly-increasing check on a list of keys. -/
+def sortedStrict : List Int → Bool
   | [] => true
   | [_] => true
   | a :: b :: rest => a < b && sortedStrict (b :: rest)
@@ -47,13 +47,13 @@ property must *run*, so this is a `Bool`, where `BasaltExamples/BST`'s `Tree.isB
 def Tree.isBST (t : Tree) : Bool := sortedStrict t.toList
 
 /-- Is `k` present? -/
-def Tree.contains (t : Tree) (k : Nat) : Bool :=
+def Tree.contains (t : Tree) (k : Int) : Bool :=
   match t with
   | leaf => false
   | node l x r => if k == x then true else if k < x then l.contains k else r.contains k
 
 /-- Correct insert: descend left/right by comparison, and treat an equal key as a no-op. -/
-def Tree.insert (t : Tree) (k : Nat) : Tree :=
+def Tree.insert (t : Tree) (k : Int) : Tree :=
   match t with
   | leaf => node leaf k leaf
   | node l x r =>
@@ -65,7 +65,7 @@ def Tree.insert (t : Tree) (k : Nat) : Tree :=
 branch and inserts a **duplicate** into the right subtree, so the in-order traversal contains `x`
 twice and `isBST` fails. Triggering it requires inserting a key that is already present — a
 condition coverage-guided search reaches by driving generation toward the equal-key branch. -/
-def Tree.insertBuggy (t : Tree) (k : Nat) : Tree :=
+def Tree.insertBuggy (t : Tree) (k : Int) : Tree :=
   match t with
   | leaf => node leaf k leaf
   | node l x r =>
@@ -82,7 +82,7 @@ model, and this bug is invisible to the former. It is still a shallow bug (a few
 backend); `BasaltFuzz/Staged.lean` is the one that separates them. -/
 
 /-- Split off the smallest key: `some (min, rest)`, or `none` for a leaf. -/
-def Tree.deleteMin : Tree → Option (Nat × Tree)
+def Tree.deleteMin : Tree → Option (Int × Tree)
   | leaf => none
   | node leaf x r => some (x, r)
   | node l x r =>
@@ -93,7 +93,7 @@ def Tree.deleteMin : Tree → Option (Nat × Tree)
 /-- As `deleteMin`, but the left-spine base case returns `.leaf` where it should return the removed
 node's right subtree, so every key under that subtree vanishes. The result is still a *sorted* tree,
 so `isBST` passes — only a model comparison catches it. -/
-def Tree.deleteMinBuggy : Tree → Option (Nat × Tree)
+def Tree.deleteMinBuggy : Tree → Option (Int × Tree)
   | leaf => none
   | node leaf x _ => some (x, .leaf)
   | node l x r =>
@@ -102,7 +102,7 @@ def Tree.deleteMinBuggy : Tree → Option (Nat × Tree)
     | none => some (x, r)
 
 /-- Standard BST delete: the two-child case promotes the right subtree's minimum. -/
-def Tree.deleteWith (dmin : Tree → Option (Nat × Tree)) (t : Tree) (k : Nat) : Tree :=
+def Tree.deleteWith (dmin : Tree → Option (Int × Tree)) (t : Tree) (k : Int) : Tree :=
   match t with
   | leaf => leaf
   | node l x r =>
@@ -114,32 +114,34 @@ def Tree.deleteWith (dmin : Tree → Option (Nat × Tree)) (t : Tree) (k : Nat) 
       | none => l
 
 /-- Correct delete. -/
-def Tree.delete (t : Tree) (k : Nat) : Tree := Tree.deleteWith Tree.deleteMin t k
+def Tree.delete (t : Tree) (k : Int) : Tree := Tree.deleteWith Tree.deleteMin t k
 
 /-- Delete built on `deleteMinBuggy`. Reaching the bug needs three things at once: `k` must be a key
 the tree actually contains, that key's node must have a non-empty right subtree, and the leftmost
 node of *that* subtree must itself have a right child. -/
-def Tree.deleteBuggy (t : Tree) (k : Nat) : Tree := Tree.deleteWith Tree.deleteMinBuggy t k
+def Tree.deleteBuggy (t : Tree) (k : Int) : Tree := Tree.deleteWith Tree.deleteMinBuggy t k
 
-/-- Generate a BST with keys in `[lo, hi]`: `leaf` on an empty interval, else `pick` between a leaf
-and a node from a uniform pivot with two recursive subtrees over the disjoint subintervals (so keys
-are automatically distinct).
+/-- Generate a BST with keys in `[lo, hi]`: `leaf` on an empty interval, else equal weight between a
+leaf and a node from a uniform pivot with two recursive subtrees over the disjoint subintervals (so
+keys are automatically distinct).
 
-Deliberately term-for-term `BasaltExamples/BST`'s `Tree.genBST`, monomorphized to `Nat` keys and
-stripped of its proofs, so what this module fuzzes is the generator that module proves sound,
-complete, almost-surely terminating, and cost-bounded. `BasaltTest/Fuzz.lean` runs both at `FuzzGen`
-on fixed buffers and pins that they agree, so drift between them is a `lake build` failure. -/
-def genBST [Gen G] (lo hi : Nat) : G Tree := do
+Deliberately term-for-term `BasaltExamples/BST`'s `Tree.genBST`, monomorphized to the `Int` keys that
+module instantiates and stripped of its proofs, so what this module fuzzes is the generator that
+module proves sound, complete, almost-surely terminating, and cost-bounded. `BasaltTest/Fuzz.lean`
+runs both at `FuzzGen` on fixed buffers and pins that they agree, so drift between them is a
+`lake build` failure. -/
+def genBST [Gen G] (lo hi : Int) : G Tree := do
   if h : lo > hi then
     return .leaf
   else
-    pick
-      (fun () => pure .leaf)
-      (fun () => do
-        let x ← chooseNat lo hi (by omega)
+    frequency [
+      (1, fun () => pure .leaf),
+      (1, fun () => do
+        let x ← chooseInt lo hi (by omega)
         let l ← genBST lo (x - 1)
         let r ← genBST (x + 1) hi
         return .node l x r)
+    ] (by simp)
 partial_fixpoint
 
 /-! ### Properties
@@ -147,18 +149,15 @@ partial_fixpoint
 Each is `forAll <generator> <predicate>`, left polymorphic in `G` so the *same* property runs under
 every interpretation the runner offers — libFuzzer (`FuzzGen`), random `IO`, or `Plausible.Gen`. -/
 
-/-- Key bounds for generated trees and inserted keys. Keys start at `1`, not `0`: `genBST`'s left
-recursion uses `x - 1`, and truncated `Nat` subtraction makes `0 - 1 = 0`, so a pivot of `0` would
-recurse on `[0,0]` again and emit duplicate `0` keys — which strict `isBST` rejects independent of
-any insert. Starting at `1` keeps every generated tree strictly sorted. The range is small so
-equal-key collisions — the condition that exposes `insertBuggy` — are reachable. -/
-abbrev loKey : Nat := 1
-abbrev hiKey : Nat := 15
+/-- Key bounds for generated trees and inserted keys. The range is small so equal-key collisions —
+the condition that exposes `insertBuggy` — are reachable. -/
+abbrev loKey : Int := 1
+abbrev hiKey : Int := 15
 
 /-- Generator of a `(BST, key)` pair to run an insert on. -/
-def genTreeAndKey [Gen G] : G (Tree × Nat) := do
+def genTreeAndKey [Gen G] : G (Tree × Int) := do
   let t ← genBST loKey hiKey
-  let k ← chooseNat loKey hiKey (by decide)
+  let k ← chooseInt loKey hiKey (by decide)
   return (t, k)
 
 /-- Sanity: the generator only ever produces valid BSTs. Should never fail. -/
@@ -207,8 +206,8 @@ They are polymorphic in `G`, so the *same* term runs under `Plausible.Gen` too. 
 Composition: one tree + two keys, a distinctness precondition, then `check`. -/
 def prop_insert_two_distinct [Gen G] : G TestOutcome := do
   let t  ← genBST loKey hiKey
-  let k1 ← chooseNat loKey hiKey (by decide)
-  let k2 ← chooseNat loKey hiKey (by decide)
+  let k1 ← chooseInt loKey hiKey (by decide)
+  let k2 ← chooseInt loKey hiKey (by decide)
   if k1 == k2 then return .discard
   let t' := (t.insert k1).insert k2
   check t'.isBST
@@ -217,8 +216,8 @@ def prop_insert_two_distinct [Gen G] : G TestOutcome := do
 `checkWith` renders all three drawn inputs. -/
 def prop_insertBuggy_two_distinct [Gen G] : G TestOutcome := do
   let t  ← genBST loKey hiKey
-  let k1 ← chooseNat loKey hiKey (by decide)
-  let k2 ← chooseNat loKey hiKey (by decide)
+  let k1 ← chooseInt loKey hiKey (by decide)
+  let k2 ← chooseInt loKey hiKey (by decide)
   if k1 == k2 then return .discard
   let t' := (t.insertBuggy k1).insertBuggy k2
   checkWith t'.isBST (fun () => s!"t={reprStr t}, k1={k1}, k2={k2}")

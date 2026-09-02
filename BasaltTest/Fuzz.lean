@@ -110,7 +110,7 @@ cost-bounded — holds only while the two agree, so these pins make a drift a bu
 /- A compact `(left key right)` s-expression rather than `Repr`, so a pin is one line. It preserves
 structure, unlike `toList`, which is not injective on trees and would pass two differently-shaped
 trees with the same keys. -/
-private def showOrig : BST.Tree Nat → String
+private def showOrig : BST.Tree Int → String
   | .leaf => "."
   | .node l x r => s!"({showOrig l} {x} {showOrig r})"
 
@@ -130,12 +130,12 @@ private def agreeOn (bs : List UInt8) : String :=
   | some a, some b => if a == b then s!"agree: {a}" else s!"DIFFER: example={a} fuzz={b}"
   | _, _ => "one generator failed to produce a value"
 
-/- A buffer that drives several `pick`/`chooseNat` steps: both generators consume the bytes in the
-same order and build the same tree. -/
+/- A buffer that drives several `frequency`/`chooseInt` steps: both generators consume the bytes in
+the same order and build the same tree. -/
 /-- info: agree: ((. 3 .) 4 .) -/
 #guard_msgs in #eval IO.println (agreeOn [1, 3, 1, 2, 0, 0, 0, 0])
 
-/- The empty buffer takes the zero-fill path in both (`pick` → first branch → `leaf`). -/
+/- The empty buffer takes the zero-fill path in both (`frequency` → first branch → `leaf`). -/
 /-- info: agree: . -/
 #guard_msgs in #eval IO.println (agreeOn [])
 

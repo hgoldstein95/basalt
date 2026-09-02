@@ -171,9 +171,9 @@ cold start (fresh process, so libFuzzer begins with an empty corpus). Measured o
 | property | fuzz | io | plausible |
 |---|---|---|---|
 | `threshold` | 28 runs | 3 | 3 |
-| `bst-buggy-insert` | 12 runs | 3 | 6 |
-| `bst-buggy-insert2` | 94 runs | 3 | 4 |
-| `bst-buggy-delete` | 500 runs | 46 | 65 |
+| `bst-buggy-insert` | 10 runs | 3 | 9 |
+| `bst-buggy-insert2` | 130 runs | 7 | 4 |
+| `bst-buggy-delete` | 789 runs | 22 | 41 |
 | `chain-2` | 200 runs | 87,745 | 19,789 |
 | `chain-3` | 556 runs | 3,839,993 (8/9 trials) | 1,725,902 (3/9) |
 | `chain-4` | 1,246 runs | **not found** (0/9) | **not found** (0/9) |
@@ -182,8 +182,9 @@ Read the two halves separately, because they say opposite things:
 
 - **Shallow bugs: random wins.** Where one unlucky draw exposes the bug, coverage guidance is pure
   overhead — libFuzzer spends its first inputs mapping coverage, and its per-run cost is higher
-  (~100k runs/s vs `io`'s ~555k and `plausible`'s ~317k on `bst-gen`). All four BST bugs are of this
-  kind: every backend finds them in well under a millisecond, and `io` gets there in the fewest runs.
+  (~55k runs/s vs `io`'s ~375k and `plausible`'s ~220k on `bst-gen`). All four BST bugs are of this
+  kind: every backend finds them in well under a millisecond, and the random ones get there in the
+  fewest runs.
 - **Staged bugs: only the fuzzer arrives.** `chain-n` puts the bug behind `n` nested guards, so a
   blind sampler needs all `n` to hit at once (`256⁻ⁿ`) while the fuzzer banks one stage at a time and
   pays roughly `n·256`. The cost of a stage is therefore multiplicative for random search and
@@ -210,8 +211,8 @@ $ fuzz-run/basalt-fuzz bst-buggy-insert -runs=2000000 -artifact_prefix=./
 ...
 *** BASALT PROPERTY FAILED ***
 counterexample : (BasaltFuzz.BuggyBST.Tree.node (...leaf) 1 (...leaf), 1)
-input bytes    : [255, 255, 42]
-runs           : 22 (0 discarded)
+input bytes    : [43]
+runs           : 4 (0 discarded)
 ==...== ERROR: libFuzzer: deadly signal
 artifact_prefix='./'; Test unit written to ./crash-<sha1>
 ```
