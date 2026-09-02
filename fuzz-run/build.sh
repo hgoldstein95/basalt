@@ -26,6 +26,7 @@ OUT="$ROOT/fuzz-run/obj"; mkdir -p "$OUT"
 # the "property + generator modules" coverage scope (none of these import Mathlib).
 MODULES=(
   Basalt/RandomChoice Basalt/Gen Basalt/IO Basalt/Combinators Basalt/PlausibleGen
+  Basalt/PBT/Property Basalt/PBT/Campaign Basalt/PBT/Driver
   Basalt/Fuzz/Core Basalt/Fuzz/Runner
   BasaltFuzz/BuggyBST BasaltFuzz/Staged
   BasaltFuzzMain
