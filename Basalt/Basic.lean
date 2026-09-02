@@ -14,6 +14,7 @@ import Basalt.SPMF.Failure
 import Basalt.Tactics
 import Basalt.Laws
 import Basalt.Combinators
+import Basalt.PBT
 import Basalt.Tuning
 import Basalt.Tuning.Attr
 import Basalt.GenStats
