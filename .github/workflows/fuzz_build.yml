@@ -1,0 +1,189 @@
+# Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+# Released under MIT license as described in the file LICENSE.
+# Authors: Michael Hicks
+
+# Guards `basalt-fuzz` on macOS and Linux. `lake build` elaborates the fuzz *modules* but
+# never emits their C, instruments it, or links the fuzzer runtime (fuzz-run/README.md), so a
+# change to `Basalt/Gen.lean`, `fuzz-run/build.sh`, or the toolchain pin can break the executable
+# with every other CI job green. That is what this workflow is for. The two platforms take
+# *different* branches through `fuzz-run/build.sh` (driver entry point, runtime source, C++
+# library), so only a matrix covers both.
+#
+# The job asserts behavior, not just linkage: a property with a real bug must produce a
+# counterexample and a saved artifact, and a correct one must survive a campaign. A build that links
+# but never fires would otherwise pass — which is also how a broken instrumentation setup (say a
+# libFuzzer runtime badly skewed from the instrumenting clang) surfaces here rather than silently.
+name: basalt-fuzz
+
+# Scoped to what can actually break the executable: the linked closure, the fuzz targets, the build
+# script, and the toolchain/dependency pins. A docs- or BasaltExamples-only change cannot, and the
+# `Lean Action CI` workflow already covers `BasaltTest/Fuzz.lean` (which is where the `genBST`
+# agreement pin lives). `push` is limited to `main` so a PR branch runs this once, not twice.
+#
+# The two path lists are duplicated on purpose. A YAML anchor would express the intent, but GitHub's
+# workflow parser does not document anchor support and a parse failure here is silent in the worst
+# way — the workflow simply never runs. Keep the lists in sync by hand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Basalt/**'
+      - 'BasaltTest/Fuzz/**'
+      - 'BasaltFuzzMain.lean'
+      - 'fuzz-run/**'
+      - 'lakefile.toml'
+      - 'lake-manifest.json'
+      - 'lean-toolchain'
+      - '.github/workflows/fuzz_build.yml'
+  pull_request:
+    paths:
+      - 'Basalt/**'
+      - 'BasaltTest/Fuzz/**'
+      - 'BasaltFuzzMain.lean'
+      - 'fuzz-run/**'
+      - 'lakefile.toml'
+      - 'lake-manifest.json'
+      - 'lean-toolchain'
+      - '.github/workflows/fuzz_build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    # NOTE: a modern-Linux build path (recent glibc, PIE-by-default) was validated by hand on Amazon
+    # Linux 2023 (clang 22, glibc 2.34; fuzz-run/README.md); `ubuntu-latest` then exposed
+    # the Debian-family variations on top of it, and each is now handled generically by the build
+    # scripts. Confirmed here (Fedora-family) plus the Debian-specific deltas the first `ubuntu-latest`
+    # run surfaced: no `LEAN_CC` wrapper (glibc new enough for Lean's vendored clang); clang exposes
+    # `LLVMFuzzerRunDriver`, not the legacy mangled entry; `native.c` needs `/usr/include` fed in, and
+    # on Debian multiarch also `/usr/include/<triple>` for its `bits/` headers; libstdc++ must be named
+    # by full path (a bare `-lstdc++` is dropped); the host-arch archive must be chosen, not the
+    # 32-bit `-i386` sibling in the legacy `.../lib/linux` layout; and on glibc >= 2.38 (24.04's 2.39)
+    # the runtime's `__isoc23_strtol`/`_strtoul` references, absent from leanc's older-baseline libc,
+    # are supplied by fuzz-run/isoc23_compat.c.
+    #
+    # `ubuntu-latest` does ship a system runtime, but from a clang several majors below the clang 22
+    # that instruments. Rather than trust that skew, `fuzz-run/build.sh` selects a *version-matched*
+    # runtime: it will bypass the mismatched system archive and build one from source via
+    # `get-libfuzzer.sh` (needs `clang++`, present here; the build needs `-fPIC`), pinned to the
+    # instrumenting clang's major. So this leg exercises the matched-from-source path; both the
+    # matched-system and matched-from-source paths were validated by hand on AL2023. The `chain-4`
+    # step remains the backstop: if coverage feedback ever failed to reach the runtime, only it —
+    # not the shallow-bug steps — would notice.
+    # `fail-fast: false` is deliberate: a failure here must not hide a passing macOS leg.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    # Every campaign below is bounded by `-runs`, not by time, so the job has no legitimate reason to
+    # approach this. It exists so a hang (a deadlocked driver, a runtime that never returns) costs
+    # minutes instead of the 6-hour default.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          # The executable's import closure is 11 modules and no Mathlib, so this job needs elan and
+          # a toolchain but none of Mathlib's build products. `build.sh` asks Lake for exactly the
+          # targets it needs.
+          build: false
+          # Both of these matter, and the second is not implied by the first: lean-action's
+          # `get mathlib cache` step is conditioned only on Mathlib being *detected* in the manifest,
+          # not on whether a build runs, so `build: false` alone still downloads several GB of
+          # Mathlib oleans this job never opens. Lake does still clone Mathlib's ~500 MB of git
+          # history during dependency resolution, which is why the `.lake` cache is left on.
+          use-mathlib-cache: false
+
+      - name: Build basalt-fuzz
+        run: fuzz-run/build.sh
+
+      # Each property gets its own artifact directory. An artifact is only meaningful for the
+      # property that produced it — the same bytes decode to a different value under a different
+      # generator — so a shared directory would let the replay step pick up a foreign artifact and
+      # "reproduce" a pass.
+      - name: A buggy property must yield a counterexample and an artifact
+        run: |
+          mkdir -p art/buggy-insert
+          if fuzz-run/basalt-fuzz bst-buggy-insert \
+               -runs=2000000 -max_len=64 -artifact_prefix=art/buggy-insert/ > log.txt 2>&1; then
+            echo "::error::bst-buggy-insert passed; it has a real bug and must fail"
+            tail -30 log.txt; exit 1
+          fi
+          grep -q 'BASALT PROPERTY FAILED' log.txt || {
+            echo "::error::process failed without reporting a counterexample"; tail -30 log.txt; exit 1; }
+          ls art/buggy-insert/crash-* >/dev/null 2>&1 || {
+            echo "::error::no artifact saved for the failing input"; exit 1; }
+          grep 'counterexample :' log.txt
+
+      - name: A saved artifact must replay to the same failure
+        run: |
+          f=$(ls art/buggy-insert/crash-* | head -1)
+          fuzz-run/basalt-fuzz replay bst-buggy-insert "$f" > replay.txt 2>&1
+          grep -q 'BASALT PROPERTY FAILED' replay.txt || {
+            echo "::error::artifact did not reproduce the failure"; cat replay.txt; exit 1; }
+
+      - name: Correct properties must survive a campaign (no false positives)
+        run: |
+          for p in bst-gen bst-insert bst-insert2 bst-delete; do
+            mkdir -p "art/$p"
+            fuzz-run/basalt-fuzz "$p" -runs=200000 -max_len=64 -artifact_prefix="art/$p/" > "log-$p.txt" 2>&1 || {
+              echo "::error::$p reported a counterexample; it must never fail"
+              tail -30 "log-$p.txt"; exit 1; }
+          done
+
+      # The non-fuzzing backends run the *same* property terms (fuzz-run/README.md), so a
+      # regression that monomorphizes the registry, or a missing `Gen` instance, shows up here. Both
+      # verdicts are asserted per backend: a buggy property must fail and a correct one must not.
+      - name: The random backends must agree on every verdict
+        run: |
+          for b in io plausible; do
+            for p in bst-buggy-insert bst-buggy-insert2 bst-buggy-delete; do
+              if fuzz-run/basalt-fuzz --backend=$b "$p" -runs=2000000 > "log-$b-$p.txt" 2>&1; then
+                echo "::error::--backend=$b $p passed; it has a real bug and must fail"
+                tail -20 "log-$b-$p.txt"; exit 1
+              fi
+              grep -q 'BASALT PROPERTY FAILED' "log-$b-$p.txt" || {
+                echo "::error::--backend=$b $p failed without reporting a counterexample"
+                tail -20 "log-$b-$p.txt"; exit 1; }
+            done
+            for p in bst-gen bst-insert bst-insert2 bst-delete; do
+              fuzz-run/basalt-fuzz --backend=$b "$p" -runs=200000 > "log-$b-$p.txt" 2>&1 || {
+                echo "::error::--backend=$b $p reported a counterexample; it must never fail"
+                tail -20 "log-$b-$p.txt"; exit 1; }
+            done
+          done
+
+      # The one property where the backends are supposed to *disagree*: `chain-4` hides its bug behind
+      # 4 nested guards, so coverage guidance finds it in ~1e3 runs while uniform sampling needs
+      # ~256^4. Asserting both directions guards the claim in fuzz-run/README.md's comparison table —
+      # if a change made the fuzzer blind (or the guards independent), this is what would notice.
+      #
+      # The negative half is a probabilistic assertion, so its budget is chosen for flake rate rather
+      # than for strength. `propChain 4` fails iff four independent draws all hit the needle, so
+      # p = 256^-4 = 2.3e-10 per run; at 2e5 runs a spurious failure is 4.7e-5 per backend, and about
+      # 1 in 5,400 CI runs across the two backends and two platforms (2e6 runs would make that 1 in
+      # 540). The separation is unharmed: the fuzzer's median is ~1.2e3 runs, so 2e5 still demonstrates
+      # a >100x gap, and fuzz-run/README.md's table — measured to 2e7 runs — is where the strong claim
+      # lives. Raise this only with that arithmetic in hand.
+      - name: The staged bug must separate the backends
+        run: |
+          mkdir -p art/chain-4
+          if fuzz-run/basalt-fuzz chain-4 -runs=2000000 -max_len=32 \
+               -artifact_prefix=art/chain-4/ > log-chain.txt 2>&1; then
+            echo "::error::coverage-guided search failed to find chain-4 in 2e6 runs"
+            tail -20 log-chain.txt; exit 1
+          fi
+          grep -q 'BASALT PROPERTY FAILED' log-chain.txt || {
+            echo "::error::chain-4 crashed without reporting a counterexample"; tail -20 log-chain.txt; exit 1; }
+          for b in io plausible; do
+            fuzz-run/basalt-fuzz --backend=$b chain-4 -runs=200000 > "log-chain-$b.txt" 2>&1 || {
+              echo "::error::--backend=$b found chain-4 in 2e5 runs; expected ~256^4 (p=2.3e-10/run,"
+              echo "::error::so this is a 1-in-21,000 flake per backend). If it recurs, the staged"
+              echo "::error::guards are no longer nested and the benchmark is void."
+              tail -20 "log-chain-$b.txt"; exit 1; }
+          done

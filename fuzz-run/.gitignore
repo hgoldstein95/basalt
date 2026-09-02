@@ -1,0 +1,7 @@
+obj/
+basalt-fuzz
+crash-*
+*.log
+corpus/
+vendor/
+env.sh

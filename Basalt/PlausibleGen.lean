@@ -4,7 +4,8 @@ Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
 import Basalt.Gen
-import Plausible
+-- Not the `Plausible` umbrella: its tactic frontend would join the `basalt-fuzz` link closure.
+import Plausible.Gen
 
 /-!
 # Plausible Gen as a Basalt Generator
