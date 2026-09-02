@@ -44,6 +44,10 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **`#genstats`** — options on the command's declarations in
   [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean); the law-discovery contract is on
   `lawProved` there, guarded by [BasaltTest/LawLine.lean](BasaltTest/LawLine.lean).
+- **Running a property** — the `TestOutcome`/`forAll` vocabulary, campaigns, and the
+  `Backend`/`dispatch` command line are [Basalt/PBT/](Basalt/PBT/), guarded by
+  [BasaltTest/PBT.lean](BasaltTest/PBT.lean). Nothing there may name an interpretation: a runner that
+  needs one belongs with that interpretation and registers itself as a `Backend`.
 
 ## Gotchas (symptom → cause → pointer)
 

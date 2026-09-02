@@ -43,6 +43,31 @@ depends on the generator, and you prove the ones that do:
 apply to it. `WORKFLOW.md` walks through writing a generator and proving it correct, with a recipe
 for each obligation.
 
+## Running Properties
+
+Generators are the inputs of property-based tests; `Basalt/PBT/` is the other half. A property is a
+generator of `TestOutcome`, so it is polymorphic in its monad too, and its inputs are drawn with
+ordinary monadic `do` — several of them, or dependent ones, need no special combinator:
+
+```lean
+def prop_takeDrop [Gen G] : G TestOutcome := do
+  let xs ← listOf (chooseNat 0 99)
+  let k ← chooseNat 0 99
+  if xs.isEmpty then return .discard
+  checkWith (xs.take k ++ xs.drop k == xs) (fun () => s!"xs={xs}, k={k}")
+```
+
+A campaign runs a property at a chosen interpretation, stopping at the first counterexample:
+
+```lean
+#eval ioCampaign (fun _ => prop_takeDrop) 1000
+```
+
+Because the property never named an interpretation, the same term is testable at each of them: a
+`Property` is the property held polymorphically, and `Backend` / `dispatch` wrap a registry of named
+properties in a command line (`--backend=io|plausible`, `-runs=N`). Every backend shares one failure
+contract — counterexample on stderr, exit `77` — so campaigns are comparable across them.
+
 ## Build
 
 Lean and Mathlib are pinned in `lean-toolchain` / `lakefile.toml` / `lake-manifest.json`.
