@@ -48,8 +48,8 @@ def runOneIO (counters : IO.Ref (Nat × Nat)) (T : FuzzGen TestOutcome) (bytes :
 `-runs`, `-max_len`, `-artifact_prefix`, …). A failure aborts the process, with the artifact saved and
 the exit code set by libFuzzer.
 
-Nothing may be reported after `goImpl`: libFuzzer's driver calls `exit()` when `-runs` is exhausted,
-so a line placed there never appears. That is why the run tally is reported by `runOneIO`. -/
+Report nothing after `goImpl`: libFuzzer's driver `exit()`s when `-runs` is exhausted, so a line
+placed there silently never appears — which is why `runOneIO` carries the run tally. -/
 def go (T : FuzzGen TestOutcome) (argv : Array String := #[]) : IO Unit := do
   IO.println s!"[basalt] starting libFuzzer campaign ({argv.toList})"
   let counters ← IO.mkRef (0, 0)

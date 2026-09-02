@@ -15,7 +15,7 @@
 # `build.sh` calls this automatically when it finds no runtime whose clang major matches the
 # instrumenting clang (so `ubuntu-latest`, whose system runtime is a different clang, builds here too);
 # run it directly only to re-fetch. The archive excludes `FuzzerMain.cpp` because Lean owns `main`
-# (BasaltFuzz/DESIGN.md §5).
+# (fuzz-run/README.md, "Platforms").
 set -euo pipefail
 cd "$(dirname "$0")"
 

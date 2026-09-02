@@ -3,7 +3,7 @@
 # Authors: Michael Hicks
 
 # Guards `basalt-fuzz` on macOS and Linux. `lake build` elaborates the fuzz *modules* but
-# never emits their C, instruments it, or links the fuzzer runtime (BasaltFuzz/DESIGN.md §6), so a
+# never emits their C, instruments it, or links the fuzzer runtime (fuzz-run/README.md), so a
 # change to `Basalt/Gen.lean`, `fuzz-run/build.sh`, or the toolchain pin can break the executable
 # with every other CI job green. That is what this workflow is for. The two platforms take
 # *different* branches through `fuzz-run/build.sh` (driver entry point, runtime source, C++
@@ -54,7 +54,7 @@ concurrency:
 jobs:
   fuzz:
     # NOTE: a modern-Linux build path (recent glibc, PIE-by-default) was validated by hand on Amazon
-    # Linux 2023 (clang 22, glibc 2.34; BasaltFuzz/DESIGN.md Appendix A); `ubuntu-latest` then exposed
+    # Linux 2023 (clang 22, glibc 2.34; fuzz-run/README.md); `ubuntu-latest` then exposed
     # the Debian-family variations on top of it, and each is now handled generically by the build
     # scripts. Confirmed here (Fedora-family) plus the Debian-specific deltas the first `ubuntu-latest`
     # run surfaced: no `LEAN_CC` wrapper (glibc new enough for Lean's vendored clang); clang exposes
@@ -136,7 +136,7 @@ jobs:
               tail -30 "log-$p.txt"; exit 1; }
           done
 
-      # The non-fuzzing backends run the *same* property terms (BasaltFuzz/DESIGN.md §5.4), so a
+      # The non-fuzzing backends run the *same* property terms (fuzz-run/README.md), so a
       # regression that monomorphizes the registry, or a missing `Gen` instance, shows up here. Both
       # verdicts are asserted per backend: a buggy property must fail and a correct one must not.
       - name: The random backends must agree on every verdict

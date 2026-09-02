@@ -14,11 +14,10 @@ insert/delete on them, and check the output against a postcondition. Each operat
 correct version (whose property never fails, showing no false positives) and a buggy one (whose
 property every backend finds a counterexample for).
 
-This restates `BasaltExamples/BST`'s `genBST` rather than importing it, and the duplication is
-forced: that module imports the `Basalt` umbrella for its proofs, which reaches Mathlib through
-`Basalt.SPMF`, and everything an executable imports it also links (`DESIGN.md` §6 and §8). The
-proof-free copy here imports only `Basalt.Combinators`/`Basalt.Fuzz.Core`. `genBST` is the one
-declaration held identical to the original, and `BasaltTest/Fuzz.lean` pins that.
+The duplication of `BasaltExamples/BST`'s `genBST` here is forced, not a choice: an executable links
+everything it imports, and that module imports the `Basalt` umbrella for its proofs, which reaches
+Mathlib (`fuzz-run/README.md`). `genBST` is the one declaration held identical to the original, and
+`BasaltTest/Fuzz.lean` pins that.
 -/
 
 namespace BasaltFuzz.BuggyBST

@@ -84,8 +84,8 @@ lake build BasaltTest     # regression tests
 
 `basalt-fuzz` drives generators from libFuzzer instead of a PRNG. It links native code, so building
 the *executable* is deliberately outside `lake build` and has its own script — which needs no
-arguments on the platforms in `BasaltFuzz/DESIGN.md`'s Appendix A, detecting the toolchain's fuzzing
-runtime and driver entry point itself:
+arguments on the platforms `fuzz-run/README.md` lists, detecting the toolchain's fuzzing runtime and
+driver entry point itself:
 
 ```sh
 fuzz-run/build.sh                                   # build the executable
@@ -95,8 +95,8 @@ fuzz-run/basalt-fuzz replay <property> <file>        # reproduce a saved crash i
 
 Where no libFuzzer runtime ships with the toolchain (macOS), the build vendors one from
 compiler-rt source on first use. Per-machine toolchain overrides go in `fuzz-run/env.sh`
-(see `fuzz-run/env.example.sh`). `fuzz-run/README.md` lists the demo properties and the failure
-model; `BasaltFuzz/DESIGN.md` is the design, with supported platforms in its Appendix A.
+(see `fuzz-run/env.example.sh`). `fuzz-run/README.md` is the whole story: the design, the demo
+properties, the failure model, and the supported platforms.
 
 Because a property is polymorphic in its monad, the same executable also runs it under the random
 interpretations — `--backend=io` or `--backend=plausible` instead of the default coverage-guided
@@ -115,8 +115,9 @@ several nested guards is reachable only by the fuzzer. `fuzz-run/compare-backend
   `LawLine.lean` has no library counterpart (it pins the `#genstats` law-reporting contract).
 - `BasaltExperiments/` — spikes; the only place with `sorry`s, and not built by default.
 - `BasaltFuzz/` — the Mathlib-free fuzzing targets (generators and properties the `basalt-fuzz`
-  executable links), plus `DESIGN.md`. The interpretation itself is `Basalt/Fuzz/`.
-- `fuzz-run/` — the `basalt-fuzz` build script, its backend benchmark, and runtime documentation.
+  executable links). The interpretation itself is `Basalt/Fuzz/`.
+- `fuzz-run/` — the `basalt-fuzz` build script, its backend benchmark, and `README.md`, which owns
+  the fuzzing design and the per-platform build contract.
 
 ## License
 

@@ -47,16 +47,14 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [BasaltTest/PBT.lean](BasaltTest/PBT.lean). Nothing there may name an interpretation: a runner that
   needs one belongs with that interpretation and registers itself as a `Backend`.
 - **Coverage-guided fuzzing** (`FuzzGen`, the libFuzzer bridge, the opt-in `basalt-fuzz` executable)
-  — [BasaltFuzz/DESIGN.md](BasaltFuzz/DESIGN.md) owns the design and the per-platform build
-  contract (Appendix A). This is the repo's only FFI and native-link config: the executable's C
-  emission and link live outside `lake build`, so a change to *them* is caught only by
+  — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
+  the measured comparison between backends. This is the repo's only FFI and native-link config: the
+  executable's C emission and link live outside `lake build`, so a change to *them* is caught only by
   `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow. The Lean side is not exempt — the fuzz
   runner and `BasaltFuzz/BuggyBST.lean` are elaborated by the default build through
   `BasaltTest/Fuzz.lean`, which is where a drift from the proved `genBST` becomes a build failure.
-  The executable also runs a property at the *random*
-  interpretations (`--backend=io|plausible`) from one polymorphic registry — DESIGN.md §5.4 owns why,
-  and `fuzz-run/README.md` owns the measured comparison between backends. Anything added to the
-  Mathlib-free link closure must stay Mathlib-free: import the narrowest module, not an umbrella.
+  Anything added to the Mathlib-free link closure must stay Mathlib-free: import the narrowest
+  module, not an umbrella.
 
 ## Gotchas (symptom → cause → pointer)
 

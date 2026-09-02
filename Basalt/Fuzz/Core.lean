@@ -55,8 +55,6 @@ instance : MonoBind Option where
     | none => exact FlatOrder.rel.refl
     | some a => exact h a
 
-/-! ### Reading choices from the byte buffer -/
-
 /-- Bits needed to distinguish `k` outcomes (0 when `k ≤ 1`). -/
 def bitsFor (k : Nat) : Nat :=
   if k ≤ 1 then 0 else (k - 1).log2 + 1

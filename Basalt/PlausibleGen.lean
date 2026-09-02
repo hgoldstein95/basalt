@@ -1,12 +1,10 @@
 /-
-Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+Copyright (c) 2026 Michael Hicks. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
 import Basalt.Gen
--- `Plausible.Gen`, not `Plausible`: the instance needs only the monad and `Gen.choose`, and the
--- umbrella import drags in the tactic frontend and deriving handlers — which the `basalt-fuzz`
--- executable would then link (`BasaltFuzz/DESIGN.md` §6).
+-- Not the `Plausible` umbrella: its tactic frontend would join the `basalt-fuzz` link closure.
 import Plausible.Gen
 
 /-!

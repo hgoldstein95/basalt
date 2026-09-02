@@ -5,7 +5,7 @@
 
 # Build the opt-in `basalt-fuzz` executable: elaborate the Mathlib-free property/generator closure
 # with Lake, SanitizerCoverage-instrument its C, and link it against libFuzzer with Lean owning
-# `main` (which calls Fuzz.go -> libFuzzer's driver). See BasaltFuzz/DESIGN.md §6.
+# `main` (which calls Fuzz.go -> libFuzzer's driver). See fuzz-run/README.md.
 #
 # Portable across macOS (arm64) and Linux; everything platform-specific is detected below, and each
 # detection can be overridden by the environment variable named in its block. `fuzz-run/env.sh`, if
@@ -84,7 +84,7 @@ fi
 # Why the major must match: the runtime implements the SanitizerCoverage ABI that the instrumenting
 # clang emits calls against. That ABI is broadly stable, but a large skew can leave an
 # instrumented-but-uninstrumented-feeling binary — it links and runs, and shallow bugs still fail,
-# yet coverage never reaches the runtime (BasaltFuzz/DESIGN.md Appendix A). Matching the major closes
+# yet coverage never reaches the runtime (fuzz-run/README.md, "Platforms"). Matching the major closes
 # that gap by construction rather than by trusting cross-version stability.
 if [ -z "${FUZZER_LIB_FLAGS+x}" ]; then
   arch=$(uname -m)

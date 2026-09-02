@@ -9,7 +9,7 @@
 # Nothing here is needed on a machine where `leanc` runs and a libFuzzer runtime is either installed
 # or vendored — macOS and an ordinary Linux both build with no env.sh at all.
 
-# --- The Amazon Linux 2 / clang 11 box (BasaltFuzz/DESIGN.md Appendix A) -------------------------
+# --- The Amazon Linux 2 / clang 11 box (fuzz-run/README.md, "Platforms") ------------------------
 # Its two problems are that Lean's vendored clang needs a newer glibc than the host provides, and
 # that the C++ runtime libFuzzer wants is off the default link path.
 #
