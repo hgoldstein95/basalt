@@ -11,13 +11,12 @@ import BasaltFuzz.Staged
 /-!
 # `basalt-fuzz` executable entry point
 
-Lean owns `main`; it selects a named property and a backend, and `Fuzz.dispatch` runs the campaign
-(libFuzzer via `Fuzz.go`, or a random loop). This module (and everything it imports) is Mathlib-free
-so the executable links a small closure; it is built by `fuzz-run/build.sh`, never by the default
-`lake build`.
+Lean owns `main`: `PBT.dispatch` selects a named property and a backend and runs the campaign. This
+module and everything it imports must stay Mathlib-free, since the executable links whatever it
+imports; it is built by `fuzz-run/build.sh`, never by the default `lake build`.
 -/
 
-open Basalt.Fuzz RandomChoice
+open Basalt.Fuzz Basalt.PBT RandomChoice
 
 /-- Infrastructure self-test: a deliberately false property. Its failure lives on a distinct branch
 (`fail` vs `pass`), so it is reachable by coverage-guided search — libFuzzer hits a byte `≥ 200`
@@ -26,13 +25,12 @@ def propThreshold [Gen G] : G TestOutcome :=
   forAll (chooseNat 0 255) (· < 200)
 
 /-- The property registry, selected by the first non-flag CLI argument. `bst-*` are the worked BST
-demo (`BasaltFuzz/BuggyBST.lean`): the `-buggy-*` ones have real bugs every backend can find; the
+demo (`BasaltFuzz/BuggyBST.lean`): the `-buggy-*` ones have real bugs every backend can find, and the
 others must never fail. `chain-*` are the staged microbenchmark (`BasaltFuzz/Staged.lean`), the one
 place the backends differ by orders of magnitude.
 
-Each entry is a `Property` — a property still polymorphic in its monad — so one registry serves all
-three backends. The `fun _ =>` is the explicit `G` binder `Property` asks for; nothing else about a
-property changes to make it fuzzable or randomly testable. -/
+Each entry is a `Property`, so one registry serves every backend; `fun _ =>` is the explicit `G`
+binder it asks for. -/
 def properties : List (String × Property) :=
   [ ("threshold",            fun _ => propThreshold),
     ("bst-gen",              fun _ => BasaltFuzz.BuggyBST.prop_genBST_isBST),
@@ -47,4 +45,4 @@ def properties : List (String × Property) :=
     ("chain-4",              fun _ => BasaltFuzz.Staged.propChain 4) ]
 
 def main (args : List String) : IO Unit :=
-  dispatch properties args
+  dispatch "basalt-fuzz" [fuzzBackend, ioBackend, plausibleBackend] properties args

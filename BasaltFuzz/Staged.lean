@@ -4,7 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
 import Basalt.Combinators
-import Basalt.Fuzz.Core
+import Basalt.PBT.Property
 
 /-!
 # A microbenchmark that separates the backends
@@ -25,7 +25,7 @@ state transitions. It is synthetic here so the exponent is a knob rather than a 
 
 namespace BasaltFuzz.Staged
 
-open Basalt.Fuzz RandomChoice
+open Basalt.PBT RandomChoice
 
 /-- The needle each stage must draw. Any fixed value in `[0, 255]` does; the point is that one draw
 in 256 advances a stage. -/

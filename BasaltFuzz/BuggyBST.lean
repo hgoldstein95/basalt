@@ -4,7 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
 import Basalt.Combinators
-import Basalt.Fuzz.Core
+import Basalt.PBT.Property
 
 /-!
 # A worked fuzzing target: binary search trees with buggy operations
@@ -23,7 +23,7 @@ declaration held identical to the original, and `BasaltTest/Fuzz.lean` pins that
 
 namespace BasaltFuzz.BuggyBST
 
-open Basalt.Fuzz RandomChoice
+open Basalt.PBT RandomChoice
 
 /-- A binary tree with `Nat` keys. -/
 inductive Tree where

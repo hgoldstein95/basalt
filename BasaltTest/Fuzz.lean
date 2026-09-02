@@ -15,7 +15,7 @@ Deterministic checks of the byte → choice mapping, run purely (no fuzzer): `ru
 arrays must produce fixed outcomes. Pins the contract that a corpus byte maps to a specific choice.
 -/
 
-open Basalt.Fuzz RandomChoice
+open Basalt.Fuzz Basalt.PBT RandomChoice
 
 /-- Build an input buffer from a byte list. -/
 private def bytes (l : List UInt8) : ByteArray := ⟨l.toArray⟩
