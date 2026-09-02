@@ -28,7 +28,7 @@ on:
     branches: [main]
     paths:
       - 'Basalt/**'
-      - 'BasaltFuzz/**'
+      - 'BasaltTest/Fuzz/**'
       - 'BasaltFuzzMain.lean'
       - 'fuzz-run/**'
       - 'lakefile.toml'
@@ -38,7 +38,7 @@ on:
   pull_request:
     paths:
       - 'Basalt/**'
-      - 'BasaltFuzz/**'
+      - 'BasaltTest/Fuzz/**'
       - 'BasaltFuzzMain.lean'
       - 'fuzz-run/**'
       - 'lakefile.toml'

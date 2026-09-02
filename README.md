@@ -113,9 +113,11 @@ several nested guards is reachable only by the fuzzer. `fuzz-run/compare-backend
   lemma sets and tactics.
 - `BasaltTest/` — regression tests, named for the library module they guard when one exists;
   `LawLine.lean` has no library counterpart (it pins the `#genstats` law-reporting contract).
+  `Fuzz/` holds the properties the `basalt-fuzz` executable links, so those modules — alone in this
+  directory — must stay Mathlib-free; `fuzz-run/README.md` says why.
 - `BasaltExperiments/` — spikes; the only place with `sorry`s, and not built by default.
-- `BasaltFuzz/` — the Mathlib-free fuzzing targets (generators and properties the `basalt-fuzz`
-  executable links). The interpretation itself is `Basalt/Fuzz/`.
+- `BasaltFuzzMain.lean` — the root of the opt-in `basalt-fuzz` executable: the property registry and
+  the `Backend` list. Not a default build target, since only `fuzz-run/build.sh` links it.
 - `fuzz-run/` — the `basalt-fuzz` build script, its backend benchmark, and `README.md`, which owns
   the fuzzing design and the per-platform build contract.
 

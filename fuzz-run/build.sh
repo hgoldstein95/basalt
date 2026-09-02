@@ -28,7 +28,7 @@ MODULES=(
   Basalt/RandomChoice Basalt/Gen Basalt/IO Basalt/Combinators Basalt/PlausibleGen
   Basalt/PBT/Property Basalt/PBT/Campaign Basalt/PBT/Driver
   Basalt/Fuzz/Core Basalt/Fuzz/Runner
-  BasaltFuzz/BuggyBST BasaltFuzz/Staged
+  BasaltTest/Fuzz/BuggyBST BasaltTest/Fuzz/Staged
   BasaltFuzzMain
 )
 
@@ -180,7 +180,10 @@ echo "== compile (SanitizerCoverage on all first-party modules) + bridge =="
 OBJS=()
 for m in "${MODULES[@]}"; do
   c="$IR/$m.c"
-  [ -f "$c" ] || { echo "  (skip $m: no IR)"; continue; }
+  # Fatal, not skipped: a renamed or moved module would otherwise drop silently out of the
+  # instrumented set, and the symptom is not a build error but a fuzzer that never finds a staged
+  # bug (`chain-4`) because the coverage it needed was never compiled in.
+  [ -f "$c" ] || { echo "no IR for $m: is MODULES stale?" >&2; exit 1; }
   o="$OUT/$(echo "$m" | tr / _).o"
   $CC -O1 -fsanitize=fuzzer-no-link -c "$c" -o "$o"
   OBJS+=("$o")

@@ -21,7 +21,7 @@ globs = ["BasaltExperiments.+"]
 # Root of the opt-in `basalt-fuzz` executable. `fuzz-run/build.sh` elaborates it and links the fuzzer.
 [[lean_lib]]
 name = "BasaltFuzzMain"
-globs = ["BasaltFuzzMain", "BasaltFuzz.+"]
+globs = ["BasaltFuzzMain"]
 
 [[require]]
 name = "mathlib"

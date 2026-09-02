@@ -90,18 +90,17 @@ noise in the feedback.
 
 **The link closure must stay Mathlib-free.** A `#eval` runs generators in the interpreter, but a
 compiled executable links the native code of its entire import closure, and importing the `Basalt`
-umbrella reaches Mathlib through `Basalt.SPMF` — 1440 modules, against the ten first-party ones
-`MODULES` compiles. Generator *definitions* need only `Gen`/`Combinators`; only their *proofs* need
+umbrella reaches Mathlib through `Basalt.SPMF` — 1440 modules, against the handful of first-party
+ones `MODULES` compiles. Generator *definitions* need only `Gen`/`Combinators`; only their *proofs* need
 Mathlib. So every module the executable imports imports the narrowest thing it can — which is also
 why `Basalt/PlausibleGen.lean` imports `Plausible.Gen` and not the `Plausible` umbrella, whose tactic
 frontend and deriving handlers would join the link.
 
-Elaboration is a separate matter from linking. `BasaltTest/Fuzz.lean` is built by the default `lake
-build` and imports `BasaltFuzz.BuggyBST`, so that target is type-checked and its `genBST` is pinned
-against the proved one — that is how a drift becomes a build failure. Only the `basalt-fuzz` CI
-workflow builds `BasaltFuzz.Staged` and `BasaltFuzzMain`, and only `build.sh` does the C emission,
-the sancov compile, and the native link, so the default `lake build` needs no C toolchain and no
-libFuzzer runtime.
+Elaboration is a separate matter from linking. The targets live under `BasaltTest/Fuzz/`, so the
+default `lake build` type-checks both, and `BasaltTest/Fuzz.lean` additionally pins `BuggyBST`'s
+`genBST` against the proved one, which is how a drift becomes a build failure. Only `BasaltFuzzMain`
+is left out, and only `build.sh` does the C emission, the sancov compile, and the native link, so the
+default `lake build` needs no C toolchain and no libFuzzer runtime.
 
 ## Build
 
@@ -127,7 +126,7 @@ fuzz-run/basalt-fuzz [--backend=fuzz|io|plausible] <property> [-runs=N] [libFuzz
 fuzz-run/basalt-fuzz replay <property> <file>      # reproduce a saved input, no fuzzer
 ```
 
-Properties (see `BasaltFuzzMain.lean`, `BasaltFuzz/BuggyBST.lean`, `BasaltFuzz/Staged.lean`):
+Properties (see `BasaltFuzzMain.lean` and `BasaltTest/Fuzz/`):
 
 | property | expectation |
 |---|---|
@@ -210,7 +209,7 @@ $ fuzz-run/basalt-fuzz bst-buggy-insert -runs=2000000 -artifact_prefix=./
 [basalt] starting libFuzzer campaign ([-runs=2000000, -artifact_prefix=./])
 ...
 *** BASALT PROPERTY FAILED ***
-counterexample : (BasaltFuzz.BuggyBST.Tree.node (...leaf) 1 (...leaf), 1)
+counterexample : (BuggyBST.Tree.node (...leaf) 1 (...leaf), 1)
 input bytes    : [43]
 runs           : 4 (0 discarded)
 ==...== ERROR: libFuzzer: deadly signal
@@ -333,8 +332,8 @@ it.
 - **Stop-on-first only.** A flag could keep going past the first failure to collect several
   counterexamples, either in-process (`return -1` and accumulate) or libFuzzer-native
   (`-fork=N -ignore_crashes=1`).
-- **`Tree`/`genBST` is duplicated** between `BasaltExamples/BST.lean` and `BasaltFuzz/BuggyBST.lean`,
-  because the example imports the `Basalt` umbrella for its proofs and so cannot be linked. Moving
+- **`Tree`/`genBST` is duplicated** between `BasaltExamples/BST.lean` and
+  `BasaltTest/Fuzz/BuggyBST.lean`, because the example imports the `Basalt` umbrella for its proofs and so cannot be linked. Moving
   the Mathlib-free part (the datatype and the generator) into a module both import would make the
   fuzzed term the proved term by construction rather than by a pinned test. Two things to settle
   first: the shared `Tree` must be monomorphic or the fuzz side must instantiate it, and `isBST` has

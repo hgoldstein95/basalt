@@ -20,7 +20,7 @@ Mathlib (`fuzz-run/README.md`). `genBST` is the one declaration held identical t
 `BasaltTest/Fuzz.lean` pins that.
 -/
 
-namespace BasaltFuzz.BuggyBST
+namespace BuggyBST
 
 open Basalt.PBT RandomChoice
 
@@ -79,7 +79,7 @@ below instead *silently drops* keys: the output is still a perfectly valid BST, 
 every input and the postcondition has to be a model comparison (`toList` against `List.erase`). The
 lesson is about the specification, not the search — an invariant check is strictly weaker than a
 model, and this bug is invisible to the former. It is still a shallow bug (a few dozen runs for any
-backend); `BasaltFuzz/Staged.lean` is the one that separates them. -/
+backend); `BasaltTest/Fuzz/Staged.lean` is the one that separates them. -/
 
 /-- Split off the smallest key: `some (min, rest)`, or `none` for a leaf. -/
 def Tree.deleteMin : Tree → Option (Int × Tree)
@@ -222,4 +222,4 @@ def prop_insertBuggy_two_distinct [Gen G] : G TestOutcome := do
   let t' := (t.insertBuggy k1).insertBuggy k2
   checkWith t'.isBST (fun () => s!"t={reprStr t}, k1={k1}, k2={k2}")
 
-end BasaltFuzz.BuggyBST
+end BuggyBST

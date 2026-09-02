@@ -6,7 +6,7 @@ Authors: Michael Hicks
 import Basalt.Fuzz.Runner
 import Basalt.Combinators
 import BasaltExamples.BST
-import BasaltFuzz.BuggyBST
+import BasaltTest.Fuzz.BuggyBST
 
 /-!
 # `FuzzGen` regression tests
@@ -101,10 +101,10 @@ private def propAnyBackend : Property := fun _ => do
 
 /-! ### The fuzz target's `genBST` is the proved one
 
-`BasaltFuzz/BuggyBST.lean` restates `BasaltExamples/BST`'s `Tree.genBST` rather than importing it,
-because that import would pull Mathlib into the executable's link closure (`fuzz-run/README.md`).
-The copy's claim — that the fuzzed generator is the one proved sound, complete, terminating, and
-cost-bounded — holds only while the two agree, so these pins make a drift a build failure: both are
+`Fuzz/BuggyBST.lean` restates `BasaltExamples/BST`'s `Tree.genBST` rather than importing it, because
+that import would pull Mathlib into the executable's link closure (`fuzz-run/README.md`). The copy's
+claim — that the fuzzed generator is the one proved sound, complete, terminating, and cost-bounded —
+holds only while the two agree, so these pins make a drift a build failure: both are
 `[Gen G]` terms, so at `FuzzGen` on the same bytes they must build the same tree. -/
 
 /- A compact `(left key right)` s-expression rather than `Repr`, so a pin is one line. It preserves
@@ -114,17 +114,17 @@ private def showOrig : BST.Tree Int → String
   | .leaf => "."
   | .node l x r => s!"({showOrig l} {x} {showOrig r})"
 
-private def showCopy : BasaltFuzz.BuggyBST.Tree → String
+private def showCopy : BuggyBST.Tree → String
   | .leaf => "."
   | .node l x r => s!"({showCopy l} {x} {showCopy r})"
 
 /- Runs both generators on one buffer, printing the shared tree so a mismatch shows what each
 produced rather than just `false`. -/
 private def agreeOn (bs : List UInt8) : String :=
-  let lo := BasaltFuzz.BuggyBST.loKey
-  let hi := BasaltFuzz.BuggyBST.hiKey
+  let lo := BuggyBST.loKey
+  let hi := BuggyBST.hiKey
   let orig : FuzzGen String := showOrig <$> BST.Tree.genBST lo hi
-  let copy : FuzzGen String := showCopy <$> BasaltFuzz.BuggyBST.genBST lo hi
+  let copy : FuzzGen String := showCopy <$> BuggyBST.genBST lo hi
   let run (g : FuzzGen String) : Option String := (g.run ⟨⟨bs.toArray⟩, 0⟩).map (·.1)
   match run orig, run copy with
   | some a, some b => if a == b then s!"agree: {a}" else s!"DIFFER: example={a} fuzz={b}"

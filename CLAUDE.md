@@ -53,7 +53,7 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   the measured comparison between backends. This is the repo's only FFI and native-link config: the
   executable's C emission and link live outside `lake build`, so a change to *them* is caught only by
   `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow. The Lean side is not exempt — the fuzz
-  runner and `BasaltFuzz/BuggyBST.lean` are elaborated by the default build through
+  runner and `BasaltTest/Fuzz/BuggyBST.lean` are elaborated by the default build through
   `BasaltTest/Fuzz.lean`, which is where a drift from the proved `genBST` becomes a build failure.
   Anything added to the Mathlib-free link closure must stay Mathlib-free: import the narrowest
   module, not an umbrella.
