@@ -35,14 +35,14 @@ open BST
 /-! ## 1. The defaults are the generator as written -/
 
 /-- `tuned_defaults` is emitted by the attribute — `Eq.refl`, checked by the kernel. -/
-example [Gen G] (lo hi : Nat) :
-    (Tree.genWeightedBST.tuned Tree.genWeightedBST.defaults lo hi : G (BST.Tree Nat)) =
+example [Gen G] (lo hi : Int) :
+    (Tree.genWeightedBST.tuned Tree.genWeightedBST.defaults lo hi : G (BST.Tree Int)) =
       Tree.genWeightedBST lo hi :=
   Tree.genWeightedBST.tuned_defaults lo hi
 
 /-- Facts about the untuned generator transfer to the default-tuned form by
     rewriting — adopting tuning does not change existing proofs. -/
-example (lo hi : Nat) (t : BST.Tree Nat) :
+example (lo hi : Int) (t : BST.Tree Int) :
     t ∈ SPMF.support (Tree.genWeightedBST.tuned Tree.genWeightedBST.defaults lo hi) ↔
       t ∈ SPMF.support (Tree.genWeightedBST lo hi) := by
   rw [Tree.genWeightedBST.tuned_defaults]
@@ -69,9 +69,9 @@ the head-constructor split). -/
 info: Tree.genWeightedBST.tuned ⟨#[(1, 0), (5, 0)]⟩ 0 10 — 200 draws (seed 0, fuel 10000)
 
   outcomes    ok 200 (100.0%)
-  size        mean 18.2   p50 17   p95 43   max 87
-  choices     mean 19.0   p50 19   p95 45   max 87
-  distinct    161 / 200
+  size        mean 12.3   p50 13   p95 23   max 23
+  choices     mean 12.6   p50 14   p95 22   max 22
+  distinct    158 / 200
 
   head constructor
     node    82.0%  (164)
@@ -79,13 +79,13 @@ info: Tree.genWeightedBST.tuned ⟨#[(1, 0), (5, 0)]⟩ 0 10 — 200 draws (seed
 
   most common
      18.0%  (36)  BST.Tree.leaf
+      1.5%   (3)  BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tree.leaf)
+      1.5%   (3)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tre…
       1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 3 (BST.Tree.leaf)
       1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 9 (BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf))
-      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 0 (BST.Tre…
-      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.le…
 
   samples
-    BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.node (BST.Tree.node (BST.Tree.no…
+    BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 10 (BST.Tree.leaf)
     BST.Tree.leaf
     BST.Tree.leaf
 -/
@@ -96,9 +96,9 @@ info: Tree.genWeightedBST.tuned ⟨#[(1, 0), (5, 0)]⟩ 0 10 — 200 draws (seed
 info: Tree.genWeightedBST.tuned ⟨#[(5, 0), (1, 0)]⟩ 0 10 — 200 draws (seed 0, fuel 10000)
 
   outcomes    ok 200 (100.0%)
-  size        mean 1.5   p50 1   p95 3   max 7
+  size        mean 1.4   p50 1   p95 3   max 7
   choices     mean 1.6   p50 1   p95 4   max 9
-  distinct    20 / 200
+  distinct    19 / 200
 
   head constructor
     leaf    84.0%  (168)
@@ -107,8 +107,8 @@ info: Tree.genWeightedBST.tuned ⟨#[(5, 0), (1, 0)]⟩ 0 10 — 200 draws (seed
   most common
      84.0%  (168)  BST.Tree.leaf
       4.0%    (8)  BST.Tree.node (BST.Tree.leaf) 3 (BST.Tree.leaf)
+      1.5%    (3)  BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)
       1.5%    (3)  BST.Tree.node (BST.Tree.leaf) 8 (BST.Tree.leaf)
-      1.0%    (2)  BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)
       1.0%    (2)  BST.Tree.node (BST.Tree.leaf) 1 (BST.Tree.leaf)
 
   samples
@@ -341,6 +341,38 @@ def genNoLvl [Gen G] : G Nat :=
     (1, fun _ => pure 0),
     (1, fun _ => pure 1)
   ] (by simp)
+
+/-! ## 8. The unfold equation
+
+A `partial_fixpoint` body's tuned form gets `eq_def`, with the recursion re-tied through
+`.tuned θ` rather than left as `Lean.Order.fix`. That is what `rw` and any consumer reading
+bodies through `getUnfoldEqnFor?` see. -/
+
+/--
+info: @genTree.tuned.eq_def : ∀ {G : Type → Type u_1} [inst : Gen G] (θ : Tuning) (depth : ℕ),
+  genTree.tuned θ depth =
+    frequency
+      [(θ.weight 0 depth, fun x => pure Tree.leaf),
+        (θ.weight 1 depth, fun x => do
+          let l ← genTree.tuned θ (depth + 1)
+          let r ← genTree.tuned θ (depth + 1)
+          pure (l.node 0 r))]
+      ⋯
+-/
+#guard_msgs in
+#check @genTree.tuned.eq_def
+
+/-- The equation unfolds the tuned generator the way `genTree`'s own does the untuned one. -/
+example [Gen G] (θ : Tuning) (depth : Nat) :
+    (genTree.tuned θ depth : G (BST.Tree Nat)) =
+      frequency [
+        (θ.weight 0 depth, fun _ => pure .leaf),
+        (θ.weight 1 depth, fun _ => do
+          let l ← genTree.tuned θ (depth + 1)
+          let r ← genTree.tuned θ (depth + 1)
+          return .node l 0 r)
+      ] (Tuning.sum_map_fst_pos θ 0 depth _ _) := by
+  rw [genTree.tuned.eq_def]
 
 end TunableExamples
 

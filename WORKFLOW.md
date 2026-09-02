@@ -70,8 +70,12 @@ Guidelines that make the proofs go smoothly:
 - **Prefer `chooseNat lo hi h` over raw `choose`.** `choose` returns a
   `ULift {x : Nat // lo ≤ x ∧ x ≤ hi}`, which costs `.down.val` projections in the generator and
   `⟨⟨n, ⟨hge, hle⟩⟩⟩` destructuring in every proof. `chooseNat` returns a bare `Nat`, and its
-  inversion lemmas produce plain inequalities that `omega` consumes directly. See `Tree.genBST` in
-  `BasaltExamples/BST.lean`.
+  inversion lemmas produce plain inequalities that `omega` consumes directly.
+- **Use `chooseInt` when the recursion subtracts from the bounds.** `Nat` truncation turns the
+  empty interval `[lo, lo - 1]` into the singleton `[0, 0]` at `lo = 0`, silently widening the
+  generator's support — and the matching predicate is wrong in the same way, so the support proof
+  still goes through. `Tree.genBST` (`BasaltExamples/BST.lean`) recurses on `[lo, x - 1]` and takes
+  `Int` bounds for exactly this reason.
 - **Recursive generators use `partial_fixpoint`** (Lean's CCPO fixpoint). Any combinator appearing
   in the recursive body needs a `@[partial_fixpoint_monotone]` lemma; the library's own combinators
   carry theirs (grep for the `@[partial_fixpoint_monotone]` tag for the current list), and
@@ -98,6 +102,14 @@ interpretation.
 Each has a fixed recipe. All three start the same way — unfold one step of the recursion, invert
 what one step can produce, then do logic/arithmetic — and they differ only in which interpretation
 they invert at.
+
+**A generator that post-processes another** (`let x ← g; return f x`) has no recursion to unfold,
+and all three obligations reduce to composition instead: `support_simp` plus a fact about `f`,
+`SPMF.IsPMF_bind_pure`, and `IsBounded_bind`. `List.genSortedBySorting`
+(`SortedList/BySorting.lean`) is the worked instance — it sorts a `List.arbitrary` draw, and each
+law follows from the corresponding law of `List.arbitrary` plus one fact about `f`: that sorting
+sorts, that it fixes a sorted list, that it is a permutation. Cost is the obligation that can fail
+outright for this shape (Step 2).
 
 **Name the laws `<GEN>.sound_complete`, `<GEN>.terminates`, `<GEN>.cost_bounded`.** The dot is not
 cosmetic: `#genstats` discovers laws by exactly this naming convention and reports which ones a
@@ -207,7 +219,8 @@ finish with `exact SPMF.mass_ge_iInf _ <new index>` (see `List.genSortedGt.termi
 `Tree.genHeap.terminates`). For a branch making two recursive calls, chain
 `SPMF.mass_bind_ge_mul` (see `Tree.genHeap.terminates`). For a `frequency`, replace `mass_pick`
 with `SPMF.mass_frequency` / `SPMF.mass_frequency_ge`; for a `chooseNat` pivot,
-`SPMF.mass_bind_chooseNat_ge` (raw `choose`: `SPMF.mass_bind_choose_ge`).
+`SPMF.mass_bind_chooseNat_ge` (`chooseInt`: `SPMF.mass_bind_chooseInt_ge`; raw `choose`:
+`SPMF.mass_bind_choose_ge`).
 
 **Shrinking seed** (`Tree.genWeightedBST`, `BST/Weighted.lean`) is the one regime with real
 content: you supply a ranking function `φ : Seed → ℝ≥0∞` (with `φ ≥ 1`) whose expected value drops
@@ -222,8 +235,10 @@ offspring exactly 1 — so it terminates via `IsPMF_of_critical_family` with no 
 Two things to know:
 
 - Candidate `φ`s, in order: the seed measure; `≡ const` (that's the static-seed case); seed measure
-  plus a depth term. Evaluate the drift in the *actual truncated `Nat` arithmetic* — `bstRank`
-  needs a `+4` bump at `lo = 0` because the pivot `x = 0` recurses on `(0, 0-1) = (0, 0)`.
+  plus a depth term. Evaluate the drift in the seed's *actual* arithmetic: `bstRank` is the plain
+  interval measure and the children's ranks sum to the parent's at every pivot, but that holds
+  because the bounds are `Int`. Under `Nat` bounds the `lo = 0` pivot has an unshrunk child and the
+  same `φ` fails its drift check — a truncating seed costs you a correction term in the rank.
 - A wrong `φ` is a *failed drift check*, never a wrong theorem. Guess freely.
 
 Whatever the regime, the residual ENNReal *arithmetic* (drift inequalities, fixed-point

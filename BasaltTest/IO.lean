@@ -66,7 +66,7 @@ example : Gen UniformIO := inferInstance
 #guard_msgs in #eval exercise 10 (ArbNat.Nat.arbitrary : UniformIO Nat).run
 
 /-- info: drew 10 samples -/
-#guard_msgs in #eval exercise 10 (BST.Tree.genBST 0 10 : UniformIO (BST.Tree Nat)).run
+#guard_msgs in #eval exercise 10 (BST.Tree.genBST 0 10 : UniformIO (BST.Tree Int)).run
 
 /-- info: drew 10 samples -/
 #guard_msgs in #eval exercise 10 (Heap.Tree.genHeap 0 : UniformIO Heap.Tree).run
@@ -102,4 +102,4 @@ def exerciseOptionT (n : Nat) (gen : OptionT IO α) : IO Unit := do
 #guard_msgs in #eval exerciseOptionT 10 (ArbNat.Nat.arbitrary : OptionT IO Nat)
 
 /-- info: 10/10 some -/
-#guard_msgs in #eval exerciseOptionT 10 (BST.Tree.genBST 0 10 : OptionT IO (BST.Tree Nat))
+#guard_msgs in #eval exerciseOptionT 10 (BST.Tree.genBST 0 10 : OptionT IO (BST.Tree Int))

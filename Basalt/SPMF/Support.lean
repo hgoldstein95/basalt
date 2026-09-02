@@ -257,6 +257,17 @@ theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
     exact ⟨⟨⟨n, h1, h2⟩⟩, rfl⟩
 
 @[simp]
+theorem mem_support_chooseInt_iff {lo hi : Int} {h : lo ≤ hi} {n : Int} :
+    n ∈ (chooseInt lo hi h : SPMF Int).support ↔ lo ≤ n ∧ n ≤ hi := by
+  unfold chooseInt
+  simp only [mem_support_bind_iff, mem_support_pure_iff, mem_support_chooseNat_iff]
+  constructor
+  · rintro ⟨k, ⟨-, hk⟩, rfl⟩
+    omega
+  · rintro ⟨h1, h2⟩
+    exact ⟨(n - lo).toNat, ⟨Nat.zero_le _, by omega⟩, by omega⟩
+
+@[simp]
 theorem support_optionGen
     {g : SPMF α} :
     support (optionGen g) = {none} ∪ {some x | x ∈ g.support} := by
@@ -676,7 +687,7 @@ theorem bind_congr_support
   · simp only [support, Function.notMem_support] at hsupport
     simp_all [DFunLike.coe]
 
-private theorem csup_apply {c : SPMF α → Prop} (hc : chain c) (a : α) :
+theorem csup_apply {c : SPMF α → Prop} (hc : chain c) (a : α) :
     (CCPO.csup hc) a = ⨆ f, ⨆ (_ : c f), f a := by
   have hge : ∀ b, ⨆ f, ⨆ (_ : c f), f b ≤ (CCPO.csup hc) b :=
     fun b => iSup₂_le (fun f hf => le_csup hc hf b)

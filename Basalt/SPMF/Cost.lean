@@ -168,6 +168,17 @@ theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n c : Nat} :
   · rintro ⟨⟨h1, h2⟩, rfl⟩
     exact ⟨⟨⟨n, h1, h2⟩⟩, rfl, rfl⟩
 
+@[simp]
+theorem mem_support_chooseInt_iff {lo hi : Int} {h : lo ≤ hi} {n : Int} {c : Nat} :
+    (n, c) ∈ (chooseInt lo hi h : SPMF.Cost Int).support ↔ (lo ≤ n ∧ n ≤ hi) ∧ c = 1 := by
+  unfold chooseInt
+  simp only [mem_support_bind_iff, mem_support_pure_iff, mem_support_chooseNat_iff]
+  constructor
+  · rintro ⟨k, n1, n2, ⟨⟨-, hk⟩, rfl⟩, ⟨rfl, rfl⟩, rfl⟩
+    exact ⟨by omega, rfl⟩
+  · rintro ⟨⟨h1, h2⟩, rfl⟩
+    exact ⟨(n - lo).toNat, 1, 0, ⟨⟨Nat.zero_le _, by omega⟩, rfl⟩, ⟨by omega, rfl⟩, rfl⟩
+
 theorem mem_support_frequency
     {gs : List (Nat × (Unit → SPMF.Cost α))}
     {hne : 0 < (List.map Prod.fst gs).sum}
@@ -215,6 +226,13 @@ theorem IsBounded_choose : IsBounded (choose lo hi h) (fun _ => 1) := by
   rw [IsBounded_iff]
   rintro ⟨n, c⟩ hmem
   simp only [mem_support_choose_iff] at hmem
+  omega
+
+theorem IsBounded_chooseInt {lo hi : Int} {h : lo ≤ hi} :
+    IsBounded (chooseInt lo hi h : SPMF.Cost Int) (fun _ => 1) := by
+  rw [IsBounded_iff]
+  rintro ⟨n, c⟩ hmem
+  simp only [mem_support_chooseInt_iff] at hmem
   omega
 
 /-- The `default` generator has empty support since it's just the constant function returning 0. -/
@@ -574,3 +592,64 @@ theorem IsBounded_nonEmptyListOf
       dsimp
       simp only [List.map_cons, List.sum_cons]
       omega
+
+namespace SPMF.Cost
+
+section expectation
+
+open scoped ENNReal
+
+/-- The expected number of random choices a cost-tracking generator makes. -/
+noncomputable def expectedCost (g : SPMF.Cost α) : ℝ≥0∞ :=
+  SPMF.expect g (fun p => (p.2 : ℝ≥0∞))
+
+theorem expect_pure (a : α) (φ : α × Nat → ℝ≥0∞) :
+    SPMF.expect (Pure.pure a : SPMF.Cost α) φ = φ (a, 0) := by
+  have h : (Pure.pure a : SPMF.Cost α) = (Pure.pure (a, 0) : SPMF (α × Nat)) := rfl
+  rw [h, SPMF.expect_pure]
+
+/-- The tower rule at the cost interpretation: the two stages' costs add. -/
+theorem expect_bind (m : SPMF.Cost α) (f : α → SPMF.Cost β) (φ : β × Nat → ℝ≥0∞) :
+    SPMF.expect (m >>= f : SPMF.Cost β) φ
+      = SPMF.expect m (fun p => SPMF.expect (f p.1) (fun q => φ (q.1, p.2 + q.2))) := by
+  have h : (m >>= f : SPMF.Cost β)
+      = SPMF.bind m fun p => SPMF.bind (f p.1) fun q => SPMF.pure (q.1, p.2 + q.2) := rfl
+  rw [h, SPMF.bind_eq, SPMF.expect_bind]
+  congr 1
+  funext p
+  rw [SPMF.bind_eq, SPMF.expect_bind]
+  congr 1
+  funext q
+  rw [SPMF.pure_eq, SPMF.expect_pure]
+
+theorem expect_pick (x y : Unit → SPMF.Cost α) (φ : α × Nat → ℝ≥0∞) :
+    SPMF.expect (pick x y : SPMF.Cost α) φ
+      = (1/2 : ℝ≥0∞) * SPMF.expect (x ()) (fun p => φ (p.1, 1 + p.2))
+        + (1/2 : ℝ≥0∞) * SPMF.expect (y ()) (fun p => φ (p.1, 1 + p.2)) := by
+  unfold RandomChoice.pick
+  rw [expect_bind]
+  have hch : (choose 0 1 (by simp) : SPMF.Cost (ULift {n : Nat // 0 ≤ n ∧ n ≤ 1}))
+      = SPMF.bind (choose 0 1 (by simp) : SPMF (ULift {n : Nat // 0 ≤ n ∧ n ≤ 1}))
+          (fun n => SPMF.pure (n, 1)) := rfl
+  rw [hch, SPMF.bind_eq, SPMF.expect_bind]
+  simp only [SPMF.pure_eq, SPMF.expect_pure]
+  rw [SPMF.expect_choose (Nat.zero_le 1) _
+    (fun k => if k == 0 then SPMF.expect (x ()) (fun p => φ (p.1, 1 + p.2))
+              else SPMF.expect (y ()) (fun p => φ (p.1, 1 + p.2)))
+    (fun a => by by_cases h : (a.down.val == 0) = true <;> simp [h])]
+  have hIcc : Finset.Icc 0 1 = ({0, 1} : Finset ℕ) := by decide
+  rw [hIcc, Finset.sum_insert (by decide), Finset.sum_singleton]
+  simp only [Nat.sub_zero, beq_self_eq_true, if_pos, Nat.one_ne_zero, beq_iff_eq]
+  norm_num
+  rw [ENNReal.add_div]
+  congr 1 <;> rw [ENNReal.div_eq_inv_mul]
+
+/-- A worst-case cost law bounds the average: `expectedCost` is at most the expected bound. -/
+theorem expectedCost_le_of_IsBounded {g : SPMF.Cost α} {c : α → Nat} (h : IsBounded g c) :
+    expectedCost g ≤ SPMF.expect g (fun p => (c p.1 : ℝ≥0∞)) := by
+  refine SPMF.expect_mono_support fun p hp => ?_
+  exact_mod_cast h p hp
+
+end expectation
+
+end SPMF.Cost
