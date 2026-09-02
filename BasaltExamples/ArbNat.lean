@@ -59,4 +59,50 @@ theorem Nat.arbitrary.cost_bounded :
       show 1 + m ≤ n + 1
       omega
 
+section expected_cost
+open scoped ENNReal
+
+/-- The cost recurrence `E = ½·1 + ½·(1 + E)` solves to 2; `fix_induct` gives the upper bound. -/
+theorem Nat.arbitrary.expected_cost :
+    SPMF.Cost.expectedCost (Nat.arbitrary : SPMF.Cost Nat) ≤ 2 := by
+  open Lean.Order in
+  delta arbitrary
+  apply fix_induct (motive := fun (g : SPMF.Cost Nat) =>
+    SPMF.expect g (fun p => (p.2 : ℝ≥0∞)) ≤ 2) _ ?admissible ?step
+  case admissible => exact SPMF.admissible_expect_le _ _
+  case step =>
+    intro arbitrary_rec ih
+    rw [SPMF.Cost.expect_pick, SPMF.Cost.expect_pure, SPMF.Cost.expect_bind]
+    simp only [SPMF.Cost.expect_pure]
+    push_cast
+    simp only [add_zero]
+    have hrec : SPMF.expect arbitrary_rec (fun p => (1 : ℝ≥0∞) + (p.2 : ℝ≥0∞)) ≤ 3 := by
+      calc SPMF.expect arbitrary_rec (fun p => (1 : ℝ≥0∞) + (p.2 : ℝ≥0∞))
+          = SPMF.expect arbitrary_rec (fun _ => 1)
+              + SPMF.expect arbitrary_rec (fun p => (p.2 : ℝ≥0∞)) := SPMF.expect_add _ _ _
+        _ ≤ 1 + 2 := add_le_add (by rw [SPMF.expect_one]; exact SPMF.mass_le_one _) ih
+        _ = 3 := by norm_num
+    calc (1/2 : ℝ≥0∞) * 1
+          + 1/2 * SPMF.expect arbitrary_rec (fun p => (1 : ℝ≥0∞) + (p.2 : ℝ≥0∞))
+        ≤ 1/2 * 1 + 1/2 * 3 := add_le_add le_rfl (mul_le_mul_right hrec _)
+      _ = 2 := by
+          ennreal_to_real
+          norm_num
+
+/-- Markov: generation costs at least `k` choices with probability at most `2 / k`. -/
+theorem Nat.arbitrary.cost_tail {k : Nat} (hk : k ≠ 0) :
+    SPMF.prob (Nat.arbitrary : SPMF.Cost Nat) {p | k ≤ p.2} ≤ 2 / (k : ℝ≥0∞) := by
+  have hset : {p : Nat × Nat | k ≤ p.2} = {p : Nat × Nat | (k : ℝ≥0∞) ≤ (p.2 : ℝ≥0∞)} := by
+    ext p
+    simp
+  rw [hset]
+  calc SPMF.prob (Nat.arbitrary : SPMF.Cost Nat) {p | (k : ℝ≥0∞) ≤ (p.2 : ℝ≥0∞)}
+      ≤ SPMF.expect (Nat.arbitrary : SPMF.Cost Nat) (fun p => (p.2 : ℝ≥0∞)) / k :=
+        SPMF.prob_le_expect_div _ _ (by exact_mod_cast hk) (ENNReal.natCast_ne_top k)
+    _ ≤ 2 / k := by
+        gcongr
+        exact Nat.arbitrary.expected_cost
+
+end expected_cost
+
 end ArbNat

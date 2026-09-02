@@ -109,6 +109,13 @@ theorem mass_chooseNat (lo hi : Nat) (h : lo ≤ hi) :
   rw [mass_map]
   exact mass_choose lo hi h
 
+@[simp]
+theorem mass_chooseInt (lo hi : Int) (h : lo ≤ hi) :
+    (chooseInt lo hi h : SPMF Int).mass = 1 := by
+  unfold chooseInt
+  rw [mass_bind_pure]
+  exact mass_chooseNat _ _ _
+
 theorem mass_bind_const {x : SPMF α} {y : SPMF β} :
     (x >>= fun _ => y).mass = x.mass * y.mass := by
   unfold mass
@@ -201,6 +208,28 @@ theorem mass_bind_chooseNat_ge {lo hi : Nat} (h : lo ≤ hi)
   rw [bind_map_left]
   exact mass_bind_choose_ge h fun a => hf a.down.val a.down.property.1 a.down.property.2
 
+/-- `chooseInt` form of `mass_bind_choose_ge`. The average is over the `Int` interval; the shift by
+`lo` that defines `chooseInt` is undone by reindexing the sum. -/
+theorem mass_bind_chooseInt_ge {lo hi : Int} (h : lo ≤ hi)
+    {f : Int → SPMF α} {m : Int → ℝ≥0∞}
+    (hf : ∀ x, lo ≤ x → x ≤ hi → (f x).mass ≥ m x) :
+    (chooseInt lo hi h >>= f).mass
+      ≥ (∑ x ∈ Finset.Icc lo hi, m x) / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞) := by
+  have hreindex : ∑ k ∈ Finset.Icc 0 (hi - lo).toNat, m (lo + (k : Int))
+      = ∑ x ∈ Finset.Icc lo hi, m x := by
+    refine Finset.sum_nbij' (fun k => lo + (k : Int)) (fun x => (x - lo).toNat)
+      (fun k hk => ?_) (fun x hx => ?_) (fun k hk => ?_) (fun x hx => ?_) (fun k hk => rfl)
+    · simp only [Finset.mem_Icc] at hk ⊢; omega
+    · simp only [Finset.mem_Icc] at hx ⊢; omega
+    · simp only [Finset.mem_Icc] at hk; omega
+    · simp only [Finset.mem_Icc] at hx; omega
+  have hcard : ((hi - lo).toNat - 0 + 1 : ℕ) = ((hi - lo + 1).toNat : ℕ) := by omega
+  unfold chooseInt
+  simp only [LawfulMonad.bind_assoc, LawfulMonad.pure_bind]
+  refine le_of_eq_of_le ?_
+    (mass_bind_chooseNat_ge (Nat.zero_le _) fun k _ _ => hf _ (by omega) (by omega))
+  rw [hreindex, hcard]
+
 /-- A `tsum` over `α` commutes with a weighted `List.sum`. -/
 private theorem tsum_map_weighted (gs : List (Nat × (Unit → SPMF α))) :
     ∑' a, (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum
@@ -262,6 +291,10 @@ theorem IsPMF_choose (lo hi : Nat) (h : lo ≤ hi) :
 theorem IsPMF_chooseNat (lo hi : Nat) (h : lo ≤ hi) :
     IsPMF (chooseNat lo hi h : SPMF Nat) :=
   mass_chooseNat lo hi h
+
+theorem IsPMF_chooseInt (lo hi : Int) (h : lo ≤ hi) :
+    IsPMF (chooseInt lo hi h : SPMF Int) :=
+  mass_chooseInt lo hi h
 
 theorem IsPMF_bind_pure {x : SPMF α} {f : α → β} (hx : IsPMF x) :
     IsPMF (x >>= fun a => Pure.pure (f a)) := by
