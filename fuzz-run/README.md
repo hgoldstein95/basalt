@@ -171,26 +171,35 @@ cold start (fresh process, so libFuzzer begins with an empty corpus). Measured o
 
 | property | fuzz | io | plausible |
 |---|---|---|---|
-| `threshold` | 28 runs | 3 | 3 |
-| `bst-buggy-insert` | 10 runs | 3 | 9 |
-| `bst-buggy-insert2` | 130 runs | 7 | 4 |
-| `bst-buggy-delete` | 789 runs | 22 | 41 |
-| `chain-2` | 200 runs | 87,745 | 19,789 |
-| `chain-3` | 556 runs | 3,839,993 (8/9 trials) | 1,725,902 (3/9) |
-| `chain-4` | 1,246 runs | **not found** (0/9) | **not found** (0/9) |
+| `threshold` | 27 runs | 2 | 2 |
+| `bst-buggy-insert` | 4 runs | 7 | 5 |
+| `bst-buggy-insert2` | 232 runs | 2 | 2 |
+| `bst-buggy-delete` | 667 runs | 14 | 10 |
+| `chain-2` | 587 runs | 100,364 | 24,824 |
+| `chain-3` | 561 runs | 5,902,188 (5/9 trials) | 14,718,791 (7/9) |
+| `chain-4` | 684 runs | **not found** (0/9) | **not found** (0/9) |
+
+Two things to know before reading it. A median is over the trials that *found* the bug, so it goes
+with the `found` count: where those differ, the backend that found it less often has the more
+favourably conditioned median (which is why `chain-3`'s `io` column looks better than `plausible`'s).
+And a run is a *tested* input — a discarded one is budgeted separately and does not count — which
+matters for `bst-buggy-delete`, whose precondition rejects most draws.
 
 Read the two halves separately, because they say opposite things:
 
-- **Shallow bugs: random wins.** Where one unlucky draw exposes the bug, coverage guidance is pure
-  overhead — libFuzzer spends its first inputs mapping coverage, and its per-run cost is higher
-  (~55k runs/s vs `io`'s ~375k and `plausible`'s ~220k on `bst-gen`). All four BST bugs are of this
-  kind: every backend finds them in well under a millisecond, and the random ones get there in the
-  fewest runs.
+- **Shallow bugs: random usually wins, and the margin is noise.** Where one unlucky draw exposes the
+  bug, coverage guidance is pure overhead — libFuzzer spends its first inputs mapping coverage, and
+  its per-run cost is higher (~54k runs/s vs `io`'s ~360k and `plausible`'s ~205k on `bst-gen`). All
+  four BST bugs are of this kind, and every backend finds them in well under a millisecond. Do not
+  read the ordering within a row: at a median of single-digit runs the trial-to-trial spread of a
+  geometric distribution swamps it, which is why `bst-buggy-insert` here has the fuzzer ahead while
+  the other three have it behind by one to two orders of magnitude.
 - **Staged bugs: only the fuzzer arrives.** `chain-n` puts the bug behind `n` nested guards, so a
   blind sampler needs all `n` to hit at once (`256⁻ⁿ`) while the fuzzer banks one stage at a time and
   pays roughly `n·256`. The cost of a stage is therefore multiplicative for random search and
-  additive for the fuzzer: at `n=4` that is ~1.2k runs versus 4.3 billion expected, and the random
-  backends found nothing in 20M runs × 9 trials.
+  additive for the fuzzer: at `n=4` that is a few hundred runs versus 4.3 billion expected, and the
+  random backends found nothing in 20M runs × 9 trials. This is the only half of the table where the
+  gap is far larger than the noise.
 
 The honest summary is that the backends are complementary, and which wins is a property of the *bug*,
 not of the tool: reach for random testing by default because it is simpler and faster per run, and
