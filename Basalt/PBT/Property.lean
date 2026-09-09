@@ -39,9 +39,9 @@ abbrev TestOutcome := Except Rejection Unit
 
 /-! ## The property monad
 
-`PropM G` is `ExceptT Rejection G`, which is *definitionally* `G TestOutcome` — so a runner can take
-a property as a plain generator of outcomes, and the instances below are all that stand between the
-two views. -/
+`PropM G` is `ExceptT Rejection G`, so `PropM G Unit` is definitionally `G TestOutcome` — a runner
+can take a property as a plain generator of outcomes, and the instances below are all that stand
+between the two views. -/
 
 /-- A property: a generator that may reject its input. -/
 abbrev PropM (G : Type → Type) := ExceptT Rejection G
@@ -146,7 +146,7 @@ instance instCoeDecidablePropM [Gen G] (p : Prop) [Decidable p] : CoeDep Prop p 
 
 /-- One test at a chosen interpretation: the property as a plain generator of its outcome.
 
-`PropM G` is definitionally `G TestOutcome`, so this is `ExceptT.run` and costs nothing — but a
+`PropM G Unit` is definitionally `G TestOutcome`, so this is `ExceptT.run` and costs nothing — but a
 runner must go through it, and so must anything that wants to *observe* an outcome. Without it, `←`
 on a property inside a `do` block infers the block's monad as `PropM G` and yields the property's
 `Unit`, hiding the outcome rather than reporting it. -/
