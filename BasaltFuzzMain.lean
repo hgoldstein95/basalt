@@ -21,7 +21,7 @@ open Basalt.Fuzz Basalt.PBT RandomChoice
 /-- Infrastructure self-test: a deliberately false property. Its failure lives on a distinct branch
 (`fail` vs `pass`), so it is reachable by coverage-guided search — libFuzzer hits a byte `≥ 200`
 quickly, the counterexample is reported, and the process crashes for libFuzzer to record. -/
-def propThreshold [Gen G] : G TestOutcome :=
+def propThreshold [Gen G] : PropM G Unit :=
   forAll (chooseNat 0 255) (· < 200)
 
 /-- The property registry, selected by the first non-flag CLI argument. `bst-*` are the worked BST

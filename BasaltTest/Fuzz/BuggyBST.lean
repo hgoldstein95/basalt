@@ -161,65 +161,63 @@ def genTreeAndKey [Gen G] : G (Tree × Int) := do
   return (t, k)
 
 /-- Sanity: the generator only ever produces valid BSTs. Should never fail. -/
-def prop_genBST_isBST [Gen G] : G TestOutcome :=
+def prop_genBST_isBST [Gen G] : PropM G Unit :=
   forAll (genBST loKey hiKey) (fun t => t.isBST)
 
 /-- The correct insert preserves the BST invariant. Should never fail (no false positives). -/
-def prop_insert_preserves_BST [Gen G] : G TestOutcome :=
+def prop_insert_preserves_BST [Gen G] : PropM G Unit :=
   forAll genTreeAndKey (fun (t, k) => t.insert k |>.isBST)
 
 /-- The buggy insert claims to preserve the BST invariant. Every backend finds a counterexample: a
 valid BST plus a key it already contains, which the missing equal-key guard duplicates. -/
-def prop_insertBuggy_preserves_BST [Gen G] : G TestOutcome :=
+def prop_insertBuggy_preserves_BST [Gen G] : PropM G Unit :=
   forAll genTreeAndKey (fun (t, k) => t.insertBuggy k |>.isBST)
 
 /-! ### Model-based properties for `delete`
 
 The postcondition is `t.delete k`'s in-order traversal against the list model `t.toList.erase k` —
 strictly stronger than `isBST`, and the only thing that sees a silently dropped key. Both properties
-`discard` unless the tree actually contains `k`, since deleting an absent key exercises nothing. -/
+`assume` the tree actually contains `k`, since deleting an absent key exercises nothing. -/
 
 /-- Correct delete agrees with the list model. Never fails. -/
-def prop_delete_model [Gen G] : G TestOutcome := do
+def prop_delete_model [Gen G] : PropM G Unit := do
   let (t, k) ← genTreeAndKey
-  if !t.contains k then return .discard
-  checkWith ((t.delete k).toList == t.toList.erase k)
-    (fun () => s!"t={reprStr t}, k={k}")
+  assume (t.contains k)
+  check ((t.delete k).toList == t.toList.erase k) s!"t={reprStr t}, k={k}"
 
 /-- The buggy delete claims to agree with the list model. The counterexample renders both traversals,
 so the dropped keys are visible in the report. -/
-def prop_deleteBuggy_model [Gen G] : G TestOutcome := do
+def prop_deleteBuggy_model [Gen G] : PropM G Unit := do
   let (t, k) ← genTreeAndKey
-  if !t.contains k then return .discard
+  assume (t.contains k)
   let got := (t.deleteBuggy k).toList
   let want := t.toList.erase k
-  checkWith (got == want)
-    (fun () => s!"t={reprStr t}, k={k}, got={got}, want={want}")
+  check (got == want) s!"t={reprStr t}, k={k}, got={got}, want={want}"
 
 /-! ### Composed, multi-input properties
 
 These illustrate that a property composes with ordinary monadic `do`: several inputs drawn in
-sequence, a precondition as an early `return .discard`, and one `check`/`checkWith` at the end.
-They are polymorphic in `G`, so the *same* term runs under `Plausible.Gen` too. -/
+sequence, a precondition as an `assume`, and one `check` at the end. They are polymorphic in `G`, so
+the *same* term runs under `Plausible.Gen` too. -/
 
 /-- Insert two *distinct* keys with the correct `insert`; the invariant is preserved. Never fails.
 Composition: one tree + two keys, a distinctness precondition, then `check`. -/
-def prop_insert_two_distinct [Gen G] : G TestOutcome := do
+def prop_insert_two_distinct [Gen G] : PropM G Unit := do
   let t  ← genBST loKey hiKey
   let k1 ← chooseInt loKey hiKey (by decide)
   let k2 ← chooseInt loKey hiKey (by decide)
-  if k1 == k2 then return .discard
+  assume (k1 != k2)
   let t' := (t.insert k1).insert k2
   check t'.isBST
 
 /-- The same composition with the buggy insert: libFuzzer finds a `(t, k1, k2)` counterexample, and
-`checkWith` renders all three drawn inputs. -/
-def prop_insertBuggy_two_distinct [Gen G] : G TestOutcome := do
+`check`'s message renders all three drawn inputs. -/
+def prop_insertBuggy_two_distinct [Gen G] : PropM G Unit := do
   let t  ← genBST loKey hiKey
   let k1 ← chooseInt loKey hiKey (by decide)
   let k2 ← chooseInt loKey hiKey (by decide)
-  if k1 == k2 then return .discard
+  assume (k1 != k2)
   let t' := (t.insertBuggy k1).insertBuggy k2
-  checkWith t'.isBST (fun () => s!"t={reprStr t}, k1={k1}, k2={k2}")
+  check t'.isBST s!"t={reprStr t}, k1={k1}, k2={k2}"
 
 end BuggyBST

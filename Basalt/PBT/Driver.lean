@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2026 Amazon.com, Inc. or its affiliates. All rights reserved.
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
@@ -24,22 +24,32 @@ structure Backend where
   /-- Reproduce one saved input, for a backend whose inputs are files (a fuzzer's artifacts). -/
   replay? : Option (Property → String → IO Unit) := none
 
+/-- The value of an `-flag=N` argument, or `default`. -/
+private def natFlag (argv : Array String) (flag : String) (default : Nat) : Nat :=
+  match argv.findSome? (fun a =>
+      if a.startsWith flag then (a.drop flag.length).toNat? else none) with
+  | some n => n
+  | none => default
+
 /-- The run budget, read from `-runs=N`: libFuzzer's own flag spelling, so one command line drives
 every backend. -/
 def runsOf (argv : Array String) (default : Nat := 100000) : Nat :=
-  match argv.findSome? (fun a => if a.startsWith "-runs=" then (a.drop 6).toNat? else none) with
-  | some n => n
-  | none => default
+  natFlag argv "-runs=" default
+
+/-- How many inputs may be discarded per requested run before the campaign gives up, read from
+`-discard_ratio=N`. QuickCheck's `maxDiscardRatio`, spelled as a flag. -/
+def discardRatioOf (argv : Array String) (default : Nat := 10) : Nat :=
+  natFlag argv "-discard_ratio=" default
 
 /-- Uniform random testing at `IO`. -/
 def ioBackend : Backend where
   name := "io"
-  campaign T argv := ioCampaign T (runsOf argv)
+  campaign T argv := ioCampaign T (runsOf argv) (discardRatioOf argv)
 
 /-- Uniform random testing at `Plausible.Gen`. -/
 def plausibleBackend : Backend where
   name := "plausible"
-  campaign T argv := plausibleCampaign T (runsOf argv)
+  campaign T argv := plausibleCampaign T (runsOf argv) (discardRatioOf argv)
 
 /-- The requested backend, or the first one as the default. -/
 def findBackend (backends : List Backend) : Option String → Option Backend
@@ -54,7 +64,7 @@ def dispatch (exe : String) (backends : List Backend) (props : List (String × P
   let names := String.intercalate ", " (props.map (·.1))
   let usage :=
     s!"usage: {exe} [--backend={String.intercalate "|" (backends.map (·.name))}] <property> \
-        [-runs=N] [backend args...]\n"
+        [-runs=N] [-discard_ratio=N] [backend args...]\n"
       ++ s!"       {exe} replay <property> <file>\n"
       ++ s!"known properties: {names}"
   let (flags, rest) := args.partition (·.startsWith "--backend=")

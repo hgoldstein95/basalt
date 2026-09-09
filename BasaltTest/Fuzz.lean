@@ -21,12 +21,12 @@ open Basalt.Fuzz Basalt.PBT RandomChoice
 private def bytes (l : List UInt8) : ByteArray := ⟨l.toArray⟩
 
 private def render : TestOutcome → String
-  | .pass => "pass"
-  | .fail r => s!"fail: {r ()}"
-  | .discard => "discard"
+  | .ok () => "pass"
+  | .error (.fail r) => s!"fail: {r.get}"
+  | .error .discard => "discard"
 
 /- A single choice in `[0,9]` consumes one byte and reduces mod 10; the property is `· < 9`. -/
-private def propLt9 : FuzzGen TestOutcome := forAll (chooseNat 0 9) (· < 9)
+private def propLt9 : PropM FuzzGen Unit := forAll (chooseNat 0 9) (· < 9)
 
 /- Byte `9` → value `9`, so `9 < 9` fails and renders the drawn value. -/
 /-- info: fail: 9 -/
@@ -41,7 +41,7 @@ private def propLt9 : FuzzGen TestOutcome := forAll (chooseNat 0 9) (· < 9)
 #guard_msgs in #eval IO.println (render (runOne propLt9 (bytes [])))
 
 /- `pick` reads one byte and takes bit 0: even → first branch, odd → second. -/
-private def propPick : FuzzGen TestOutcome :=
+private def propPick : PropM FuzzGen Unit :=
   forAll (pick (fun () => pure 100) (fun () => pure 200)) (fun n => n == 100)
 
 /- Even byte → first branch. -/
@@ -54,18 +54,18 @@ private def propPick : FuzzGen TestOutcome :=
 
 /- A recursive polymorphic generator from `BasaltExamples/` runs at `FuzzGen` and terminates on a
 fixed buffer. -/
-private def propBSTsizeNonneg : FuzzGen TestOutcome :=
+private def propBSTsizeNonneg : PropM FuzzGen Unit :=
   forAll (BST.Tree.genBST 0 20) (fun t => t.size ≥ 0)
 
 /-- info: pass -/
 #guard_msgs in #eval IO.println (render (runOne propBSTsizeNonneg (bytes [1,5,1,3,0,0,0,0])))
 
-/- Two draws (one byte each), a precondition, then `checkWith` — plain monadic `do`. -/
-private def propTwo : FuzzGen TestOutcome := do
+/- Two draws (one byte each), a precondition, then `check` — plain monadic `do`. -/
+private def propTwo : PropM FuzzGen Unit := do
   let x ← chooseNat 0 9
   let y ← chooseNat 0 9
-  if x == y then return .discard
-  checkWith (x < y) (fun () => s!"x={x}, y={y}")
+  assume (x != y)
+  check (x < y) s!"x={x}, y={y}"
 
 /- Ordered: `x=3, y=7`. -/
 /-- info: pass -/
@@ -87,17 +87,18 @@ build failure here rather than a link error in the opt-in executable. -/
 
 private def propAnyBackend : Property := fun _ => do
   let x ← chooseNat 0 9
-  checkWith (x ≤ 9) (fun () => s!"x={x}")
+  check (x ≤ 9) s!"x={x}"
 
 /- `x ≤ 9` holds for every draw, so the outcome is `pass` whatever the backend chooses. -/
 /-- info: pass -/
 #guard_msgs in #eval IO.println (render (runOne (propAnyBackend FuzzGen) (bytes [4])))
 
 /-- info: pass -/
-#guard_msgs in #eval do IO.println (render (← propAnyBackend IO))
+#guard_msgs in #eval do IO.println (render (← runProp (propAnyBackend IO)))
 
 /-- info: pass -/
-#guard_msgs in #eval do IO.println (render (← Plausible.Gen.run (propAnyBackend Plausible.Gen) 0))
+#guard_msgs in
+#eval do IO.println (render (← Plausible.Gen.run (runProp (propAnyBackend Plausible.Gen)) 0))
 
 /-! ### The fuzz target's `genBST` is the proved one
 

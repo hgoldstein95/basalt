@@ -96,9 +96,9 @@ example : Gen FuzzGen := inferInstance
 /-- Run a property on one input buffer — the pure core the C bridge calls per input. The `none` case
 is the `partial_fixpoint` bottom, unreachable for a productive generator; we map it to `discard` for
 totality. -/
-def runOne (T : FuzzGen TestOutcome) (bytes : ByteArray) : TestOutcome :=
-  match T.run { buffer := bytes, cursor := 0 } with
+def runOne (T : PropM FuzzGen Unit) (bytes : ByteArray) : TestOutcome :=
+  match (runProp T).run { buffer := bytes, cursor := 0 } with
   | some (outcome, _) => outcome
-  | none              => .discard
+  | none              => Except.error .discard
 
 end Basalt.Fuzz

@@ -35,10 +35,10 @@ newly-reached guard as coverage and mutates onward from that input, paying rough
 Do not drop the `break`: it is what nests the guards. Without it every input draws all `n` bytes and
 reaches every stage, so no new coverage distinguishes a partial match and the benchmark quietly
 degrades to blind search for every backend. -/
-def propChain [Gen G] (n : Nat) : G TestOutcome := do
+def propChain [Gen G] (n : Nat) : PropM G Unit := do
   let mut ok := 0
   for _ in [0:n] do
     if (← chooseNat 0 255) == needle then ok := ok + 1 else break
-  checkWith (ok < n) (fun () => s!"stages={ok} of {n}")
+  check (ok < n) s!"stages={ok} of {n}"
 
 end Staged

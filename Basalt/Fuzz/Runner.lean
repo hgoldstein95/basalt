@@ -31,15 +31,15 @@ opaque goImpl (run : ByteArray → IO UInt8) (argv : Array String) : IO Unit
 `counters` tallies executions and discards so a failing campaign can report the same run line the
 other backends do — libFuzzer's own `#N` markers count only corpus-worthy inputs, which is not the
 number of tests run. -/
-def runOneIO (counters : IO.Ref (Nat × Nat)) (T : FuzzGen TestOutcome) (bytes : ByteArray) :
+def runOneIO (counters : IO.Ref (Nat × Nat)) (T : PropM FuzzGen Unit) (bytes : ByteArray) :
     IO UInt8 := do
   counters.modify (fun (runs, discards) => (runs + 1, discards))
   match runOne T bytes with
-  | .pass => pure 0
-  | .discard => counters.modify (fun (r, d) => (r, d + 1)); pure 2
-  | .fail render =>
+  | Except.ok () => pure 0
+  | Except.error .discard => counters.modify (fun (r, d) => (r, d + 1)); pure 2
+  | Except.error (.fail render) =>
     let (runs, discards) ← counters.get
-    reportFailure (render ())
+    reportFailure render.get
       #[("input bytes", s!"{bytes.toList.map (fun b => b.toNat)}"),
         ("runs", s!"{runs} ({discards} discarded)")]
     pure 1
@@ -50,20 +50,20 @@ the exit code set by libFuzzer.
 
 Report nothing after `goImpl`: libFuzzer's driver `exit()`s when `-runs` is exhausted, so a line
 placed there silently never appears — which is why `runOneIO` carries the run tally. -/
-def go (T : FuzzGen TestOutcome) (argv : Array String := #[]) : IO Unit := do
+def go (T : PropM FuzzGen Unit) (argv : Array String := #[]) : IO Unit := do
   IO.println s!"[basalt] starting libFuzzer campaign ({argv.toList})"
   let counters ← IO.mkRef (0, 0)
   goImpl (fun bytes => runOneIO counters T bytes) argv
 
 /-- Replay one saved input file against a property (no fuzzer): reproduces the outcome
 deterministically and prints it. This is how a saved artifact (`crash-…`) is consumed. -/
-def replay (T : FuzzGen TestOutcome) (path : String) : IO Unit := do
+def replay (T : PropM FuzzGen Unit) (path : String) : IO Unit := do
   let bytes ← IO.FS.readBinFile path
   IO.println s!"[basalt] replaying {path} ({bytes.size} bytes)"
   match runOne T bytes with
-  | .pass => IO.println "outcome: pass"
-  | .discard => IO.println "outcome: discard"
-  | .fail render => reportFailure (render ())
+  | Except.ok () => IO.println "outcome: pass"
+  | Except.error .discard => IO.println "outcome: discard"
+  | Except.error (.fail render) => reportFailure render.get
 
 /-- The coverage-guided backend, for `Basalt.PBT.dispatch`. All of `argv` goes to libFuzzer, and a
 saved artifact — which *is* a `FuzzGen` input buffer — can be replayed. -/

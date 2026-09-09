@@ -43,7 +43,7 @@ zero-extension costs.
 ```
  ┌────────────────────── Lean executable (owns main) ───────────────────────┐
  │ main → PBT.dispatch → Fuzz.go T argv                                     │
- │   T : G TestOutcome         -- the property, polymorphic in the Gen G     │
+ │   T : PropM G Unit          -- the property, polymorphic in the Gen G     │
  │   go builds  run : ByteArray → IO UInt8  and hands it to the bridge ──┐   │
  │                                                                      ▼   │
  │ RandomChoice FuzzGen          ┌──── C bridge (Basalt/Fuzz/native.c) ────┐ │
@@ -122,7 +122,7 @@ seconds, once). Instrumentation itself needs nothing extra.
 ## Run
 
 ```bash
-fuzz-run/basalt-fuzz [--backend=fuzz|io|plausible] <property> [-runs=N] [libFuzzer args...]
+fuzz-run/basalt-fuzz [--backend=fuzz|io|plausible] <property> [-runs=N] [-discard_ratio=N] [libFuzzer args...]
 fuzz-run/basalt-fuzz replay <property> <file>      # reproduce a saved input, no fuzzer
 ```
 
@@ -142,7 +142,9 @@ Properties (see `BasaltFuzzMain.lean` and `BasaltTest/Fuzz/`):
 
 Useful libFuzzer flags: `-runs=N` (bounded campaign), `-max_len=N` (input size),
 `-artifact_prefix=./` (where crashing inputs are written), a positional dir for a seed/growing
-corpus. The random backends read `-runs=N` from the same spelling, and ignore the rest.
+corpus. The random backends read `-runs=N` from the same spelling, plus `-discard_ratio=N` for the
+discard budget (`Basalt/PBT/Driver.lean`), and ignore the rest — under `fuzz`, libFuzzer owns the
+loop, so a discarded input is a `-1` return and neither budget applies.
 
 ## Backends
 
