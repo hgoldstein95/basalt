@@ -49,7 +49,7 @@ private def calleeAssume [Gen G] (n : Nat) : PropM G Unit := do
   check false "the callee's precondition did not stop the caller"
 
 private def propCallerDiscards [Gen G] : PropM G Unit := do
-  let n ← chooseNat 0 9
+  let n ← generate (chooseNat 0 9)
   calleeAssume n
   check false "the caller ran past a rejected callee"
 
@@ -60,17 +60,6 @@ private def propCallerDiscards [Gen G] : PropM G Unit := do
 /-- info: discard -/
 #guard_msgs in #eval do
   IO.println (render (← runProp (implies false (check true) : PropM IO Unit)))
-
-/-! ### Generators need no lift, and `partial_fixpoint` still elaborates
-
-`PropM G` is itself a `Gen`, so a recursive generator can be written directly in it. -/
-
-private def genCoinFlips [Gen G] : PropM G (List Bool) :=
-  pick (fun () => pure []) (fun () => do
-    let b ← coin (1/2)
-    let bs ← genCoinFlips
-    return b :: bs)
-partial_fixpoint
 
 /-! ### `forAll` names the drawn value, and nests -/
 
@@ -108,7 +97,7 @@ private def propPass [Gen G] : PropM G Unit :=
 
 /-- A property whose precondition rejects every input. -/
 private def propDiscard [Gen G] : PropM G Unit := do
-  let n ← chooseNat 0 9
+  let n ← generate (chooseNat 0 9)
   assume (n > 9)
 
 /- A counterexample stops the campaign on the input that found it.
@@ -129,7 +118,7 @@ exhausting it is a give-up, not a pass. -/
 
 /- A property that rejects only *some* inputs still gets every run it asked for. -/
 private def propHalfDiscard [Gen G] : PropM G Unit := do
-  let n ← chooseNat 0 9
+  let n ← generate (chooseNat 0 9)
   assume (n < 5)
 
 /-- info: runs=10 counterexample=none gaveUp=false -/
@@ -192,8 +181,8 @@ info: [basalt] starting Plausible.Gen campaign (runs=3)
 counterexample is pinned, since the discard count depends on the draw. -/
 
 private def prop_takeDrop [Gen G] : PropM G Unit := do
-  let xs ← listOf (chooseNat 0 99)
-  let k ← chooseNat 0 99
+  let xs ← generate (listOf (chooseNat 0 99))
+  let k ← generate (chooseNat 0 99)
   assume !xs.isEmpty
   check (xs.take k ++ xs.drop k == xs) s!"xs={xs}, k={k}"
 
