@@ -44,48 +44,17 @@ abbrev TestOutcome := Except Rejection Unit
 can take a property as a plain generator of outcomes, and the instances below are all that stand
 between the two views. -/
 
-/-- A property: a generator that may reject its input. -/
 abbrev PropM (G : Type → Type) := ExceptT Rejection G
-
-section Instances
-
-open Lean.Order
-
-variable {ε : Type} {g : Type → Type}
-
-instance instInhabitedExceptT [∀ α, Inhabited (g α)] : ∀ α, Inhabited (ExceptT ε g α) :=
-  fun α => inferInstanceAs (Inhabited (g (Except ε α)))
-
-instance instPartialOrderExceptT [∀ α, PartialOrder (g α)] :
-    ∀ α, PartialOrder (ExceptT ε g α) :=
-  fun α => inferInstanceAs (PartialOrder (g (Except ε α)))
-
-instance instCCPOExceptT [∀ α, CCPO (g α)] : ∀ α, CCPO (ExceptT ε g α) :=
-  fun α => inferInstanceAs (CCPO (g (Except ε α)))
-
-/-- Rejecting is monotone because it ignores the continuation: `throw` is a `pure` in the underlying
-monad, and the `bind`s around it are that monad's. This is what lets a `partial_fixpoint` generator
-be written directly at `PropM G`. -/
-instance instMonoBindExceptT [Monad g] [∀ α, PartialOrder (g α)] [MonoBind g] :
-    MonoBind (ExceptT ε g) where
-  bind_mono_left h := by
-    show (_ >>= _ : g _) ⊑ (_ >>= _ : g _)
-    exact MonoBind.bind_mono_left h
-  bind_mono_right h := by
-    show (_ >>= _ : g _) ⊑ (_ >>= _ : g _)
-    refine MonoBind.bind_mono_right fun x => ?_
-    cases x with
-    | error _ => exact PartialOrder.rel_refl
-    | ok a => exact h a
 
 instance instRandomChoiceExceptT [Monad g] [RandomChoice g] : RandomChoice (ExceptT ε g) where
   choose lo hi h := ExceptT.lift (RandomChoice.choose lo hi h)
 
-end Instances
-
-/-- Every generator combinator is available inside a property with no `lift`: `PropM G` is itself a
-`Gen`, so a `def gen [Gen G] : G α` instantiates at it directly. -/
-example [Gen G] : Gen (PropM G) := inferInstance
+instance [Gen G] : Gen (PropM G) where
+  instCCPO := inferInstance
+  instInhabited := fun _ => instInhabitedExceptTOfMonad
+  instMonad := inferInstance
+  instRandomChoice := instRandomChoiceExceptT
+  instMonoBind := inferInstanceAs (Lean.Order.MonoBind (ExceptT Rejection G))
 
 /-! ## Stating a property -/
 
