@@ -18,7 +18,7 @@ open Basalt.PBT RandomChoice
 
 private def render : TestOutcome → String
   | Except.ok () => "pass"
-  | Except.error (.fail r) => s!"fail: {r.get}"
+  | Except.error (.fail r) => s!"fail: {r}"
   | Except.error .discard => "discard"
 
 private def summary (r : CampaignReport) : String :=
@@ -93,15 +93,6 @@ outer value. -/
 /-- info: discard -/
 #guard_msgs in #eval do
   IO.println (render (← runProp (forAll (chooseNat 0 0) (fun _ => assume false) : PropM IO Unit)))
-
-/-! ### The counterexample message is lazy
-
-A passing run must not pay to render a counterexample it will not report, so the coercion at a
-`check`'s call site must build a closure rather than a string. Pinning the elaborated term is the
-only reliable way to say so: a `dbgTrace` inside the message fires even when the `Thunk` is never
-forced, because `dbgTrace` is `@[never_extract]` and so is hoisted out of the closure. -/
-
-example (x : Nat) : (s!"x={x}" : Thunk String) = Thunk.mk (fun _ => s!"x={x}") := rfl
 
 /-! ## Running a campaign
 
