@@ -158,6 +158,10 @@ runs           : 0 (30 discarded)
 #guard (findBackend [ioBackend, plausibleBackend] (some "plausible")).map (·.name) == some "plausible"
 #guard (findBackend [ioBackend, plausibleBackend] (some "fuzz")).isNone
 
+/- `@[basalt_backend]` registers in declaration order, and `dispatch` reads that list where it is
+called: everything Basalt itself offers, with `io` as the default. -/
+#guard ((registered_backends% : List Backend).map (·.name)) == ["io", "plausible"]
+
 private def demo : List (String × Property) :=
   [("pass", fun _ => propPass), ("fail", fun _ => propFail)]
 
@@ -166,14 +170,14 @@ info: [basalt] starting IO campaign (runs=3)
 [basalt] IO: 3 runs, no counterexample (0 discarded)
 -/
 #guard_msgs in
-#eval dispatch "demo" [ioBackend, plausibleBackend] demo ["--backend=io", "pass", "-runs=3"]
+#eval dispatch "demo" demo ["--backend=io", "pass", "-runs=3"]
 
 /--
 info: [basalt] starting Plausible.Gen campaign (runs=3)
 [basalt] Plausible.Gen: 3 runs, no counterexample (0 discarded)
 -/
 #guard_msgs in
-#eval dispatch "demo" [ioBackend, plausibleBackend] demo ["--backend=plausible", "pass", "-runs=3"]
+#eval dispatch "demo" demo ["--backend=plausible", "pass", "-runs=3"]
 
 /-! ## The design document's examples
 

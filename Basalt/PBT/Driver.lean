@@ -1,28 +1,17 @@
 /-
 Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
-Authors: Michael Hicks
+Authors: Michael Hicks, Harrison Goldstein
 -/
-import Basalt.PBT.Campaign
+import Basalt.PBT.Backend
 
 /-!
-# A command-line front end
+# A Command-Line Front End
 
-`dispatch` turns a list of named properties into a `main`: it picks the property and the
-interpretation to test it at. Backends are a list rather than an enumeration so that an
-interpretation defined outside this module can register itself.
+Infrastructure for running Basalt properties from the command line.
 -/
 
 namespace Basalt.PBT
-
-/-- An interpretation a campaign can run at, named for the command line. -/
-structure Backend where
-  /-- The `--backend=` spelling. -/
-  name : String
-  /-- Start a campaign, given the property and the command-line arguments after the property name. -/
-  campaign : Property → Array String → IO Unit
-  /-- Reproduce one saved input, for a backend whose inputs are files (a fuzzer's artifacts). -/
-  replay? : Option (Property → String → IO Unit) := none
 
 /-- The value of an `-flag=N` argument, or `default`. -/
 private def natFlag (argv : Array String) (flag : String) (default : Nat) : Nat :=
@@ -42,11 +31,13 @@ def discardRatioOf (argv : Array String) (default : Nat := 10) : Nat :=
   natFlag argv "-discard_ratio=" default
 
 /-- Uniform random testing at `IO`. -/
+@[basalt_backend]
 def ioBackend : Backend where
   name := "io"
   campaign T argv := ioCampaign T (runsOf argv) (discardRatioOf argv)
 
 /-- Uniform random testing at `Plausible.Gen`. -/
+@[basalt_backend]
 def plausibleBackend : Backend where
   name := "plausible"
   campaign T argv := plausibleCampaign T (runsOf argv) (discardRatioOf argv)
@@ -58,9 +49,13 @@ def findBackend (backends : List Backend) : Option String → Option Backend
 
 /-- A front end for an executable exposing several named properties:
 `<exe> [--backend=…] <property> [args...]` starts a campaign, and `<exe> replay <property> <file>`
-reproduces a saved input. The first backend in `backends` is the default. -/
-def dispatch (exe : String) (backends : List Backend) (props : List (String × Property))
-    (args : List String) : IO Unit := do
+reproduces a saved input.
+
+`backends` defaults to everything tagged `@[basalt_backend]` at the *call site*, so an executable
+that imports a fuzzer backend offers it with no further ceremony; the first one registered is the
+default, which is `ioBackend` for anyone importing this module. -/
+def dispatch (exe : String) (props : List (String × Property)) (args : List String)
+    (backends : List Backend := by exact registered_backends%) : IO Unit := do
   let names := String.intercalate ", " (props.map (·.1))
   let usage :=
     s!"usage: {exe} [--backend={String.intercalate "|" (backends.map (·.name))}] <property> \
