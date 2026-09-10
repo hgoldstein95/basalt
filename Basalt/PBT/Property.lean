@@ -27,12 +27,13 @@ interpretation is chosen.
 
 namespace Basalt.PBT
 
-/-- Why a test did not pass: a counterexample (rendered on demand) or a precondition that rejected
-the input. Passing needs no constructor — it is `Except.ok`, so a property that fails to report
-cannot be mistaken for one that passed. -/
+/-- Why a test did not pass: a counterexample or a precondition that rejected the input. Passing
+needs no constructor — it is `Except.ok`, so a property that fails to report cannot be mistaken for
+one that passed. -/
 inductive Rejection where
-  | fail (render : Thunk String)
+  | fail (message : String)
   | discard
+  deriving Inhabited
 
 /-- The outcome of one test. `.ok ()` passed; `.error` carries the reason it did not. -/
 abbrev TestOutcome := Except Rejection Unit
@@ -88,11 +89,9 @@ example [Gen G] : Gen (PropM G) := inferInstance
 
 /-! ## Stating a property -/
 
-/-- `pass` iff `b`, with `msg` as the counterexample. `msg` is a `Thunk`, so an `s!"…"` at the call
-site costs nothing on the passing runs: Lean's coercion to `Thunk` wraps the interpolation in a
-closure, and it is forced only when the test fails. -/
+/-- `pass` iff `b`, with `msg` as the counterexample. -/
 def check [Gen G] (b : Bool) (msg : Thunk String := "") : PropM G Unit :=
-  if b then pure () else throw (.fail msg)
+  if b then pure () else throw (.fail (Thunk.get msg))
 
 /-- A precondition: reject this input unless `c` holds. Unlike a bare outcome value, this
 short-circuits — the rest of the `do` block does not run, and neither does the rest of a *caller's*
@@ -109,10 +108,8 @@ def implies [Gen G] (c : Bool) (p : PropM G Unit) : PropM G Unit := do
 @[inherit_doc] scoped infixr:55 " ==> " => implies
 
 /-- Prefix `outer` to `inner`, which may be the empty message a bare `check` leaves. -/
-private def joinDetail (outer inner : Thunk String) : Thunk String :=
-  Thunk.mk fun _ =>
-    let i := inner.get
-    if i.isEmpty then outer.get else s!"{outer.get}, {i}"
+private def joinDetail (outer inner : String) : String :=
+  if inner.isEmpty then outer else s!"{outer}, {inner}"
 
 /-- Draw from `gen` and check `p` of the result, naming the drawn value in the counterexample.
 

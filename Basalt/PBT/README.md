@@ -45,10 +45,6 @@ instance supplies.
 QuickChick's `==>` (and Plausible's) wraps the rest of the property as an argument; `assume` is
 available too as `implies` / `==>` when that reads better, but the flat form is the default.
 
-**`check`'s message is lazy.** `msg : Thunk String`, and Lean's coercion wraps an `s!"…"` at the
-call site in a closure, so a passing run never renders a counterexample it will not report. This is
-QuickChick's `whenFail'` (the `unit -> string` variant) without the call-site ceremony.
-
 ### `forAll`, when you want the value named
 
 ```lean

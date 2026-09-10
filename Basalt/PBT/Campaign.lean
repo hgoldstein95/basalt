@@ -46,8 +46,8 @@ def runCampaign (step : IO TestOutcome) (runs : Nat) (maxDiscardRatio : Nat := 1
     match ← step with
     | Except.ok () => report := { report with runs := report.runs + 1 }
     | Except.error .discard => report := { report with discards := report.discards + 1 }
-    | Except.error (.fail render) =>
-      report := { report with runs := report.runs + 1, counterexample? := some render.get }
+    | Except.error (.fail msg) =>
+      report := { report with runs := report.runs + 1, counterexample? := some msg }
   if report.counterexample?.isNone && report.runs < runs then
     report := { report with gaveUp := true }
   return report
