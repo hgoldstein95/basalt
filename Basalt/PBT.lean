@@ -5,6 +5,7 @@ Authors: Michael Hicks
 -/
 import Basalt.PBT.Property
 import Basalt.PBT.Campaign
+import Basalt.PBT.Backend
 import Basalt.PBT.Driver
 
 /-!
@@ -20,5 +21,6 @@ campaign is just that term run at a chosen one.
 - `PropM`, `Rejection`, `TestOutcome`, `check` / `assume` / `forAll` — stating a property.
 - `Property` — a property before an interpretation is chosen.
 - `CampaignReport`, `campaign` — running one, and the failure contract every backend shares.
-- `Backend`, `dispatch` — a command-line front end over named properties.
+- `Backend`, `@[basalt_backend]`, `dispatch` — a command-line front end over the registered
+  backends and a list of named properties.
 -/
