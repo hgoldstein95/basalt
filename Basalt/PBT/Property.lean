@@ -1,60 +1,46 @@
 /-
 Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
-Authors: Michael Hicks
+Authors: Michael Hicks, Harrison Goldstein
 -/
 import Basalt.Gen
 
 /-!
 # Properties
 
-A property is a generator that can *reject* the input it drew, so it lives in `PropM G`, an
-`ExceptT` over the generator monad. Rejecting short-circuits, so a precondition is a statement and
-not a nesting, and inputs are drawn with ordinary monadic `do`:
+A property is the easiest top-level way into using Basalt for PBT; it is represented under the hood
+as a generator of test results (pass, fail, or discard). The following property does some sampling,
+makes some assumptions that discard invalid data, and then checks a predicate.
 
 ```lean
-def prop [Gen G] : PropM G Unit := do
-  let xs ← listOf (chooseNat 0 99)
-  let k ← chooseNat 0 99
+def prop [Gen G] : Property := do
+  let xs ← generate (listOf (chooseNat 0 99))
+  let k ← generate (chooseNat 0 99)
   assume !xs.isEmpty                          -- a precondition
   check (xs.take k ++ xs.drop k == xs) s!"xs={xs}, k={k}"
 ```
-
-Because a property is polymorphic in its monad, one term is testable at every interpretation of
-`Gen`; `Basalt.PBT.Campaign` runs it, and `Property` is how it is passed around before an
-interpretation is chosen.
 -/
 
 namespace Basalt.PBT
 
-/-- Why a test did not pass: a counterexample or a precondition that rejected the input. Passing
-needs no constructor — it is `Except.ok`, so a property that fails to report cannot be mistaken for
-one that passed. -/
+/-- Why a test did not pass. -/
 inductive Rejection where
-  | fail (message : String)
+  /-- The test failed, with sampled inputs represented in `counterExample`. -/
+  | fail (counterExample : String)
+  /-- The test was skipped because a generated input was discarded. -/
   | discard
   deriving Inhabited
 
-/-- The outcome of one test. `.ok ()` passed; `.error` carries the reason it did not. -/
+/-- The outcome of one test. `.ok ()` passed; `.error` carries the reason it did not.  -/
 abbrev TestOutcome := Except Rejection Unit
 
-/-! ## The property monad
+/-! ## The Property Monad -/
 
-`PropM G` is `ExceptT Rejection G`, so `PropM G Unit` is definitionally `G TestOutcome` — a runner
-can take a property as a plain generator of outcomes, and the instances below are all that stand
-between the two views. -/
-
+/-- Note, this is definitionally equal to `G TestOutcome`, but the monad instance threads failure
+and discards better. -/
 abbrev PropM (G : Type → Type) := ExceptT Rejection G
 
-instance instRandomChoiceExceptT [Monad g] [RandomChoice g] : RandomChoice (ExceptT ε g) where
-  choose lo hi h := ExceptT.lift (RandomChoice.choose lo hi h)
-
-instance [Gen G] : Gen (PropM G) where
-  instCCPO := inferInstance
-  instInhabited := fun _ => instInhabitedExceptTOfMonad
-  instMonad := inferInstance
-  instRandomChoice := instRandomChoiceExceptT
-  instMonoBind := inferInstanceAs (Lean.Order.MonoBind (ExceptT Rejection G))
+def generate [Gen G] (g : G α) : PropM G α := ExceptT.lift g
 
 /-! ## Stating a property -/
 
