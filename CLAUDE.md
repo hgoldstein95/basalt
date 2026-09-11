@@ -44,12 +44,10 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **`#genstats`** — options on the command's declarations in
   [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean); the law-discovery contract is on
   `lawProved` there, guarded by [BasaltTest/LawLine.lean](BasaltTest/LawLine.lean).
-- **Stating and running a property** — [Basalt/PBT/README.md](Basalt/PBT/README.md) is the design
-  document: why a property is `PropM G Unit` and not a returned outcome, what each of the three
-  layers owns, the alternatives rejected, and what is deliberately still missing. The code is
-  [Basalt/PBT/](Basalt/PBT/), guarded by [BasaltTest/PBT.lean](BasaltTest/PBT.lean). Nothing there
-  may name an interpretation: a runner that needs one belongs with that interpretation and registers
-  itself as a `Backend`.
+- **Stating and running a property** — [Basalt/PBT/](Basalt/PBT/), guarded by
+  [BasaltTest/PBT.lean](BasaltTest/PBT.lean), which is the tour. Nothing there may name an
+  interpretation: a runner that needs one belongs with that interpretation and tags itself
+  `@[basalt_backend]`.
 - **Coverage-guided fuzzing** (`FuzzGen`, the libFuzzer bridge, the opt-in `basalt-fuzz` executable)
   — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
   the measured comparison between backends. This is the repo's only FFI and native-link config: the

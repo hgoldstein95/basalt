@@ -37,9 +37,9 @@ def runOneIO (counters : IO.Ref (Nat × Nat)) (T : PropM FuzzGen Unit) (bytes : 
   match runOne T bytes with
   | Except.ok () => pure 0
   | Except.error .discard => counters.modify (fun (r, d) => (r, d + 1)); pure 2
-  | Except.error (.fail render) =>
+  | Except.error (.fail msg) =>
     let (runs, discards) ← counters.get
-    reportFailure render.get
+    reportFailure msg
       #[("input bytes", s!"{bytes.toList.map (fun b => b.toNat)}"),
         ("runs", s!"{runs} ({discards} discarded)")]
     pure 1
@@ -63,10 +63,11 @@ def replay (T : PropM FuzzGen Unit) (path : String) : IO Unit := do
   match runOne T bytes with
   | Except.ok () => IO.println "outcome: pass"
   | Except.error .discard => IO.println "outcome: discard"
-  | Except.error (.fail render) => reportFailure render.get
+  | Except.error (.fail msg) => reportFailure msg
 
 /-- The coverage-guided backend, for `Basalt.PBT.dispatch`. All of `argv` goes to libFuzzer, and a
 saved artifact — which *is* a `FuzzGen` input buffer — can be replayed. -/
+@[basalt_backend]
 def fuzzBackend : Backend where
   name := "fuzz"
   campaign T argv := go (T FuzzGen) argv

@@ -38,7 +38,7 @@ degrades to blind search for every backend. -/
 def propChain [Gen G] (n : Nat) : PropM G Unit := do
   let mut ok := 0
   for _ in [0:n] do
-    if (← chooseNat 0 255) == needle then ok := ok + 1 else break
+    if (← generate (chooseNat 0 255)) == needle then ok := ok + 1 else break
   check (ok < n) s!"stages={ok} of {n}"
 
 end Staged

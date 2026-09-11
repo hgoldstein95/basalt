@@ -24,9 +24,13 @@ OUT="$ROOT/fuzz-run/obj"; mkdir -p "$OUT"
 
 # The exact (Mathlib-free) module closure the executable links. Instrumenting all of it realizes
 # the "property + generator modules" coverage scope (none of these import Mathlib).
+#
+# Keep this in step with the imports: a module added upstream but missing here fails at link with
+# `undefined symbol: initialize_basalt_<Module>`, which reads as a toolchain problem rather than a
+# stale list.
 MODULES=(
   Basalt/RandomChoice Basalt/Gen Basalt/IO Basalt/Combinators Basalt/PlausibleGen
-  Basalt/PBT/Property Basalt/PBT/Campaign Basalt/PBT/Driver
+  Basalt/PBT/Property Basalt/PBT/Campaign Basalt/PBT/Backend Basalt/PBT/Driver
   Basalt/Fuzz/Core Basalt/Fuzz/Runner
   BasaltTest/Fuzz/BuggyBST BasaltTest/Fuzz/Staged
   BasaltFuzzMain

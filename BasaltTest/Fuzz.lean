@@ -22,7 +22,7 @@ private def bytes (l : List UInt8) : ByteArray := ⟨l.toArray⟩
 
 private def render : TestOutcome → String
   | .ok () => "pass"
-  | .error (.fail r) => s!"fail: {r.get}"
+  | .error (.fail r) => s!"fail: {r}"
   | .error .discard => "discard"
 
 /- A single choice in `[0,9]` consumes one byte and reduces mod 10; the property is `· < 9`. -/
@@ -62,8 +62,8 @@ private def propBSTsizeNonneg : PropM FuzzGen Unit :=
 
 /- Two draws (one byte each), a precondition, then `check` — plain monadic `do`. -/
 private def propTwo : PropM FuzzGen Unit := do
-  let x ← chooseNat 0 9
-  let y ← chooseNat 0 9
+  let x ← generate (chooseNat 0 9)
+  let y ← generate (chooseNat 0 9)
   assume (x != y)
   check (x < y) s!"x={x}, y={y}"
 
@@ -86,7 +86,7 @@ private def propTwo : PropM FuzzGen Unit := do
 build failure here rather than a link error in the opt-in executable. -/
 
 private def propAnyBackend : Property := fun _ => do
-  let x ← chooseNat 0 9
+  let x ← generate (chooseNat 0 9)
   check (x ≤ 9) s!"x={x}"
 
 /- `x ≤ 9` holds for every draw, so the outcome is `pass` whatever the backend chooses. -/

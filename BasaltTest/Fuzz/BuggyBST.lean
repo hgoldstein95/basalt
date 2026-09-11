@@ -181,14 +181,14 @@ strictly stronger than `isBST`, and the only thing that sees a silently dropped 
 
 /-- Correct delete agrees with the list model. Never fails. -/
 def prop_delete_model [Gen G] : PropM G Unit := do
-  let (t, k) ← genTreeAndKey
+  let (t, k) ← generate genTreeAndKey
   assume (t.contains k)
   check ((t.delete k).toList == t.toList.erase k) s!"t={reprStr t}, k={k}"
 
 /-- The buggy delete claims to agree with the list model. The counterexample renders both traversals,
 so the dropped keys are visible in the report. -/
 def prop_deleteBuggy_model [Gen G] : PropM G Unit := do
-  let (t, k) ← genTreeAndKey
+  let (t, k) ← generate genTreeAndKey
   assume (t.contains k)
   let got := (t.deleteBuggy k).toList
   let want := t.toList.erase k
@@ -203,9 +203,9 @@ the *same* term runs under `Plausible.Gen` too. -/
 /-- Insert two *distinct* keys with the correct `insert`; the invariant is preserved. Never fails.
 Composition: one tree + two keys, a distinctness precondition, then `check`. -/
 def prop_insert_two_distinct [Gen G] : PropM G Unit := do
-  let t  ← genBST loKey hiKey
-  let k1 ← chooseInt loKey hiKey (by decide)
-  let k2 ← chooseInt loKey hiKey (by decide)
+  let t  ← generate (genBST loKey hiKey)
+  let k1 ← generate (chooseInt loKey hiKey (by decide))
+  let k2 ← generate (chooseInt loKey hiKey (by decide))
   assume (k1 != k2)
   let t' := (t.insert k1).insert k2
   check t'.isBST
@@ -213,9 +213,9 @@ def prop_insert_two_distinct [Gen G] : PropM G Unit := do
 /-- The same composition with the buggy insert: libFuzzer finds a `(t, k1, k2)` counterexample, and
 `check`'s message renders all three drawn inputs. -/
 def prop_insertBuggy_two_distinct [Gen G] : PropM G Unit := do
-  let t  ← genBST loKey hiKey
-  let k1 ← chooseInt loKey hiKey (by decide)
-  let k2 ← chooseInt loKey hiKey (by decide)
+  let t  ← generate (genBST loKey hiKey)
+  let k1 ← generate (chooseInt loKey hiKey (by decide))
+  let k2 ← generate (chooseInt loKey hiKey (by decide))
   assume (k1 != k2)
   let t' := (t.insertBuggy k1).insertBuggy k2
   check t'.isBST s!"t={reprStr t}, k1={k1}, k2={k2}"

@@ -45,4 +45,4 @@ def properties : List (String × Property) :=
     ("chain-4",              fun _ => Staged.propChain 4) ]
 
 def main (args : List String) : IO Unit :=
-  dispatch "basalt-fuzz" [fuzzBackend, ioBackend, plausibleBackend] properties args
+  dispatch "basalt-fuzz" properties args
