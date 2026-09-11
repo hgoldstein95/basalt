@@ -5,7 +5,6 @@ Authors: Michael Hicks
 -/
 
 import Basalt.Gen
--- Not the `Plausible` umbrella: its tactic frontend would join the `basalt-fuzz` link closure.
 import Plausible.Gen
 
 /-!
