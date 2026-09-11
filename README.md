@@ -71,9 +71,11 @@ A campaign runs a property at a chosen interpretation, stopping at the first cou
 ```
 
 Because the property never named an interpretation, the same term is testable at each of them: a
-`Property` is the property held polymorphically, and `Backend` / `dispatch` wrap a registry of named
-properties in a command line (`--backend=io|plausible`, `-runs=N`, `-discard_ratio=N`). Every backend shares one failure
-contract — counterexample on stderr, exit `77` — so campaigns are comparable across them.
+`Property` is the property held polymorphically, and `dispatch` wraps a list of named properties in a
+command line (`--backend=io|plausible`, `-runs=N`, `-discard_ratio=N`) over every `Backend` tagged
+`@[basalt_backend]`, so an interpretation defined outside Basalt is offered there too. Every backend
+shares one failure contract — counterexample on stderr, exit `77` — so campaigns are comparable
+across them.
 
 [`Basalt/PBT/README.md`](Basalt/PBT/README.md) is the design document for this half of the library:
 why a property rejects by throwing rather than by returning, how it compares to QuickCheck,

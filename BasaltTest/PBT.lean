@@ -18,7 +18,7 @@ open Basalt.PBT RandomChoice
 
 private def render : TestOutcome → String
   | Except.ok () => "pass"
-  | Except.error (.fail r) => s!"fail: {r.get}"
+  | Except.error (.fail r) => s!"fail: {r}"
   | Except.error .discard => "discard"
 
 private def summary (r : CampaignReport) : String :=
@@ -49,7 +49,7 @@ private def calleeAssume [Gen G] (n : Nat) : PropM G Unit := do
   check false "the callee's precondition did not stop the caller"
 
 private def propCallerDiscards [Gen G] : PropM G Unit := do
-  let n ← chooseNat 0 9
+  let n ← generate (chooseNat 0 9)
   calleeAssume n
   check false "the caller ran past a rejected callee"
 
@@ -60,17 +60,6 @@ private def propCallerDiscards [Gen G] : PropM G Unit := do
 /-- info: discard -/
 #guard_msgs in #eval do
   IO.println (render (← runProp (implies false (check true) : PropM IO Unit)))
-
-/-! ### Generators need no lift, and `partial_fixpoint` still elaborates
-
-`PropM G` is itself a `Gen`, so a recursive generator can be written directly in it. -/
-
-private def genCoinFlips [Gen G] : PropM G (List Bool) :=
-  pick (fun () => pure []) (fun () => do
-    let b ← coin (1/2)
-    let bs ← genCoinFlips
-    return b :: bs)
-partial_fixpoint
 
 /-! ### `forAll` names the drawn value, and nests -/
 
@@ -94,15 +83,6 @@ outer value. -/
 #guard_msgs in #eval do
   IO.println (render (← runProp (forAll (chooseNat 0 0) (fun _ => assume false) : PropM IO Unit)))
 
-/-! ### The counterexample message is lazy
-
-A passing run must not pay to render a counterexample it will not report, so the coercion at a
-`check`'s call site must build a closure rather than a string. Pinning the elaborated term is the
-only reliable way to say so: a `dbgTrace` inside the message fires even when the `Thunk` is never
-forced, because `dbgTrace` is `@[never_extract]` and so is hoisted out of the closure. -/
-
-example (x : Nat) : (s!"x={x}" : Thunk String) = Thunk.mk (fun _ => s!"x={x}") := rfl
-
 /-! ## Running a campaign
 
 `runCampaign` reports and does not exit, so a failing campaign is `#eval`-able. -/
@@ -117,7 +97,7 @@ private def propPass [Gen G] : PropM G Unit :=
 
 /-- A property whose precondition rejects every input. -/
 private def propDiscard [Gen G] : PropM G Unit := do
-  let n ← chooseNat 0 9
+  let n ← generate (chooseNat 0 9)
   assume (n > 9)
 
 /- A counterexample stops the campaign on the input that found it.
@@ -138,7 +118,7 @@ exhausting it is a give-up, not a pass. -/
 
 /- A property that rejects only *some* inputs still gets every run it asked for. -/
 private def propHalfDiscard [Gen G] : PropM G Unit := do
-  let n ← chooseNat 0 9
+  let n ← generate (chooseNat 0 9)
   assume (n < 5)
 
 /-- info: runs=10 counterexample=none gaveUp=false -/
@@ -178,6 +158,10 @@ runs           : 0 (30 discarded)
 #guard (findBackend [ioBackend, plausibleBackend] (some "plausible")).map (·.name) == some "plausible"
 #guard (findBackend [ioBackend, plausibleBackend] (some "fuzz")).isNone
 
+/- `@[basalt_backend]` registers in declaration order, and `dispatch` reads that list where it is
+called: everything Basalt itself offers, with `io` as the default. -/
+#guard ((registered_backends% : List Backend).map (·.name)) == ["io", "plausible"]
+
 private def demo : List (String × Property) :=
   [("pass", fun _ => propPass), ("fail", fun _ => propFail)]
 
@@ -186,14 +170,14 @@ info: [basalt] starting IO campaign (runs=3)
 [basalt] IO: 3 runs, no counterexample (0 discarded)
 -/
 #guard_msgs in
-#eval dispatch "demo" [ioBackend, plausibleBackend] demo ["--backend=io", "pass", "-runs=3"]
+#eval dispatch "demo" demo ["--backend=io", "pass", "-runs=3"]
 
 /--
 info: [basalt] starting Plausible.Gen campaign (runs=3)
 [basalt] Plausible.Gen: 3 runs, no counterexample (0 discarded)
 -/
 #guard_msgs in
-#eval dispatch "demo" [ioBackend, plausibleBackend] demo ["--backend=plausible", "pass", "-runs=3"]
+#eval dispatch "demo" demo ["--backend=plausible", "pass", "-runs=3"]
 
 /-! ## The design document's examples
 
@@ -201,8 +185,8 @@ info: [basalt] starting Plausible.Gen campaign (runs=3)
 counterexample is pinned, since the discard count depends on the draw. -/
 
 private def prop_takeDrop [Gen G] : PropM G Unit := do
-  let xs ← listOf (chooseNat 0 99)
-  let k ← chooseNat 0 99
+  let xs ← generate (listOf (chooseNat 0 99))
+  let k ← generate (chooseNat 0 99)
   assume !xs.isEmpty
   check (xs.take k ++ xs.drop k == xs) s!"xs={xs}, k={k}"
 

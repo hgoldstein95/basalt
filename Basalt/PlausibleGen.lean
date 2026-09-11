@@ -1,8 +1,9 @@
 /-
-Copyright (c) 2026 Michael Hicks. All rights reserved.
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
+
 import Basalt.Gen
 -- Not the `Plausible` umbrella: its tactic frontend would join the `basalt-fuzz` link closure.
 import Plausible.Gen
