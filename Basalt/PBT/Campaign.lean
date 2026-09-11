@@ -17,6 +17,8 @@ A campaign runs a property until it fails or a run budget is exhausted.
 namespace Basalt.PBT
 
 structure CampaignReport where
+  /-- The total number of test inputs that passed the property's precondition and were tested
+  against the SUT. -/
   runs : Nat
   /-- The total number of test inputs that failed the property's precondition or `assume`
   statements. -/

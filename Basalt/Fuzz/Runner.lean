@@ -33,11 +33,11 @@ other backends do — libFuzzer's own `#N` markers count only corpus-worthy inpu
 number of tests run. -/
 def runOneIO (counters : IO.Ref (Nat × Nat)) (T : PropM FuzzGen Unit) (bytes : ByteArray) :
     IO UInt8 := do
-  counters.modify (fun (runs, discards) => (runs + 1, discards))
   match runOne T bytes with
-  | Except.ok () => pure 0
+  | Except.ok () => counters.modify (fun (runs, discards) => (runs + 1, discards)); pure 0
   | Except.error .discard => counters.modify (fun (r, d) => (r, d + 1)); pure 2
   | Except.error (.fail msg) =>
+    counters.modify (fun (runs, discards) => (runs + 1, discards))
     let (runs, discards) ← counters.get
     reportFailure msg
       #[("input bytes", s!"{bytes.toList.map (fun b => b.toNat)}"),
