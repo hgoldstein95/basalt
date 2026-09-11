@@ -48,20 +48,20 @@ for each obligation.
 
 Generators are the inputs of property-based tests; `Basalt/PBT/` is the other half. A property lives
 in `PropM G`, a generator monad that can *reject* the input it drew, so it is polymorphic in its
-monad too, and its inputs are drawn with ordinary monadic `do` — several of them, or dependent ones,
-need no special combinator:
+monad too. Its inputs are drawn with `generate` in an ordinary monadic `do` — several of them, or
+dependent ones, need no special combinator:
 
 ```lean
 def prop_takeDrop [Gen G] : PropM G Unit := do
-  let xs ← listOf (chooseNat 0 99)
-  let k ← chooseNat 0 99
+  let xs ← generate (listOf (chooseNat 0 99))
+  let k ← generate (chooseNat 0 99)
   assume !xs.isEmpty                              -- a precondition; discards this input
   check (xs.take k ++ xs.drop k == xs) s!"xs={xs}, k={k}"
 ```
 
 Rejecting short-circuits, so `assume` is a statement rather than a nesting, and it holds through a
 *function call* — a helper the property calls can reject the input on its behalf. `forAll gen p` is
-the alternative to a bare `←`: it names the drawn value in the counterexample, and nests, with `p`
+the alternative to `generate`: it names the drawn value in the counterexample, and nests, with `p`
 returning a property, a `Bool`, or a decidable `Prop`.
 
 A campaign runs a property at a chosen interpretation, stopping at the first counterexample:
@@ -76,10 +76,6 @@ command line (`--backend=io|plausible`, `-runs=N`, `-discard_ratio=N`) over ever
 `@[basalt_backend]`, so an interpretation defined outside Basalt is offered there too. Every backend
 shares one failure contract — counterexample on stderr, exit `77` — so campaigns are comparable
 across them.
-
-[`Basalt/PBT/README.md`](Basalt/PBT/README.md) is the design document for this half of the library:
-why a property rejects by throwing rather than by returning, how it compares to QuickCheck,
-QuickChick, and Plausible, and what is deliberately still missing.
 
 ## Build
 

@@ -122,7 +122,7 @@ seconds, once). Instrumentation itself needs nothing extra.
 ## Run
 
 ```bash
-fuzz-run/basalt-fuzz [--backend=io|plausible|fuzz] <property> [-runs=N] [-discard_ratio=N] [libFuzzer args...]
+fuzz-run/basalt-fuzz [--backend=fuzz|io|plausible] <property> [-runs=N] [-discard_ratio=N] [libFuzzer args...]
 fuzz-run/basalt-fuzz replay <property> <file>      # reproduce a saved input, no fuzzer
 ```
 
@@ -153,14 +153,13 @@ guided fuzzer or under a plain random sampler; `--backend=` picks the interpreta
 
 | backend | interpretation | choices come from |
 |---|---|---|
-| `io` (default) | `IO` | `IO.rand` |
+| `fuzz` (default) | `Fuzz.FuzzGen` | libFuzzer's mutated byte buffer, guided by coverage |
+| `io` | `IO` | `IO.rand` |
 | `plausible` | `Plausible.Gen` | Plausible's `StdGen` |
-| `fuzz` | `Fuzz.FuzzGen` | libFuzzer's mutated byte buffer, guided by coverage |
 
 All three come from one registry of `Basalt.PBT.Property` and share `Basalt.PBT`'s failure contract,
 so their campaigns are directly comparable. `fuzzBackend` is a `@[basalt_backend]`, so `dispatch`
-offers it alongside Basalt's own two without `BasaltFuzzMain` naming any of them — which is also why
-the order above, and hence the default, is registration order: Basalt's imports first. Adding the two random backends needed no new instance and
+offers it alongside Basalt's own two without `BasaltFuzzMain` listing them. Adding the two random backends needed no new instance and
 no change to any property or generator: `Gen IO` and `Gen Plausible.Gen` already followed by
 `inferInstance`, and what it took was a registry type that keeps the monad open. `replay` is
 fuzz-only, because a saved artifact *is* a `FuzzGen` byte buffer and has no meaning as a PRNG state.

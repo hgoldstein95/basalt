@@ -77,6 +77,11 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `<gen>.sound_complete` / `.terminates` / … naming convention, or its statement is not the law
   (both halves are checked). WORKFLOW.md Part 2 owns the convention;
   [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean)'s `lawProved` implements the check.
+- **Drawing from a generator inside a property fails with `failed to synthesize instance Gen
+  (PropM G)`** — `PropM G` is deliberately not a `Gen`, so a bare `←` on a generator elaborates it at
+  the ambient `PropM G` instead of lifting it. Wrap the draw in `generate`
+  ([Basalt/PBT/Property.lean](Basalt/PBT/Property.lean)), or use `forAll`. The error names the
+  missing instance, not the missing combinator, so it reads as a gap in `Basalt/Gen.lean`.
 - **A `do` block that binds a property with `←` reports a nonsense error somewhere else** (e.g.
   "unknown constant `Unit.ok`" at a later `match`) — `PropM G Unit` is *definitionally*
   `G TestOutcome`, so `←` on a property inside a `PropM G` block unifies before the automatic lift

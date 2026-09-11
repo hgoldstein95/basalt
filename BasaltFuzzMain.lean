@@ -44,5 +44,9 @@ def properties : List (String × Property) :=
     ("chain-3",              fun _ => Staged.propChain 3),
     ("chain-4",              fun _ => Staged.propChain 4) ]
 
+/-- `dispatch`'s default backend is the first one registered, which is `io` — Basalt's own backends
+are registered by the import. This executable is a fuzzer, so it moves `fuzzBackend` to the front
+rather than listing the backends: anything else tagged `@[basalt_backend]` is still offered. -/
 def main (args : List String) : IO Unit :=
-  dispatch "basalt-fuzz" properties args
+  let (fuzz, others) := (registered_backends% : List Backend).partition (·.name == fuzzBackend.name)
+  dispatch "basalt-fuzz" properties args (fuzz ++ others)
