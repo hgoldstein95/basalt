@@ -30,6 +30,7 @@ trial() { # backend property -> "runs seconds", or "- -" if no counterexample wi
   local t0 t1 out
   mkdir -p /tmp/basalt-cmp
   t0=$(python3 -c 'import time;print(time.time())')
+  # shellcheck disable=SC2086   # a flag string: the split into words is the point
   out=$(perl -e "alarm $TIMEOUT; exec @ARGV" \
           fuzz-run/basalt-fuzz --backend="$b" "$p" -runs="$MAXRUNS" $extra 2>&1 | tr -d '\000' || true)
   t1=$(python3 -c 'import time;print(time.time())')

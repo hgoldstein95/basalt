@@ -369,6 +369,11 @@ it.
   returns a structured result, but the moment it delegates to `afl-fuzz` it reverts to crash → the
   driver saves the input. That split — own the loop and you can return a value; delegate to a driver
   and you crash — is the lesson behind the subprocess item above.
+- **Mutagen** (Haskell/QuickCheck, [Mista and Russo, ICSTW 2023](https://www.mista.me/assets/pdf/icst23-preprint.pdf))
+  is coverage-guided PBT that drives search by *exhaustively* mutating a pool of saved inputs rather
+  than by handing an external fuzzer a byte buffer — so it keeps QuickCheck's typed generators and
+  needs no byte encoding, at the cost of a bespoke mutation engine per type. It reports beating
+  FuzzChick on mutant quality.
 
 Basalt-side reading: `Basalt/RandomChoice.lean` (`choose`), `Basalt/Gen.lean` (the bundle and its
 auto-instance), `Basalt/PBT/` (the interpretation-agnostic property and campaign API),

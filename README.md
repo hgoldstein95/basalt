@@ -109,8 +109,8 @@ properties, the failure model, and the supported platforms.
 Because a property is polymorphic in its monad, the same executable also runs it under the random
 interpretations — `--backend=io` or `--backend=plausible` instead of the default coverage-guided
 `fuzz` — from one shared property registry. Which backend finds a bug faster is a property of the
-bug: random testing wins on shallow bugs (fewer runs, ~3–5× the throughput), while a bug behind
-several nested guards is reachable only by the fuzzer. `fuzz-run/compare-backends.sh` measures it and
+bug: blind random sampling wins on shallow bugs (fewer runs, ~3–5× the throughput), while a bug
+behind several nested guards is reachable only by coverage guidance. `fuzz-run/compare-backends.sh` measures it and
 `fuzz-run/README.md` records the numbers.
 
 ## Repository layout

@@ -5,8 +5,6 @@ Authors: Michael Hicks
 -/
 import Basalt.PBT.Property
 
-open Lean.Order
-
 /-!
 # The `FuzzGen` interpretation
 
@@ -36,24 +34,6 @@ abbrev FuzzGen (α : Type) := StateT FuzzState Option α
 
 instance : Inhabited (FuzzGen α) :=
   ⟨fun _ => none⟩
-
-/-! ### `Option` as a flat order with `none` as bottom -/
-
-instance instPartialOrderOption : PartialOrder (Option α) :=
-  FlatOrder.instOrder (b := none)
-
-instance instCCPOOption : CCPO (Option α) :=
-  FlatOrder.instCCPO (b := none)
-
-instance : MonoBind Option where
-  bind_mono_left h := by
-    cases h with
-    | bot => exact FlatOrder.rel.bot
-    | refl => exact FlatOrder.rel.refl
-  bind_mono_right h := by
-    cases ‹Option _› with
-    | none => exact FlatOrder.rel.refl
-    | some a => exact h a
 
 /-- Bits needed to distinguish `k` outcomes (0 when `k ≤ 1`). -/
 def bitsFor (k : Nat) : Nat :=

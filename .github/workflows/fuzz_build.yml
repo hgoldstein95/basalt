@@ -52,6 +52,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Check build scripts for risky behavior
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck fuzz-run/*.sh
+      - run: for f in fuzz-run/*.sh; do bash -n "$f"; done
+
   fuzz:
     # NOTE: a modern-Linux build path (recent glibc, PIE-by-default) was validated by hand on Amazon
     # Linux 2023 (clang 22, glibc 2.34; fuzz-run/README.md); `ubuntu-latest` then exposed

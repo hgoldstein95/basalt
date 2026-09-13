@@ -16,6 +16,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 
+# shellcheck source=/dev/null   # optional and git-ignored; nothing to follow
 if [ -f fuzz-run/env.sh ]; then . fuzz-run/env.sh; fi
 
 IR="$ROOT/.lake/build/ir"
@@ -153,7 +154,10 @@ if [ -z "${CXXLIB_FLAGS+x}" ]; then
   if [ "$UNAME" = "Darwin" ]; then
     CXXLIB_FLAGS="-lc++"
   else
-    newest_libstdcxx=$(ls /usr/lib/gcc/*/*/libstdc++.so 2>/dev/null | grep -v '/32/' | sort -V | tail -1)
+    newest_libstdcxx=$(for so in /usr/lib/gcc/*/*/libstdc++.so; do
+                         [ -f "$so" ] || continue
+                         [[ $so == */32/* ]] || printf '%s\n' "$so"
+                       done | sort -V | tail -1)
     CXXLIB_FLAGS="${newest_libstdcxx:--lstdc++}"
   fi
 fi
@@ -163,6 +167,7 @@ fi
 # than parsing a version, since the archive is the thing that must contain the symbol.
 if [ -z "${DRIVER_DEFINE+x}" ]; then
   DRIVER_DEFINE=""
+  # shellcheck disable=SC2086   # a flag string: the split into words is the point
   probe=$(printf '%s\n' $FUZZER_LIB_FLAGS | grep -E '\.a$' | head -1 || true)
   if [ -n "$probe" ] && [ -f "$probe" ]; then
     # `grep -c`, not `grep -q`: `-q` exits at the first match, so `nm` dies of SIGPIPE and
@@ -177,6 +182,7 @@ echo "== platform: $UNAME; cc: $CC; runtime: $FUZZER_LIB_FLAGS ${DRIVER_DEFINE:+
 
 # ---------------------------------------------------------------------------------------------
 echo "== elaborate + emit C via Lake =="
+# shellcheck disable=SC2086   # a target list: the split into words is the point
 lake build Basalt.Fuzz.Runner Basalt.Combinators BasaltFuzzMain \
   ${EXTRA_LAKE_TARGETS:-} >/dev/null
 
@@ -199,6 +205,7 @@ for m in "${DEP_MODULES[@]}"; do
   $CC -O1 -c "$c" -o "$o"
   OBJS+=("$o")
 done
+# shellcheck disable=SC2086   # flag strings: the split into words is the point
 $CC -O1 $BRIDGE_INCLUDES $DRIVER_DEFINE -c Basalt/Fuzz/native.c -o "$OUT/native.o"
 OBJS+=("$OUT/native.o")
 
@@ -221,6 +228,7 @@ echo "== link =="
 # `fuzz-run/basalt-fuzz: No such file or directory`. Filter the noise for display, but fail loudly on
 # a nonzero status or a missing binary.
 rm -f fuzz-run/basalt-fuzz
+# shellcheck disable=SC2086   # flag strings: the split into words is the point
 if ! $CC "${OBJS[@]}" -o fuzz-run/basalt-fuzz $FUZZER_LIB_FLAGS $CXXLIB_FLAGS > "$OUT/link.log" 2>&1; then
   grep -viE 'unused|-Wl' "$OUT/link.log" >&2 || true
   echo "== link FAILED (runtime: $FUZZER_LIB_FLAGS; cxxlib: $CXXLIB_FLAGS) ==" >&2

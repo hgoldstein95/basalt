@@ -1,3 +1,4 @@
+# shellcheck shell=bash   # sourced by build.sh, so it has no shebang of its own
 # Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 # Released under MIT license as described in the file LICENSE.
 # Authors: Michael Hicks
