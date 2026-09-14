@@ -44,12 +44,19 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **`#genstats`** — options on the command's declarations in
   [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean); the law-discovery contract is on
   `lawProved` there, guarded by [BasaltTest/LawLine.lean](BasaltTest/LawLine.lean).
-- **Stating and running a property** — [Basalt/PBT/README.md](Basalt/PBT/README.md) is the design
-  document: why a property is `PropM G Unit` and not a returned outcome, what each of the three
-  layers owns, the alternatives rejected, and what is deliberately still missing. The code is
-  [Basalt/PBT/](Basalt/PBT/), guarded by [BasaltTest/PBT.lean](BasaltTest/PBT.lean). Nothing there
-  may name an interpretation: a runner that needs one belongs with that interpretation and registers
-  itself as a `Backend`.
+- **Stating and running a property** — [Basalt/PBT/](Basalt/PBT/), guarded by
+  [BasaltTest/PBT.lean](BasaltTest/PBT.lean), which is the tour. Nothing there may name an
+  interpretation: a runner that needs one belongs with that interpretation and tags itself
+  `@[basalt_backend]`.
+- **Coverage-guided fuzzing** (`FuzzGen`, the libFuzzer bridge, the opt-in `basalt-fuzz` executable)
+  — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
+  the measured comparison between backends. This is the repo's only FFI and native-link config: the
+  executable's C emission and link live outside `lake build`, so a change to *them* is caught only by
+  `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow. The Lean side is not exempt — the fuzz
+  runner and `BasaltTest/Fuzz/BuggyBST.lean` are elaborated by the default build through
+  `BasaltTest/Fuzz.lean`, which is where a drift from the proved `genBST` becomes a build failure.
+  Anything added to the Mathlib-free link closure must stay Mathlib-free: import the narrowest
+  module, not an umbrella.
 
 ## Gotchas (symptom → cause → pointer)
 
@@ -70,6 +77,11 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `<gen>.sound_complete` / `.terminates` / … naming convention, or its statement is not the law
   (both halves are checked). WORKFLOW.md Part 2 owns the convention;
   [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean)'s `lawProved` implements the check.
+- **Drawing from a generator inside a property fails with `failed to synthesize instance Gen
+  (PropM G)`** — `PropM G` is deliberately not a `Gen`, so a bare `←` on a generator elaborates it at
+  the ambient `PropM G` instead of lifting it. Wrap the draw in `generate`
+  ([Basalt/PBT/Property.lean](Basalt/PBT/Property.lean)), or use `forAll`. The error names the
+  missing instance, not the missing combinator, so it reads as a gap in `Basalt/Gen.lean`.
 - **A `do` block that binds a property with `←` reports a nonsense error somewhere else** (e.g.
   "unknown constant `Unit.ok`" at a later `match`) — `PropM G Unit` is *definitionally*
   `G TestOutcome`, so `←` on a property inside a `PropM G` block unifies before the automatic lift

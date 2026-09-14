@@ -179,10 +179,10 @@ info: [basalt] starting Plausible.Gen campaign (runs=3)
 #guard_msgs in
 #eval dispatch "demo" demo ["--backend=plausible", "pass", "-runs=3"]
 
-/-! ## The design document's examples
+/-! ## The README's examples
 
-[Basalt/PBT/README.md](../Basalt/PBT/README.md) claims these compile and pass; only the
-counterexample is pinned, since the discard count depends on the draw. -/
+[README.md](../README.md) claims these compile and pass; only the counterexample is pinned, since the
+discard count depends on the draw. -/
 
 private def prop_takeDrop [Gen G] : PropM G Unit := do
   let xs ← generate (listOf (chooseNat 0 99))

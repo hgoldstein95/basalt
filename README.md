@@ -24,6 +24,7 @@ def myGen [Gen G] : G α := ...
 | `SPMF` | a sub-probability mass function — reason about the distribution and its `support` |
 | `SPMF.Cost` | the same, plus a count of random choices |
 | `GenStats.StatGen` | seeded, fuel-guarded execution that counts choices (drives `#genstats`) |
+| `Fuzz.FuzzGen` | choices read from a byte buffer, so a coverage-guided fuzzer drives generation |
 
 `RandomChoice.choose` is the only source of randomness; every combinator (`pick`, `elements`,
 `oneOf`, `frequency`, `listOf`, …) is built on it. Recursive generators are defined by
@@ -47,20 +48,20 @@ for each obligation.
 
 Generators are the inputs of property-based tests; `Basalt/PBT/` is the other half. A property lives
 in `PropM G`, a generator monad that can *reject* the input it drew, so it is polymorphic in its
-monad too, and its inputs are drawn with ordinary monadic `do` — several of them, or dependent ones,
-need no special combinator:
+monad too. Its inputs are drawn with `generate` in an ordinary monadic `do` — several of them, or
+dependent ones, need no special combinator:
 
 ```lean
 def prop_takeDrop [Gen G] : PropM G Unit := do
-  let xs ← listOf (chooseNat 0 99)
-  let k ← chooseNat 0 99
+  let xs ← generate (listOf (chooseNat 0 99))
+  let k ← generate (chooseNat 0 99)
   assume !xs.isEmpty                              -- a precondition; discards this input
   check (xs.take k ++ xs.drop k == xs) s!"xs={xs}, k={k}"
 ```
 
 Rejecting short-circuits, so `assume` is a statement rather than a nesting, and it holds through a
 *function call* — a helper the property calls can reject the input on its behalf. `forAll gen p` is
-the alternative to a bare `←`: it names the drawn value in the counterexample, and nests, with `p`
+the alternative to `generate`: it names the drawn value in the counterexample, and nests, with `p`
 returning a property, a `Bool`, or a decidable `Prop`.
 
 A campaign runs a property at a chosen interpretation, stopping at the first counterexample:
@@ -76,10 +77,6 @@ command line (`--backend=io|plausible`, `-runs=N`, `-discard_ratio=N`) over ever
 shares one failure contract — counterexample on stderr, exit `77` — so campaigns are comparable
 across them.
 
-[`Basalt/PBT/README.md`](Basalt/PBT/README.md) is the design document for this half of the library:
-why a property rejects by throwing rather than by returning, how it compares to QuickCheck,
-QuickChick, and Plausible, and what is deliberately still missing.
-
 ## Build
 
 Lean and Mathlib are pinned in `lean-toolchain` / `lakefile.toml` / `lake-manifest.json`.
@@ -91,6 +88,31 @@ lake build BasaltExamples # the cookbook
 lake build BasaltTest     # regression tests
 ```
 
+### Coverage-guided fuzzing (opt-in)
+
+`basalt-fuzz` drives generators from libFuzzer instead of a PRNG. It links native code, so building
+the *executable* is deliberately outside `lake build` and has its own script — which needs no
+arguments on the platforms `fuzz-run/README.md` lists, detecting the toolchain's fuzzing runtime and
+driver entry point itself:
+
+```sh
+fuzz-run/build.sh                                   # build the executable
+fuzz-run/basalt-fuzz <property> [libFuzzer args...]  # run a campaign
+fuzz-run/basalt-fuzz replay <property> <file>        # reproduce a saved crash input
+```
+
+Where no libFuzzer runtime ships with the toolchain (macOS), the build vendors one from
+compiler-rt source on first use. Per-machine toolchain overrides go in `fuzz-run/env.sh`
+(see `fuzz-run/env.example.sh`). `fuzz-run/README.md` is the whole story: the design, the demo
+properties, the failure model, and the supported platforms.
+
+Because a property is polymorphic in its monad, the same executable also runs it under the random
+interpretations — `--backend=io` or `--backend=plausible` instead of the default coverage-guided
+`fuzz` — from one shared property registry. Which backend finds a bug faster is a property of the
+bug: blind random sampling wins on shallow bugs (fewer runs, ~3–5× the throughput), while a bug
+behind several nested guards is reachable only by coverage guidance. `fuzz-run/compare-backends.sh` measures it and
+`fuzz-run/README.md` records the numbers.
+
 ## Repository layout
 
 - `Basalt/` — the library.
@@ -99,7 +121,13 @@ lake build BasaltTest     # regression tests
   lemma sets and tactics.
 - `BasaltTest/` — regression tests, named for the library module they guard when one exists;
   `LawLine.lean` has no library counterpart (it pins the `#genstats` law-reporting contract).
+  `Fuzz/` holds the properties the `basalt-fuzz` executable links, so those modules — alone in this
+  directory — must stay Mathlib-free; `fuzz-run/README.md` says why.
 - `BasaltExperiments/` — spikes; the only place with `sorry`s, and not built by default.
+- `BasaltFuzzMain.lean` — the root of the opt-in `basalt-fuzz` executable: the property registry.
+  Not a default build target, since only `fuzz-run/build.sh` links it.
+- `fuzz-run/` — the `basalt-fuzz` build script, its backend benchmark, and `README.md`, which owns
+  the fuzzing design and the per-platform build contract.
 
 ## License
 

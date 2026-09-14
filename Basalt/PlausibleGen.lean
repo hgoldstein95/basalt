@@ -5,7 +5,7 @@ Authors: Michael Hicks
 -/
 
 import Basalt.Gen
-import Plausible
+import Plausible.Gen
 
 /-!
 # Plausible Gen as a Basalt Generator
