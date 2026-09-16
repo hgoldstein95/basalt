@@ -3,3 +3,5 @@
 # libFuzzer writes artifacts to the *current directory* unless -artifact_prefix says otherwise, so a
 # campaign run from the repo root drops crash-<sha1> files here, not under fuzz-run/.
 crash-*
+.claude/*
+
