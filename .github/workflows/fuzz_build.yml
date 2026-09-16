@@ -167,6 +167,70 @@ jobs:
             done
           done
 
+      # Buffer growth (fuzz-run/README.md, "Extending the buffer"). Both assertions here are ones that
+      # fail *silently* otherwise: libFuzzer discovers the custom mutator by name at startup and says
+      # nothing when the lookup misses, so `--grow` degrades to a plain campaign that still finds the
+      # bug; and a growth path that never fires reports `grew 0 times` while passing every other step in
+      # this job. `build.sh` asserts the symbol is exported — this asserts libFuzzer used it.
+      #
+      # `long-16` is the property whose generator outruns its buffer (BasaltTest/Fuzz/Staged.lean), so
+      # it is the only one where growth has anything to do. It falls in a few thousand runs either way,
+      # so 2e6 is several hundred times the budget it needs, and both settings must find it because
+      # zero-extension is part of the *semantics* — `--grow` only materializes bytes the run already
+      # read as `0`, so a setting under which the property became unfalsifiable would be a broken
+      # interpretation, not a slow search. (Whether growth *helps* is a separate question that a
+      # pass/fail assertion cannot answer; fuzz-run/README.md measures it and reports that it does not.)
+      - name: --grow must actually grow, and neither setting may lose the bug
+        run: |
+          for setting in off grow; do
+            d=art/long-$setting; mkdir -p "$d"
+            flags=""
+            if [ "$setting" = grow ]; then flags=--grow; fi
+            # shellcheck disable=SC2086   # empty or one word; the split into no words is the point
+            if fuzz-run/basalt-fuzz long-16 $flags -len_control=0 -max_len=65536 \
+                 -runs=2000000 -artifact_prefix="$d/" > "log-long-$setting.txt" 2>&1; then
+              echo "::error::long-16 --grow=$setting found no counterexample in 2e6 runs (needs a few thousand)"
+              tail -20 "log-long-$setting.txt"; exit 1
+            fi
+            grep -q 'BASALT PROPERTY FAILED' "log-long-$setting.txt" || {
+              echo "::error::long-16 --grow=$setting crashed without reporting a counterexample"
+              tail -20 "log-long-$setting.txt"; exit 1; }
+            grep -q 'found LLVMFuzzerCustomMutator' "log-long-$setting.txt" || {
+              echo "::error::libFuzzer did not find LLVMFuzzerCustomMutator: --grow can do nothing"
+              echo "::error::(the dlsym lookup is silent on failure; see fuzz-run/build.sh)"
+              tail -20 "log-long-$setting.txt"; exit 1; }
+            if [ "$setting" = grow ]; then
+              grep -q 'grew [1-9][0-9]* times' "log-long-$setting.txt" || {
+                echo "::error::--grow never appended a byte to a property that runs short"
+                grep -a '^\[basalt\] runs' "log-long-$setting.txt" || true; exit 1; }
+            fi
+            grep -a '^\[basalt\] runs' "log-long-$setting.txt"
+          done
+
+      # An artifact from a grown campaign is just a byte buffer, and a longer one than the campaign
+      # started with. Replay takes no flag because zero-extension is a property of `readByte` rather
+      # than a campaign setting (Basalt/Fuzz/Runner.lean), so the bytes alone are the reproduction.
+      - name: An artifact grown by --grow must replay
+        run: |
+          f=$(ls art/long-grow/crash-* 2>/dev/null | head -1)
+          [ -n "$f" ] || { echo "::error::no long-16 artifact to replay"; exit 1; }
+          fuzz-run/basalt-fuzz replay long-16 "$f" > replay-long.txt 2>&1
+          grep -q 'BASALT PROPERTY FAILED' replay-long.txt || {
+            echo "::error::a saved long-16 artifact did not reproduce its failure"
+            cat replay-long.txt; exit 1; }
+
+      # A campaign reports its verdict *only* through the exit status, so a property name the registry
+      # does not know must not exit 0 (`usageError`, Basalt/PBT/Driver.lean): every "this must fail"
+      # step above would otherwise read a typo as the property having survived.
+      - name: A misspelled property must exit nonzero
+        run: |
+          if fuzz-run/basalt-fuzz long-6 -runs=1 > log-typo.txt 2>&1; then
+            echo "::error::an unknown property exited 0; a typo would read as a passing campaign"
+            cat log-typo.txt; exit 1
+          fi
+          grep -q "unknown property 'long-6'" log-typo.txt || {
+            echo "::error::an unknown property was not reported as such"; cat log-typo.txt; exit 1; }
+
       # The one property where the backends are supposed to *disagree*: `chain-4` hides its bug behind
       # 4 nested guards, so coverage guidance finds it in ~1e3 runs while uniform sampling needs
       # ~256^4. Asserting both directions guards the claim in fuzz-run/README.md's comparison table —
