@@ -34,8 +34,9 @@ theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ :=
 
 theorem Nat.arbitrary.terminates : IsAlmostSurelyTerminating Nat.arbitrary := by
   -- Static seed, mean offspring 1/2: subcritical.
-  refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
+  refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) fun c _ => ?_
   conv_rhs => rw [Nat.arbitrary]
+  mass_bound
   simp
 
 /-- Producing `n` costs `n + 1` random choices (one per increment, plus the final stop). -/

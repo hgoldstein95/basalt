@@ -89,33 +89,22 @@ theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) :
   refine SPMF.IsPMF_of_critical_family
     (fun p : Int × Int => (Tree.genBST p.1 p.2 : SPMF (Tree Int)))
     (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
-    (fun c hle hge => ?_) ?_ (lo, hi)
+    (fun c hle hge => ?_) (fun c hrec p => ?_) (lo, hi)
   · rw [← ENNReal.toReal_eq_one_iff]
     ennreal_to_real at hge
     ennreal_to_real at hle
     norm_num at hge hle
     nlinarith [sq_nonneg (c.toReal - 1)]
-  · rintro ⟨lo, hi⟩
-    set b := ⨅ p : Int × Int, (Tree.genBST p.1 p.2 : SPMF (Tree Int)).mass
-    by_cases hgt : lo > hi
-    · rw [Tree.genBST, dif_pos hgt, SPMF.mass_pure]
-      have hb1 : b ≤ 1 := le_trans (SPMF.mass_ge_iInf _ (lo, hi)) (SPMF.mass_le_one _)
-      calc (1 : ℝ≥0∞) / 2 + 1 / 2 * b ^ 2 ≤ 1 / 2 + 1 / 2 * 1 ^ 2 := by gcongr
+  · -- `mass_bound` discharges a recursive call by `apply`ing a hypothesis, so re-curry the seed.
+    have hrec : ∀ lo hi, c ≤ (Tree.genBST lo hi : SPMF (Tree Int)).mass := fun lo hi => hrec (lo, hi)
+    have hc1 : c ≤ 1 := (hrec p.1 p.2).trans (SPMF.mass_le_one _)
+    conv_rhs => rw [Tree.genBST]
+    mass_bound
+    -- The `dite`'s bound is a `min`: the empty-interval shortcut, and one `frequency` step.
+    refine le_min ?_ ?_
+    · calc (1 : ℝ≥0∞) / 2 + 1 / 2 * c ^ 2 ≤ 1 / 2 + 1 / 2 * 1 ^ 2 := by gcongr
         _ = 1 := by rw [one_pow, mul_one, ENNReal.add_halves]
-    · conv_rhs => rw [Tree.genBST]
-      rw [dif_neg hgt]
-      rw [SPMF.mass_frequency]
-      simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, SPMF.mass_pure,
-        Nat.cast_one, add_zero, one_mul]
-      rw [show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num, ENNReal.add_div, ENNReal.div_eq_inv_mul,
-        ENNReal.div_eq_inv_mul]
-      simp only [mul_one]
-      gcongr
-      rw [sq]
-      refine SPMF.mass_bind_ge_of_isPMF (SPMF.mass_chooseInt lo hi (by omega)) (fun x => ?_)
-      refine SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo, x - 1)) (fun l => ?_)
-      simpa [SPMF.mass_bind_pure] using
-        SPMF.mass_ge_iInf (fun p : Int × Int => (Tree.genBST p.1 p.2 : SPMF (Tree Int))) (x + 1, hi)
+    · simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 end termination
 

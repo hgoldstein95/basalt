@@ -131,8 +131,9 @@ private theorem genWeightedBST_mass_ge (lo hi : Int) (hle : lo ≤ hi) :
   rw [show ((1 + 5 : ℕ) : ℝ≥0∞) = 6 by norm_num, ENNReal.add_div, ENNReal.mul_div_right_comm]
   gcongr
   refine mass_bind_chooseInt_ge hle fun x _ _ => ?_
-  refine mass_bind_ge_mul le_rfl fun l => ?_
-  rw [mass_bind_pure]
+  -- The ranking regime bounds each child by *its own* mass, not by a constant.
+  mass_bound [SPMF.le_mass_self]
+  simp
 
 private theorem genWeightedBST_step (p : Int × Int) :
     1 - (Tree.genWeightedBST p.1 p.2 : SPMF (Tree Int)).mass

@@ -96,16 +96,10 @@ theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.
   -- Subcritical (mean offspring 1/2); the recursion re-indexes the seed, hence the family form.
   refine SPMF.IsPMF_of_subcritical_mass_family
     (fun (m : Nat) => (List.genSortedGt m : SPMF (List Nat)))
-    (m := 1 / 2) (by norm_num) ?_ m
-  intro n
+    (m := 1 / 2) (by norm_num) (fun c hrec n => ?_) m
   conv_rhs => unfold List.genSortedGt
-  simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-  gcongr
-  · simp_all
-  · apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates
-    intro x
-    simp only [SPMF.mass_bind_pure]
-    exact SPMF.mass_ge_iInf _ (n + x)
+  mass_bound
+  simp
 
 theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=
   List.genSortedGt.terminates 0

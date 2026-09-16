@@ -84,21 +84,16 @@ theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) :=
   refine SPMF.IsPMF_of_critical_family
     (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree))
     (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
-    (fun c hle hge => ?_) ?_ lo
+    (fun c hle hge => ?_) (fun c hrec lo => ?_) lo
   · rw [← ENNReal.toReal_eq_one_iff]
     ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
     ennreal_to_real at hle
     norm_num at hge hle
     nlinarith [sq_nonneg (c.toReal - 1)]
-  · intro lo
-    conv_rhs => rw [Tree.genHeap]
-    simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-    gcongr
+  · conv_rhs => rw [Tree.genHeap]
+    mass_bound
     rw [sq]
-    refine SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates (fun delta => ?_)
-    refine SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo + delta)) (fun l => ?_)
-    simpa [SPMF.mass_bind_pure] using SPMF.mass_ge_iInf
-      (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree)) (lo + delta)
+    simp
 
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/
 theorem Tree.genHeap.cost_bounded :

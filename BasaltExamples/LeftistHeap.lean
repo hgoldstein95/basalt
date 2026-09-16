@@ -13,7 +13,9 @@ open RandomChoice ArbNat
 
 `Tree.genLeftist lo` generates leftist min-heaps with every value at least `lo`. Heap order is
 threaded as a lower bound, as in `Heap.Tree.genHeap`; the leftist property couples siblings, so the
-generator builds both children independently and then puts the higher-rank one on the left.
+generator builds both children independently and then puts the higher-rank one on the left. That
+`if` is the only difference from `genHeap` — including in the termination proof, which is
+**critical** in the same way and the same text.
 -/
 
 namespace LeftistHeap
@@ -106,29 +108,18 @@ theorem Tree.genLeftistOfRank.sound_complete :
           · exists (l.rank - k)
             grind only [Nat.arbitrary_mem_support, eq_def, rank.eq_def, isLeftist.eq_def]
 
--- theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist lo) := by
---   refine SPMF.IsPMF_of_critical_family
---     (fun (lo : Nat) => (Tree.genLeftist lo : SPMF Tree))
---     (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
---     (fun c hle hge => ?_) ?_ lo
---   · rw [← ENNReal.toReal_eq_one_iff]
---     ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
---     ennreal_to_real at hle
---     norm_num at hge hle
---     nlinarith [sq_nonneg (c.toReal - 1)]
---   · intro lo
---     conv_rhs => rw [Tree.genLeftist]
---     simp only [one_div, SPMF.mass_oneOf, List.map_cons, SPMF.mass_pure,
---       List.map_nil, List.sum_cons, List.sum_nil, add_zero, List.length_cons, List.length_nil,
---       zero_add, Nat.reduceAdd, Nat.cast_ofNat]
---     rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num), add_mul,
---       ENNReal.inv_mul_cancel (by norm_num) (by norm_num), mul_right_comm,
---       ENNReal.inv_mul_cancel (by norm_num) (by norm_num), one_mul]
---     gcongr
---     rw [sq]
---     refine SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates (fun delta => ?_)
---     refine SPMF.mass_bind_ge_mul (SPMF.mass_ge_iInf _ (lo + delta)) (fun l => ?_)
---     simpa [SPMF.mass_bind_pure] using SPMF.mass_ge_iInf
---       (fun (lo : Nat) => (Tree.genLeftist lo : SPMF Tree)) (lo + delta)
+theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist lo) := by
+  refine SPMF.IsPMF_of_critical_family
+    (fun (lo : Nat) => (Tree.genLeftist lo : SPMF Tree))
+    (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
+    (fun c hle hge => ?_) (fun c hrec lo => ?_) lo
+  · rw [← ENNReal.toReal_eq_one_iff]
+    ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
+    ennreal_to_real at hle
+    norm_num at hge hle
+    nlinarith [sq_nonneg (c.toReal - 1)]
+  · conv_rhs => rw [Tree.genLeftist]
+    mass_bound
+    simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 end LeftistHeap

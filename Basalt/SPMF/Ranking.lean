@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Termination
+import Basalt.SPMF.MassBound
 
 open ENNReal
 
@@ -283,13 +284,14 @@ theorem IsPMF_of_subcritical {α : Type*} {g : SPMF α} {m : ℝ≥0∞} (hm : m
     exact le_of_eq (by field_simp; ring)
 
 /-- Mass form of `IsPMF_of_subcritical`: what one reads off directly from unfolding a generator
-whose non-recursive branches carry total probability `1 - m`. -/
+whose non-recursive branches carry total probability `1 - m`. The recursive occurrence in one
+unfolding is bounded below by the `c` that `hstep` is handed. -/
 theorem IsPMF_of_subcritical_mass {α : Type*} {g : SPMF α} {m : ℝ≥0∞} (hm : m < 1)
-    (hstep : (1 - m) + m * g.mass ≤ g.mass) : IsPMF g := by
+    (hstep : ∀ c ≤ g.mass, (1 - m) + m * c ≤ g.mass) : IsPMF g := by
   have hm_top : m ≠ ⊤ := (hm.trans one_lt_top).ne
   refine IsPMF_of_subcritical hm ?_
   calc 1 - g.mass
-      ≤ 1 - ((1 - m) + m * g.mass) := tsub_le_tsub_left hstep 1
+      ≤ 1 - ((1 - m) + m * g.mass) := tsub_le_tsub_left (hstep _ le_rfl) 1
     _ = (1 - (1 - m)) - m * g.mass := by rw [tsub_add_eq_tsub_tsub]
     _ = m - m * g.mass := by rw [ENNReal.sub_sub_cancel one_ne_top hm.le]
     _ = m * (1 - g.mass) := by
@@ -310,14 +312,14 @@ theorem _root_.ENNReal.eq_one_of_deficit_le_mul {c m : ℝ≥0∞} (hm : m < 1) 
   exact absurd hlt (lt_irrefl _)
 
 /-- **Family form of subcritical termination**, for a subcritical generator whose recursion
-re-indexes the seed. One unfolding must bound the mass below by `(1 - m) + m * X` where `X` is the
-family infimum of the masses; recursive occurrences are bounded by `mass_ge_iInf`. -/
+re-indexes the seed. One unfolding must bound the mass below by `(1 - m) + m * c`, for a `c` that
+bounds the whole family below — which is what every recursive occurrence is discharged by. -/
 theorem IsPMF_of_subcritical_mass_family {ι : Type*} {α : Type*} [Nonempty ι]
     (g : ι → SPMF α) {m : ℝ≥0∞} (hm : m < 1)
-    (hstep : ∀ i, (1 - m) + m * (⨅ j, (g j).mass) ≤ (g i).mass) :
+    (hstep : ∀ c, (∀ j, c ≤ (g j).mass) → ∀ i, (1 - m) + m * c ≤ (g i).mass) :
     ∀ i, IsPMF (g i) := by
   have hm_top : m ≠ ⊤ := (hm.trans one_lt_top).ne
-  refine IsPMF_of_mass_fixpoint g (fun c => (1 - m) + m * c) ?_ (fun i _ => hstep i)
+  refine IsPMF_of_mass_fixpoint g (fun c => (1 - m) + m * c) ?_ hstep
   intro c hle hge
   refine ENNReal.eq_one_of_deficit_le_mul hm hle ?_
   calc 1 - c
@@ -326,28 +328,23 @@ theorem IsPMF_of_subcritical_mass_family {ι : Type*} {α : Type*} [Nonempty ι]
     _ = m - m * c := by rw [ENNReal.sub_sub_cancel one_ne_top hm.le]
     _ = m * (1 - c) := by rw [ENNReal.mul_sub fun _ _ => hm_top, mul_one]
 
-/-- **Critical termination.** A single-seed wrapper around `IsPMF_of_mass_fixpoint`: if the mass
-satisfies `F g.mass ≤ g.mass` for an `F` whose only fixed-or-below point in `[0, 1]` is `1`, then
-`g` is a PMF. -/
+/-- **Critical termination.** A single-seed wrapper around `IsPMF_of_mass_fixpoint`: if one
+unfolding bounds the mass below by `F c` for every `c ≤ g.mass`, and `F` has no fixed-or-below point
+in `[0, 1)`, then `g` is a PMF. -/
 theorem IsPMF_of_critical {α : Type*} {g : SPMF α} (F : ℝ≥0∞ → ℝ≥0∞)
     (hF : ∀ c : ℝ≥0∞, c ≤ 1 → F c ≤ c → c = 1)
-    (hstep : F g.mass ≤ g.mass) : IsPMF g := by
+    (hstep : ∀ c ≤ g.mass, F c ≤ g.mass) : IsPMF g := by
   have : Nonempty Unit := ⟨()⟩
-  refine IsPMF_of_mass_fixpoint (fun _ : Unit => g) F ?_ ?_ ()
-  · intro c hle hge
-    exact hF c hle hge
-  · intro _ _
-    simpa [iInf_const] using hstep
+  exact IsPMF_of_mass_fixpoint (fun _ : Unit => g) F hF (fun c hc _ => hstep c (hc ())) ()
 
 /-- **Family form of critical termination**, for a critical generator whose recursion re-indexes the
-seed: one unfolding must bound the mass below by `F` of the family infimum of the masses. Like
-`IsPMF_of_critical`, it comes with no expected-size bound. -/
+seed. Like `IsPMF_of_critical`, it comes with no expected-size bound. -/
 theorem IsPMF_of_critical_family {ι : Type*} {α : Type*} [Nonempty ι]
     (g : ι → SPMF α) (F : ℝ≥0∞ → ℝ≥0∞)
     (hF : ∀ c : ℝ≥0∞, c ≤ 1 → F c ≤ c → c = 1)
-    (hstep : ∀ i, F (⨅ j, (g j).mass) ≤ (g i).mass) :
+    (hstep : ∀ c, (∀ j, c ≤ (g j).mass) → ∀ i, F c ≤ (g i).mass) :
     ∀ i, IsPMF (g i) :=
-  IsPMF_of_mass_fixpoint g F (fun c hle hge => hF c hle hge) (fun i _ => hstep i)
+  IsPMF_of_mass_fixpoint g F hF hstep
 
 end corollaries
 
@@ -359,31 +356,21 @@ variable {α : Type*}
 theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
     IsPMF (listOf g) := by
   -- Total probability of non-recursive branches is 1/2, hence `m := 1/2`
-  refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
-  rw [show ((1 : ℝ≥0∞) - 1 / 2 = 1 / 2) by rw [one_div, ENNReal.one_sub_inv_two]]
+  refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) fun c _ => ?_
   conv_rhs => rw [listOf]
-  simp only [mass_pick, mass_pure, mul_one]
-  gcongr
-  apply mass_bind_ge_of_isPMF hg
-  intro x
-  rw [mass_bind_pure]
+  mass_bound
+  rw [show ((1 : ℝ≥0∞) - 1 / 2 = 1 / 2) by rw [one_div, ENNReal.one_sub_inv_two]]
+  simp
 
 /-- If a generator `g` is an SPMF, then `nonEmptyListOf g` is also an SPMF. -/
 theorem IsPMF_nonEmptyListOf {g : SPMF α} (hg : IsPMF g) :
     IsPMF (nonEmptyListOf g) := by
   -- Total probability of non-recursive branches is 1/2, hence `m := 1/2`
-  refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
-  rw [show ((1 : ℝ≥0∞) - 1 / 2 = 1 / 2) by rw [one_div, ENNReal.one_sub_inv_two]]
+  refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) fun c _ => ?_
   conv_rhs => rw [nonEmptyListOf]
-  -- In the base case, we have `g >>= fun x => pure [x]`,
-  -- whose mass is `g.mass = 1` by assumption
-  have hg' : g.mass = 1 := hg
-  simp only [mass_pick, mass_bind_pure, hg', mul_one]
-  gcongr
-  apply mass_bind_ge_of_isPMF
-  . assumption
-  . intro x
-    rw [mass_bind_pure]
+  mass_bound
+  rw [show ((1 : ℝ≥0∞) - 1 / 2 = 1 / 2) by rw [one_div, ENNReal.one_sub_inv_two]]
+  simp
 
 end combinators
 

@@ -195,43 +195,65 @@ call: a uniform `pick` with one recursive branch has `m = 1/2`; `frequency [(2, 
 with two calls in `node` has `m = 2·(1/3) = 2/3`. **A critical generator (`m = 1`) terminates but
 has infinite expected size** (`AllTwoTree.genTree_expectedSteps_infinite`) — reweight it if you can.
 
-The step obligation is the same in every regime: *unfold once and lower-bound the mass, one lemma
-per `←` in the do-block*.
+Outside the ranking regime the proof is the same three steps, and only the arithmetic is yours:
 
 ```lean
-theorem <GEN>.terminates : IsAlmostSurelyTerminating <GEN> := by
-  -- Subcritical, static seed (worked instances: Nat.arbitrary, List.arbitrary, genAllTwos,
-  -- genCharList; family form: List.genSortedGt):
-  refine SPMF.IsPMF_of_subcritical_mass (m := <M>) (by norm_num) ?_
-  conv_rhs => rw [<GEN>]             -- unfold one step, RHS only
-  simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-  gcongr                             -- match the non-recursive parts; leaves the recursive branch
-  simp_all
-  -- Now one lemma per `←`, reading the do-block top to bottom:
-  apply SPMF.mass_bind_ge_of_isPMF <callee>.terminates   -- `← callee` with a known PMF
-  intro x
-  rw [SPMF.mass_bind_pure]           -- trailing `return f x` — done if the recursive call is last
+theorem <GEN>.terminates : IsAlmostSurelyTerminating (<GEN> <IDX>) := by
+  -- the step argument of every criterion: `c` bounds the generator (family) below, `hrec` says so,
+  -- and `<IDX>` is there only in the `_family` forms
+  refine SPMF.IsPMF_of_<REGIME> … (fun c hrec <IDX> => ?_)
+  conv_rhs => rw [<GEN>]    -- 1. unfold one step, RHS only
+  mass_bound                -- 2. compute this step's mass from below
+  simp                      -- 3. whatever is left is ℝ≥0∞ arithmetic
 ```
 
-For the *family* forms (`IsPMF_of_subcritical_mass_family`, `IsPMF_of_critical_family`) the
-recursive occurrence recurses at a *different index*, so it is bounded by the family's infimum:
-finish with `exact SPMF.mass_ge_iInf _ <new index>` (see `List.genSortedGt.terminates`,
-`Tree.genHeap.terminates`). For a branch making two recursive calls, chain
-`SPMF.mass_bind_ge_mul` (see `Tree.genHeap.terminates`). For a `frequency`, replace `mass_pick`
-with `SPMF.mass_frequency` / `SPMF.mass_frequency_ge`; for a `chooseNat` pivot,
-`SPMF.mass_bind_chooseNat_ge` (`chooseInt`: `SPMF.mass_bind_chooseInt_ge`; raw `choose`:
-`SPMF.mass_bind_choose_ge`).
+**Step 1** is the unfolding idiom for `≤` goals (see the table above): only the side being bounded
+may be unfolded, or the recursive occurrences unfold with it.
+
+**Step 2, `mass_bound`, is the whole structural argument.** It walks the unfolded generator and
+*computes* a lower bound on its mass — one `@[mass_bound]` rule per combinator, so the bound comes
+out in the shape of the do-block (`Basalt/SPMF/MassBound.lean` owns the rules and the walk;
+`BasaltTest/MassBound.lean` shows a generator that uses every one of them). Nothing about the
+generator is yours to supply:
+
+- a **recursive occurrence** is discharged from the local context — that is what `hrec` is for, and
+  the recursive occurrences are the only places that need it. It need not be named: anything in
+  scope that `apply` closes the goal with will do.
+- a **callee** is discharged by its own `<callee>.terminates` law, found by the naming convention
+  (Part 2 above) — `Nat.arbitrary` inside a body needs no mention. Any other fact is passed
+  explicitly: `mass_bound [h₁, h₂]`.
+- an **`if`/`dite`** is no different from any other combinator: the bound is the `min` of the
+  branches', which step 3 either simplifies away (`min 1 1`) or splits with `le_min`.
+  `Tree.genLeftist` (`LeftistHeap.lean`) ends its recursive branch in an `if` that orders the two
+  children and `Tree.genHeap` (`Heap.lean`) does not; their termination proofs are otherwise the
+  same text. `Tree.genBST` (`BST.lean`) shortcuts on an exhausted interval, and that `dite` is the
+  `le_min` case.
+
+**Step 3** is pure `ℝ≥0∞` arithmetic: your `F`/`m` on the left, the computed bound on the right, and
+no generator in sight. Try `simp` (`ArbNat.lean`, `SortedList.lean`), then `simp` with the
+identities the goal needs (`simp [sq, ENNReal.div_eq_inv_mul, mul_add]` in `LeftistHeap.lean`), then
+`ennreal_to_real` (`Basalt/ENNRealAuto.lean`) and `nlinarith` when the inequality is genuinely
+strict (`genWeightedTree.terminates`, `AllTwoTree.lean`). If it looks *false*, your `m` or `F` is
+wrong, not your proof.
+
+The one adjustment the step sometimes needs, and it is one line: **a seed the criterion had to
+tuple.** A family is an `ι → SPMF α`, so a two-argument generator is indexed by a pair and `hrec`
+arrives about `<GEN> j.1 j.2`, which `apply` cannot match against `<GEN> lo (x - 1)`. Re-curry it —
+`have hrec : ∀ lo hi, c ≤ (<GEN> lo hi : SPMF _).mass := fun lo hi => hrec (lo, hi)` — before
+`mass_bound` (`Tree.genBST.terminates`, `BST.lean`).
 
 **Shrinking seed** (`Tree.genWeightedBST`, `BST/Weighted.lean`) is the one regime with real
-content: you supply a ranking function `φ : Seed → ℝ≥0∞` (with `φ ≥ 1`) whose expected value drops
-by `ε` at every step, and `SPMF.IsPMF_of_ranking` returns termination *plus* `E[#steps] ≤ φ/ε`. The
-proof splits into a `LevelOp` (three algebra laws), a drift lemma (`A φ + ε ≤ φ` — pure arithmetic
-about your rank), and a step lemma (one unfolding, using `ENNReal.one_sub_le_mul_one_sub`,
-`one_sub_sum_div_le`, `one_sub_mul_le_add` to push the deficit through the branches). Follow
-`genWeightedBST_drift`/`genWeightedBST_step`/`genWeightedBST.terminates` in `BST/Weighted.lean`.
-(The plain `Tree.genBST` in `BST.lean` is *critical*, not shrinking — a uniform pivot gives mean
-offspring exactly 1 — so it terminates via `IsPMF_of_critical_family` with no ranking function; the
-`frequency`-weighted variant is what tips supercritical under the crude bound and needs the rank.)
+content, and the one where the step is not a constant: you supply a ranking function
+`φ : Seed → ℝ≥0∞` (with `φ ≥ 1`) whose expected value drops by `ε` at every step, and
+`SPMF.IsPMF_of_ranking` returns termination *plus* `E[#steps] ≤ φ/ε`. The proof splits into a
+`LevelOp` (three algebra laws), a drift lemma (`A φ + ε ≤ φ` — pure arithmetic about your rank), and
+a step lemma (one unfolding, using `ENNReal.one_sub_le_mul_one_sub`, `one_sub_sum_div_le`,
+`one_sub_mul_le_add` to push the deficit through the branches). The unfolding inside the step lemma
+is still `mass_bound`, but each child is bounded by *its own* mass rather than by a constant, so it
+is passed `SPMF.le_mass_self`; a uniform pivot is averaged over with
+`SPMF.mass_bind_chooseInt_ge` (`chooseNat`: `mass_bind_chooseNat_ge`; raw `choose`:
+`mass_bind_choose_ge`) before `mass_bound` takes over. Follow
+`genWeightedBST_drift`/`genWeightedBST_step`/`genWeightedBST.terminates`.
 Two things to know:
 
 - Candidate `φ`s, in order: the seed measure; `≡ const` (that's the static-seed case); seed measure
@@ -240,11 +262,6 @@ Two things to know:
   because the bounds are `Int`. Under `Nat` bounds the `lo = 0` pivot has an unshrunk child and the
   same `φ` fails its drift check — a truncating seed costs you a correction term in the rank.
 - A wrong `φ` is a *failed drift check*, never a wrong theorem. Guess freely.
-
-Whatever the regime, the residual ENNReal *arithmetic* (drift inequalities, fixed-point
-bounds) is handled by `ennreal_to_real` + `norm_num`/`linarith`/`nlinarith` — see
-`Basalt/ENNRealAuto.lean`, with worked uses in `genWeightedBST_drift` (`BST/Weighted.lean`),
-`genTree.terminates` (`AllTwoTree.lean`), and `IsPMF_retry` (`Failure.lean`).
 
 ### Recipe 3: Cost
 
@@ -304,10 +321,12 @@ inversion path above is uniform and the combinator side conditions just reintrod
   `rw [show lo + (x - lo) = x by omega]`.
 - **`omega` fails in a cost proof** → read the goal: it is the exact inequality your bound must
   satisfy. Either a `have` for some callee's bound is missing, or the bound is too tight.
-- **`gcongr` leaves a strange goal in a termination proof** → the mass chain must mirror the
-  do-block exactly, one lemma per `←`: `mass_bind_ge_of_isPMF` (known-PMF callee),
-  `mass_ge_iInf` (recursive call at another index, family forms), `mass_bind_ge_mul` (two recursive
-  calls), `mass_bind_pure` (trailing `return`).
+- **`mass_bound` says nothing bounds the mass of a sub-generator** → it is a combinator with no
+  `@[mass_bound]` rule (tag one), a callee whose termination law is under another name (pass it:
+  `mass_bound [h]`), or a recursive occurrence whose bound cannot escape the binder it sits under —
+  see the two adjustments in Recipe 2.
+- **`mass_bound` leaves an arithmetic goal that is false** → the structural half is not in doubt;
+  the `m` or `F` you claimed is. Re-count the mean offspring.
 - **`fix_induct` fails to apply** → the motive must mention the *bare* fixpoint value; for an
   indexed generator quantify the indices in the motive (see the BST cost proofs).
 - **Finite-domain data (chars, enums)** → skip the machinery: `decide` / `native_decide` on the

@@ -171,16 +171,6 @@ theorem mass_bind_ge_mul {x : SPMF α} {f : α → SPMF β} {c d : ℝ≥0∞}
   calc (x >>= f).mass ≥ x.mass * d := h
     _ ≥ c * d := by gcongr
 
-theorem mass_bind_ge_of_isPMF {x : SPMF α} (hx : x.mass = 1)
-    {f : α → SPMF β} {c : ℝ≥0∞}
-    (hf : ∀ a, (f a).mass ≥ c) : (x >>= f).mass ≥ c := by
-  have := mass_bind_ge_mul (c := 1) (d := c) hx.symm.le hf
-  simpa using this
-
-theorem mass_ge_iInf {ι : Type*} (g : ι → SPMF α) (i : ι) :
-    (g i).mass ≥ ⨅ j, (g j).mass :=
-  iInf_le (fun j => (g j).mass) i
-
 /-- Lower-bound the mass of a generator that draws a pivot with `choose` and continues: the mass is
 at least the *average* over the range of a per-pivot lower bound. -/
 theorem mass_bind_choose_ge {lo hi : Nat} (h : lo ≤ hi)
@@ -277,20 +267,6 @@ theorem mass_frequency
   rw [hm]
   simp only [frequency_apply, div_eq_mul_inv]
   rw [ENNReal.tsum_mul_right, tsum_map_weighted]
-
-/-- Lower-bound form of `mass_frequency`, for termination proofs: inside a `partial_fixpoint` one
-only ever has a *lower bound* on a recursive branch's mass, never an equality. -/
-theorem mass_frequency_ge {gs : List (Nat × (Unit → SPMF α))}
-    (h : 0 < (gs.map Prod.fst).sum)
-    {f : (Nat × (Unit → SPMF α)) → ℝ≥0∞}
-    (hgs : ∀ p ∈ gs, (p.2 ()).mass ≥ f p) :
-    (frequency gs h : SPMF α).mass
-      ≥ (gs.map fun p => (p.1 : ℝ≥0∞) * f p).sum / ((gs.map Prod.fst).sum : ℝ≥0∞) := by
-  rw [mass_frequency h]
-  refine ENNReal.div_le_div_right ?_ _
-  refine List.sum_le_sum fun p hp => ?_
-  gcongr
-  exact hgs p hp
 
 end mass
 
@@ -462,18 +438,21 @@ theorem IsPMF_listOfMaxLength {g : SPMF α} (hg : IsPMF g) :
 
 /-- A general fixpoint principle for proving almost-sure termination.
 
-If the mass of each generator satisfies `mass ≥ F(inf mass)` and `F` is such that
-`c ≤ 1 ∧ c ≥ F c → c = 1`, then all generators are PMFs. -/
+`hstep` is the one-unfolding obligation, stated so that the proof never has to name the infimum it
+is really about: it may assume *some* `c` bounds every member of the family below — which is exactly
+what a recursive occurrence needs — and must then bound one unfolding below by `F c`. If `F` has no
+fixed-or-below point in `[0, 1)`, every member of the family is a PMF. -/
 theorem IsPMF_of_mass_fixpoint {ι : Type*} {α : Type*} [Nonempty ι]
     (g : ι → SPMF α) (F : ℝ≥0∞ → ℝ≥0∞)
-    (hF : ∀ c : ℝ≥0∞, c ≤ 1 → c ≥ F c → c = 1)
-    (h_step : ∀ i, (⨅ j, (g j).mass) ≤ 1 → (g i).mass ≥ F (⨅ j, (g j).mass)) :
+    (hF : ∀ c : ℝ≥0∞, c ≤ 1 → F c ≤ c → c = 1)
+    (hstep : ∀ c, (∀ j, c ≤ (g j).mass) → ∀ i, F c ≤ (g i).mass) :
     ∀ i, IsPMF (g i) := by
   intro i
   unfold IsPMF
   apply le_antisymm (g i).tsum_coe
   have hc_le : (⨅ j, (g j).mass) ≤ 1 := (iInf_le _ i).trans (g i).tsum_coe
-  have hc_ge_F : (⨅ j, (g j).mass) ≥ F (⨅ j, (g j).mass) := le_iInf (fun j => h_step j hc_le)
+  have hc_ge_F : F (⨅ j, (g j).mass) ≤ ⨅ j, (g j).mass :=
+    le_iInf (hstep _ fun j => iInf_le (fun j => (g j).mass) j)
   calc (1 : ℝ≥0∞) = ⨅ j, (g j).mass := (hF _ hc_le hc_ge_F).symm
     _ ≤ (g i).mass := iInf_le _ i
 

@@ -45,14 +45,10 @@ theorem List.arbitrary.sound_complete : IsSoundAndComplete List.arbitrary ⊤ :=
 
 theorem List.arbitrary.terminates : IsAlmostSurelyTerminating List.arbitrary := by
   -- Static seed, mean offspring 1/2: subcritical.
-  refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) ?_
+  refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) fun c _ => ?_
   conv_rhs => rw [List.arbitrary]
-  simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-  gcongr
-  · simp_all
-  · apply SPMF.mass_bind_ge_of_isPMF Nat.arbitrary.terminates
-    intro x
-    rw [SPMF.mass_bind_pure]
+  mass_bound
+  simp
 
 /-- Producing `xs` costs at most `2 * xs.length + xs.sum + 1` choices: one `pick` and one
 `Nat.arbitrary` (bounded by the element plus one) per cons cell, plus the final `pick`. -/

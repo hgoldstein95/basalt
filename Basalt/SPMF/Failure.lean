@@ -150,9 +150,10 @@ theorem IsPMF_retry (p : SPMF (Option α)) (hmass : p.mass = 1)
     ennreal_to_real at hle
     nlinarith [hge, hsn, hle, hspos]
   case mass =>
-    intro _ _
-    rw [iInf_const]
-    exact (mass_retry p).ge
+    intro c hc _
+    calc massSome p + massNone p * c
+        ≤ massSome p + massNone p * (retry p).mass := by gcongr; exact hc ()
+      _ = (retry p).mass := (mass_retry p).symm
 
 /-- The retry loop never lands on an explicit failure: it retries every `none`. -/
 theorem retry_none (p : SPMF (Option α)) :
