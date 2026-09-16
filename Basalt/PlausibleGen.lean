@@ -1,10 +1,11 @@
 /-
-Copyright (c) 2026 Michael Hicks. All rights reserved.
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
+
 import Basalt.Gen
-import Plausible
+import Plausible.Gen
 
 /-!
 # Plausible Gen as a Basalt Generator
