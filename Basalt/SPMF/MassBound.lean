@@ -11,8 +11,7 @@ import Basalt.SPMF.MassBound.Attr
 
 The structural half of a termination proof: `mass_bound` walks a generator's syntax and *computes* a
 lower bound on its mass from the `@[mass_bound]` rules, leaving a goal that is pure `ℝ≥0∞`
-arithmetic. Every combinator in `Combinators.lean` needs a rule here, in the shape `Attr.lean`
-describes, or the walk stops at it.
+arithmetic.
 -/
 
 open ENNReal RandomChoice Lean Meta Elab Tactic
@@ -224,7 +223,7 @@ end
 /-- `mass_bound` replaces a goal `c ≤ (gen …).mass` by the `ℝ≥0∞` inequality `c ≤ b`, where `b` is
 the bound it computes by walking `gen`'s syntax with the `@[mass_bound]` rules. Recursive
 occurrences are closed from the local context, callees from their `.terminates` law; any other fact
-can be passed as `mass_bound [h₁, h₂]`. Unfold one step of the recursion *before* calling it. -/
+can be passed as `mass_bound [h₁, h₂]`. -/
 syntax (name := massBoundTac) "mass_bound" (" [" term,* "]")? : tactic
 
 elab_rules : tactic
