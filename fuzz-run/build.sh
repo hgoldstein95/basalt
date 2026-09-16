@@ -166,6 +166,15 @@ if [ -z "${CXXLIB_FLAGS+x}" ]; then
   fi
 fi
 
+# libFuzzer looks the custom mutator up by name at startup — `dlsym(RTLD_DEFAULT, …)` on Darwin, a
+# weak reference on Linux — so nothing in the link *references* it and it must be kept and exported
+# explicitly. The check after the link is what catches a spelling that stops doing that.
+if [ "$UNAME" = "Darwin" ]; then
+  EXPORT_FLAGS="-Wl,-exported_symbol,_LLVMFuzzerCustomMutator"
+else
+  EXPORT_FLAGS="-Wl,--export-dynamic"
+fi
+
 # Which driver symbol the bridge calls. LLVM >= 12 has the stable C entry `LLVMFuzzerRunDriver`;
 # clang 11 and earlier expose only the mangled `fuzzer::FuzzerDriver`. Probe the archive rather
 # than parsing a version, since the archive is the thing that must contain the symbol.
@@ -233,12 +242,22 @@ echo "== link =="
 # a nonzero status or a missing binary.
 rm -f fuzz-run/basalt-fuzz
 # shellcheck disable=SC2086   # flag strings: the split into words is the point
-if ! $CC "${OBJS[@]}" "${DEP_LIBS[@]}" -o fuzz-run/basalt-fuzz $FUZZER_LIB_FLAGS $CXXLIB_FLAGS > "$OUT/link.log" 2>&1; then
+if ! $CC "${OBJS[@]}" "${DEP_LIBS[@]}" -o fuzz-run/basalt-fuzz $FUZZER_LIB_FLAGS $CXXLIB_FLAGS $EXPORT_FLAGS \
+     > "$OUT/link.log" 2>&1; then
   grep -viE 'unused|-Wl' "$OUT/link.log" >&2 || true
   echo "== link FAILED (runtime: $FUZZER_LIB_FLAGS; cxxlib: $CXXLIB_FLAGS) ==" >&2
   exit 1
 fi
 grep -viE 'unused|-Wl' "$OUT/link.log" || true
 [ -x fuzz-run/basalt-fuzz ] || { echo "== link reported success but produced no binary ==" >&2; exit 1; }
+
+# libFuzzer finds the custom mutator with `dlsym(RTLD_DEFAULT, ...)`, and a lookup that fails is
+# silent: the campaign runs the default mutators and `--grow` does nothing. So assert the linked
+# binary really exports it (`nm -g` lists dynamic externals; a hidden symbol shows as `private
+# external`, which `grep -v` drops).
+if ! nm -g fuzz-run/basalt-fuzz 2>/dev/null | grep -q 'T _\?LLVMFuzzerCustomMutator$'; then
+  echo "== LLVMFuzzerCustomMutator is not exported: --grow would silently do nothing ==" >&2
+  exit 1
+fi
 
 echo "== built: fuzz-run/basalt-fuzz =="

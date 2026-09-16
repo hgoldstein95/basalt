@@ -20,10 +20,14 @@ open Basalt.Fuzz Basalt.PBT RandomChoice
 /-- Build an input buffer from a byte list. -/
 private def bytes (l : List UInt8) : ByteArray := ⟨l.toArray⟩
 
-private def render : TestOutcome → String
+private def renderOutcome : TestOutcome → String
   | .ok () => "pass"
   | .error (.fail r) => s!"fail: {r}"
   | .error .discard => "discard"
+
+/- Most pins care only about the verdict; `renderShort` below adds the deficit where that is the
+point. -/
+private def render (r : FuzzResult) : String := renderOutcome r.outcome
 
 /- A single choice in `[0,9]` consumes one byte and reduces mod 10; the property is `· < 9`. -/
 private def propLt9 : PropM FuzzGen Unit := forAll (chooseNat 0 9) (· < 9)
@@ -79,6 +83,34 @@ private def propTwo : PropM FuzzGen Unit := do
 /-- info: discard -/
 #guard_msgs in #eval IO.println (render (runOne propTwo (bytes [5, 5])))
 
+/-! ### The deficit
+
+How many bytes a run wanted beyond the ones it was given is the whole feedback channel for `--grow`,
+which appends that many zeros. These pin the two facts growth rests on: the count is exact, and
+appending zeros does not change the outcome. -/
+
+private def renderShort (r : FuzzResult) : String := s!"{render r} (short {r.deficit})"
+
+/- One byte for two draws: the second reads past the end and gets `0`, so the property fails on
+`7 < 0` and reports a deficit of exactly the one byte it went without. -/
+/-- info: fail: x=7, y=0 (short 1) -/
+#guard_msgs in #eval IO.println (renderShort (runOne propTwo (bytes [7])))
+
+/- Materializing that byte is what `--grow` does, and it is semantics-preserving: the same failure,
+now with the byte the fuzzer can mutate actually present in the input. -/
+/-- info: fail: x=7, y=0 (short 0) -/
+#guard_msgs in #eval IO.println (renderShort (runOne propTwo (bytes [7, 0])))
+
+/- A run that fits inside its buffer reports no deficit, which is what keeps growth from firing on
+inputs that were never starved. -/
+/-- info: pass (short 0) -/
+#guard_msgs in #eval IO.println (renderShort (runOne propTwo (bytes [3, 7])))
+
+/- The deficit counts every byte the run went without, not just the first: after `[1, 5]` builds a
+node, `genBST` recurses on both subtrees and each reads a `frequency` byte past the end. -/
+/-- info: pass (short 2) -/
+#guard_msgs in #eval IO.println (renderShort (runOne propBSTsizeNonneg (bytes [1, 5])))
+
 /-! ### One property, every backend
 
 `basalt-fuzz --backend=` rests on one registry entry (a `Basalt.PBT.Property`) running at `FuzzGen`,
@@ -94,11 +126,11 @@ private def propAnyBackend : Property := fun _ => do
 #guard_msgs in #eval IO.println (render (runOne (propAnyBackend FuzzGen) (bytes [4])))
 
 /-- info: pass -/
-#guard_msgs in #eval do IO.println (render (← runProp (propAnyBackend IO)))
+#guard_msgs in #eval do IO.println (renderOutcome (← runProp (propAnyBackend IO)))
 
 /-- info: pass -/
 #guard_msgs in
-#eval do IO.println (render (← Plausible.Gen.run (runProp (propAnyBackend Plausible.Gen)) 0))
+#eval do IO.println (renderOutcome (← Plausible.Gen.run (runProp (propAnyBackend Plausible.Gen)) 0))
 
 /-! ### The fuzz target's `genBST` is the proved one
 
