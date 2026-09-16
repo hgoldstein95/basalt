@@ -568,6 +568,49 @@ theorem mem_support_oneOf_iff
     a ∈ support (oneOf gs hne) ↔ ∃ g ∈ gs, a ∈ (g ()).support := by
   simp [support_oneOf]
 
+/-- Summing a list's entries by index over `range l.length` recovers `l.sum`. -/
+private theorem sum_range_getD (l : List ℝ≥0∞) :
+    ∑ n ∈ Finset.range l.length, l.getD n 0 = l.sum := by
+  induction l with
+  | nil => simp
+  | cons hd tl ih =>
+    rw [List.length_cons, Finset.sum_range_succ']
+    simp only [List.getD_cons_succ, List.getD_cons_zero, ih, List.sum_cons]
+    exact add_comm _ _
+
+/-- Branch `j` of `oneOf` fires with probability `1 / gs.length`. -/
+@[simp]
+theorem oneOf_apply
+    (gs : List (Unit → SPMF α)) (h : gs ≠ []) (a : α) :
+    oneOf gs h a
+      = (gs.map fun p => (p ()) a).sum / (gs.length : ℝ≥0∞) := by
+  have hlen : 0 < gs.length := List.length_pos_iff.mpr h
+  unfold oneOf Helpers.oneOfAux
+  rw [bind_map_left, bind_apply]
+  simp only [choose_apply]
+  trans (∑ n ∈ Finset.Icc 0 (gs.length - 1),
+      (fun n : Nat => 1 / ((gs.length - 1 - 0 + 1 : ℕ) : ℝ≥0∞) *
+        (gs.map fun p => (p ()) a).getD n 0) n)
+  · trans (∑' (m : ULift.{0} {x : Nat // 0 ≤ x ∧ x ≤ gs.length - 1}),
+        (fun n : Nat => 1 / ((gs.length - 1 - 0 + 1 : ℕ) : ℝ≥0∞) *
+          (gs.map fun p => (p ()) a).getD n 0) m.down.val)
+    · refine tsum_congr ?_
+      rintro ⟨⟨i, -, hi⟩⟩
+      dsimp only
+      have hi' : i < gs.length := by omega
+      simp only [List.getD_eq_getElem?_getD, List.getElem?_map,
+        List.getElem?_eq_getElem hi', Option.map_some, Option.getD_some]
+    · exact tsum_subtype_Icc 0 (gs.length - 1)
+        (fun n : Nat => 1 / ((gs.length - 1 - 0 + 1 : ℕ) : ℝ≥0∞) *
+          (gs.map fun p => (p ()) a).getD n 0)
+  · have hIcc : Finset.Icc 0 (gs.length - 1)
+        = Finset.range (gs.map fun p => (p ()) a).length := by
+      ext n
+      simp only [Finset.mem_Icc, Finset.mem_range, List.length_map]
+      omega
+    have hT : gs.length - 1 - 0 + 1 = gs.length := by omega
+    rw [hIcc, hT, ← Finset.mul_sum, sum_range_getD, one_div, div_eq_mul_inv, mul_comm]
+
 /-- Summing `frequencySelect` over all values of the uniform draw counts each branch `(w, g)`
 exactly `w` times. -/
 private theorem sum_frequencySelect_apply

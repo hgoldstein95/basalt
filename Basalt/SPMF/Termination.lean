@@ -116,6 +116,10 @@ theorem mass_chooseInt (lo hi : Int) (h : lo ≤ hi) :
   rw [mass_bind_pure]
   exact mass_chooseNat _ _ _
 
+theorem mass_ite {b : Bool} {x y : SPMF α} :
+    (if b then x else y).mass = if b then x.mass else y.mass := by
+  grind
+
 theorem mass_bind_const {x : SPMF α} {y : SPMF β} :
     (x >>= fun _ => y).mass = x.mass * y.mass := by
   unfold mass
@@ -240,6 +244,28 @@ private theorem tsum_map_weighted (gs : List (Nat × (Unit → SPMF α))) :
     simp only [List.map_cons, List.sum_cons]
     rw [ENNReal.tsum_add, ENNReal.tsum_mul_left, ih]
     rfl
+
+/-- A `tsum` over `α` commutes with an unweighted `List.sum`. -/
+private theorem tsum_map_mass (gs : List (Unit → SPMF α)) :
+    ∑' a, (gs.map fun p => (p ()) a).sum
+      = (gs.map fun p => (p ()).mass).sum := by
+  induction gs with
+  | nil => simp
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.sum_cons]
+    rw [ENNReal.tsum_add, ih]
+    rfl
+
+/-- The mass of a uniform choice is the average of the branch masses. -/
+@[simp]
+theorem mass_oneOf
+    {gs : List (Unit → SPMF α)} {h : gs ≠ []} :
+    (oneOf gs h : SPMF α).mass
+      = (gs.map (fun p => (p ()).mass)).sum / (gs.length : ℝ≥0∞) := by
+  have hm : (oneOf gs h : SPMF α).mass = ∑' a, oneOf gs h a := rfl
+  rw [hm]
+  simp only [oneOf_apply, div_eq_mul_inv]
+  rw [ENNReal.tsum_mul_right, tsum_map_mass]
 
 /-- The mass of a weighted choice is the weighted average of the branch masses. -/
 @[simp]
