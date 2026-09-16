@@ -66,8 +66,9 @@ theorem List.support_genSortedBySorting_eq :
     (List.genSortedBySorting_mem_support ys).trans (List.genSorted.sound_complete ys).symm
 
 theorem List.genSortedBySorting.terminates :
-    IsAlmostSurelyTerminating List.genSortedBySorting :=
-  SPMF.IsPMF_bind_pure ArbList.List.arbitrary.terminates
+    IsAlmostSurelyTerminating List.genSortedBySorting := by
+  mass_fixpoint using SPMF.LfpIsOne.one
+  simp
 
 /-- `List.arbitrary`'s own bound, read on the sorted output: `mergeSort` makes no random choices,
 and being a permutation it changes neither the length nor the sum the bound is stated in. -/

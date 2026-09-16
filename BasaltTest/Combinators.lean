@@ -37,9 +37,9 @@ example : (frequency [(1, fun _ => Pure.pure 0), (1, fun _ => Pure.pure 1),
 
 example : IsPMF (frequency [(2, fun _ => Pure.pure true), (3, fun _ => Pure.pure false)]
     (by simp) : SPMF Bool) := by
-  apply IsPMF_frequency
-  intro p hp _
-  fin_cases hp <;> exact IsPMF_pure _
+  refine IsPMF.of_one_le ?_
+  mass_bound
+  norm_num [ENNReal.div_self]
 
 end FrequencyExamples
 

@@ -43,10 +43,7 @@ theorem genAllTwos.sound_complete : IsSoundAndComplete genAllTwos AllTwos := by
     simp [ih, AllTwos, and_comm]
 
 theorem genAllTwos.terminates : IsAlmostSurelyTerminating genAllTwos := by
-  -- Static seed, mean offspring 1/2: subcritical.
-  refine SPMF.IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) fun c _ => ?_
-  conv_rhs => rw [genAllTwos]
-  mass_bound
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp
 
 theorem genAllTwos.cost_bounded : IsCostBounded genAllTwos AllTwos.cost := by

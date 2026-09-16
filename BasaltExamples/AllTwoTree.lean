@@ -61,17 +61,9 @@ theorem genTree.sound_complete : IsSoundAndComplete genTree Tree.isAllTwos := by
   grind
 
 theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
-  refine SPMF.IsPMF_of_critical (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
-    (fun c hle hge => ?_) (fun c hc => ?_)
-  · rw [← ENNReal.toReal_eq_one_iff]
-    ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
-    ennreal_to_real at hle
-    norm_num at hge hle
-    nlinarith [sq_nonneg (c.toReal - 1)]
-  · conv_rhs => rw [genTree]
-    mass_bound
-    rw [sq]
-    simp
+  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
+    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+  simp [sq]
 
 theorem genTree.cost_bounded : IsCostBounded genTree Tree.cost := by
   open Lean.Order in
@@ -110,17 +102,9 @@ def genWeightedTree [Gen G] : G Tree :=
 partial_fixpoint
 
 theorem genWeightedTree.terminates : IsAlmostSurelyTerminating genWeightedTree := by
-  -- Mean offspring `2 * (1/3) = 2/3`: subcritical.
-  refine SPMF.IsPMF_of_subcritical_mass (m := 2 / 3)
-    (by rw [ENNReal.div_lt_iff (by norm_num) (by norm_num), one_mul]; norm_num)
-    (fun c hc => ?_)
-  have hc1 : c ≤ 1 := hc.trans (SPMF.mass_le_one _)
-  conv_rhs => rw [genWeightedTree]
-  mass_bound
-  norm_num
-  rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num)]
-  ennreal_to_real
-  nlinarith [sq_nonneg (c.toReal - 1)]
+  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 2 / 3) (b := 0) (d := 1 / 3)
+    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Expected size of the subcritical `genWeightedTree`: `1 / (1 - 2/3) = 3`. -/
 theorem genWeightedTree_expectedSteps :

@@ -13,9 +13,9 @@ open RandomChoice ArbNat
 
 `Tree.genHeap lo` generates arbitrary binary min-heaps whose values are all at least `lo`. It draws
 each node's value as `lo` plus a `Nat.arbitrary` gap, then recurses on both children with that
-value as the new lower bound. Like `SortedList`, the recursion re-indexes the seed, so termination
-uses a `_family` criterion; unlike it, recursing on *two* children makes the mean offspring exactly
-`1`, so this is a **critical** generator (almost surely terminating, infinite expected size).
+value as the new lower bound. Like `SortedList`, the recursion re-indexes the seed; unlike it,
+recursing on *two* children makes the mean offspring exactly `1`, so this is a **critical**
+generator (almost surely terminating, infinite expected size).
 -/
 
 namespace Heap
@@ -80,20 +80,9 @@ theorem Tree.genHeap.sound_complete :
       · rw [show lo + (x - lo) = x by omega]; exact ihr.mpr hr
 
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
-  -- Critical (mean offspring exactly 1); the recursion re-indexes the seed, hence the family form.
-  refine SPMF.IsPMF_of_critical_family
-    (fun (lo : Nat) => (Tree.genHeap lo : SPMF Tree))
-    (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
-    (fun c hle hge => ?_) (fun c hrec lo => ?_) lo
-  · rw [← ENNReal.toReal_eq_one_iff]
-    ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
-    ennreal_to_real at hle
-    norm_num at hge hle
-    nlinarith [sq_nonneg (c.toReal - 1)]
-  · conv_rhs => rw [Tree.genHeap]
-    mass_bound
-    rw [sq]
-    simp
+  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
+    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+  simp [sq]
 
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/
 theorem Tree.genHeap.cost_bounded :

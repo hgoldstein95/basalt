@@ -109,17 +109,8 @@ theorem Tree.genLeftistOfRank.sound_complete :
             grind only [Nat.arbitrary_mem_support, eq_def, rank.eq_def, isLeftist.eq_def]
 
 theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist lo) := by
-  refine SPMF.IsPMF_of_critical_family
-    (fun (lo : Nat) => (Tree.genLeftist lo : SPMF Tree))
-    (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
-    (fun c hle hge => ?_) (fun c hrec lo => ?_) lo
-  · rw [← ENNReal.toReal_eq_one_iff]
-    ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
-    ennreal_to_real at hle
-    norm_num at hge hle
-    nlinarith [sq_nonneg (c.toReal - 1)]
-  · conv_rhs => rw [Tree.genLeftist]
-    mass_bound
-    simp [sq, ENNReal.div_eq_inv_mul, mul_add]
+  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
+    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 end LeftistHeap

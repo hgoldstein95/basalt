@@ -4,37 +4,16 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Termination
-import Basalt.SPMF.MassBound
 
 open ENNReal
 
 /-!
 # Ranking-Function Termination
 
-A reusable criterion for almost-sure termination of recursive generators, with an expected-size
-bound as a byproduct.
-
-Model a recursive generator as an unfold over a seed space `ι`: one step at seed `i` makes a
-weighted choice, and each branch recurses on a (possibly random) list of child seeds. Abstract one
-step as a *level operator* `A : (ι → ℝ≥0∞) → (ι → ℝ≥0∞)`, where `A e i` is the expected total of `e`
-over the child seeds of one step at `i`.
-
-Given a *ranking function* `φ : ι → ℝ≥0∞` whose expected value drops by at least `ε` at every step
-(`A φ i + ε ≤ φ i`), the generator terminates with probability 1 from every seed
-(`IsPMF_of_ranking`), and the expected number of unfolding steps from seed `i` is at most `φ i / ε`
-(`LevelOp.tsum_iterate_le`).
-
-## Main Definitions
-
-- `SPMF.LevelOp` — the algebraic laws a level operator must satisfy.
-- `SPMF.IsPMF_of_ranking` — the general termination theorem.
-- `SPMF.IsPMF_of_subcritical` — the static-seed corollary: a generator whose one-step deficit
-  shrinks by a factor `m < 1` (mean offspring below 1) is a PMF.
-- `SPMF.IsPMF_of_critical` — the boundary case (`m = 1`): a single-seed wrapper around
-  `IsPMF_of_mass_fixpoint`, for generators whose only mass fixed point below 1 is 1 itself.
-- `ENNReal.one_sub_prod_le_sum_one_sub` — the union bound "the chance that some child diverges is
-  at most the sum of the chances that each does," used to discharge `hstep` for branches that make
-  several recursive calls.
+`SPMF.LfpIsOne.ranking`, the certificate for a generator whose seed shrinks: a ranking function
+whose expected value drops by `ε` under a level operator `SPMF.LevelOp` forces the one-step mass
+bound's least fixed point to `1`, and bounds the expected number of unfolding steps by `φ / ε`. The
+union bounds that discharge its deficit condition live here too.
 -/
 
 namespace SPMF
@@ -140,26 +119,25 @@ theorem expectedSteps_const_mul (m : ℝ≥0∞) (i : ι) :
 
 end LevelOp
 
-/-- **Ranking-function termination.** Let `g : ι → SPMF α` be a family of generators indexed by a
-seed, let `A` be a level operator describing the expected child seeds of one unfolding step, and let
-`φ` be a ranking function whose expected value drops by at least `ε > 0` at every step. If one
-unfolding of `g` is dominated by `A` in deficit form (`hstep`), then every `g i` terminates almost
-surely. -/
-theorem IsPMF_of_ranking {ι : Type*} {α : Type*} (g : ι → SPMF α)
+/-- **Ranking-function certificate.** Let `A` be a level operator describing the expected child
+seeds of one unfolding step, and `φ` a finite ranking function whose expected value drops by at
+least `ε > 0` at every step. If the deficit of `T` is dominated by `A` (`hdef`), `T` has least fixed
+point `1`: a sub-fixed point's deficit is bounded by every level `A^[k] 1`, whose sum is finite. -/
+theorem LfpIsOne.ranking {T : (ι → ℝ≥0∞) → (ι → ℝ≥0∞)}
     {A : (ι → ℝ≥0∞) → (ι → ℝ≥0∞)} (hA : LevelOp A)
     (φ : ι → ℝ≥0∞) (hφ_top : ∀ i, φ i ≠ ⊤) {ε : ℝ≥0∞} (hε : 0 < ε)
     (hdrift : ∀ i, A φ i + ε ≤ φ i)
-    (hstep : ∀ i, 1 - (g i).mass ≤ A (fun j => 1 - (g j).mass) i) :
-    ∀ i, IsPMF (g i) := by
-  intro i
+    (hdef : ∀ c ≤ 1, ∀ i, 1 - T c i ≤ A (fun j => 1 - c j) i) :
+    LfpIsOne T := by
+  intro c hc hTc
+  funext i
   have hε_top : ε ≠ ⊤ := by
     intro htop
     apply hφ_top i
     have h := hdrift i
     rw [htop, add_top, top_le_iff] at h
     exact h
-  -- The divergence probability from each seed.
-  set d : ι → ℝ≥0∞ := fun j => 1 - (g j).mass
+  set d : ι → ℝ≥0∞ := fun j => 1 - c j
   -- `d` is dominated by every level: `d ≤ A^[k] 1`.
   have hd_le : ∀ k, d ≤ A^[k] (fun _ => 1) := by
     intro k
@@ -167,7 +145,8 @@ theorem IsPMF_of_ranking {ι : Type*} {α : Type*} (g : ι → SPMF α)
     | zero => intro j; simpa using tsub_le_self
     | succ k ih =>
       intro j
-      calc d j ≤ A d j := hstep j
+      calc d j ≤ 1 - T c j := tsub_le_tsub_left (hTc j) 1
+        _ ≤ A d j := hdef c hc j
         _ ≤ A (A^[k] fun _ => 1) j := hA.mono _ _ ih j
         _ = A^[k + 1] (fun _ => 1) j := by rw [Function.iterate_succ_apply']
   -- The series `∑ₖ A^[k] 1 i` is finite, so a constant lower bound on its terms must be zero.
@@ -178,9 +157,7 @@ theorem IsPMF_of_ranking {ι : Type*} {α : Type*} (g : ι → SPMF α)
         _ ≤ ∑' k, A^[k] (fun _ => 1) i := ENNReal.tsum_le_tsum fun k => hd_le k i
         _ ≤ φ i / ε := hA.tsum_iterate_le φ hε.ne' hε_top hdrift i
     exact (ENNReal.div_lt_top (hφ_top i) hε.ne').ne (top_le_iff.mp hsum)
-  -- Zero divergence probability means mass 1.
-  have hmass : 1 ≤ (g i).mass := tsub_eq_zero_iff_le.mp hd0
-  exact le_antisymm (g i).tsum_coe hmass
+  exact le_antisymm (hc i) (tsub_eq_zero_iff_le.mp hd0)
 
 end level_op
 
@@ -221,10 +198,10 @@ theorem one_sub_mul_le_add {a b : ℝ≥0∞} (ha : a ≤ 1) (hb : b ≤ 1) :
   have h := one_sub_prod_le_sum_one_sub [a, b] (by simp [ha, hb])
   simpa using h
 
-/-- **Deficit splitting** for one unfolding step: a generator whose mass is at least `w + m * X` —
-escape branches carrying weight `w`, recursive continuation of mass `X` weighted `m`, with `w + m =
-1` — has divergence probability at most `m * (1 - X)`.  This is the standard first move when
-discharging the `hstep` obligation of `SPMF.IsPMF_of_ranking` or `SPMF.IsPMF_of_subcritical`. -/
+/-- **Deficit splitting** for one unfolding step: a bound of at least `w + m * X` — escape branches
+carrying weight `w`, recursive continuation of bound `X` weighted `m`, with `w + m = 1` — falls
+short of `1` by at most `m * (1 - X)`. This is the standard first move in the deficit condition of
+`SPMF.LfpIsOne.ranking`. -/
 theorem one_sub_le_mul_one_sub {g w m X : ℝ≥0∞} (hwm : w + m = 1) (hm : m ≠ ⊤)
     (hmass : w + m * X ≤ g) : 1 - g ≤ m * (1 - X) := by
   have h1w : 1 - w = m :=
@@ -236,8 +213,8 @@ theorem one_sub_le_mul_one_sub {g w m X : ℝ≥0∞} (hwm : w + m = 1) (hm : m 
     _ = m * (1 - X) := (ENNReal.mul_sub fun _ _ => hm).symm
 
 /-- **Averaged union bound**: if a step draws one of `s.card ≥ n` continuations uniformly (each of
-mass `m x ≤ 1`), the deficit of the average is at most the average of the deficits. Pairs with
-`SPMF.mass_bind_choose_ge` for generators that draw a uniform pivot. -/
+mass `m x ≤ 1`), the deficit of the average is at most the average of the deficits: the deficit condition's step
+through a uniform pivot. -/
 theorem one_sub_sum_div_le {β : Type*} {s : Finset β} {m : β → ℝ≥0∞} {n : ℝ≥0∞}
     (hn0 : n ≠ 0) (hntop : n ≠ ⊤) (hns : n ≤ s.card) (hm : ∀ x ∈ s, m x ≤ 1) :
     1 - (∑ x ∈ s, m x) / n ≤ (∑ x ∈ s, (1 - m x)) / n := by
@@ -251,127 +228,3 @@ theorem one_sub_sum_div_le {β : Type*} {s : Finset β} {m : β → ℝ≥0∞} 
     _ = _ := by rw [Finset.sum_add_distrib]
 
 end ENNReal
-
-namespace SPMF
-
-section corollaries
-
-/-- **Subcritical termination.** If one unfolding of `g` shrinks the divergence probability by a
-factor `m < 1` — for a `frequency` over branches with weights `wⱼ` and `hⱼ` recursive calls,
-`m = Σⱼ wⱼ·hⱼ / Σⱼ wⱼ` is the mean offspring — then `g` is a PMF.  -/
-theorem IsPMF_of_subcritical {α : Type*} {g : SPMF α} {m : ℝ≥0∞} (hm : m < 1)
-    (hstep : 1 - g.mass ≤ m * (1 - g.mass)) : IsPMF g := by
-  have h1m : 1 - m ≠ 0 := fun h0 => absurd (tsub_eq_zero_iff_le.mp h0) (not_le.mpr hm)
-  refine IsPMF_of_ranking (ι := Unit) (fun _ => g)
-    (A := fun e _ => m * e ()) ⟨?_, ?_, ?_⟩ (fun _ => (1 - m)⁻¹) (fun _ => ?_) (ε := 1)
-    one_pos (fun _ => ?_) (fun _ => hstep) ()
-  · intro e f hef _
-    exact mul_le_mul' le_rfl (hef ())
-  · intro e f
-    funext _
-    exact mul_add m (e ()) (f ())
-  · intro r e
-    funext _
-    exact mul_left_comm m r (e ())
-  · finiteness
-  · -- drift: `m * (1-m)⁻¹ + 1 ≤ (1-m)⁻¹`, with equality — the geometric series bound is tight.
-    show m * (1 - m)⁻¹ + 1 ≤ (1 - m)⁻¹
-    have hm1 : m ≤ 1 := hm.le
-    have hmlt : m.toReal < 1 := by
-      simpa using (ENNReal.toReal_lt_toReal (by finiteness) ENNReal.one_ne_top).mpr hm
-    ennreal_to_real
-    have hne : (1 : ℝ) - m.toReal ≠ 0 := by linarith
-    exact le_of_eq (by field_simp; ring)
-
-/-- Mass form of `IsPMF_of_subcritical`: what one reads off directly from unfolding a generator
-whose non-recursive branches carry total probability `1 - m`. The recursive occurrence in one
-unfolding is bounded below by the `c` that `hstep` is handed. -/
-theorem IsPMF_of_subcritical_mass {α : Type*} {g : SPMF α} {m : ℝ≥0∞} (hm : m < 1)
-    (hstep : ∀ c ≤ g.mass, (1 - m) + m * c ≤ g.mass) : IsPMF g := by
-  have hm_top : m ≠ ⊤ := (hm.trans one_lt_top).ne
-  refine IsPMF_of_subcritical hm ?_
-  calc 1 - g.mass
-      ≤ 1 - ((1 - m) + m * g.mass) := tsub_le_tsub_left (hstep _ le_rfl) 1
-    _ = (1 - (1 - m)) - m * g.mass := by rw [tsub_add_eq_tsub_tsub]
-    _ = m - m * g.mass := by rw [ENNReal.sub_sub_cancel one_ne_top hm.le]
-    _ = m * (1 - g.mass) := by
-        rw [ENNReal.mul_sub fun _ _ => hm_top, mul_one]
-
-/-- A `c ≤ 1` whose deficit shrinks by a factor `m < 1` must be `1`. -/
-theorem _root_.ENNReal.eq_one_of_deficit_le_mul {c m : ℝ≥0∞} (hm : m < 1) (hle : c ≤ 1)
-    (h : 1 - c ≤ m * (1 - c)) : c = 1 := by
-  by_contra hne
-  have hpos : 0 < 1 - c :=
-    pos_iff_ne_zero.mpr fun h0 => hne (le_antisymm hle (tsub_eq_zero_iff_le.mp h0))
-  have htop : (1 : ℝ≥0∞) - c ≠ ⊤ := (tsub_le_self.trans_lt one_lt_top).ne
-  have hlt : (1 : ℝ≥0∞) - c < 1 - c :=
-    calc 1 - c ≤ m * (1 - c) := h
-      _ = (1 - c) * m := mul_comm _ _
-      _ < (1 - c) * 1 := ENNReal.mul_lt_mul_right hpos.ne' htop hm
-      _ = 1 - c := mul_one _
-  exact absurd hlt (lt_irrefl _)
-
-/-- **Family form of subcritical termination**, for a subcritical generator whose recursion
-re-indexes the seed. One unfolding must bound the mass below by `(1 - m) + m * c`, for a `c` that
-bounds the whole family below — which is what every recursive occurrence is discharged by. -/
-theorem IsPMF_of_subcritical_mass_family {ι : Type*} {α : Type*} [Nonempty ι]
-    (g : ι → SPMF α) {m : ℝ≥0∞} (hm : m < 1)
-    (hstep : ∀ c, (∀ j, c ≤ (g j).mass) → ∀ i, (1 - m) + m * c ≤ (g i).mass) :
-    ∀ i, IsPMF (g i) := by
-  have hm_top : m ≠ ⊤ := (hm.trans one_lt_top).ne
-  refine IsPMF_of_mass_fixpoint g (fun c => (1 - m) + m * c) ?_ hstep
-  intro c hle hge
-  refine ENNReal.eq_one_of_deficit_le_mul hm hle ?_
-  calc 1 - c
-      ≤ 1 - ((1 - m) + m * c) := tsub_le_tsub_left hge 1
-    _ = (1 - (1 - m)) - m * c := by rw [tsub_add_eq_tsub_tsub]
-    _ = m - m * c := by rw [ENNReal.sub_sub_cancel one_ne_top hm.le]
-    _ = m * (1 - c) := by rw [ENNReal.mul_sub fun _ _ => hm_top, mul_one]
-
-/-- **Critical termination.** A single-seed wrapper around `IsPMF_of_mass_fixpoint`: if one
-unfolding bounds the mass below by `F c` for every `c ≤ g.mass`, and `F` has no fixed-or-below point
-in `[0, 1)`, then `g` is a PMF. -/
-theorem IsPMF_of_critical {α : Type*} {g : SPMF α} (F : ℝ≥0∞ → ℝ≥0∞)
-    (hF : ∀ c : ℝ≥0∞, c ≤ 1 → F c ≤ c → c = 1)
-    (hstep : ∀ c ≤ g.mass, F c ≤ g.mass) : IsPMF g := by
-  have : Nonempty Unit := ⟨()⟩
-  exact IsPMF_of_mass_fixpoint (fun _ : Unit => g) F hF (fun c hc _ => hstep c (hc ())) ()
-
-/-- **Family form of critical termination**, for a critical generator whose recursion re-indexes the
-seed. Like `IsPMF_of_critical`, it comes with no expected-size bound. -/
-theorem IsPMF_of_critical_family {ι : Type*} {α : Type*} [Nonempty ι]
-    (g : ι → SPMF α) (F : ℝ≥0∞ → ℝ≥0∞)
-    (hF : ∀ c : ℝ≥0∞, c ≤ 1 → F c ≤ c → c = 1)
-    (hstep : ∀ c, (∀ j, c ≤ (g j).mass) → ∀ i, F c ≤ (g i).mass) :
-    ∀ i, IsPMF (g i) :=
-  IsPMF_of_mass_fixpoint g F hF hstep
-
-end corollaries
-
-section combinators
-
-variable {α : Type*}
-
-/-- If a generator `g` is an SPMF, then `listOf g` is also an SPMF. -/
-theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) :
-    IsPMF (listOf g) := by
-  -- Total probability of non-recursive branches is 1/2, hence `m := 1/2`
-  refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) fun c _ => ?_
-  conv_rhs => rw [listOf]
-  mass_bound
-  rw [show ((1 : ℝ≥0∞) - 1 / 2 = 1 / 2) by rw [one_div, ENNReal.one_sub_inv_two]]
-  simp
-
-/-- If a generator `g` is an SPMF, then `nonEmptyListOf g` is also an SPMF. -/
-theorem IsPMF_nonEmptyListOf {g : SPMF α} (hg : IsPMF g) :
-    IsPMF (nonEmptyListOf g) := by
-  -- Total probability of non-recursive branches is 1/2, hence `m := 1/2`
-  refine IsPMF_of_subcritical_mass (m := 1 / 2) (by norm_num) fun c _ => ?_
-  conv_rhs => rw [nonEmptyListOf]
-  mass_bound
-  rw [show ((1 : ℝ≥0∞) - 1 / 2 = 1 / 2) by rw [one_div, ENNReal.one_sub_inv_two]]
-  simp
-
-end combinators
-
-end SPMF

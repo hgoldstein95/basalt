@@ -13,9 +13,9 @@ open RandomChoice ArbNat
 
 `List.genSorted` generates sorted `List Nat`s. It works by generating each element as the previous
 one plus a `Nat.arbitrary` gap, threading the running lower bound `m` through the recursion:
-`List.genSortedGt m` produces sorted lists whose every element is at least `m`. Because the
-recursion *re-indexes the seed* (`genSortedGt x` for a new `x`), termination uses the `_family` form
-of the subcritical criterion. The public `genSorted` and its laws are the `m = 0` specializations.
+`List.genSortedGt m` produces sorted lists whose every element is at least `m`; the recursion
+*re-indexes the seed* (`genSortedGt x` for a new `x`), so `m` is the seed of its termination proof.
+The public `genSorted` and its laws are the `m = 0` specializations.
 -/
 
 namespace SortedList
@@ -93,12 +93,7 @@ theorem List.genSorted.sound_complete : IsSoundAndComplete List.genSorted List.s
   simp [genSortedGt_mem_support, List.forall_iff_forall_mem]
 
 theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.genSortedGt m) := by
-  -- Subcritical (mean offspring 1/2); the recursion re-indexes the seed, hence the family form.
-  refine SPMF.IsPMF_of_subcritical_mass_family
-    (fun (m : Nat) => (List.genSortedGt m : SPMF (List Nat)))
-    (m := 1 / 2) (by norm_num) (fun c hrec n => ?_) m
-  conv_rhs => unfold List.genSortedGt
-  mass_bound
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp
 
 theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=

@@ -18,8 +18,8 @@ open scoped NNReal ENNReal
 with the same cost bound; only the distribution differs.
 
 Unlike `genBST`, this weighting is *supercritical* under the crude branching bound (`node` has
-probability `5/6`, so mean offspring is `5/6 · 2 = 5/3 > 1`), so `IsPMF_of_critical_family` does not
-apply. Termination instead goes through a ranking function on the seed `(lo, hi)`, exploiting the
+probability `5/6`, so mean offspring is `5/6 · 2 = 5/3 > 1`), so no `LfpIsOne.quadratic` certificate
+applies. Termination instead goes through a ranking function on the seed `(lo, hi)`, exploiting the
 fact that the interval genuinely shrinks. The machinery (`bstLevel`, `bstRank`) lives here since it
 is used nowhere else, instantiated at recursion weight `w = 5/6` and drift `ε = 1/6`.
 -/
@@ -117,73 +117,36 @@ private theorem genWeightedBST_drift (p : Int × Int) :
     ennreal_to_real at hrank1
     linarith
 
-private theorem genWeightedBST_mass_ge (lo hi : Int) (hle : lo ≤ hi) :
-    (Tree.genWeightedBST lo hi : SPMF (Tree Int)).mass
-      ≥ 1 / 6 + 5 / 6 * ((∑ x ∈ Finset.Icc lo hi,
-            (Tree.genWeightedBST lo (x - 1) : SPMF (Tree Int)).mass
-              * (Tree.genWeightedBST (x + 1) hi : SPMF (Tree Int)).mass)
-          / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞)) := by
-  conv_lhs => rw [Tree.genWeightedBST]
-  rw [dif_neg (by omega)]
-  rw [mass_frequency]
-  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, mass_pure,
-    Nat.cast_one, Nat.cast_ofNat, add_zero, mul_one]
-  rw [show ((1 + 5 : ℕ) : ℝ≥0∞) = 6 by norm_num, ENNReal.add_div, ENNReal.mul_div_right_comm]
-  gcongr
-  refine mass_bind_chooseInt_ge hle fun x _ _ => ?_
-  -- The ranking regime bounds each child by *its own* mass, not by a constant.
-  mass_bound [SPMF.le_mass_self]
-  simp
-
-private theorem genWeightedBST_step (p : Int × Int) :
-    1 - (Tree.genWeightedBST p.1 p.2 : SPMF (Tree Int)).mass
-      ≤ bstLevel (5 / 6)
-          (fun q => 1 - (Tree.genWeightedBST q.1 q.2 : SPMF (Tree Int)).mass) p := by
-  obtain ⟨lo, hi⟩ := p
-  unfold bstLevel
-  by_cases hgt : lo > hi
-  · rw [if_pos hgt, Tree.genWeightedBST, dif_pos hgt]
-    simp
-  · push Not at hgt
-    rw [if_neg (by omega)]
-    simp only
-    have hne0 : (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞) ≠ 0 := by
-      simp only [ne_eq, Nat.cast_eq_zero]
-      omega
-    have hcard : (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞) ≤ ((Finset.Icc lo hi).card : ℝ≥0∞) := by
-      rw [Int.card_Icc]
-      norm_cast
-      omega
-    calc 1 - (Tree.genWeightedBST lo hi : SPMF (Tree Int)).mass
-        ≤ 5 / 6 * (1 - (∑ x ∈ Finset.Icc lo hi,
-              (Tree.genWeightedBST lo (x - 1) : SPMF (Tree Int)).mass
-                * (Tree.genWeightedBST (x + 1) hi : SPMF (Tree Int)).mass)
-            / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞)) :=
-          ENNReal.one_sub_le_mul_one_sub (by ennreal_to_real; norm_num)
-            (by finiteness)
-            (genWeightedBST_mass_ge lo hi hgt)
-      _ ≤ 5 / 6 * ((∑ x ∈ Finset.Icc lo hi,
-              (1 - (Tree.genWeightedBST lo (x - 1) : SPMF (Tree Int)).mass
-                * (Tree.genWeightedBST (x + 1) hi : SPMF (Tree Int)).mass))
-            / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞)) := by
-          gcongr 5 / 6 * ?_
-          exact ENNReal.one_sub_sum_div_le hne0 (ENNReal.natCast_ne_top _) hcard
-            fun x _ => mul_le_one' (mass_le_one _) (mass_le_one _)
-      _ ≤ 5 / 6 * ((∑ x ∈ Finset.Icc lo hi,
-              ((1 - (Tree.genWeightedBST lo (x - 1) : SPMF (Tree Int)).mass)
-                + (1 - (Tree.genWeightedBST (x + 1) hi : SPMF (Tree Int)).mass)))
-            / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞)) := by
-          gcongr with x hx
-          exact ENNReal.one_sub_mul_le_add (mass_le_one _) (mass_le_one _)
-
 theorem Tree.genWeightedBST.terminates : IsAlmostSurelyTerminating (Tree.genWeightedBST lo hi) := by
-  refine SPMF.IsPMF_of_ranking
-    (fun p : Int × Int => (Tree.genWeightedBST p.1 p.2 : SPMF (Tree Int)))
-    (levelOp_bstLevel (5 / 6))
-    (fun p => (bstRank p : ℝ≥0∞))
-    (fun p => ENNReal.natCast_ne_top _)
-    (ε := 1 / 6) (ENNReal.div_pos one_ne_zero (by norm_num))
-    genWeightedBST_drift genWeightedBST_step (lo, hi)
+  mass_fixpoint per_seed
+  refine LfpIsOne.ranking (levelOp_bstLevel (5 / 6)) (fun p => (bstRank p : ℝ≥0∞))
+    (fun p => ENNReal.natCast_ne_top _) (ε := 1 / 6) (by norm_num) genWeightedBST_drift ?_
+  rintro c hc ⟨lo, hi⟩
+  simp only [bstLevel, List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, Nat.cast_one,
+    Nat.cast_ofNat, mul_one, add_zero]
+  split_ifs with hgt
+  · simp
+  have hne0 : (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞) ≠ 0 := by
+    simp only [ne_eq, Nat.cast_eq_zero]
+    omega
+  have hcard : (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞) ≤ ((Finset.Icc lo hi).card : ℝ≥0∞) := by
+    rw [Int.card_Icc]
+    norm_cast
+    omega
+  -- Split off the leaf branch, then the union bound over the pivot and over the two children.
+  calc _ ≤ 5 / 6 * (1 - (∑ x ∈ Finset.Icc lo hi, c (lo, x - 1) * c (x + 1, hi))
+          / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞)) :=
+        ENNReal.one_sub_le_mul_one_sub (w := 1 / 6) (by ennreal_to_real; norm_num) (by finiteness)
+          (by rw [show ((1 + 5 : ℕ) : ℝ≥0∞) = 6 by norm_num, ENNReal.add_div,
+            ENNReal.mul_div_right_comm])
+    _ ≤ 5 / 6 * ((∑ x ∈ Finset.Icc lo hi, (1 - c (lo, x - 1) * c (x + 1, hi)))
+          / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞)) := by
+        gcongr 5 / 6 * ?_
+        exact ENNReal.one_sub_sum_div_le hne0 (ENNReal.natCast_ne_top _) hcard
+          fun x _ => mul_le_one' (hc _) (hc _)
+    _ ≤ _ := by
+        gcongr with x
+        exact ENNReal.one_sub_mul_le_add (hc _) (hc _)
 
 theorem Tree.genWeightedBST.cost_bounded :
     IsCostBounded (Tree.genWeightedBST lo hi) (fun t => 3 * t.size + 1) := by

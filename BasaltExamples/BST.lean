@@ -10,15 +10,6 @@ open RandomChoice
 
 /-!
 # Binary Search Trees
-
-`Tree.genBST lo hi` generates binary search trees with keys in `[lo, hi]`: pick a uniform pivot,
-then recurse on the two subintervals. Like `genTree` and `genHeap` it is *critical* — a leaf with
-probability `1/2`, otherwise a node with two recursive children, so mean offspring is exactly `1` —
-and termination follows from the same `IsPMF_of_critical_family` criterion, with no ranking function.
-
-The `frequency`-weighted, `@[tunable]` variant `genWeightedBST` lives in `BasaltExamples/BST/Weighted`.
-Weighting `node` five times as heavily makes it *supercritical* under that crude bound, so it does
-need a ranking function that exploits the shrinking interval — that machinery lives with it.
 -/
 
 namespace BST
@@ -86,25 +77,13 @@ section termination
 open scoped ENNReal
 
 theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) := by
-  refine SPMF.IsPMF_of_critical_family
-    (fun p : Int × Int => (Tree.genBST p.1 p.2 : SPMF (Tree Int)))
-    (F := fun c => 1 / 2 + 1 / 2 * c ^ 2)
-    (fun c hle hge => ?_) (fun c hrec p => ?_) (lo, hi)
-  · rw [← ENNReal.toReal_eq_one_iff]
-    ennreal_to_real at hge
-    ennreal_to_real at hle
-    norm_num at hge hle
-    nlinarith [sq_nonneg (c.toReal - 1)]
-  · -- `mass_bound` discharges a recursive call by `apply`ing a hypothesis, so re-curry the seed.
-    have hrec : ∀ lo hi, c ≤ (Tree.genBST lo hi : SPMF (Tree Int)).mass := fun lo hi => hrec (lo, hi)
-    have hc1 : c ≤ 1 := (hrec p.1 p.2).trans (SPMF.mass_le_one _)
-    conv_rhs => rw [Tree.genBST]
-    mass_bound
-    -- The `dite`'s bound is a `min`: the empty-interval shortcut, and one `frequency` step.
-    refine le_min ?_ ?_
-    · calc (1 : ℝ≥0∞) / 2 + 1 / 2 * c ^ 2 ≤ 1 / 2 + 1 / 2 * 1 ^ 2 := by gcongr
-        _ = 1 := by rw [one_pow, mul_one, ENNReal.add_halves]
-    · simp [sq, ENNReal.div_eq_inv_mul, mul_add]
+  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
+    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+  split
+  · rw [zero_mul, add_zero]
+    calc (1 : ℝ≥0∞) / 2 + 1 / 2 * c ^ 2 ≤ 1 / 2 + 1 / 2 * 1 ^ 2 := by gcongr
+      _ = 1 := by rw [one_pow, mul_one, ENNReal.add_halves]
+  · simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 end termination
 

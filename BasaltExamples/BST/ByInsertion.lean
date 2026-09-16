@@ -141,8 +141,9 @@ theorem Tree.support_genBSTByInsertion_eq {lo hi : Int} (h : lo ≤ hi) :
 /-! ## Termination -/
 
 theorem Tree.genBSTByInsertion.terminates {lo hi : Int} (h : lo ≤ hi) :
-    IsAlmostSurelyTerminating (Tree.genBSTByInsertion lo hi h) :=
-  SPMF.IsPMF_bind_pure (SPMF.IsPMF_listOf (SPMF.mass_chooseInt lo hi h))
+    IsAlmostSurelyTerminating (Tree.genBSTByInsertion lo hi h) := by
+  mass_fixpoint using SPMF.LfpIsOne.one
+  simp
 
 /-! ## Cost -/
 

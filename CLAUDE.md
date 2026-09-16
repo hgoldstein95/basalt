@@ -32,10 +32,14 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
 - **Support inversion** (`mem_support_*_iff`) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean);
   the `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactics.lean](Basalt/Tactics.lean).
-- **Termination theory** (seed regimes, ranking functions, expected size) —
-  [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean); the practical entry is WORKFLOW.md's Recipe 2.
-- **The `mass_bound` tactic and its `@[mass_bound]` rules** — one rule per combinator, keyed by the
-  combinator's head constant; [Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean) owns both,
+- **Termination** — the criterion (`IsPMF_of_lfp_eq_one`) and its `LfpIsOne` certificates:
+  [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); the `mass_fixpoint` tactic:
+  [Basalt/SPMF/MassFixpoint.lean](Basalt/SPMF/MassFixpoint.lean), contract
+  pinned by [BasaltTest/Termination.lean](BasaltTest/Termination.lean). Ranking functions and
+  expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). `mass` and its equations:
+  [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
+- **The `mass_bound` tactic and its `@[mass_bound]` rules** — rules keyed by the combinator's head
+  constant, later ones fallbacks; [Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean) owns both,
   with the attribute in [MassBound/Attr.lean](Basalt/SPMF/MassBound/Attr.lean) and the contract
   pinned by [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean). Adding a combinator to
   `Combinators.lean` means adding its rule here — nothing else in a termination proof mentions
@@ -73,11 +77,6 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [RandomChoice.lean](Basalt/RandomChoice.lean)) are the models. The same applies inside a
   `@[tunable]` body: the attribute rebuilds the fixpoint's monotonicity proof
   ([Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)).
-- **`mass_bound` reports that nothing bounds the mass of the generator being proved terminating** —
-  the recursive occurrence is discharged by `apply`ing a hypothesis, and a `_family` criterion over
-  a *tupled* seed hands one about `gen j.1 j.2`, which does not match `gen lo (x - 1)`. The error
-  names the generator, so it reads as a missing `@[mass_bound]` rule; re-curry the hypothesis
-  instead (WORKFLOW.md's Recipe 2, worked in `BST.lean`).
 - **`rw [gen]` (or another unfolding) fails or gives a confusing error in a correctness proof** —
   wrong unfolding idiom for the context; the four-idiom table is in `WORKFLOW.md`
   ("Unfolding: one idiom per context").
