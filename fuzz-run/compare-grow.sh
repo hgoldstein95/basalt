@@ -68,10 +68,6 @@ budget_for() {
   esac
 }
 
-flags_for() { # setting -> the argv words for it (none, for "off")
-  [ "$1" = "--grow" ] && echo "--grow" || true
-}
-
 run_rate() {
   local trials="${TRIALS:-300}"
   printf '%-10s %-8s %9s %14s\n' property setting budget "found (±1 SE)"
@@ -79,8 +75,8 @@ run_rate() {
   for p in "${PROPS[@]}"; do
     local budget; budget=$(budget_for "$p")
     for setting in "off" "--grow"; do
-      local flags hits=0
-      read -r -a flags <<<"$(flags_for "$setting")"
+      local hits=0 flags=()
+      if [ "$setting" = "--grow" ]; then flags=(--grow); fi
       for _ in $(seq "$trials"); do
         found_within "$p" "$budget" "${flags[@]+"${flags[@]}"}" && hits=$((hits+1))
       done
@@ -127,8 +123,8 @@ run_median() {
   printf '%.0s-' {1..56}; echo
   for p in "${PROPS[@]}"; do
     for setting in "off" "--grow"; do
-      local flags rs=() ss=() found=0
-      read -r -a flags <<<"$(flags_for "$setting")"
+      local rs=() ss=() found=0 flags=()
+      if [ "$setting" = "--grow" ]; then flags=(--grow); fi
       for _ in $(seq "$trials"); do
         read -r r s <<<"$(trial "$p" "${flags[@]+"${flags[@]}"}")"
         rs+=("$r"); ss+=("$s"); [ "$r" != "-" ] && found=$((found+1))
