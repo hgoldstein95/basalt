@@ -102,7 +102,7 @@
                 <span class="code__file">BST.lean</span>
               </div>
               <pre><span class="t-cm">-- what it means to be valid:</span>
-<span class="t-kw">def</span> isBST (lo hi : <span class="t-ty">Nat</span>) : <span class="t-ty">Tree Nat</span> -> <span class="t-ty">Prop</span>
+<span class="t-kw">def</span> isBST (lo hi : <span class="t-ty">Int</span>) : <span class="t-ty">Tree Int</span> -> <span class="t-ty">Prop</span>
   | leaf => <span class="t-kw">true</span>
   | node l x r =>
       lo &le; x &and; x &le; hi &and;
@@ -110,12 +110,12 @@
       isBST (x + 1) hi r
 
 <span class="t-cm">-- one term, polymorphic in the monad G:</span>
-<span class="t-kw">def</span> genBST [<span class="t-ty">Gen G</span>] (lo hi : <span class="t-ty">Nat</span>) : <span class="t-ty">G (Tree Nat)</span> := <span class="t-kw">do</span>
+<span class="t-kw">def</span> genBST [<span class="t-ty">Gen G</span>] (lo hi : <span class="t-ty">Int</span>) : <span class="t-ty">G (Tree Int)</span> := <span class="t-kw">do</span>
   <span class="t-kw">if</span> h : lo &gt; hi <span class="t-kw">then return</span> leaf
   <span class="t-kw">else</span> <span class="t-fn">pick</span>
     (<span class="t-kw">fun</span> () => <span class="t-fn">pure</span> leaf)
     (<span class="t-kw">fun</span> () => <span class="t-kw">do</span>
-      <span class="t-kw">let</span> x &lt;- <span class="t-fn">chooseNat</span> lo hi (<span class="t-kw">by</span> omega)
+      <span class="t-kw">let</span> x &lt;- <span class="t-fn">chooseInt</span> lo hi (<span class="t-kw">by</span> omega)
       <span class="t-kw">let</span> l &lt;- <span class="t-fn">genBST</span> lo (x - 1)
       <span class="t-kw">let</span> r &lt;- <span class="t-fn">genBST</span> (x + 1) hi
       <span class="t-fn">pure</span> (node l x r))

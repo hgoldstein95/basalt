@@ -64,6 +64,38 @@ theorem mass_split (p : SPMF (Option α)) :
   rw [SPMF.tsum_option]
   rw [add_comm]
 
+/-- `massSome` is the probability of the success event. -/
+theorem massSome_eq_prob (p : SPMF (Option α)) :
+    massSome p = prob p {o | o.isSome = true} := by
+  unfold prob expect
+  rw [tsum_option (fun o => p o * ({o : Option α | o.isSome = true}).indicator 1 o)]
+  simp [massSome, Set.indicator]
+
+/-- The acceptance rate of a biased filter: `biasedOptionGen r g` succeeds with probability
+`r · mass g`. Feeds `retry_attempts` to bound the cost of rejection sampling. -/
+theorem massSome_biasedOptionGen {r : Rat} {g : SPMF α} (h0 : 0 ≤ r) (h1 : r ≤ 1) :
+    massSome (biasedOptionGen r g)
+      = (r.num.toNat : ℝ≥0∞) / (r.den : ℝ≥0∞) * g.mass := by
+  rw [massSome_eq_prob]
+  unfold biasedOptionGen
+  rw [prob_bind, expect_coin h0 h1]
+  have htrue : prob ((g >>= fun x => Pure.pure (some x)) : SPMF (Option α))
+      {o | o.isSome = true} = g.mass := by
+    rw [prob_bind]
+    calc expect g (fun x => prob (Pure.pure (some x) : SPMF (Option α)) {o | o.isSome = true})
+        = expect g (fun _ => 1) := expect_congr_support fun x _ => by rw [prob_pure]; simp
+      _ = g.mass := expect_one g
+  have hfalse : prob (Pure.pure none : SPMF (Option α)) {o | o.isSome = true} = 0 := by
+    rw [prob_pure]
+    simp
+  rw [if_pos (by trivial), if_neg (by simp), htrue, hfalse, mul_zero, add_zero]
+
+theorem massSome_optionGen {g : SPMF α} : massSome (optionGen g) = g.mass / 2 := by
+  unfold optionGen
+  rw [massSome_biasedOptionGen (by norm_num) (by norm_num)]
+  rw [one_div, Rat.inv_ofNat_num, Rat.inv_ofNat_den, Int.toNat_one, Nat.cast_one,
+    Nat.cast_ofNat, one_div, ENNReal.div_eq_inv_mul]
+
 /-!
 ## Retry
 
@@ -103,24 +135,14 @@ with positive probability) and itself terminates almost surely. -/
 theorem IsPMF_retry (p : SPMF (Option α)) (hmass : p.mass = 1)
     (hprod : 0 < massSome p) : SPMF.IsPMF (retry p) := by
   have hsn : massSome p + massNone p = 1 := by rw [← mass_split p]; exact hmass
-  refine (SPMF.IsPMF_of_mass_fixpoint
-    (g := fun _ : Unit => retry p)
-    (F := fun c => massSome p + massNone p * c)
-    ?bounds ?mass) ()
-  case bounds =>
-    intro c hle hge
-    have hs1 : massSome p ≤ 1 := le_of_add_le_left hsn.le
-    have hn1 : massNone p ≤ 1 := le_of_add_le_right hsn.le
-    have hspos : 0 < (massSome p).toReal := ENNReal.toReal_pos hprod.ne' (by finiteness)
-    rw [← ENNReal.toReal_eq_one_iff]
-    ennreal_to_real at hge   -- before `hle`: finiteness needs `c ≤ 1`
-    ennreal_to_real at hsn
-    ennreal_to_real at hle
-    nlinarith [hge, hsn, hle, hspos]
-  case mass =>
-    intro _ _
-    rw [iInf_const]
-    exact (mass_retry p).ge
+  have hn_top : massNone p ≠ ⊤ := ENNReal.ne_top_of_le_one' (le_of_add_le_right hsn.le)
+  have hn : massNone p < 1 := hsn ▸ add_comm (massNone p) _ ▸ ENNReal.lt_add_right hn_top hprod.ne'
+  refine SPMF.IsPMF_of_lfp_eq_one_uniform (fun _ : Unit => retry p)
+    (SPMF.LfpIsOne.affine hn) (fun c _ hrec _ => ?_) ()
+  show 1 - massNone p + massNone p * c ≤ (retry p).mass
+  rw [ENNReal.sub_eq_of_eq_add hn_top hsn.symm, mass_retry p]
+  gcongr
+  exact hrec ()
 
 /-- The retry loop never lands on an explicit failure: it retries every `none`. -/
 theorem retry_none (p : SPMF (Option α)) :

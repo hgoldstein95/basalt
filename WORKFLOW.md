@@ -70,8 +70,12 @@ Guidelines that make the proofs go smoothly:
 - **Prefer `chooseNat lo hi h` over raw `choose`.** `choose` returns a
   `ULift {x : Nat // lo ≤ x ∧ x ≤ hi}`, which costs `.down.val` projections in the generator and
   `⟨⟨n, ⟨hge, hle⟩⟩⟩` destructuring in every proof. `chooseNat` returns a bare `Nat`, and its
-  inversion lemmas produce plain inequalities that `omega` consumes directly. See `Tree.genBST` in
-  `BasaltExamples/BST.lean`.
+  inversion lemmas produce plain inequalities that `omega` consumes directly.
+- **Use `chooseInt` when the recursion subtracts from the bounds.** `Nat` truncation turns the
+  empty interval `[lo, lo - 1]` into the singleton `[0, 0]` at `lo = 0`, silently widening the
+  generator's support — and the matching predicate is wrong in the same way, so the support proof
+  still goes through. `Tree.genBST` (`BasaltExamples/BST.lean`) recurses on `[lo, x - 1]` and takes
+  `Int` bounds for exactly this reason.
 - **Recursive generators use `partial_fixpoint`** (Lean's CCPO fixpoint). Any combinator appearing
   in the recursive body needs a `@[partial_fixpoint_monotone]` lemma; the library's own combinators
   carry theirs (grep for the `@[partial_fixpoint_monotone]` tag for the current list), and
@@ -99,6 +103,14 @@ Each has a fixed recipe. All three start the same way — unfold one step of the
 what one step can produce, then do logic/arithmetic — and they differ only in which interpretation
 they invert at.
 
+**A generator that post-processes another** (`let x ← g; return f x`) has no recursion to unfold,
+and all three obligations reduce to composition instead: `support_simp` plus a fact about `f`,
+`mass_fixpoint using SPMF.LfpIsOne.one` (Recipe 2), and `IsBounded_bind`. `List.genSortedBySorting`
+(`SortedList/BySorting.lean`) is the worked instance — it sorts a `List.arbitrary` draw, and each
+law follows from the corresponding law of `List.arbitrary` plus one fact about `f`: that sorting
+sorts, that it fixes a sorted list, that it is a permutation. Cost is the obligation that can fail
+outright for this shape (Step 2).
+
 **Name the laws `<GEN>.sound_complete`, `<GEN>.terminates`, `<GEN>.cost_bounded`.** The dot is not
 cosmetic: `#genstats` discovers laws by exactly this naming convention and reports which ones a
 generator carries beside the statistics it merely *measured* (`Basalt/GenStats/Command.lean`,
@@ -115,7 +127,7 @@ synthesis that emits the same convention reports identically to hand-written gen
 | Context | Idiom |
 |---|---|
 | Support proof, goal `x ∈ support gen ↔ P` | `rw [gen]` (the equation lemma) |
-| Termination step (rewrite only one side of `≤`/`≥`) | `conv_rhs => rw [gen]` (or `conv_lhs`) |
+| Mass bound by hand (rewrite only one side of `≤`/`≥`) | `conv_rhs => rw [gen]` (or `conv_lhs`) |
 | Cost proof, before `fix_induct` (must expose `fix`) | `delta gen` |
 | Under binders where `rw` fails | `unfold gen` |
 
@@ -168,68 +180,86 @@ Notes:
 
 ### Recipe 2: Termination
 
-First read the **regime** off the generator — what does one unfolding do to the seed (the
-generator's arguments)?
+Every termination proof is one criterion, `SPMF.IsPMF_of_lfp_eq_one` (`Basalt/SPMF/Termination.lean`):
+if one unfolding bounds the generator's mass below by `F c` whenever `c` bounds it below, and `F`'s
+least fixed point is `1` (`LfpIsOne F`), the generator is a PMF. Outside the shrinking-seed regime
+the proof is the tactic and the arithmetic:
 
-| Regime | How to recognize it | Target lemma |
+```lean
+theorem <GEN>.terminates : IsAlmostSurelyTerminating (<GEN> <ARGS>) := by
+  mass_fixpoint using <CERTIFICATE>
+  simp                      -- the goal left is `F c ≤ <computed bound>`, pure ℝ≥0∞
+```
+
+What you choose is the **certificate** for `F`, read off the generator's branches. A generator with
+no recursion — including one that only post-processes a callee — is the first row:
+
+| Generator | Certificate | `F c` |
 |---|---|---|
-| Static seed, mean offspring `m < 1` | Arguments inert; expected number of recursive calls per step `< 1` | `SPMF.IsPMF_of_subcritical_mass` |
-| … and the recursion *re-indexes* the seed | e.g. recursing at `m + delta` | `SPMF.IsPMF_of_subcritical_mass_family` |
-| Static seed, `m = 1` exactly | e.g. uniform `pick` with two recursive calls | `SPMF.IsPMF_of_critical`(`_family`) |
-| Shrinking seed | Recursive calls partition/shrink the seed | `SPMF.IsPMF_of_ranking` |
+| No recursive call | `SPMF.LfpIsOne.one` | `1` |
+| Mean offspring `m < 1` | `SPMF.LfpIsOne.affine (m := m) h` | `(1 - m) + m * c` |
+| At most two calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.quadratic (a := _) (b := _) (d := _) h₁ h₂ h₃` | `a + b * c + d * c ^ 2` |
+| Shrinking seed, mean offspring `> 1` | `SPMF.LfpIsOne.ranking …` with `mass_fixpoint per_seed` (below) | a function of `c` and the seed |
 
 `m` is weights-on-recursive-branches over total weights, counting each branch once per recursive
 call: a uniform `pick` with one recursive branch has `m = 1/2`; `frequency [(2, leaf…), (1, node…)]`
-with two calls in `node` has `m = 2·(1/3) = 2/3`. **A critical generator (`m = 1`) terminates but
-has infinite expected size** (`AllTwoTree.genTree_expectedSteps_infinite`) — reweight it if you can.
+with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a quadratic, `a = 2/3`, `d = 1/3`; a uniform
+`pick` between a leaf and two calls is the quadratic `a = d = 1/2`. **A critical generator
+(`m = 1`) terminates but has infinite expected size** (`AllTwoTree.genTree_expectedSteps_infinite`)
+— reweight it if you can. The side conditions of a certificate are closed numerals: `by norm_num`,
+or `by ennreal_to_real; norm_num`.
 
-The step obligation is the same in every regime: *unfold once and lower-bound the mass, one lemma
-per `←` in the do-block*.
+**`mass_fixpoint`** reads the seed off `<GEN>`'s equation (the arguments some recursive call
+changes; a tuple of them, or none), unfolds one step, and runs `mass_bound`. It leaves `c`,
+`hc1 : c ≤ 1`, `hrec` (the bound on every recursive occurrence), and the seed under its own binder
+names in context. Without `using`, the goal left is `LfpIsOne <computed bound>` instead, to be
+finished with `SPMF.LfpIsOne.mono` and a certificate (`BasaltTest/Termination.lean`).
 
-```lean
-theorem <GEN>.terminates : IsAlmostSurelyTerminating <GEN> := by
-  -- Subcritical, static seed (worked instances: Nat.arbitrary, List.arbitrary, genAllTwos,
-  -- genCharList; family form: List.genSortedGt):
-  refine SPMF.IsPMF_of_subcritical_mass (m := <M>) (by norm_num) ?_
-  conv_rhs => rw [<GEN>]             -- unfold one step, RHS only
-  simp only [SPMF.mass_pick, SPMF.mass_pure, mul_one]
-  gcongr                             -- match the non-recursive parts; leaves the recursive branch
-  simp_all
-  -- Now one lemma per `←`, reading the do-block top to bottom:
-  apply SPMF.mass_bind_ge_of_isPMF <callee>.terminates   -- `← callee` with a known PMF
-  intro x
-  rw [SPMF.mass_bind_pure]           -- trailing `return f x` — done if the recursive call is last
-```
+**`mass_bound` is the whole structural argument.** It walks the unfolded generator and *computes* a
+lower bound on its mass — `@[mass_bound]` rules per combinator, so the bound comes out in the
+shape of the do-block (`Basalt/SPMF/MassBound.lean` owns the rules and the walk;
+`BasaltTest/MassBound.lean` shows a generator that uses every one of them). Nothing about the
+generator is yours to supply:
 
-For the *family* forms (`IsPMF_of_subcritical_mass_family`, `IsPMF_of_critical_family`) the
-recursive occurrence recurses at a *different index*, so it is bounded by the family's infimum:
-finish with `exact SPMF.mass_ge_iInf _ <new index>` (see `List.genSortedGt.terminates`,
-`Tree.genHeap.terminates`). For a branch making two recursive calls, chain
-`SPMF.mass_bind_ge_mul` (see `Tree.genHeap.terminates`). For a `frequency`, replace `mass_pick`
-with `SPMF.mass_frequency` / `SPMF.mass_frequency_ge`; for a `chooseNat` pivot,
-`SPMF.mass_bind_chooseNat_ge` (raw `choose`: `SPMF.mass_bind_choose_ge`).
+- a **recursive occurrence** is discharged by `hrec`, whatever the shape of the seed.
+- a **callee** is discharged by its own `<callee>.terminates` law, found by the naming convention
+  (Part 2 above) — `Nat.arbitrary` inside a body needs no mention. Any other fact is passed
+  explicitly: `mass_fixpoint [h₁, h₂] using …`.
+- an **`if`/`dite`** is no different from any other combinator: the bound is the same conditional
+  over the branches' bounds, which the arithmetic `split`s — `Tree.genBST` (`BST.lean`) shortcuts on
+  an exhausted interval. A conditional on a value drawn inside the step cannot appear in the bound,
+  so there it is the `min` of the branches' instead: `Tree.genLeftist` (`LeftistHeap.lean`) ends
+  its recursive branch in an `if` that orders the two children and `Tree.genHeap` (`Heap.lean`)
+  does not, and their termination proofs are the same text.
+
+**The arithmetic** has your `F c` on the left, the computed bound on the right, and no generator in
+sight. Try `simp` (`ArbNat.lean`, `SortedList.lean`), then `simp` with the identities the goal needs
+(`simp [sq, ENNReal.div_eq_inv_mul, mul_add]` in `LeftistHeap.lean` and `AllTwoTree.lean`), then
+`ennreal_to_real` (`Basalt/ENNRealAuto.lean`) and `nlinarith`. If it looks *false*, your
+certificate is wrong, not your proof. A generator that is not a `Gen` term, or whose seed has an
+argument typed by another, goes through `SPMF.IsPMF_of_lfp_eq_one_uniform` on an explicit family
+(`SPMF.IsPMF_retry`, `Basalt/SPMF/Failure.lean`). A bare combinator term, which has no definition
+to unfold, is `SPMF.IsPMF.of_one_le` and `mass_bound` (`BasaltTest/Combinators.lean`).
 
 **Shrinking seed** (`Tree.genWeightedBST`, `BST/Weighted.lean`) is the one regime with real
-content: you supply a ranking function `φ : Seed → ℝ≥0∞` (with `φ ≥ 1`) whose expected value drops
-by `ε` at every step, and `SPMF.IsPMF_of_ranking` returns termination *plus* `E[#steps] ≤ φ/ε`. The
-proof splits into a `LevelOp` (three algebra laws), a drift lemma (`A φ + ε ≤ φ` — pure arithmetic
-about your rank), and a step lemma (one unfolding, using `ENNReal.one_sub_le_mul_one_sub`,
-`one_sub_sum_div_le`, `one_sub_mul_le_add` to push the deficit through the branches). Follow
-`genWeightedBST_drift`/`genWeightedBST_step`/`genWeightedBST.terminates` in `BST/Weighted.lean`.
-(The plain `Tree.genBST` in `BST.lean` is *critical*, not shrinking — a uniform pivot gives mean
-offspring exactly 1 — so it terminates via `IsPMF_of_critical_family` with no ranking function; the
-`frequency`-weighted variant is what tips supercritical under the crude bound and needs the rank.)
+content, and the one where the bound is not a single `F c`: `mass_fixpoint per_seed` takes the
+bound family `c` and the computed bound `T c seed` as functions of the seed, and leaves
+`LfpIsOne T`. You supply a ranking function `φ : Seed → ℝ≥0∞` whose expected value drops by `ε` at
+every step, and `SPMF.LfpIsOne.ranking` (`Basalt/SPMF/Ranking.lean`) discharges the certificate,
+with `E[#steps] ≤ φ/ε` as a byproduct. Its obligations are a `LevelOp` `A` (three algebra laws), a
+drift lemma (`A φ + ε ≤ φ` — pure arithmetic about your rank), and the deficit condition
+`1 - T c seed ≤ A (1 - c) seed` — arithmetic about `T`, with no generator in sight, pushed through
+the branches by `ENNReal.one_sub_le_mul_one_sub`, `one_sub_sum_div_le`, and `one_sub_mul_le_add`.
+A uniform pivot's continuation has a bound that depends on the pivot, which `mass_bound` computes
+as the average over the range. Follow `genWeightedBST_drift`/`genWeightedBST.terminates`.
 Two things to know:
 
 - Candidate `φ`s, in order: the seed measure; `≡ const` (that's the static-seed case); seed measure
-  plus a depth term. Evaluate the drift in the *actual truncated `Nat` arithmetic* — `bstRank`
-  needs a `+4` bump at `lo = 0` because the pivot `x = 0` recurses on `(0, 0-1) = (0, 0)`.
+  plus a depth term. Evaluate the drift in the seed's *actual* arithmetic: `bstRank` is the plain
+  interval measure and the children's ranks sum to the parent's at every pivot, but that holds
+  because the bounds are `Int`. Under `Nat` bounds the `lo = 0` pivot has an unshrunk child and the
+  same `φ` fails its drift check — a truncating seed costs you a correction term in the rank.
 - A wrong `φ` is a *failed drift check*, never a wrong theorem. Guess freely.
-
-Whatever the regime, the residual ENNReal *arithmetic* (drift inequalities, fixed-point
-bounds) is handled by `ennreal_to_real` + `norm_num`/`linarith`/`nlinarith` — see
-`Basalt/ENNRealAuto.lean`, with worked uses in `genWeightedBST_drift` (`BST/Weighted.lean`),
-`genTree.terminates` (`AllTwoTree.lean`), and `IsPMF_retry` (`Failure.lean`).
 
 ### Recipe 3: Cost
 
@@ -289,10 +319,13 @@ inversion path above is uniform and the combinator side conditions just reintrod
   `rw [show lo + (x - lo) = x by omega]`.
 - **`omega` fails in a cost proof** → read the goal: it is the exact inequality your bound must
   satisfy. Either a `have` for some callee's bound is missing, or the bound is too tight.
-- **`gcongr` leaves a strange goal in a termination proof** → the mass chain must mirror the
-  do-block exactly, one lemma per `←`: `mass_bind_ge_of_isPMF` (known-PMF callee),
-  `mass_ge_iInf` (recursive call at another index, family forms), `mass_bind_ge_mul` (two recursive
-  calls), `mass_bind_pure` (trailing `return`).
+- **`mass_bound` says nothing bounds the mass of a sub-generator** → it is a combinator with no
+  `@[mass_bound]` rule (tag one), a callee whose termination law is under another name (pass it:
+  `mass_bound [h]`), or a recursive occurrence whose bound depends on a value drawn earlier from
+  something other than a uniform pivot — only `chooseNat`/`chooseInt` draws have a rule that averages
+  over the drawn value.
+- **`mass_fixpoint` leaves an arithmetic goal that is false** → the structural half is not in doubt;
+  the certificate you named is. Re-count the mean offspring.
 - **`fix_induct` fails to apply** → the motive must mention the *bare* fixpoint value; for an
   indexed generator quantify the indices in the motive (see the BST cost proofs).
 - **Finite-domain data (chars, enums)** → skip the machinery: `decide` / `native_decide` on the
@@ -300,5 +333,6 @@ inversion path above is uniform and the combinator side conditions just reintrod
 
 ## Prior Art
 
-For the *theory* behind the termination recipes — the ranking-function theorem, the three seed
-regimes, and why critical generators have infinite expected size — see `Basalt/SPMF/Ranking.lean`.
+For the *theory* behind the termination recipe — the least-fixed-point criterion and its
+certificates — see `Basalt/SPMF/Termination.lean` (the tactic is `Basalt/SPMF/MassFixpoint.lean`); for the ranking-function certificate and why
+critical generators have infinite expected size, `Basalt/SPMF/Ranking.lean`.

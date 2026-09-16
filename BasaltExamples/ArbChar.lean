@@ -32,8 +32,8 @@ theorem Char.arbitrary.sound_complete :
   fun _ => Char.arbitrary_mem_support
 
 theorem Char.arbitrary.terminates : IsAlmostSurelyTerminating Char.arbitrary := by
-  unfold Char.arbitrary
-  apply SPMF.IsPMF_elements
+  mass_fixpoint using SPMF.LfpIsOne.one
+  simp
 
 theorem Char.arbitrary.cost_bounded :
     IsCostBounded Char.arbitrary (fun _ => 1) := by

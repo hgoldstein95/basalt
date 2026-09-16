@@ -82,17 +82,13 @@ theorem NonEmptyString.arbitrary_support :
     . rw [String.ofList_toList]
 
 theorem String.arbitrary.terminates : IsAlmostSurelyTerminating String.arbitrary := by
-  unfold String.arbitrary IsAlmostSurelyTerminating SPMF.IsPMF
-  rw [SPMF.mass_map]
-  rw [SPMF.IsPMF_listOf]
-  apply Char.arbitrary.terminates
+  mass_fixpoint using SPMF.LfpIsOne.one
+  simp
 
 /-- `NonEmptyString.arbitrary` almost surely terminates -/
 theorem NonEmptyString.arbitrary_terminates : IsAlmostSurelyTerminating NonEmptyString.arbitrary := by
-  unfold NonEmptyString.arbitrary IsAlmostSurelyTerminating SPMF.IsPMF
-  rw [SPMF.mass_map]
-  rw [SPMF.IsPMF_nonEmptyListOf]
-  apply Char.arbitrary.terminates
+  mass_fixpoint using SPMF.LfpIsOne.one
+  simp
 
 /-- The cost bound comes from the generic `IsBounded_listOf` combinator lemma
     applied to `Char.arbitrary` (whose per-element cost is `1`):

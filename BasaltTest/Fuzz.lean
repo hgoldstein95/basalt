@@ -100,5 +100,51 @@ private def propAnyBackend : Property := fun _ => do
 #guard_msgs in
 #eval do IO.println (render (← Plausible.Gen.run (runProp (propAnyBackend Plausible.Gen)) 0))
 
--- (Omitted on the 4.29 backport: the genBST drift-pins require the Int-keyed BasaltExamples/BST
--- rework, which is unrelated 4.33-line work.)
+/-! ### The fuzz target's `genBST` is the proved one
+
+`Fuzz/BuggyBST.lean` restates `BasaltExamples/BST`'s `Tree.genBST` rather than importing it, because
+that import would pull Mathlib into the executable's link closure (`fuzz-run/README.md`). The copy's
+claim — that the fuzzed generator is the one proved sound, complete, terminating, and cost-bounded —
+holds only while the two agree, so these pins make a drift a build failure: both are
+`[Gen G]` terms, so at `FuzzGen` on the same bytes they must build the same tree. -/
+
+/- A compact `(left key right)` s-expression rather than `Repr`, so a pin is one line. It preserves
+structure, unlike `toList`, which is not injective on trees and would pass two differently-shaped
+trees with the same keys. -/
+private def showOrig : BST.Tree Int → String
+  | .leaf => "."
+  | .node l x r => s!"({showOrig l} {x} {showOrig r})"
+
+private def showCopy : BuggyBST.Tree → String
+  | .leaf => "."
+  | .node l x r => s!"({showCopy l} {x} {showCopy r})"
+
+/- Runs both generators on one buffer, printing the shared tree so a mismatch shows what each
+produced rather than just `false`. -/
+private def agreeOn (bs : List UInt8) : String :=
+  let lo := BuggyBST.loKey
+  let hi := BuggyBST.hiKey
+  let orig : FuzzGen String := showOrig <$> BST.Tree.genBST lo hi
+  let copy : FuzzGen String := showCopy <$> BuggyBST.genBST lo hi
+  let run (g : FuzzGen String) : Option String := (g.run ⟨⟨bs.toArray⟩, 0⟩).map (·.1)
+  match run orig, run copy with
+  | some a, some b => if a == b then s!"agree: {a}" else s!"DIFFER: example={a} fuzz={b}"
+  | _, _ => "one generator failed to produce a value"
+
+/- A buffer that drives several `frequency`/`chooseInt` steps: both generators consume the bytes in
+the same order and build the same tree. -/
+/-- info: agree: ((. 3 .) 4 .) -/
+#guard_msgs in #eval IO.println (agreeOn [1, 3, 1, 2, 0, 0, 0, 0])
+
+/- The empty buffer takes the zero-fill path in both (`frequency` → first branch → `leaf`). -/
+/-- info: agree: . -/
+#guard_msgs in #eval IO.println (agreeOn [])
+
+/- A longer buffer, exercising deeper recursion on both sides. -/
+/-- info: agree: ((. 6 (. 7 .)) 8 .) -/
+#guard_msgs in #eval IO.println (agreeOn [1, 7, 1, 5, 0, 1, 6, 0, 0, 1, 9, 0, 0])
+
+/- A tree branching on both sides at depth two, so the pin covers both recursive calls rather than
+just the left spine. -/
+/-- info: agree: (((. 3 .) 5 .) 9 (. 10 (. 11 .))) -/
+#guard_msgs in #eval IO.println (agreeOn [1, 8, 1, 4, 1, 2, 0, 0, 0, 1, 12, 1, 10, 0, 0, 0])

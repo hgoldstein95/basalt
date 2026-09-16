@@ -32,8 +32,20 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
 - **Support inversion** (`mem_support_*_iff`) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean);
   the `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactics.lean](Basalt/Tactics.lean).
-- **Termination theory** (seed regimes, ranking functions, expected size) —
-  [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean); the practical entry is WORKFLOW.md's Recipe 2.
+- **Termination** — the criterion (`IsPMF_of_lfp_eq_one`) and its `LfpIsOne` certificates:
+  [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); the `mass_fixpoint` tactic:
+  [Basalt/SPMF/MassFixpoint.lean](Basalt/SPMF/MassFixpoint.lean), contract
+  pinned by [BasaltTest/Termination.lean](BasaltTest/Termination.lean). Ranking functions and
+  expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). `mass` and its equations:
+  [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
+- **The `mass_bound` tactic and its `@[mass_bound]` rules** — rules keyed by the combinator's head
+  constant, later ones fallbacks; [Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean) owns both,
+  with the attribute in [MassBound/Attr.lean](Basalt/SPMF/MassBound/Attr.lean) and the contract
+  pinned by [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean). Adding a combinator to
+  `Combinators.lean` means adding its rule here — nothing else in a termination proof mentions
+  combinators.
+- **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
+  [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean).
 - **Cost** (`SPMF.Cost`, `IsBounded` and its algebra) — [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean).
 - **ENNReal arithmetic** — `ennreal_to_real` in [Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean).
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
@@ -42,6 +54,19 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **`#genstats`** — options on the command's declarations in
   [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean); the law-discovery contract is on
   `lawProved` there, guarded by [BasaltTest/LawLine.lean](BasaltTest/LawLine.lean).
+- **Stating and running a property** — [Basalt/PBT/](Basalt/PBT/), guarded by
+  [BasaltTest/PBT.lean](BasaltTest/PBT.lean), which is the tour. Nothing there may name an
+  interpretation: a runner that needs one belongs with that interpretation and tags itself
+  `@[basalt_backend]`.
+- **Coverage-guided fuzzing** (`FuzzGen`, the libFuzzer bridge, the opt-in `basalt-fuzz` executable)
+  — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
+  the measured comparison between backends. This is the repo's only FFI and native-link config: the
+  executable's C emission and link live outside `lake build`, so a change to *them* is caught only by
+  `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow. The Lean side is not exempt — the fuzz
+  runner and `BasaltTest/Fuzz/BuggyBST.lean` are elaborated by the default build through
+  `BasaltTest/Fuzz.lean`, which is where a drift from the proved `genBST` becomes a build failure.
+  Anything added to the Mathlib-free link closure must stay Mathlib-free: import the narrowest
+  module, not an umbrella.
 
 ## Gotchas (symptom → cause → pointer)
 
@@ -62,6 +87,19 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `<gen>.sound_complete` / `.terminates` / … naming convention, or its statement is not the law
   (both halves are checked). WORKFLOW.md Part 2 owns the convention;
   [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean)'s `lawProved` implements the check.
+- **Drawing from a generator inside a property fails with `failed to synthesize instance Gen
+  (PropM G)`** — `PropM G` is deliberately not a `Gen`, so a bare `←` on a generator elaborates it at
+  the ambient `PropM G` instead of lifting it. Wrap the draw in `generate`
+  ([Basalt/PBT/Property.lean](Basalt/PBT/Property.lean)), or use `forAll`. The error names the
+  missing instance, not the missing combinator, so it reads as a gap in `Basalt/Gen.lean`.
+- **A `do` block that binds a property with `←` reports a nonsense error somewhere else** (e.g.
+  "unknown constant `Unit.ok`" at a later `match`) — `PropM G Unit` is *definitionally*
+  `G TestOutcome`, so `←` on a property inside a `PropM G` block unifies before the automatic lift
+  is tried and silently yields the property's `Unit` instead of its outcome. Go through
+  `runProp` ([Basalt/PBT/Property.lean](Basalt/PBT/Property.lean)) to observe an outcome. The same
+  defeq means a runner's `IO TestOutcome` argument does not determine `G`: ascribe the
+  interpretation (`(prop : PropM IO Unit)`) at the call site.
+
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
   `ennreal_to_real` ([Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean)) and finish over `ℝ`.
 

@@ -151,8 +151,9 @@ def genSurely [Gen G] : G (Option Nat) :=
   RandomChoice.pick (fun () => pure (some 0)) (fun () => pure (some 1))
 
 theorem genSurely.filter_free : IsFilterFree (genSurely (G := SPMF)) := by
-  have hmass : (genSurely (G := SPMF)).mass = 1 :=
-    SPMF.IsPMF_pick (SPMF.IsPMF_pure _) (SPMF.IsPMF_pure _)
+  have hmass : SPMF.IsPMF (genSurely (G := SPMF)) := by
+    mass_fixpoint using SPMF.LfpIsOne.one
+    simp [ENNReal.inv_two_add_inv_two]
   rw [IsFilterFree_iff_massNone_eq_zero hmass]
   show (genSurely (G := SPMF)) none = 0
   rw [SPMF.apply_eq_zero_iff]

@@ -17,9 +17,9 @@ namespace GenStatsExamples
 info: BST.Tree.genBST 0 10 — 200 draws (seed 0, fuel 10000)
 
   outcomes    ok 200 (100.0%)
-  size        mean 4.1   p50 1   p95 15   max 21
-  choices     mean 4.8   p50 1   p95 17   max 24
-  distinct    80 / 200
+  size        mean 3.8   p50 1   p95 13   max 19
+  choices     mean 4.3   p50 1   p95 14   max 20
+  distinct    77 / 200
 
   head constructor
     leaf    54.0%  (108)
@@ -30,7 +30,7 @@ info: BST.Tree.genBST 0 10 — 200 draws (seed 0, fuel 10000)
       2.0%    (4)  BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf)
       1.5%    (3)  BST.Tree.node (BST.Tree.leaf) 3 (BST.Tree.leaf)
       1.5%    (3)  BST.Tree.node (BST.Tree.leaf) 5 (BST.Tree.leaf)
-      1.0%    (2)  BST.Tree.node (BST.Tree.leaf) 2 (BST.Tree.leaf)
+      1.0%    (2)  BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)
 
   samples
     BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf)
@@ -48,9 +48,9 @@ info: BST.Tree.genBST 0 10 — 200 draws (seed 0, fuel 10000)
 info: BST.Tree.genWeightedBST 0 10 — 200 draws (seed 0, fuel 10000)
 
   outcomes    ok 200 (100.0%)
-  size        mean 8.6   p50 8   p95 21   max 43
-  choices     mean 19.0   p50 19   p95 45   max 87
-  distinct    161 / 200
+  size        mean 5.7   p50 6   p95 11   max 11
+  choices     mean 12.6   p50 14   p95 22   max 22
+  distinct    158 / 200
 
   head constructor
     node    82.0%  (164)
@@ -58,13 +58,13 @@ info: BST.Tree.genWeightedBST 0 10 — 200 draws (seed 0, fuel 10000)
 
   most common
      18.0%  (36)  BST.Tree.leaf
+      1.5%   (3)  BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tree.leaf)
+      1.5%   (3)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tre…
       1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 3 (BST.Tree.leaf)
       1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 9 (BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf))
-      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 0 (BST.Tre…
-      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.le…
 
   samples
-    BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.node (BST.Tree.node (BST.Tree.no…
+    BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 10 (BST.Tree.leaf)
     BST.Tree.leaf
     BST.Tree.leaf
 

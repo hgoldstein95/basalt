@@ -119,7 +119,7 @@ def vectorOf [Gen G] (n : Nat) (g : G α) : G (List α) :=
     pure (x :: xs)) (pure []) (List.replicate n g)
 
 /-- Helper lemma that unfolds one layer of recursion in `vectorOf (n + 1) g`.  This is needed for
-the lemmas `support_vectorOf`, `IsPMF_vectorOf`. -/
+the lemmas `support_vectorOf`, `le_mass_vectorOf`. -/
 theorem vectorOf_succ [Gen G] {n : Nat} {g : G α} :
     vectorOf (n + 1) g = (do let x ← g; let xs ← vectorOf n g; pure (x :: xs)) :=
   rfl
