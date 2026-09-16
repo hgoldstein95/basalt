@@ -68,7 +68,7 @@ static struct {
   uint64_t runs;
   uint64_t starved;           /* runs that read past the end of their buffer                    */
   uint32_t max_deficit;       /* how far off `-max_len` is, if it is                            */
-  uint64_t grew;              /* the fuzz_build workflow asserts this is nonzero under --grow   */
+  uint64_t grew;
   uint64_t cap_blocked;       /* wanted more but was already at `-max_len`                      */
 } g_stats;
 
