@@ -81,6 +81,11 @@ generators: it hides `choose`'s `ULift` subtype from bodies and proofs. -/
 def chooseNat [Gen G] (lo hi : Nat) (h : lo ≤ hi := by gen_side_condition) : G Nat :=
   (·.down.val) <$> RandomChoice.choose lo hi h
 
+/-- Same as `chooseNat` but for signed `Int`s.  -/
+def chooseInt [Gen G] (lo hi : Int) (_h : lo ≤ hi := by gen_side_condition) : G Int := do
+  let k ← chooseNat 0 (hi - lo).toNat (Nat.zero_le _)
+  return lo + (k : Int)
+
 /-- Generates an element of the list `xs` at random.  This combinator takes as input a proof that
 `xs` is non-empty, discharged by `gen_side_condition` when omitted. -/
 def elements [Gen G] (xs : List α) (hne : xs ≠ [] := by gen_side_condition) : G α := do
