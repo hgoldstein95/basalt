@@ -167,6 +167,24 @@ jobs:
             done
           done
 
+      # `--grow` (fuzz-run/README.md, "Extending the buffer") is deliberately unasserted here. It is
+      # off by default and measured not to help, so a campaign under it does not earn CI time; the
+      # cost of leaving it out is that two silent failures go uncaught — libFuzzer finding no
+      # `LLVMFuzzerCustomMutator` (only `build.sh`'s export check remains), and a growth path that
+      # never fires. `fuzz-run/compare-grow.sh` is where growth is exercised, by hand.
+
+      # A campaign reports its verdict *only* through the exit status, so a property name the registry
+      # does not know must not exit 0 (`usageError`, Basalt/PBT/Driver.lean): every "this must fail"
+      # step above would otherwise read a typo as the property having survived.
+      - name: A misspelled property must exit nonzero
+        run: |
+          if fuzz-run/basalt-fuzz long-6 -runs=1 > log-typo.txt 2>&1; then
+            echo "::error::an unknown property exited 0; a typo would read as a passing campaign"
+            cat log-typo.txt; exit 1
+          fi
+          grep -q "unknown property 'long-6'" log-typo.txt || {
+            echo "::error::an unknown property was not reported as such"; cat log-typo.txt; exit 1; }
+
       # The one property where the backends are supposed to *disagree*: `chain-4` hides its bug behind
       # 4 nested guards, so coverage guidance finds it in ~1e3 runs while uniform sampling needs
       # ~256^4. Asserting both directions guards the claim in fuzz-run/README.md's comparison table —

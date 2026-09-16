@@ -42,6 +42,17 @@ def plausibleBackend : Backend where
   name := "plausible"
   campaign T argv := plausibleCampaign T (runsOf argv) (discardRatioOf argv)
 
+/-- Report a usage error and exit nonzero.
+
+The exit code is the point. A campaign reports its verdict *only* through the exit status, so while
+these paths exited `0` a misspelled property name was indistinguishable from a property that passed:
+the `.github/workflows/fuzz_build.yml` steps that assert "this property must fail" would have read
+that `0` as the property having survived a campaign that never ran. `2` also distinguishes it from a
+counterexample (`77` at `IO`/`Plausible`, libFuzzer's own code under the fuzzer). -/
+def usageError (msg : String) : IO α := do
+  IO.eprintln msg
+  IO.Process.exit 2
+
 /-- The requested backend, or the first one as the default. -/
 def findBackend (backends : List Backend) : Option String → Option Backend
   | none => backends.head?
@@ -65,16 +76,16 @@ def dispatch (exe : String) (props : List (String × Property)) (args : List Str
   let (flags, rest) := args.partition (·.startsWith "--backend=")
   let requested := flags.head?.map (fun f => (f.drop "--backend=".length).toString)
   match findBackend backends requested, rest with
-  | none, _ => IO.eprintln s!"unknown backend '{requested.getD ""}'\n{usage}"
+  | none, _ => usageError s!"unknown backend '{requested.getD ""}'\n{usage}"
   | some backend, "replay" :: name :: path :: _ =>
     match backend.replay?, props.lookup name with
-    | none, _ => IO.eprintln s!"backend '{backend.name}' has no saved inputs to replay"
-    | _, none => IO.eprintln s!"unknown property '{name}'; known: {names}"
+    | none, _ => usageError s!"backend '{backend.name}' has no saved inputs to replay"
+    | _, none => usageError s!"unknown property '{name}'; known: {names}"
     | some replay, some T => replay T path
   | some backend, name :: rest =>
     match props.lookup name with
     | some T => backend.campaign T rest.toArray
-    | none => IO.eprintln s!"unknown property '{name}'; known: {names}"
-  | some _, [] => IO.eprintln usage
+    | none => usageError s!"unknown property '{name}'; known: {names}"
+  | some _, [] => usageError usage
 
 end Basalt.PBT
