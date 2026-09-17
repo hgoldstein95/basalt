@@ -150,4 +150,23 @@ example (b : Bool) (g : SPMF Nat) (h : b = true → 1 ≤ g.mass) :
   mass_bound
   simp
 
+/-- A generator over a long literal alphabet, and one that calls it. -/
+def longChars : List Char :=
+  (List.range 32).map (fun i => Char.ofNat (i + 32)) ++ (List.range 96).map (fun i => Char.ofNat (i + 128))
+
+def genLongChar [Gen G] : G Char := elements longChars (by simp [longChars])
+
+theorem genLongChar.terminates : IsAlmostSurelyTerminating (genLongChar : SPMF Char) := by
+  mass_fixpoint using SPMF.LfpIsOne.one
+  simp
+
+def genLongText [Gen G] (n : Nat) : G (List Char) := listOfMaxLength n genLongChar
+
+/-- A hypothesis about another generator is not tried as a leaf: unifying it with the callee would
+unfold both, and the literal alphabet exceeds the recursion depth. -/
+example (c : ℝ≥0∞) (_hrec : ∀ _ : Unit, c ≤ (genLongText n : SPMF (List Char)).mass) :
+    (1 : ℝ≥0∞) ≤ (genLongChar : SPMF Char).mass := by
+  mass_bound
+  simp
+
 end MassBoundTest
