@@ -98,6 +98,27 @@ Pass a cost bound for it to `cost_bound [_]`.
 example (g : SPMF.Cost Nat) : IsCostBounded (listOf g) (fun _ => 1) := by
   cost_bound
 
+-- A combinator term passed as a generator argument is bounded by its worst case.
+/--
+trace: xs : List ℕ
+n_xs : ℕ
+h_xs : n_xs ≤ (List.map (fun x => 1 + max 1 0) xs).sum
+⊢ n_xs ≤ 2 * xs.length
+-/
+#guard_msgs in
+example : IsCostBounded (vectorOf 3 (pick (fun _ => chooseNat 0 5) (fun _ => pure 0)))
+    (fun xs => 2 * xs.length) := by
+  cost_bound
+  trace_state
+  simp at *
+  omega
+
+example : IsCostBounded (listOfMaxLength 3 (chooseNat 0 5 >>= fun x => pure (x + 1)))
+    (fun xs => 1 + xs.length) := by
+  cost_bound
+  simp at *
+  omega
+
 /-- A cost bound the caller supplies, here one that is no law of anything. -/
 example : IsCostBounded (Nat.arbitrary >>= fun n => pure n) (fun n => n + 2) := by
   cost_bound [IsBounded_mono Nat.arbitrary.cost_bounded (c₂ := fun n => n + 2) (by omega)]
@@ -111,7 +132,8 @@ example (g : Int → Int → SPMF.Cost Nat) (ih : ∀ lo hi, IsBounded (g lo hi)
 
 end CostBoundTest
 
--- Every combinator has a rule for every judgment that has rules for combinators.
+-- Every combinator has a mass rule and a cost rule. The worst-case `IsBounded` rules exist only for
+-- the combinators whose runs are bounded.
 open Lean Elab Command Basalt.Walk in
 run_cmd do
   let reg := genRuleExt.getState (← getEnv)

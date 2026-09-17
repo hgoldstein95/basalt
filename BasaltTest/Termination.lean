@@ -114,4 +114,16 @@ example : SPMF.IsPMF (frequency [(1, fun _ => Pure.pure 0), (1, fun _ => Pure.pu
     (by simp) : SPMF Nat) := by
   mass_fixpoint using SPMF.LfpIsOne.one
 
+/-- Matching on an argument makes it no seed when nothing recurses, so an argument whose type
+depends on it is harmless. -/
+def byCases [Gen G] (n : Nat) (_h : 0 < n) : G Nat :=
+  match n with
+  | 1 => pure 0
+  | _ + 2 => chooseNat 0 1
+
+example (n : Nat) (h : 0 < n) : IsAlmostSurelyTerminating (byCases n h) := by
+  match n, h with
+  | 1, h => mass_fixpoint using SPMF.LfpIsOne.one; simp
+  | _ + 2, h => mass_fixpoint using SPMF.LfpIsOne.one; simp
+
 end TerminationTest

@@ -120,4 +120,34 @@ example (g : Nat → SPMF Nat) (c : Nat → ℝ≥0∞) (hrec : ∀ j, c j ≤ (
   trace_state
   exact zero_le
 
+-- A continuation whose bound depends on a value drawn from anything else falls back to the worst
+-- case over every value.
+/--
+trace: ⊢ 1 ≤ 1 * ⨅ x, 1 ^ x
+-/
+#guard_msgs in
+example : (1 : ℝ≥0∞) ≤
+    (elements [1, 2] (by simp) >>= fun k => vectorOf k (pure 0) : SPMF (List Nat)).mass := by
+  mass_bound
+  trace_state
+  simp
+
+/-- A drawn value is named after its binder, so a fact passed for a sub-generator can mention it. -/
+example (g : Nat → SPMF Nat) (h : ∀ k, k ≤ 3 → 1 ≤ (g k).mass) :
+    (1 : ℝ≥0∞) ≤ (ULift.down <$> choose 0 3 (by omega) >>= fun k => g k.1 : SPMF Nat).mass := by
+  mass_bound [h k.1 k.2.2]
+  simp
+
+/-- A fact over a subtype is matched through the value alone. -/
+example (g : Nat → SPMF Nat) (h : ∀ k : {k // 0 ≤ k ∧ k ≤ 3}, 1 ≤ (g k.1).mass) :
+    (1 : ℝ≥0∞) ≤ (ULift.down <$> choose 0 3 (by omega) >>= fun k => g k.1 : SPMF Nat).mass := by
+  mass_bound
+  simp
+
+/-- A fact's premise that its use does not determine is found among the hypotheses. -/
+example (b : Bool) (g : SPMF Nat) (h : b = true → 1 ≤ g.mass) :
+    (1 : ℝ≥0∞) ≤ (if b = true then g else pure 0 : SPMF Nat).mass := by
+  mass_bound
+  simp
+
 end MassBoundTest
