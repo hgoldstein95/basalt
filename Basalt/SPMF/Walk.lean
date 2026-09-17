@@ -288,8 +288,16 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
         let some gs ← tryFact j goal e | failure
         namePremises none (← goal.getType) gs
       if let some gs := r then return some (← walkAll extras gs)
+    -- A hypothesis is tried only if it mentions `g`'s head: unifying one about another generator
+    -- unfolds both, and on a generator over a long literal list that exceeds the recursion depth.
+    let mentionsHead : Expr → Bool := match (← whnfCore g).getAppFn with
+      | .const n _ => fun e => (e.find? (·.isConstOf n)).isSome
+      | .fvar x => (·.containsFVar x)
+      | _ => fun _ => true
     for decl in ← getLCtx do
       unless decl.isImplementationDetail do
+        unless ← isProp decl.type do continue
+        unless mentionsHead (← instantiateMVars decl.type) do continue
         if let some gs ← tryFact j goal decl.toExpr then
           return some (← walkAll extras (← namePremises none (← goal.getType) gs))
     if let some law ← law? j g then
