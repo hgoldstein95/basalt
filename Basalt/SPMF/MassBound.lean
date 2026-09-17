@@ -59,6 +59,13 @@ theorem le_mass_bind_chooseInt {lo hi : Int} {h : lo ≤ hi} {f : Int → SPMF �
   gcongr with x
   exact hf x
 
+/-- The last fallback for a bind whose continuation's bound depends on the drawn value: a bound
+outside the draw can only be the worst case over every value. -/
+@[gen_rule]
+theorem le_mass_bind_iInf {g : SPMF α} {f : α → SPMF β} {c : ℝ≥0∞} {d : α → ℝ≥0∞}
+    (hg : c ≤ g.mass) (hf : ∀ a, d a ≤ (f a).mass) : c * ⨅ x, d x ≤ (g >>= f).mass :=
+  le_mass_bind hg fun a => (iInf_le d a).trans (hf a)
+
 @[gen_rule]
 theorem le_mass_map {x : SPMF α} {f : α → β} {c : ℝ≥0∞} (hx : c ≤ x.mass) :
     c ≤ (f <$> x).mass := by rw [mass_map]; exact hx

@@ -9,6 +9,7 @@ import Lean.Elab.SyntheticMVars
 import Lean.Meta.Eqns
 import Lean.Meta.Transform
 import Lean.Meta.Tactic.Replace
+import Lean.Meta.Tactic.Assumption
 
 /-!
 # The Generator Walker
@@ -63,18 +64,27 @@ def reduceCtorProjs (e : Expr) : MetaM Expr := do
     let r ← whnfR x
     return if r.isProj then .continue else .done r)
 
-/-- `e` with its leading binders instantiated by `mkCtorMVar`, and its type ascribed with the
-resulting projections reduced. A family criterion hands over a recursive bound `∀ j, c ≤ (g j).mass`
-over a tupled (or `Unit`) seed, and `apply` alone cannot match `g j.1 j.2` against `g lo (x - 1)`,
-nor invent the `()`; left unreduced, `(?a, ?b).1 =?= p.1` is solved by structure eta, which fixes
-`?b := p.2` and fails on the second argument. A callee's law with arguments
-(`<gen>.terminates : ∀ m, …`) is instantiated the same way. -/
-private def instCtorBinders (e : Expr) : MetaM Expr := do
+/-- `e` with its leading binders instantiated, by `mkCtorMVar` when `ctor`, and its type ascribed
+with the resulting projections reduced. A family criterion hands over a recursive bound
+`∀ j, c ≤ (g j).mass` over a tupled (or `Unit`) seed, and `apply` alone cannot match `g j.1 j.2`
+against `g lo (x - 1)`, nor invent the `()`; left unreduced, `(?a, ?b).1 =?= p.1` is solved by
+structure eta, which fixes `?b := p.2` and fails on the second argument. A callee's law with
+arguments (`<gen>.terminates : ∀ m, …`) is instantiated the same way. A binder whose constructor has
+a proof field, as a subtype does, is matched only through its value (`k.1`), which leaves the proof
+field unassigned; `ctor := false` is the retry for it. -/
+private def instBinders (ctor : Bool) (e : Expr) : MetaM Expr := do
   let mut e := e
   repeat
     let .forallE _ d _ _ ← instantiateMVars (← inferType e) | break
-    e := e.app (← mkCtorMVar d)
+    e := e.app (← if ctor then mkCtorMVar d else mkFreshExprMVar d)
   mkExpectedTypeHint e (← reduceCtorProjs (← inferType e))
+
+/-- Assign every unassigned `Prop`-typed metavariable of `e` from a hypothesis, as a premise the
+fact's use does not determine (an `if`'s branch condition) must be. -/
+private def assumeProps (e : Expr) : MetaM Unit := do
+  for m in (← getMVars e) do
+    unless ← m.isAssigned do
+      if ← isProp (← m.getType) then m.assumption
 
 /-- `b` applied to `e` as its first explicit argument, with fresh metavariables before it. -/
 private def applyBridge (b : Name) (e : Expr) : MetaM Expr := do
@@ -97,11 +107,13 @@ private def bridgeArgHead (b : Name) : MetaM (Option Name) := do
     return none
 
 /-- Close `goal`, a leaf of judgment `j`, with the fact `e` through one of `j`'s bridges, `e`'s
-binders possibly instantiated by `instCtorBinders` first. Returns the bridge's premises, not yet
+binders possibly instantiated by `instBinders` first. Returns the bridge's premises, not yet
 walked; `none` if `e` does not apply. -/
 private def tryFact (j : Judgment) (goal : MVarId) (e : Expr) : MetaM (Option (List MVarId)) := do
-  for inst in [false, true] do
-    let e ← if inst then observing? (instCtorBinders e) else pure (some e)
+  for inst in [none, some true, some false] do
+    let e ← match inst with
+      | none => pure (some e)
+      | some ctor => observing? (instBinders ctor e)
     let some e := e | continue
     let head := (← whnfR (← inferType e)).getAppFn.constName?
     -- A bridge stated for the fact's own head is tried before one that must unfold the fact, which
@@ -115,6 +127,7 @@ private def tryFact (j : Judgment) (goal : MVarId) (e : Expr) : MetaM (Option (L
           | some b => applyBridge b e
         let gs ← applyExact goal cand
         if bridge.isNone && !gs.isEmpty then failure
+        goal.withContext (assumeProps e)
         if (← instantiateMVars e).hasExprMVar then failure
         return gs
       if let some gs := r then return some gs
@@ -185,18 +198,28 @@ private def nameBinders (t : Expr) (hint : Option Name) (post : Option (Name × 
       return mkAppN t.getAppFn (args.set! i (.lam v d₁ (.lam c d₂ b bi₂) bi₁))
   go t #[] none 0 false
 
-/-- `premises` renamed by `nameBinders`, the `i`th taking the `i`th hint when there is one per
-premise. -/
+/-- Whether premise `t` binds a drawn value: a `∀` over data, or a postcondition to hand on. -/
+private def bindsValue (t : Expr) : MetaM Bool := do
+  match t with
+  | .forallE _ d _ _ => return !(← isProp d)
+  | _ => return (postNames t).isSome
+
+/-- `premises` renamed by `nameBinders`. The hints go one per premise when there are as many, and
+otherwise, in order, to the premises that bind a value, when there are as many of those. -/
 private def namePremises (g? : Option Expr) (goalTy : Expr) (premises : List MVarId) :
     MetaM (List MVarId) := do
   let hints := (g?.map lambdaHints).getD #[]
   let post := postNames goalTy
-  let hints := if hints.size == premises.length then hints.map some
-    else .replicate premises.length none
-  (premises.zip hints.toList).mapM fun (p, hint) => do
-    let t ← instantiateMVars (← p.getType)
-    let t' ← nameBinders t hint post
-    p.replaceTargetDefEq t'
+  let types ← premises.mapM fun p => do instantiateMVars (← p.getType)
+  let hints ← if hints.size == premises.length then pure (hints.toList.map some) else do
+    let binds ← types.mapM bindsValue
+    if (binds.filter id).length != hints.size then pure (types.map fun _ => none) else
+      let (out, _) := binds.foldl (fun (out, rest) b =>
+        if b then (out ++ [rest.head?], rest.drop 1) else (out ++ [none], rest))
+        (([] : List (Option Name)), hints.toList)
+      pure out
+  (premises.zip (types.zip hints)).mapM fun (p, t, hint) => do
+    p.replaceTargetDefEq (← nameBinders t hint post)
 
 mutual
 
@@ -235,40 +258,46 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
   -- The goal is restated in the reduced form before the rule is applied: matching a rule against
   -- an unreduced branch closes a side condition like `xs ≠ []` by proof irrelevance rather than by
   -- unification, and the side condition then survives as a goal.
-  for g' in [g, ← whnfCore g, ← whnfR g] do
-    let some lems := g'.getAppFn.constName?.bind (rulesFor (← getEnv) j.key) | continue
-    let goal ← if g' == g then pure goal else goal.change (restate g')
-    -- A later rule is a fallback: it runs only when every earlier one failed, and the first
-    -- rule's failure is the one reported.
-    let saved ← saveState
-    let mut firstErr : Option Exception := none
-    for lem in lems do
-      try
-        let premises ← applyExact goal (← mkConstWithFreshMVarLevels lem)
-        return ← walkAll extras (← namePremises (some g') (← goal.getType) premises)
-      catch ex =>
-        firstErr := firstErr <|> some ex
-        saved.restore
-    if let some ex := firstErr then throw ex
+  let rules : TermElabM (Option (List MVarId)) := do
+    for g' in [g, ← whnfCore g, ← whnfR g] do
+      let some lems := g'.getAppFn.constName?.bind (rulesFor (← getEnv) j.key) | continue
+      let goal ← if g' == g then pure goal else goal.change (restate g')
+      -- A later rule is a fallback: it runs only when every earlier one failed, and the first
+      -- rule's failure is the one reported.
+      let saved ← saveState
+      let mut firstErr : Option Exception := none
+      for lem in lems do
+        try
+          let premises ← applyExact goal (← mkConstWithFreshMVarLevels lem)
+          return some (← walkAll extras (← namePremises (some g') (← goal.getType) premises))
+        catch ex =>
+          firstErr := firstErr <|> some ex
+          saved.restore
+      if let some ex := firstErr then throw ex
+    return none
   -- A leaf: a caller-supplied fact, a hypothesis (a recursive occurrence), or a proved law. The
   -- fact is committed to before its bridge's premises are walked, so that a failure inside them is
   -- reported where it happens.
-  for t in extras do
-    let r ← observing? do
-      let e ← Term.withoutErrToSorry do
-        let e ← Term.elabTerm t none
-        Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
-        instantiateMVars e
-      let some gs ← tryFact j goal e | failure
-      namePremises none (← goal.getType) gs
-    if let some gs := r then return ← walkAll extras gs
-  for decl in ← getLCtx do
-    unless decl.isImplementationDetail do
-      if let some gs ← tryFact j goal decl.toExpr then
-        return ← walkAll extras (← namePremises none (← goal.getType) gs)
-  if let some law ← law? j g then
-    if let some gs ← tryFact j goal law then
-      return ← walkAll extras (← namePremises none (← goal.getType) gs)
+  let leaf : TermElabM (Option (List MVarId)) := do
+    for t in extras do
+      let r ← observing? do
+        let e ← Term.withoutErrToSorry do
+          let e ← Term.elabTerm t none
+          Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+          instantiateMVars e
+        let some gs ← tryFact j goal e | failure
+        namePremises none (← goal.getType) gs
+      if let some gs := r then return some (← walkAll extras gs)
+    for decl in ← getLCtx do
+      unless decl.isImplementationDetail do
+        if let some gs ← tryFact j goal decl.toExpr then
+          return some (← walkAll extras (← namePremises none (← goal.getType) gs))
+    if let some law ← law? j g then
+      if let some gs ← tryFact j goal law then
+        return some (← walkAll extras (← namePremises none (← goal.getType) gs))
+    return none
+  for step in if j.leavesFirst then [leaf, rules] else [rules, leaf] do
+    if let some gs ← step then return gs
   throwError j.noLeaf g
 
 end
@@ -276,22 +305,26 @@ end
 /-! ## Reading a recursive definition -/
 
 /-- The explicit-or-not argument positions of `gen` that some recursive call in one of its equations
-changes: those are the seed. -/
+changes, or that an equation of a recursive `gen` matches on: those are the seed. -/
 def seedPositions (gen : Name) : MetaM (Array Nat) := do
   let some eqns ← getEqnsFor? gen
     | throwError "walk: `{gen}` has no equation lemmas to unfold"
   let varying ← IO.mkRef (∅ : Std.HashSet Nat)
+  let matched ← IO.mkRef (∅ : Std.HashSet Nat)
+  let recursive ← IO.mkRef false
   for eqn in eqns do
     forallTelescope (← getConstInfo eqn).type fun _ body => do
       let some (_, lhs, rhs) := body.eq? | return
       let params := lhs.getAppArgs
       for h : k in [:params.size] do
-        unless params[k].isFVar do varying.modify (·.insert k)
+        unless params[k].isFVar do matched.modify (·.insert k)
       forEachExpr rhs fun e => do
         if e.isAppOf gen && e.getAppNumArgs == params.size then
+          recursive.set true
           for h : k in [:params.size] do
             if e.getArg! k != params[k] then varying.modify (·.insert k)
-  let v ← varying.get
+  -- A pattern-matched argument is a seed only when there is a recursion for it to vary in.
+  let v ← if ← recursive.get then pure ((← varying.get).union (← matched.get)) else pure ∅
   return (Array.range (← getConstInfo gen).type.getForallArity).filter v.contains
 
 /-- The user-facing name of `gen`'s `k`th binder. -/

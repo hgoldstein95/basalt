@@ -289,7 +289,8 @@ leave. Nothing about the generator is yours to supply:
   (Part 2 above). Any other cost bound is passed explicitly: `cost_fixpoint [h₁, h₂]`.
 - a **combinator that takes a generator** (`listOf`, `optionGen`, …) asks for that generator's cost
   law the same way, and the goal states the combinator's bound in terms of it —
-  `String.arbitrary_cost` (`ArbString.lean`).
+  `String.arbitrary_cost` (`ArbString.lean`). A combinator term in that position, which has no law,
+  is bounded by its worst case: the most choices any of its runs makes.
 
 **The arithmetic** is the only content. Unfold the cost function one constructor and finish with
 `omega`; when the cost function is a named `def`, unfold it `at *` so the hypotheses about
@@ -313,14 +314,17 @@ definition to unfold, is `cost_bound` alone (`BasaltTest/CostBound.lean`).
   satisfy, with every sub-cost's bound in context. Either the cost function is still folded in a
   hypothesis (`simp only [...] at *`), or the bound is too tight.
 - **`cost_bound` says nothing bounds the cost of a sub-generator** → it is a callee whose cost law is
-  under another name, or the generator argument of a combinator that has no law of its own; pass a
-  bound for it: `cost_fixpoint [h]`. A combinator with no `@[gen_rule]` cost rule gets the same
-  message (tag one).
+  under another name, or the generator argument of a combinator that has no law of its own and no
+  worst case (it recurses, or draws from something that does); pass a bound for it:
+  `cost_fixpoint [h]`. A combinator with no `@[gen_rule]` cost rule gets the same message (tag one).
 - **`mass_bound` says nothing bounds the mass of a sub-generator** → it is a combinator with no
   `@[gen_rule]` mass rule (tag one), a callee whose termination law is under another name (pass it:
-  `mass_bound [h]`), or a recursive occurrence whose bound depends on a value drawn earlier from
-  something other than a uniform pivot — only `chooseNat`/`chooseInt` draws have a rule that averages
-  over the drawn value.
+  `mass_bound [h]`), or a recursive occurrence whose fact needs a premise that neither unification
+  nor a hypothesis supplies (`m < n` for a size computed from a draw). Pass that fact instantiated;
+  the drawn values are in scope under the generator's names (`mass_bound [ih _ (… k₁ …)]`).
+- **`mass_bound` leaves `⨅ x, …`** → a continuation's bound depends on a value drawn from something
+  other than a uniform pivot (which is averaged instead), so the bound is its worst case over every
+  value.
 - **`mass_fixpoint` leaves an arithmetic goal that is false** → the structural half is not in doubt;
   the certificate you named is. Re-count the mean offspring.
 - **Finite-domain data (chars, enums)** → skip the machinery: `decide` / `native_decide` on the

@@ -206,8 +206,8 @@ open Basalt.Walk
 /-- `goal`, a cost law or a cost bound, restated as `Always`, its postcondition's binders named
 after the cost function's as in a residual goal. -/
 def toAlways (goal : MVarId) : MetaM MVarId := goal.withContext do
-  let ty ← instantiateMVars (← goal.getType)
-  if ty.isAppOfArity ``SPMF.Cost.Always 3 then return goal
+  let ty := (← instantiateMVars (← goal.getType)).consumeMData
+  if ty.isAppOfArity ``SPMF.Cost.Always 3 then return ← goal.replaceTargetDefEq ty
   let ty ← if ty.isAppOfArity ``IsCostBounded 3 then
       pure (mkAppN (mkConst ``IsBounded ty.getAppFn.constLevels!) ty.getAppArgs)
     else pure ty
@@ -257,14 +257,14 @@ open Basalt.CostBound
 
 /-! ## Rules for the combinators that take a generator
 
-They ask for the generator's cost bound, which only a fact can supply: the list's postcondition says
-nothing about any one element's cost. -/
+They ask for the generator's cost bound, which the list's postcondition says nothing about: a fact
+supplies it, or else the worst-case rules below. -/
 
 section generatorArgument
 
 variable {α : Type} {g : SPMF.Cost α} {c : α → Nat}
 
-private theorem isBounded_vectorOf (hg : IsBounded g c) {k : Nat} :
+private theorem isBounded_vectorOf_sum (hg : IsBounded g c) {k : Nat} :
     IsBounded (vectorOf k g : SPMF.Cost (List α)) fun a => (a.map c).sum := by
   induction k with
   | zero =>
@@ -280,7 +280,7 @@ private theorem isBounded_vectorOf (hg : IsBounded g c) {k : Nat} :
 theorem always_vectorOf {k : Nat} {Q : List α → Nat → Prop}
     (hg : IsBounded g c) (hq : ∀ a n, n ≤ (a.map c).sum → Q a n) :
     Always (vectorOf k g : SPMF.Cost (List α)) Q :=
-  Always.of_isBounded (isBounded_vectorOf hg) hq
+  Always.of_isBounded (isBounded_vectorOf_sum hg) hq
 
 @[gen_rule]
 theorem always_listOfMaxLength {k : Nat} {Q : List α → Nat → Prop} (hg : IsBounded g c)
@@ -335,5 +335,154 @@ theorem always_optionGen {Q : Option α → Nat → Prop} (hg : IsBounded g c)
   always_biasedOptionGen hg hq
 
 end generatorArgument
+
+/-! ## Worst-case costs
+
+A combinator term passed as a generator argument has no law to supply its cost bound. These rules
+compute one that ignores the value — the most choices any run can make — which exists only for a
+combinator whose runs are bounded. -/
+
+section worstCase
+
+variable {α β : Type}
+
+/-- Worst-case costs of a list combinator's branches, one `cons` at a time: `k` bounds them all. -/
+inductive MaxBound : Nat → List (Unit → SPMF.Cost α) → Prop
+  | nil : MaxBound 0 []
+  | cons {k ks : Nat} {g : Unit → SPMF.Cost α} {gs}
+      (h : IsBounded (g ()) fun _ => k) (hs : MaxBound ks gs) : MaxBound (max k ks) (g :: gs)
+
+/-- `MaxBound` for a weighted branch list. -/
+inductive WeightedMaxBound : Nat → List (Nat × (Unit → SPMF.Cost α)) → Prop
+  | nil : WeightedMaxBound 0 []
+  | cons {k ks w : Nat} {g : Unit → SPMF.Cost α} {gs}
+      (h : IsBounded (g ()) fun _ => k) (hs : WeightedMaxBound ks gs) :
+      WeightedMaxBound (max k ks) ((w, g) :: gs)
+
+private theorem isBounded_le {x : SPMF.Cost α} {k k' : Nat} (h : IsBounded x fun _ => k)
+    (hk : k ≤ k') {Q : α → Nat → Prop} (hq : ∀ a n, n ≤ k' → Q a n) : Always x Q :=
+  Always.of_isBounded h fun a n hn => hq a n (Nat.le_trans hn hk)
+
+theorem MaxBound.allBranches {k : Nat} {gs : List (Unit → SPMF.Cost α)} (h : MaxBound k gs)
+    {Q : α → Nat → Prop} (hq : ∀ a n, n ≤ k → Q a n) : AllBranches Q gs := by
+  induction h with
+  | nil => exact .nil
+  | cons hg _ ih =>
+    exact .cons (isBounded_le hg (Nat.le_max_left _ _) hq)
+      (ih fun a n hn => hq a n (Nat.le_trans hn (Nat.le_max_right _ _)))
+
+theorem WeightedMaxBound.allWeighted {k : Nat} {gs : List (Nat × (Unit → SPMF.Cost α))}
+    (h : WeightedMaxBound k gs) {Q : α → Nat → Prop} (hq : ∀ a n, n ≤ k → Q a n) :
+    AllWeighted Q gs := by
+  induction h with
+  | nil => exact .nil
+  | cons hg _ ih =>
+    exact .cons (isBounded_le hg (Nat.le_max_left _ _) hq)
+      (ih fun a n hn => hq a n (Nat.le_trans hn (Nat.le_max_right _ _)))
+
+@[gen_rule]
+theorem isBounded_pure {a : α} : IsBounded (Pure.pure a : SPMF.Cost α) fun _ => 0 := by
+  cost_bound; omega
+
+@[gen_rule]
+theorem isBounded_bind {x : SPMF.Cost α} {f : α → SPMF.Cost β} {k₁ k₂ : Nat}
+    (hx : IsBounded x fun _ => k₁) (hf : ∀ a, IsBounded (f a) fun _ => k₂) :
+    IsBounded (x >>= f) fun _ => k₁ + k₂ := by
+  cost_bound; omega
+
+@[gen_rule]
+theorem isBounded_map {x : SPMF.Cost α} {f : α → β} {k : Nat} (hx : IsBounded x fun _ => k) :
+    IsBounded (f <$> x) fun _ => k := by
+  cost_bound; omega
+
+@[gen_rule]
+theorem isBounded_pick {x y : Unit → SPMF.Cost α} {k₁ k₂ : Nat}
+    (hx : IsBounded (x ()) fun _ => k₁) (hy : IsBounded (y ()) fun _ => k₂) :
+    IsBounded (pick x y) fun _ => 1 + max k₁ k₂ := by
+  cost_bound <;> omega
+
+@[gen_rule]
+theorem isBounded_ite {p : Prop} [Decidable p] {x y : SPMF.Cost α} {k₁ k₂ : Nat}
+    (hx : p → IsBounded x fun _ => k₁) (hy : ¬p → IsBounded y fun _ => k₂) :
+    IsBounded (if p then x else y) fun _ => max k₁ k₂ := by
+  cost_bound <;> omega
+
+@[gen_rule]
+theorem isBounded_dite {p : Prop} [Decidable p] {x : p → SPMF.Cost α} {y : ¬p → SPMF.Cost α}
+    {k₁ k₂ : Nat} (hx : ∀ h, IsBounded (x h) fun _ => k₁) (hy : ∀ h, IsBounded (y h) fun _ => k₂) :
+    IsBounded (if h : p then x h else y h) fun _ => max k₁ k₂ := by
+  cost_bound <;> omega
+
+@[gen_rule]
+theorem isBounded_choose {lo hi : Nat} {h : lo ≤ hi} :
+    IsBounded (choose lo hi h : SPMF.Cost (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) fun _ => 1 := by
+  cost_bound; omega
+
+@[gen_rule]
+theorem isBounded_chooseNat {lo hi : Nat} {h : lo ≤ hi} :
+    IsBounded (chooseNat lo hi h : SPMF.Cost Nat) fun _ => 1 := by
+  cost_bound; omega
+
+@[gen_rule]
+theorem isBounded_chooseInt {lo hi : Int} {h : lo ≤ hi} :
+    IsBounded (chooseInt lo hi h : SPMF.Cost Int) fun _ => 1 := by
+  cost_bound; omega
+
+@[gen_rule]
+theorem isBounded_elements {xs : List α} {hne : xs ≠ []} :
+    IsBounded (elements xs hne : SPMF.Cost α) fun _ => 1 := by
+  cost_bound; omega
+
+@[gen_rule]
+theorem isBounded_coin {r : Rat} : IsBounded (coin r : SPMF.Cost Bool) fun _ => 1 := by
+  cost_bound; omega
+
+@[gen_rule]
+theorem isBounded_oneOf {gs : List (Unit → SPMF.Cost α)} {hne : gs ≠ []} {k : Nat}
+    (h : MaxBound k gs) : IsBounded (oneOf gs hne : SPMF.Cost α) fun _ => 1 + k :=
+  isBounded_iff_always.mpr (always_oneOf (h.allBranches fun _ _ _ => by omega))
+
+@[gen_rule]
+theorem isBounded_frequency {gs : List (Nat × (Unit → SPMF.Cost α))}
+    {hw : 0 < (gs.map Prod.fst).sum} {k : Nat} (h : WeightedMaxBound k gs) :
+    IsBounded (frequency gs hw : SPMF.Cost α) fun _ => 1 + k :=
+  isBounded_iff_always.mpr (always_frequency (h.allWeighted fun _ _ _ => by omega))
+
+@[gen_rule]
+theorem isBounded_vectorOf {n : Nat} {g : SPMF.Cost α} {k : Nat} (hg : IsBounded g fun _ => k) :
+    IsBounded (vectorOf n g : SPMF.Cost (List α)) fun _ => n * k := by
+  induction n with
+  | zero =>
+    show IsBounded (Pure.pure []) _
+    exact IsBounded_mono isBounded_pure fun _ => Nat.zero_le _
+  | succ n ih =>
+    rw [vectorOf_succ]
+    refine IsBounded_mono (isBounded_bind hg fun _ => isBounded_bind ih fun _ => isBounded_pure)
+      fun _ => ?_
+    rw [Nat.succ_mul]
+    omega
+
+@[gen_rule]
+theorem isBounded_listOfMaxLength {n : Nat} {g : SPMF.Cost α} {k : Nat}
+    (hg : IsBounded g fun _ => k) :
+    IsBounded (listOfMaxLength n g : SPMF.Cost (List α)) fun _ => 1 + n * k := by
+  unfold listOfMaxLength
+  refine isBounded_iff_always.mpr (always_bind (always_map (always_choose ?_)))
+  rintro ⟨j, -, hj⟩
+  exact isBounded_le (isBounded_vectorOf hg) (Nat.mul_le_mul_right k hj) fun _ _ _ => by omega
+
+@[gen_rule]
+theorem isBounded_biasedOptionGen {r : Rat} {g : SPMF.Cost α} {k : Nat}
+    (hg : IsBounded g fun _ => k) :
+    IsBounded (biasedOptionGen r g : SPMF.Cost (Option α)) fun _ => 1 + k := by
+  cost_bound
+  cases x <;> simp only [Option.elim] at * <;> omega
+
+@[gen_rule]
+theorem isBounded_optionGen {g : SPMF.Cost α} {k : Nat} (hg : IsBounded g fun _ => k) :
+    IsBounded (optionGen g : SPMF.Cost (Option α)) fun _ => 1 + k :=
+  isBounded_biasedOptionGen hg
+
+end worstCase
 
 end SPMF.Cost

@@ -35,6 +35,8 @@ structure Judgment where
   lawSuffix : Name
   /-- The error for a leaf nothing closes. -/
   noLeaf : Expr → MessageData
+  /-- Whether a fact about a generator is tried before its combinator's rules. -/
+  leavesFirst : Bool := false
 
 /-- `c ≤ SPMF.mass g`: a lower bound on the mass, computed by the rules. -/
 def massJudgment : Judgment where
@@ -63,7 +65,8 @@ def alwaysJudgment : Judgment where
     of{indentExpr g}\nTag a rule for it `@[gen_rule]`, or pass a cost bound to `cost_bound [_]`."
 
 /-- `IsBounded g c` with `c` to be found: a combinator's generator argument, whose cost bound the
-combinator's rule is stated in terms of. Only a fact can supply it. -/
+combinator's rule is stated in terms of. A fact supplies it; failing one, a combinator term's rules
+compute its worst case, a `c` that ignores the value. -/
 def isBoundedJudgment : Judgment where
   key := `IsBounded
   subject? ty := do
@@ -73,6 +76,7 @@ def isBoundedJudgment : Judgment where
   lawSuffix := `cost_bounded
   noLeaf g := m!"cost_bound: no hypothesis or `.cost_bounded` law bounds the cost of the \
     combinator argument{indentExpr g}\nPass a cost bound for it to `cost_bound [_]`."
+  leavesFirst := true
 
 /-- Every judgment the walker knows, tried in order. -/
 def judgments : Array Judgment := #[massJudgment, alwaysJudgment, isBoundedJudgment]

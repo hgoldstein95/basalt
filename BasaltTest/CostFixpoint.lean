@@ -135,4 +135,15 @@ error: cost_fixpoint: `listOf` is a combinator, not a generator definition; prov
 example : IsCostBounded (listOf Nat.arbitrary) (fun xs => xs.length + (xs.map (· + 1)).sum + 1) := by
   cost_fixpoint
 
+/-- The goals of a tactic `match` are recognized. -/
+def byCases [Gen G] (n : Nat) : G Nat :=
+  match n with
+  | 0 => pure 0
+  | _ + 1 => chooseNat 0 1
+
+example (n : Nat) : IsCostBounded (byCases n) (fun _ => 1) := by
+  match n with
+  | 0 => cost_fixpoint; omega
+  | _ + 1 => cost_fixpoint; omega
+
 end CostFixpointTest
