@@ -216,8 +216,8 @@ names in context. Without `using`, the goal left is `LfpIsOne <computed bound>` 
 finished with `SPMF.LfpIsOne.mono` and a certificate (`BasaltTest/Termination.lean`).
 
 **`mass_bound` is the whole structural argument.** It walks the unfolded generator and *computes* a
-lower bound on its mass — `@[mass_bound]` rules per combinator, so the bound comes out in the
-shape of the do-block (`Basalt/SPMF/MassBound.lean` owns the rules and the walk;
+lower bound on its mass — `@[gen_rule]` rules per combinator, so the bound comes out in the
+shape of the do-block (`Basalt/SPMF/MassBound.lean` owns the rules, `Basalt/SPMF/Walk.lean` the walk;
 `BasaltTest/MassBound.lean` shows a generator that uses every one of them). Nothing about the
 generator is yours to supply:
 
@@ -320,7 +320,7 @@ inversion path above is uniform and the combinator side conditions just reintrod
 - **`omega` fails in a cost proof** → read the goal: it is the exact inequality your bound must
   satisfy. Either a `have` for some callee's bound is missing, or the bound is too tight.
 - **`mass_bound` says nothing bounds the mass of a sub-generator** → it is a combinator with no
-  `@[mass_bound]` rule (tag one), a callee whose termination law is under another name (pass it:
+  `@[gen_rule]` mass rule (tag one), a callee whose termination law is under another name (pass it:
   `mass_bound [h]`), or a recursive occurrence whose bound depends on a value drawn earlier from
   something other than a uniform pivot — only `chooseNat`/`chooseInt` draws have a rule that averages
   over the drawn value.
