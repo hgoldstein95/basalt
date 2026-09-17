@@ -62,7 +62,13 @@ elab_rules : tactic
       throwError "mass_fixpoint: `{gen}` is a combinator, not a generator definition; prove \
         `SPMF.IsPMF` of a combinator term with `SPMF.IsPMF.of_one_le` and `mass_bound`"
     let args := x.getAppArgs
-    let seed ← seedPositions gen
+    let seed ← match ← fixpointSeed? gen with
+      | some (_, seed) => pure seed
+      | none => do
+        if ← isRecursiveDefinition gen then
+          throwError "mass_fixpoint: `{gen}` is recursive but not a `partial_fixpoint`; induct on \
+            its decreasing argument, unfold it, and apply `SPMF.IsPMF.of_one_le` and `mass_bound`"
+        pure #[]
     unless seed.all (· < args.size) do
       throwError "mass_fixpoint: `{gen}` is not fully applied in{indentExpr x}"
     -- The family over the seed.

@@ -6,7 +6,7 @@ Authors: Harrison Goldstein
 import Basalt.SPMF.Walk.Attr
 import Lean.Elab.Tactic.Basic
 import Lean.Elab.SyntheticMVars
-import Lean.Meta.Eqns
+import Lean.Meta.RecExt
 import Lean.Meta.Transform
 import Lean.Meta.Tactic.Replace
 import Lean.Meta.Tactic.Assumption
@@ -305,28 +305,19 @@ end
 
 /-! ## Reading a recursive definition -/
 
-/-- The explicit-or-not argument positions of `gen` that some recursive call in one of its equations
-changes, or that an equation of a recursive `gen` matches on: those are the seed. -/
-def seedPositions (gen : Name) : MetaM (Array Nat) := do
-  let some eqns ← getEqnsFor? gen
-    | throwError "walk: `{gen}` has no equation lemmas to unfold"
-  let varying ← IO.mkRef (∅ : Std.HashSet Nat)
-  let matched ← IO.mkRef (∅ : Std.HashSet Nat)
-  let recursive ← IO.mkRef false
-  for eqn in eqns do
-    forallTelescope (← getConstInfo eqn).type fun _ body => do
-      let some (_, lhs, rhs) := body.eq? | return
-      let params := lhs.getAppArgs
-      for h : k in [:params.size] do
-        unless params[k].isFVar do matched.modify (·.insert k)
-      forEachExpr rhs fun e => do
-        if e.isAppOf gen && e.getAppNumArgs == params.size then
-          recursive.set true
-          for h : k in [:params.size] do
-            if e.getArg! k != params[k] then varying.modify (·.insert k)
-  -- A pattern-matched argument is a seed only when there is a recursion for it to vary in.
-  let v ← if ← recursive.get then pure ((← varying.get).union (← matched.get)) else pure ∅
-  return (Array.range (← getConstInfo gen).type.getForallArity).filter v.contains
+/-- `gen.fixpoint_induct`, and the positions of `gen`'s arguments it abstracts: those some recursive
+call changes, as `partial_fixpoint` decided. `none` when `gen` is not a `partial_fixpoint`. -/
+def fixpointSeed? (gen : Name) : MetaM (Option (Name × Array Nat)) := do
+  let some ind ← observing? (realizeGlobalConstNoOverload (mkIdent (gen ++ `fixpoint_induct)))
+    | return none
+  let (_, _, concl) ← forallMetaTelescope (← inferType (← mkConstWithFreshMVarLevels ind))
+  let F := concl.appArg!
+  return some (ind, ← forallTelescope (← whnf (← inferType F)) fun ys _ => do
+    let body := (mkAppN F ys).headBeta
+    ys.mapM fun y => do
+      let some k := body.getAppArgs.findIdx? (· == y)
+        | throwError "`{gen}`'s fixpoint abstracts something other than an argument"
+      return k)
 
 /-- The user-facing name of `gen`'s `k`th binder. -/
 def binderName (gen : Name) (k : Nat) : MetaM Name :=

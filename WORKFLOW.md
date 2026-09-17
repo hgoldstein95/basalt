@@ -208,7 +208,7 @@ with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a quadratic, `a = 2/3`
 — reweight it if you can. The side conditions of a certificate are closed numerals: `by norm_num`,
 or `by ennreal_to_real; norm_num`.
 
-**`mass_fixpoint`** reads the seed off `<GEN>`'s equation (the arguments some recursive call
+**`mass_fixpoint`** reads the seed off `<GEN>.fixpoint_induct` (the arguments some recursive call
 changes; a tuple of them, or none), unfolds one step, and runs `mass_bound`. It leaves `c`,
 `hc1 : c ≤ 1`, `hrec` (the bound on every recursive occurrence), and the seed under its own binder
 names in context. Without `using`, the goal left is `LfpIsOne <computed bound>` instead, to be
@@ -238,7 +238,9 @@ sight. Try `simp` (`ArbNat.lean`, `SortedList.lean`), then `simp` with the ident
 certificate is wrong, not your proof. A generator that is not a `Gen` term, or whose seed has an
 argument typed by another, goes through `SPMF.IsPMF_of_lfp_eq_one_uniform` on an explicit family
 (`SPMF.IsPMF_retry`, `Basalt/SPMF/Failure.lean`). A bare combinator term, which has no definition
-to unfold, is `SPMF.IsPMF.of_one_le` and `mass_bound` (`BasaltTest/Combinators.lean`).
+to unfold, is `SPMF.IsPMF.of_one_le` and `mass_bound` (`BasaltTest/Combinators.lean`). A generator
+recursive by `termination_by` has no fixpoint: induct on its decreasing argument and close each case
+with the same two (`BasaltTest/Termination.lean`).
 
 **Shrinking seed** (`Tree.genWeightedBST`, `BST/Weighted.lean`) is the one regime with real
 content, and the one where the bound is not a single `F c`: `mass_fixpoint per_seed` takes the
@@ -297,7 +299,9 @@ leave. Nothing about the generator is yours to supply:
 sub-costs unfold too (`AllTwoTree.lean`). If `omega` fails, the bound is too tight: the failing goal
 is exactly the linear inequality that doesn't hold, with each sub-cost's bound as a hypothesis.
 Adjust the bound in Step 2; nothing else in the proof changes. A bare combinator term, which has no
-definition to unfold, is `cost_bound` alone (`BasaltTest/CostBound.lean`).
+definition to unfold, is `cost_bound` alone (`BasaltTest/CostBound.lean`). A generator recursive by
+`termination_by` is induction on its decreasing argument and `cost_bound` in each case
+(`BasaltTest/CostFixpoint.lean`).
 
 ## When Stuck
 

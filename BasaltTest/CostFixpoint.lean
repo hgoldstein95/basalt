@@ -146,4 +146,31 @@ example (n : Nat) : IsCostBounded (byCases n) (fun _ => 1) := by
   | 0 => cost_fixpoint; omega
   | _ + 1 => cost_fixpoint; omega
 
+
+def fuelled [Gen G] (fuel : Nat) : G (BST.Tree Nat) :=
+  if _h : fuel = 0 then pure .leaf
+  else
+    pick (fun () => pure .leaf) (fun () => do
+      let l ← fuelled (fuel - 1)
+      let r ← fuelled (fuel - 1)
+      return .node l 0 r)
+termination_by fuel
+
+/--
+error: cost_fixpoint: `CostFixpointTest.fuelled` is recursive but not a `partial_fixpoint`; induct on its decreasing argument, unfold it, and apply `cost_bound`
+-/
+#guard_msgs in
+example (fuel : Nat) : IsCostBounded (fuelled fuel) (fun t => 3 * t.size + 1) := by
+  cost_fixpoint
+
+-- The route the error names. The base case discards the branch it cannot take first: the walk
+-- bounds both branches, and nothing bounds `fuelled (0 - 1)`.
+example (fuel : Nat) : IsCostBounded (fuelled fuel) (fun t => 3 * t.size + 1) := by
+  induction fuel with
+  | zero => rw [fuelled, dif_pos rfl]; cost_bound; simp
+  | succ n ih =>
+    rw [fuelled]
+    cost_bound
+    all_goals simp only [BST.Tree.size]; omega
+
 end CostFixpointTest
