@@ -13,7 +13,7 @@ open RandomChoice ArbNat ENNReal
 # The `mass_bound` Contract
 
 Pins what `mass_bound` leaves behind: a bound whose shape mirrors the generator's, built from one
-`@[mass_bound]` rule per combinator, and the message for a combinator that has no rule.
+`@[gen_rule]` rule per combinator, and the message for a combinator that has no rule.
 -/
 
 namespace MassBoundTest
@@ -50,7 +50,7 @@ example (b : Bool) : (0 : ℝ≥0∞) ≤ (gen b : SPMF Nat).mass := by
 /--
 error: mass_bound: no rule, hypothesis, or `.terminates` law bounds the mass of
   g
-Tag a lower bound for it `@[mass_bound]`, or pass one to `mass_bound [_]`.
+Tag a lower bound for it `@[gen_rule]`, or pass one to `mass_bound [_]`.
 -/
 #guard_msgs in
 example (g : SPMF Nat) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
