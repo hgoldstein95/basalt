@@ -14,8 +14,7 @@ import Lean.Meta.Tactic.Assumption
 /-!
 # The Generator Walker
 
-Proves a judgment about a generator by structural recursion on its syntax: a `@[gen_rule]` per
-combinator, facts at the leaves. What no rule or fact covers is handed back as a residual goal.
+Proves a judgment about a generator by structural recursion on its syntax.
 -/
 
 open Lean Meta Elab Tactic
@@ -139,13 +138,7 @@ def law? (j : Judgment) (g : Expr) : MetaM (Option Expr) := do
   unless (← getEnv).contains (head ++ j.lawSuffix) do return none
   return some (← mkConstWithFreshMVarLevels (head ++ j.lawSuffix))
 
-/-! ## Naming what a rule introduces
-
-A rule's premises bind the values and costs the generator draws, under the rule's own binder names;
-the generator's names for them survive only as binder names of its lambdas, and are lost once the
-premise's metavariables are instantiated. They are recovered before the premise is walked: a
-drawn value takes the name of the continuation it is passed to (`hint`), or else that of the goal's
-postcondition (`post`); a cost is `n_<value>` and a hypothesis about the value `h_<value>`. -/
+/-! ## Machinery for Keeping Names Consistent -/
 
 /-- The names of the lambda arguments of `g`'s head that bind something other than `Unit`: a
 continuation's `delta`, a `dite` branch's `h`. -/
@@ -223,9 +216,9 @@ private def namePremises (g? : Option Expr) (goalTy : Expr) (premises : List MVa
 
 mutual
 
-/-- Prove `goal` by walking the generator it is about, returning the residual goals: those no
-judgment recognizes. `extras` are the facts the caller passed; they stay syntax because one may be
-used at several sub-generators, and elaborating once would freeze its metavariables at the first. -/
+/-- Prove `goal` by walking the generator and returning residual goals.  `extras` are the facts the
+caller passed; are kept as syntax because one may be used at several sub-generators, and elaborating
+once would freeze its metavariables at the first. -/
 partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
   goal.withContext do
   let ty ← whnfR (← instantiateMVars (← goal.getType))
