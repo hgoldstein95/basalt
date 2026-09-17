@@ -51,7 +51,7 @@ For a list generator that flips a coin per element, the bound is `fun xs => xs.l
 (`fun n => n + 1`).
 
 Keep the bound *tight*: a precise bound is what catches accidental backtracking or other
-inefficiency, and (see the cost recipe) a too-tight bound now fails as a legible `omega` goal that
+inefficiency, and (see the cost recipe) a too-tight bound fails as a legible `omega` goal that
 shows you exactly which term is missing.
 
 ### Step 3: Create and Validate Your Generator
@@ -99,13 +99,13 @@ interpretation.
 | Termination | `IsAlmostSurelyTerminating g`, i.e. `SPMF.IsPMF g` (`mass g = 1`) | The generator terminates with probability 1. |
 | Cost | `IsCostBounded g c`, i.e. `IsBounded g c` | Producing `v` takes at most `c v` random choices. |
 
-Each has a fixed recipe. All three start the same way — unfold one step of the recursion, invert
-what one step can produce, then do logic/arithmetic — and they differ only in which interpretation
-they invert at.
+Each has a fixed recipe, and all three reason about one step of the recursion. Support inverts what
+one step can produce and finishes with logic; termination and cost hand the whole structural
+argument to a tactic that walks the step (`mass_fixpoint`, `cost_fixpoint`) and leave arithmetic.
 
 **A generator that post-processes another** (`let x ← g; return f x`) has no recursion to unfold,
 and all three obligations reduce to composition instead: `support_simp` plus a fact about `f`,
-`mass_fixpoint using SPMF.LfpIsOne.one` (Recipe 2), and `IsBounded_bind`. `List.genSortedBySorting`
+`mass_fixpoint using SPMF.LfpIsOne.one` (Recipe 2), and `cost_fixpoint` (Recipe 3). `List.genSortedBySorting`
 (`SortedList/BySorting.lean`) is the worked instance — it sorts a `List.arbitrary` draw, and each
 law follows from the corresponding law of `List.arbitrary` plus one fact about `f`: that sorting
 sorts, that it fixes a sorted list, that it is a permutation. Cost is the obligation that can fail
@@ -122,13 +122,12 @@ synthesis that emits the same convention reports identically to hand-written gen
 
 ### Unfolding: one idiom per context
 
-`partial_fixpoint` definitions unfold four ways, and picking the wrong one gives confusing errors:
+`partial_fixpoint` definitions unfold three ways, and picking the wrong one gives confusing errors:
 
 | Context | Idiom |
 |---|---|
 | Support proof, goal `x ∈ support gen ↔ P` | `rw [gen]` (the equation lemma) |
 | Mass bound by hand (rewrite only one side of `≤`/`≥`) | `conv_rhs => rw [gen]` (or `conv_lhs`) |
-| Cost proof, before `fix_induct` (must expose `fix`) | `delta gen` |
 | Under binders where `rw` fails | `unfold gen` |
 
 ### Recipe 1: Support
@@ -263,48 +262,41 @@ Two things to know:
 
 ### Recipe 3: Cost
 
-Worked instances: `Nat.arbitrary.cost_bounded` (`ArbNat.lean`) is the minimal case; `Tree.genHeap.cost_bounded`
-(`Heap.lean`) has a callee and two recursive calls; `Tree.genBST.cost_bounded` (`BST.lean`) shows `dite`
-and `chooseNat`, and `Tree.genWeightedBST.cost_bounded` (`BST/Weighted.lean`) adds `frequency`.
+Worked instances: `Nat.arbitrary.cost_bounded` (`ArbNat.lean`) is the minimal case;
+`Tree.genHeap.cost_bounded` (`Heap.lean`) has a callee and two recursive calls;
+`Tree.genBST.cost_bounded` (`BST.lean`) has a `dite`, a `frequency`, and a pivot; and
+`List.genSortedBySorting.cost_bounded` (`SortedList/BySorting.lean`) has no recursion at all.
 
 ```lean
-theorem <GEN>.cost_bounded : IsCostBounded <GEN> <COST> := by
-  open Lean.Order in
-  delta <GEN>                        -- 1. expose the `fix`
-  apply fix_induct (motive := fun (g : SPMF.Cost <α>) => IsBounded g <COST>) _ ?admissible ?step
-  -- (indexed generators: motive `fun g => ∀ i, IsBounded (g i) <COST>` and
-  --  `admissible_pi_apply _ fun _ => admissible_IsBounded _`)
-  case admissible => apply admissible_IsBounded
-  case step =>
-    intro <GEN>_rec ih
-    rw [IsBounded_iff]
-    rintro ⟨v, n⟩ hmem
-    -- 2. Invert "(value, cost) came from one step" into arithmetic facts.
-    cost_support_simp at hmem
-    -- 3. Destructure. Name the cost equations (hn, hm, …) and let `omega` consume them —
-    --    deeply nested `rfl` patterns fail in ways that are hard to diagnose.
-    obtain ⟨m, rfl, h | h⟩ := hmem            -- a `pick`: 1 + m, branch left/right
-    · obtain ⟨rfl, rfl⟩ := h                  -- base branch
-      simp [<COST>]
-    · obtain ⟨x, n1, n2, hx, ⟨...⟩, hm⟩ := h  -- recursive branch
-      -- 4. One line per callee / recursive call: bring its bound into scope.
-      have hhead : n1 ≤ <callee bound> := IsBounded_iff.mp <callee>.cost_bounded (x, n1) hx
-      have htail : n3 ≤ <COST> tl := ih (tl, n3) htl
-      -- 5. State the goal in constructor form and finish with omega.
-      show 1 + m ≤ <COST> (<CTOR> x tl)
-      simp only [<COST>, List.length_cons]    -- unfold the cost function one constructor
-      omega
+theorem <GEN>.cost_bounded : IsCostBounded (<GEN> <ARGS>) <COST> := by
+  cost_fixpoint
+  all_goals simp only [<COST>'s equations]; omega   -- one goal per path through <GEN>
 ```
 
-If `omega` fails here, your bound is too tight — the failing goal displays exactly the linear
-inequality that doesn't hold, with each sub-cost as a named hypothesis. Adjust the bound in Step 2
-and re-run; nothing else in the proof changes.
+**`cost_fixpoint`** (`Basalt/SPMF/CostFixpoint.lean`) inducts over the arguments some recursive call
+of `<GEN>` changes, unfolds one step, and runs `cost_bound`. A generator with no recursion is
+unfolded and walked.
 
-For straight-line (non-recursive) generators skip `fix_induct` entirely and use the compositional
-algebra: `IsBounded_pure`, `IsBounded_choose`, `IsBounded_pick`, `IsBounded_bind`,
-`IsBounded_elements`, `IsBounded_map`, `IsBounded_mono` — see `Char.arbitrary.cost_bounded`
-(`ArbChar.lean`). Don't use the combinator path for recursive generators: under `fix_induct` the
-inversion path above is uniform and the combinator side conditions just reintroduce the same work.
+**`cost_bound` is the whole structural argument.** It pushes the postcondition "producing `v` took
+at most `<COST> v` choices" backward through the step, with one `@[gen_rule]` rule per combinator —
+the tally of Step 2 is what the rules compute. It leaves one goal per path through the generator,
+stated over the values that path drew; the tactic's docstring (`Basalt/SPMF/CostBound.lean`) says
+how they are named, and `BasaltTest/CostFixpoint.lean` shows the goals `genHeap` and `genBST`
+leave. Nothing about the generator is yours to supply:
+
+- a **recursive occurrence** is bounded by `ih`, at whatever arguments it is called with.
+- a **callee** is bounded by its own `<callee>.cost_bounded` law, found by the naming convention
+  (Part 2 above). Any other cost bound is passed explicitly: `cost_fixpoint [h₁, h₂]`.
+- a **combinator that takes a generator** (`listOf`, `optionGen`, …) asks for that generator's cost
+  law the same way, and the goal states the combinator's bound in terms of it —
+  `String.arbitrary_cost` (`ArbString.lean`).
+
+**The arithmetic** is the only content. Unfold the cost function one constructor and finish with
+`omega`; when the cost function is a named `def`, unfold it `at *` so the hypotheses about
+sub-costs unfold too (`AllTwoTree.lean`). If `omega` fails, the bound is too tight: the failing goal
+is exactly the linear inequality that doesn't hold, with each sub-cost's bound as a hypothesis.
+Adjust the bound in Step 2; nothing else in the proof changes. A bare combinator term, which has no
+definition to unfold, is `cost_bound` alone (`BasaltTest/CostBound.lean`).
 
 ## When Stuck
 
@@ -318,7 +310,12 @@ inversion path above is uniform and the combinator side conditions just reintrod
   the index arithmetic (`x - lo` when the recursion ran at `lo + d`), plus
   `rw [show lo + (x - lo) = x by omega]`.
 - **`omega` fails in a cost proof** → read the goal: it is the exact inequality your bound must
-  satisfy. Either a `have` for some callee's bound is missing, or the bound is too tight.
+  satisfy, with every sub-cost's bound in context. Either the cost function is still folded in a
+  hypothesis (`simp only [...] at *`), or the bound is too tight.
+- **`cost_bound` says nothing bounds the cost of a sub-generator** → it is a callee whose cost law is
+  under another name, or the generator argument of a combinator that has no law of its own; pass a
+  bound for it: `cost_fixpoint [h]`. A combinator with no `@[gen_rule]` cost rule gets the same
+  message (tag one).
 - **`mass_bound` says nothing bounds the mass of a sub-generator** → it is a combinator with no
   `@[gen_rule]` mass rule (tag one), a callee whose termination law is under another name (pass it:
   `mass_bound [h]`), or a recursive occurrence whose bound depends on a value drawn earlier from
@@ -326,8 +323,6 @@ inversion path above is uniform and the combinator side conditions just reintrod
   over the drawn value.
 - **`mass_fixpoint` leaves an arithmetic goal that is false** → the structural half is not in doubt;
   the certificate you named is. Re-count the mean offspring.
-- **`fix_induct` fails to apply** → the motive must mention the *bare* fixpoint value; for an
-  indexed generator quantify the indices in the motive (see the BST cost proofs).
 - **Finite-domain data (chars, enums)** → skip the machinery: `decide` / `native_decide` on the
   support fact directly (see `ArbChar.lean`).
 
