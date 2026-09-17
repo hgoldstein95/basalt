@@ -90,40 +90,20 @@ theorem NonEmptyString.arbitrary_terminates : IsAlmostSurelyTerminating NonEmpty
   mass_fixpoint using SPMF.LfpIsOne.one
   simp
 
-/-- The cost bound comes from the generic `IsBounded_listOf` combinator lemma
-    applied to `Char.arbitrary` (whose per-element cost is `1`):
-    - `s.length` calls to `pick`
-    - a cost of `(fun _ => 1) <$> s = s.length` for generating each element of the list,
-    - plus `1` for the final `pick` to generate the end of the list,
-    resulting in a total `2 * s.length + 1`. -/
+/-- `listOf`'s bound with `Char.arbitrary`'s per-element cost of `1`: one `pick` and one character
+per element, plus the `pick` that ends the list. -/
 theorem String.arbitrary_cost :
     IsCostBounded String.arbitrary (fun s => 2 * s.length + 1) := by
-  unfold String.arbitrary IsCostBounded
-  simp [IsBounded_iff]
-  intro s cost cs hcs heq
-  subst heq
-  simp [String.length_ofList]
-  have hcost : cost ≤ cs.length + ((fun _ => 1) <$> cs).sum + 1 := by
-    apply IsBounded_iff.mp (IsBounded_listOf Char.arbitrary.cost_bounded) (cs, cost)
-    assumption
-  simp only [Functor.map, List.map_const', List.sum_replicate, smul_eq_mul, mul_one] at hcost
+  cost_fixpoint
+  simp only [String.length_ofList, List.map_const', List.sum_replicate, smul_eq_mul] at *
   omega
 
-/-- The cost bound is the same as `String.arbitrary`, except its value is always 1 less
-    since `NonEmptyString` doesn't need to call `pick` at the end
-    to terminate the list after all elements have been generated
-    (strings produced by this generator are always guaranteed to be non-empty). -/
+/-- `String.arbitrary`'s bound less the final `pick`: `nonEmptyListOf` draws its last element
+directly. -/
 theorem NonEmptyString.arbitrary_cost :
     IsCostBounded NonEmptyString.arbitrary (fun s => 2 * s.length) := by
-  unfold NonEmptyString.arbitrary IsCostBounded
-  simp [IsBounded_iff]
-  intro s cost cs hcs heq
-  subst heq
-  simp [String.length_ofList]
-  have hcost : cost ≤ cs.length + ((fun _ => 1) <$> cs).sum := by
-    apply IsBounded_iff.mp (IsBounded_nonEmptyListOf Char.arbitrary.cost_bounded) (cs, cost)
-    assumption
-  simp only [Functor.map, List.map_const', List.sum_replicate, smul_eq_mul, mul_one] at hcost
+  cost_fixpoint
+  simp only [String.length_ofList, List.map_const', List.sum_replicate, smul_eq_mul] at *
   omega
 
 end ArbString

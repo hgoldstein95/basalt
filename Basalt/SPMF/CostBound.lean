@@ -188,52 +188,14 @@ theorem always_oneOf {gs : List (Unit → SPMF.Cost α)} {hne : gs ≠ []} {Q : 
 theorem always_frequency {gs : List (Nat × (Unit → SPMF.Cost α))} {hw : 0 < (gs.map Prod.fst).sum}
     {Q : α → Nat → Prop} (h : AllWeighted (fun a n => Q a (1 + n)) gs) :
     Always (frequency gs hw : SPMF.Cost α) Q := by
-  rintro ⟨a, k⟩ ha
-  obtain ⟨w, g, n, hg, -, hn, rfl⟩ := mem_support_frequency ha
-  rw [Nat.add_comm]
-  exact h.always (w, g) hg (a, n) hn
-
-/-! The combinators that take a generator ask for its cost bound, which only a fact can supply: the
-list's postcondition says nothing about any one element's cost. -/
-
-@[gen_rule]
-theorem always_vectorOf {α : Type} {k : Nat} {g : SPMF.Cost α} {c : α → Nat}
-    {Q : List α → Nat → Prop}
-    (hg : IsBounded g c) (hq : ∀ a n, n ≤ (a.map c).sum → Q a n) :
-    Always (vectorOf k g : SPMF.Cost (List α)) Q :=
-  Always.of_isBounded (IsBounded_vectorOf hg) hq
-
-@[gen_rule]
-theorem always_listOfMaxLength {α : Type} {k : Nat} {g : SPMF.Cost α} {c : α → Nat}
-    {Q : List α → Nat → Prop} (hg : IsBounded g c)
-    (hq : ∀ a n, n ≤ 1 + (a.map c).sum → Q a n) :
-    Always (listOfMaxLength k g : SPMF.Cost (List α)) Q :=
-  Always.of_isBounded (IsBounded_listOfMaxLength hg) hq
-
-@[gen_rule]
-theorem always_listOf {α : Type} {g : SPMF.Cost α} {c : α → Nat} {Q : List α → Nat → Prop}
-    (hg : IsBounded g c) (hq : ∀ a n, n ≤ a.length + (a.map c).sum + 1 → Q a n) :
-    Always (listOf g : SPMF.Cost (List α)) Q :=
-  Always.of_isBounded (IsBounded_listOf hg) hq
-
-@[gen_rule]
-theorem always_nonEmptyListOf {α : Type} {g : SPMF.Cost α} {c : α → Nat} {Q : List α → Nat → Prop}
-    (hg : IsBounded g c) (hq : ∀ a n, n ≤ a.length + (a.map c).sum → Q a n) :
-    Always (nonEmptyListOf g : SPMF.Cost (List α)) Q :=
-  Always.of_isBounded (IsBounded_nonEmptyListOf hg) hq
-
-@[gen_rule]
-theorem always_biasedOptionGen {α : Type} {r : Rat} {g : SPMF.Cost α} {c : α → Nat}
-    {Q : Option α → Nat → Prop} (hg : IsBounded g c)
-    (hq : ∀ a n, n ≤ 1 + a.elim 0 c → Q a n) :
-    Always (biasedOptionGen r g : SPMF.Cost (Option α)) Q :=
-  Always.of_isBounded (IsBounded_biasedOptionGen hg) hq
-
-@[gen_rule]
-theorem always_optionGen {α : Type} {g : SPMF.Cost α} {c : α → Nat} {Q : Option α → Nat → Prop}
-    (hg : IsBounded g c) (hq : ∀ a n, n ≤ 1 + a.elim 0 c → Q a n) :
-    Always (optionGen g : SPMF.Cost (Option α)) Q :=
-  Always.of_isBounded (IsBounded_optionGen hg) hq
+  unfold frequency Helpers.frequencyAux
+  refine always_bind (always_map (always_choose fun ⟨i, _, _⟩ => ?_))
+  dsimp only
+  split
+  · obtain ⟨w, g, hg, -, heq⟩ := frequencySelect_mem ‹_›
+    rw [heq]
+    exact h.always (w, g) hg
+  · exact fun _ hp => absurd rfl hp
 
 end SPMF.Cost
 
@@ -288,3 +250,90 @@ elab_rules : tactic
     replaceMainGoal (← run ((args.map (·.getElems)).getD #[]) (← getMainGoal))
 
 end Basalt.CostBound
+
+namespace SPMF.Cost
+
+open Basalt.CostBound
+
+/-! ## Rules for the combinators that take a generator
+
+They ask for the generator's cost bound, which only a fact can supply: the list's postcondition says
+nothing about any one element's cost. -/
+
+section generatorArgument
+
+variable {α : Type} {g : SPMF.Cost α} {c : α → Nat}
+
+private theorem isBounded_vectorOf (hg : IsBounded g c) {k : Nat} :
+    IsBounded (vectorOf k g : SPMF.Cost (List α)) fun a => (a.map c).sum := by
+  induction k with
+  | zero =>
+    show Always (Pure.pure []) fun a n => n ≤ (a.map c).sum
+    exact always_pure (Nat.zero_le _)
+  | succ k ih =>
+    rw [vectorOf_succ]
+    cost_bound
+    simp only [List.map_cons, List.sum_cons]
+    omega
+
+@[gen_rule]
+theorem always_vectorOf {k : Nat} {Q : List α → Nat → Prop}
+    (hg : IsBounded g c) (hq : ∀ a n, n ≤ (a.map c).sum → Q a n) :
+    Always (vectorOf k g : SPMF.Cost (List α)) Q :=
+  Always.of_isBounded (isBounded_vectorOf hg) hq
+
+@[gen_rule]
+theorem always_listOfMaxLength {k : Nat} {Q : List α → Nat → Prop} (hg : IsBounded g c)
+    (hq : ∀ a n, n ≤ 1 + (a.map c).sum → Q a n) :
+    Always (listOfMaxLength k g : SPMF.Cost (List α)) Q := by
+  unfold listOfMaxLength
+  exact always_bind (always_map (always_choose fun ⟨_, _⟩ =>
+    always_vectorOf hg fun a n hn => hq a (1 + n) (by omega)))
+
+private theorem isBounded_listOf (hg : IsBounded g c) :
+    IsBounded (listOf g : SPMF.Cost (List α)) fun a => a.length + (a.map c).sum + 1 := by
+  refine listOf.fixpoint_induct g _
+    (admissible_Always fun a n => n ≤ a.length + (a.map c).sum + 1)
+    (fun listOf ih => ?_)
+  cost_bound
+  all_goals simp only [List.length_cons, List.map_cons, List.sum_cons, List.length_nil,
+    List.map_nil, List.sum_nil]; omega
+
+private theorem isBounded_nonEmptyListOf (hg : IsBounded g c) :
+    IsBounded (nonEmptyListOf g : SPMF.Cost (List α)) fun a => a.length + (a.map c).sum := by
+  refine nonEmptyListOf.fixpoint_induct g _
+    (admissible_Always fun a n => n ≤ a.length + (a.map c).sum)
+    (fun nonEmptyListOf ih => ?_)
+  cost_bound
+  all_goals simp only [List.length_cons, List.map_cons, List.sum_cons, List.length_nil,
+    List.map_nil, List.sum_nil]; omega
+
+@[gen_rule]
+theorem always_listOf {Q : List α → Nat → Prop}
+    (hg : IsBounded g c) (hq : ∀ a n, n ≤ a.length + (a.map c).sum + 1 → Q a n) :
+    Always (listOf g : SPMF.Cost (List α)) Q :=
+  Always.of_isBounded (isBounded_listOf hg) hq
+
+@[gen_rule]
+theorem always_nonEmptyListOf {Q : List α → Nat → Prop}
+    (hg : IsBounded g c) (hq : ∀ a n, n ≤ a.length + (a.map c).sum → Q a n) :
+    Always (nonEmptyListOf g : SPMF.Cost (List α)) Q :=
+  Always.of_isBounded (isBounded_nonEmptyListOf hg) hq
+
+@[gen_rule]
+theorem always_biasedOptionGen {r : Rat} {Q : Option α → Nat → Prop} (hg : IsBounded g c)
+    (hq : ∀ a n, n ≤ 1 + a.elim 0 c → Q a n) :
+    Always (biasedOptionGen r g : SPMF.Cost (Option α)) Q := by
+  unfold biasedOptionGen
+  cost_bound
+  all_goals apply hq; simp only [Option.elim]; omega
+
+@[gen_rule]
+theorem always_optionGen {Q : Option α → Nat → Prop} (hg : IsBounded g c)
+    (hq : ∀ a n, n ≤ 1 + a.elim 0 c → Q a n) :
+    Always (optionGen g : SPMF.Cost (Option α)) Q :=
+  always_biasedOptionGen hg hq
+
+end generatorArgument
+
+end SPMF.Cost

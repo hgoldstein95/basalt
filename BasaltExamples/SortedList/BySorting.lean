@@ -74,14 +74,9 @@ theorem List.genSortedBySorting.terminates :
 and being a permutation it changes neither the length nor the sum the bound is stated in. -/
 theorem List.genSortedBySorting.cost_bounded :
     IsCostBounded List.genSortedBySorting (fun ys => 2 * ys.length + ys.sum + 1) := by
-  unfold List.genSortedBySorting
-  refine IsBounded_bind (cx := fun (xs : List Nat) => 2 * xs.length + xs.sum + 1)
-    (cf := fun (_ : List Nat) (_ : List Nat) => 0)
-    ArbList.List.arbitrary.cost_bounded (fun _ => IsBounded_pure) ?_
-  rintro ⟨xs, n⟩ - ⟨ys, m⟩ hq
-  simp only [SPMF.Cost.mem_support_pure_iff] at hq
-  obtain ⟨rfl, -⟩ := hq
+  cost_fixpoint
   have hperm := List.mergeSort_perm xs (fun a b => a ≤ b)
-  simp [hperm.length_eq, hperm.sum_eq]
+  simp only [hperm.length_eq, hperm.sum_eq]
+  omega
 
 end SortedList

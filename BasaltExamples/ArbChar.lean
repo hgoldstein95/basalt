@@ -37,7 +37,7 @@ theorem Char.arbitrary.terminates : IsAlmostSurelyTerminating Char.arbitrary := 
 
 theorem Char.arbitrary.cost_bounded :
     IsCostBounded Char.arbitrary (fun _ => 1) := by
-  unfold Char.arbitrary
-  exact IsBounded_elements _
+  cost_fixpoint
+  omega
 
 end ArbChar
