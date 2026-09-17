@@ -15,22 +15,11 @@ generator with the `@[gen_rule]` rules for `SPMF.Cost.Always`, leaving one arith
 
 open RandomChoice Lean Meta Elab Tactic
 
-namespace SPMF
-
-/-- Every outcome of `g` satisfies `P`. -/
-def All (g : SPMF α) (P : α → Prop) : Prop :=
-  ∀ a ∈ SPMF.support g, P a
-
-end SPMF
-
-theorem IsCostBounded.isBounded {g : SPMF.Cost α} {c : α → Nat} (h : IsCostBounded g c) :
-    IsBounded g c := h
-
 namespace SPMF.Cost
 
 /-- Every value `g` produces satisfies `Q` together with the number of choices it took. -/
 def Always (g : SPMF.Cost α) (Q : α → Nat → Prop) : Prop :=
-  SPMF.All g fun p => Q p.1 p.2
+  ∀ p ∈ SPMF.support g, Q p.1 p.2
 
 theorem isBounded_iff_always {g : SPMF.Cost α} {c : α → Nat} :
     IsBounded g c ↔ Always g (fun a n => n ≤ c a) := Iff.rfl
