@@ -126,4 +126,51 @@ example (n : Nat) (h : 0 < n) : IsAlmostSurelyTerminating (byCases n h) := by
   | 1, h => mass_fixpoint using SPMF.LfpIsOne.one; simp
   | _ + 2, h => mass_fixpoint using SPMF.LfpIsOne.one; simp
 
+
+/-- `n` is matched on but passed through unchanged, so it is no seed. -/
+def passThrough [Gen G] (n k : Nat) : G Nat :=
+  match n with
+  | 0 => pure k
+  | _ + 1 => pick (fun () => pure 0) (fun () => passThrough n (k + 1))
+partial_fixpoint
+
+-- A goal that has already split on an argument outside the seed keeps the split, and the `match`
+-- reduces.
+/--
+trace: m : ℕ
+c : ℝ≥0∞
+hc1 : c ≤ 1
+k : ℕ
+hrec : ∀ (j : ℕ), c ≤ (passThrough (m + 1) j).mass
+⊢ 1 - 1 / 2 + 1 / 2 * c ≤ 1 / 2 * 1 + 1 / 2 * c
+-/
+#guard_msgs in
+example (m k : Nat) : IsAlmostSurelyTerminating (passThrough (m + 1) k) := by
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  trace_state
+  simp [ENNReal.one_sub_inv_two]
+
+def fuelled [Gen G] (fuel : Nat) : G Nat :=
+  if _h : fuel = 0 then pure 0
+  else pick (fun () => pure 0) (fun () => fuelled (fuel - 1))
+termination_by fuel
+
+/--
+error: mass_fixpoint: `TerminationTest.fuelled` is recursive but not a `partial_fixpoint`; induct on its decreasing argument, unfold it, and apply `SPMF.IsPMF.of_one_le` and `mass_bound`
+-/
+#guard_msgs in
+example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
+  mass_fixpoint
+
+-- The route the error names. The base case discards the branch it cannot take first: the walk
+-- bounds both branches, and nothing bounds `fuelled (0 - 1)`.
+example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
+  induction fuel with
+  | zero => apply SPMF.IsPMF.of_one_le; rw [fuelled, dif_pos rfl]; mass_bound; rfl
+  | succ n ih =>
+    apply SPMF.IsPMF.of_one_le
+    rw [fuelled]
+    mass_bound
+    simp [ENNReal.inv_two_add_inv_two]
+
 end TerminationTest

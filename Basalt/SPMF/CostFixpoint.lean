@@ -52,8 +52,11 @@ elab_rules : tactic
     if isCombinator (← getEnv) gen then
       throwError "cost_fixpoint: `{gen}` is a combinator, not a generator definition; prove a \
         bound on a combinator term with `cost_bound`"
-    let some indName ← observing? (realizeGlobalConstNoOverload (mkIdent (gen ++ `fixpoint_induct)))
-      | let [goal] ← Lean.Elab.Tactic.run goal (evalTactic (← `(tactic| unfold $(mkIdent gen))))
+    let some (indName, seed) ← fixpointSeed? gen
+      | if ← isRecursiveDefinition gen then
+          throwError "cost_fixpoint: `{gen}` is recursive but not a `partial_fixpoint`; induct on its \
+            decreasing argument, unfold it, and apply `cost_bound`"
+        let [goal] ← Lean.Elab.Tactic.run goal (evalTactic (← `(tactic| unfold $(mkIdent gen))))
           | throwError "cost_fixpoint: could not unfold `{gen}`"
         replaceMainGoal (← run extras goal)
         return
@@ -63,19 +66,12 @@ elab_rules : tactic
     let adm := xs[xs.size - 2]!
     let F := concl.appArg!
     let fTy ← whnf (← inferType F)
-    -- The seed: the positions of `gen`'s arguments that `F` abstracts. Matching `F`'s body against
-    -- the goal fixes the others.
+    -- Matching `F`'s body against the goal fixes the arguments outside the seed.
     let args := x.getAppArgs
-    let seed ← forallTelescope fTy fun ys _ => do
-      let body := (mkAppN F ys).headBeta
-      let seed ← ys.mapM fun y => do
-        let some k := body.getAppArgs.findIdx? (· == y)
-          | throwError "cost_fixpoint: `{gen}`'s fixpoint abstracts something other than an argument"
-        pure k
+    forallTelescope fTy fun ys _ => do
       let target := (seed.zip ys).foldl (fun as (k, y) => as.set! k y) args
-      unless ← isDefEq body (mkAppN x.getAppFn target) do
+      unless ← isDefEq (mkAppN F ys).headBeta (mkAppN x.getAppFn target) do
         throwError "cost_fixpoint: could not match{indentExpr x}\nagainst `{gen}`'s fixpoint"
-      pure seed
     let seedArgs := seed.map (args[·]!)
     let seedFVars := seedArgs.filter (·.isFVar)
     let postAt (ys : Array Expr) : MetaM Expr := do
