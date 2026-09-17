@@ -5,6 +5,7 @@ Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Walk.Attr
 import Lean.Elab.Tactic.Basic
+import Lean.Elab.SyntheticMVars
 import Lean.Meta.Eqns
 import Lean.Meta.Transform
 import Lean.Meta.Tactic.Replace
@@ -111,6 +112,78 @@ def law? (j : Judgment) (g : Expr) : MetaM (Option Expr) := do
   unless (← getEnv).contains (head ++ j.lawSuffix) do return none
   return some (← mkConstWithFreshMVarLevels (head ++ j.lawSuffix))
 
+/-! ## Naming what a rule introduces
+
+A rule's premises bind the values and costs the generator draws, under the rule's own binder names;
+the generator's names for them survive only as binder names of its lambdas, and are lost once the
+premise's metavariables are instantiated. They are recovered before the premise is walked: a
+drawn value takes the name of the continuation it is passed to (`hint`), or else that of the goal's
+postcondition (`post`); a cost is `n_<value>` and a hypothesis about the value `h_<value>`. -/
+
+/-- The names of the lambda arguments of `g`'s head that bind something other than `Unit`: a
+continuation's `delta`, a `dite` branch's `h`. -/
+private def lambdaHints (g : Expr) : Array Name :=
+  g.getAppArgs.filterMap fun
+    | .lam n d _ _ => if d.isConstOf ``Unit || d.isConstOf ``PUnit || d.isAppOf ``PUnit then none
+        else some n.eraseMacroScopes
+    | _ => none
+
+/-- The first two binder names of the goal's postcondition: its first argument that is a lambda of
+two binders. -/
+private def postNames (ty : Expr) : Option (Name × Name) :=
+  ty.getAppArgs.findSome? fun
+    | .lam v _ (.lam n _ _ _) _ => some (v.eraseMacroScopes, n.eraseMacroScopes)
+    | _ => none
+
+private def prefixed (p : String) (v : Name) : Name := .mkSimple (p ++ v.toString)
+
+/-- `t`, a rule premise, with its binders named as the section docstring says. -/
+private def nameBinders (t : Expr) (hint : Option Name) (post : Option (Name × Name)) :
+    MetaM Expr := do
+  let value? := hint <|> post.map (·.1)
+  let cost? := if hint.isSome then value?.map (prefixed "n_") else post.map (·.2)
+  let rec go (t : Expr) (fvars : Array Expr) (v : Option Name) (k : Nat) (hintUsed : Bool) :
+      MetaM Expr := do
+    match t with
+    | .forallE n d b bi =>
+      let d := d.instantiateRev fvars
+      let (n', v', k', used) ← do
+        if ← isProp d then
+          match v, hint, hintUsed with
+          | some v, _, _ => pure (prefixed "h_" v, some v, k, hintUsed)
+          | none, some h, false => pure (h, none, k, true)
+          | _, _, _ => pure (if n.hasMacroScopes then `h else n, v, k, hintUsed)
+        else if k == 0 then
+          let v := value?.getD n
+          pure (v, some v, 1, true)
+        else if k == 1 then pure ((cost?.getD n), v, 2, hintUsed)
+        else pure (n, v, k + 1, hintUsed)
+      withLocalDecl n' bi d fun x => do
+        mkForallFVars #[x] (← go b (fvars.push x) v' k' used)
+    | _ =>
+      let t := t.instantiateRev fvars
+      unless fvars.isEmpty do return t
+      -- A premise that binds nothing may still hand a postcondition on: name its binders.
+      let (some v, some c) := (value?, cost?) | return t
+      let args := t.getAppArgs
+      let some i := args.findIdx? (· matches .lam _ _ (.lam ..) _) | return t
+      let .lam _ d₁ (.lam _ d₂ b bi₂) bi₁ := args[i]! | return t
+      return mkAppN t.getAppFn (args.set! i (.lam v d₁ (.lam c d₂ b bi₂) bi₁))
+  go t #[] none 0 false
+
+/-- `premises` renamed by `nameBinders`, the `i`th taking the `i`th hint when there is one per
+premise. -/
+private def namePremises (g? : Option Expr) (goalTy : Expr) (premises : List MVarId) :
+    MetaM (List MVarId) := do
+  let hints := (g?.map lambdaHints).getD #[]
+  let post := postNames goalTy
+  let hints := if hints.size == premises.length then hints.map some
+    else .replicate premises.length none
+  (premises.zip hints.toList).mapM fun (p, hint) => do
+    let t ← instantiateMVars (← p.getType)
+    let t' ← nameBinders t hint post
+    p.replaceTargetDefEq t'
+
 mutual
 
 /-- Prove `goal` by walking the generator it is about, returning the residual goals: those no
@@ -120,8 +193,8 @@ partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
   goal.withContext do
   let ty ← whnfR (← instantiateMVars (← goal.getType))
   -- A rule's premise may be a `∀` (a bind's continuation, an `ite`'s branch condition).
-  if ty.isForall then
-    let (_, goal) ← goal.intro1P
+  if let .forallE n _ _ _ := ty then
+    let (_, goal) ← goal.intro ((← getLCtx).getUnusedName n.eraseMacroScopes)
     return ← walk extras goal
   for j in judgments do
     if let some (g, restate) ← j.subject? ty then
@@ -133,7 +206,7 @@ partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
       let ctor := if (← whnfR ty.appArg!).isAppOfArity ``List.nil 1 then `nil else `cons
       return ← walkAll extras
         (← applyExact goal (← mkConstWithFreshMVarLevels (head ++ ctor)))
-  return [← goal.replaceTargetDefEq ty]
+  return [← goal.replaceTargetDefEq (← instantiateMVars (← goal.getType)).headBeta]
 
 /-- `walk` each goal in turn. -/
 partial def walkAll (extras : Array Term) (goals : List MVarId) : TermElabM (List MVarId) :=
@@ -157,7 +230,8 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
     let mut firstErr : Option Exception := none
     for lem in lems do
       try
-        return ← walkAll extras (← applyExact goal (← mkConstWithFreshMVarLevels lem))
+        let premises ← applyExact goal (← mkConstWithFreshMVarLevels lem)
+        return ← walkAll extras (← namePremises (some g') (← goal.getType) premises)
       catch ex =>
         firstErr := firstErr <|> some ex
         saved.restore
@@ -167,15 +241,20 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
   -- reported where it happens.
   for t in extras do
     let r ← observing? do
-      let e ← Term.withoutErrToSorry <| Term.elabTerm t none
+      let e ← Term.withoutErrToSorry do
+        let e ← Term.elabTerm t none
+        Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+        instantiateMVars e
       let some gs ← tryFact j goal e | failure
-      return gs
+      namePremises none (← goal.getType) gs
     if let some gs := r then return ← walkAll extras gs
   for decl in ← getLCtx do
     unless decl.isImplementationDetail do
-      if let some gs ← tryFact j goal decl.toExpr then return ← walkAll extras gs
+      if let some gs ← tryFact j goal decl.toExpr then
+        return ← walkAll extras (← namePremises none (← goal.getType) gs)
   if let some law ← law? j g then
-    if let some gs ← tryFact j goal law then return ← walkAll extras gs
+    if let some gs ← tryFact j goal law then
+      return ← walkAll extras (← namePremises none (← goal.getType) gs)
   throwError j.noLeaf g
 
 end

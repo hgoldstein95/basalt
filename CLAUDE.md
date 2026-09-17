@@ -43,9 +43,11 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/SPMF/Walk/Attr.lean](Basalt/SPMF/Walk/Attr.lean), the walk is
   [Basalt/SPMF/Walk.lean](Basalt/SPMF/Walk.lean). The mass rules and the `mass_bound` tactic are
   [Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean), contract pinned by
-  [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean). Adding a combinator to
-  `Combinators.lean` means adding its rules there — nothing else in a termination proof mentions
-  combinators.
+  [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean); the cost rules (`SPMF.Cost.Always`) and
+  the `cost_bound` tactic are [Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean), contract
+  pinned by [BasaltTest/CostBound.lean](BasaltTest/CostBound.lean), which also fails the build when
+  a combinator has a rule for one judgment and not the other. Nothing else in a termination or
+  cost proof mentions combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean).
 - **Cost** (`SPMF.Cost`, `IsBounded` and its algebra) — [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean).
