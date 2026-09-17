@@ -50,9 +50,11 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   cost proof mentions combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean).
-- **Cost** (`SPMF.Cost`, `IsBounded` and its algebra) — [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean);
-  the `cost_fixpoint` tactic — [Basalt/SPMF/CostFixpoint.lean](Basalt/SPMF/CostFixpoint.lean),
-  contract pinned by [BasaltTest/CostFixpoint.lean](BasaltTest/CostFixpoint.lean).
+- **Cost** — the interpretation (`SPMF.Cost`, `IsBounded`, its support inversion, expected cost):
+  [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:
+  [Basalt/SPMF/CostFixpoint.lean](Basalt/SPMF/CostFixpoint.lean), contract pinned by
+  [BasaltTest/CostFixpoint.lean](BasaltTest/CostFixpoint.lean). The practical entry is
+  WORKFLOW.md's Recipe 3.
 - **ENNReal arithmetic** — `ennreal_to_real` in [Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean).
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
   [Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)'s module docstring;
