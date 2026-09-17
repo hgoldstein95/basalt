@@ -88,14 +88,28 @@ private def applyBridge (b : Name) (e : Expr) : MetaM Expr := do
     f := f.app (← mkFreshExprMVar d)
   failure
 
+/-- The head constant of the type of `b`'s first explicit argument. -/
+private def bridgeArgHead (b : Name) : MetaM (Option Name) := do
+  forallTelescope (← getConstInfo b).type fun xs _ => do
+    for x in xs do
+      if (← x.fvarId!.getBinderInfo).isExplicit then
+        return (← whnfR (← inferType x)).getAppFn.constName?
+    return none
+
 /-- Close `goal`, a leaf of judgment `j`, with the fact `e` through one of `j`'s bridges, `e`'s
 binders possibly instantiated by `instCtorBinders` first. Returns the bridge's premises, not yet
 walked; `none` if `e` does not apply. -/
 private def tryFact (j : Judgment) (goal : MVarId) (e : Expr) : MetaM (Option (List MVarId)) := do
   for inst in [false, true] do
-    for bridge in j.bridges do
+    let e ← if inst then observing? (instCtorBinders e) else pure (some e)
+    let some e := e | continue
+    let head := (← whnfR (← inferType e)).getAppFn.constName?
+    -- A bridge stated for the fact's own head is tried before one that must unfold the fact, which
+    -- can succeed too, by unification against the unfolded judgment, but with a mangled result.
+    let goalHead := (← whnfR (← goal.getType)).getAppFn.constName?
+    let exact ← j.bridges.filterM fun b => return head == (← b.elim (pure goalHead) bridgeArgHead)
+    for bridge in exact ++ j.bridges.filter (!exact.contains ·) do
       let r ← observing? do
-        let e ← if inst then instCtorBinders e else pure e
         let cand ← match bridge with
           | none => pure e
           | some b => applyBridge b e

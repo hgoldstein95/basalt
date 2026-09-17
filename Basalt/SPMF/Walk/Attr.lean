@@ -56,7 +56,8 @@ def alwaysJudgment : Judgment where
   subject? ty := do
     unless ty.isAppOfArity `SPMF.Cost.Always 3 do return none
     return some (ty.getArg! 1, fun g => mkApp3 ty.getAppFn (ty.getArg! 0) g (ty.getArg! 2))
-  bridges := #[none, some `SPMF.Cost.Always.of_isBounded, some `SPMF.Cost.Always.of_always]
+  bridges := #[none, some `SPMF.Cost.Always.of_always, some `SPMF.Cost.Always.of_isBounded,
+    some `SPMF.Cost.Always.of_isCostBounded]
   lawSuffix := `cost_bounded
   noLeaf g := m!"cost_bound: no rule, hypothesis, or `.cost_bounded` law bounds the cost \
     of{indentExpr g}\nTag a rule for it `@[gen_rule]`, or pass a cost bound to `cost_bound [_]`."
@@ -68,7 +69,7 @@ def isBoundedJudgment : Judgment where
   subject? ty := do
     unless ty.isAppOfArity `IsBounded 3 do return none
     return some (ty.getArg! 1, fun g => mkApp3 ty.getAppFn (ty.getArg! 0) g (ty.getArg! 2))
-  bridges := #[none]
+  bridges := #[none, some `IsCostBounded.isBounded]
   lawSuffix := `cost_bounded
   noLeaf g := m!"cost_bound: no hypothesis or `.cost_bounded` law bounds the cost of the \
     combinator argument{indentExpr g}\nPass a cost bound for it to `cost_bound [_]`."

@@ -23,6 +23,9 @@ def All (g : SPMF α) (P : α → Prop) : Prop :=
 
 end SPMF
 
+theorem IsCostBounded.isBounded {g : SPMF.Cost α} {c : α → Nat} (h : IsCostBounded g c) :
+    IsBounded g c := h
+
 namespace SPMF.Cost
 
 /-- Every value `g` produces satisfies `Q` together with the number of choices it took. -/
@@ -38,6 +41,10 @@ theorem isBounded_iff_always {g : SPMF.Cost α} {c : α → Nat} :
 theorem Always.of_isBounded {x : SPMF.Cost α} {c : α → Nat} {Q : α → Nat → Prop}
     (hx : IsBounded x c) (hq : ∀ a n, n ≤ c a → Q a n) : Always x Q :=
   fun p hp => hq _ _ (hx p hp)
+
+theorem Always.of_isCostBounded {x : SPMF.Cost α} {c : α → Nat} {Q : α → Nat → Prop}
+    (hx : IsCostBounded x c) (hq : ∀ a n, n ≤ c a → Q a n) : Always x Q :=
+  of_isBounded hx hq
 
 /-- Consequence: a postcondition implies any weaker one. -/
 theorem Always.of_always {x : SPMF.Cost α} {R Q : α → Nat → Prop}
@@ -235,7 +242,7 @@ namespace Basalt.CostBound
 open Basalt.Walk
 
 /-- `goal`, a cost law or a cost bound, restated as `Always`, its postcondition's binders named
-after the cost function's. -/
+after the cost function's as in a residual goal. -/
 def toAlways (goal : MVarId) : MetaM MVarId := goal.withContext do
   let ty ← instantiateMVars (← goal.getType)
   if ty.isAppOfArity ``SPMF.Cost.Always 3 then return goal
@@ -247,7 +254,7 @@ def toAlways (goal : MVarId) : MetaM MVarId := goal.withContext do
       `SPMF.Cost.Always (gen …) Q`, got{indentExpr ty}"
   let #[α, g, c] := ty.getAppArgs | unreachable!
   let v := match c with | .lam v _ _ _ => v.eraseMacroScopes | _ => `v
-  let post ← withLocalDeclD v α fun a => withLocalDeclD `n (mkConst ``Nat) fun n => do
+  let post ← withLocalDeclD v α fun a => withLocalDeclD (.mkSimple s!"n_{v}") (mkConst ``Nat) fun n => do
     mkLambdaFVars #[a, n] (← mkAppM ``LE.le #[n, (mkApp c a).headBeta])
   goal.change (← mkAppM ``SPMF.Cost.Always #[g, post])
 
