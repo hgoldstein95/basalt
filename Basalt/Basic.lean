@@ -14,6 +14,7 @@ import Basalt.SPMF.Failure
 import Basalt.Tactics
 import Basalt.Laws
 import Basalt.SPMF.CostBound
+import Basalt.SPMF.CostFixpoint
 import Basalt.Combinators
 import Basalt.PBT
 import Basalt.Tuning
