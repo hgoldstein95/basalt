@@ -49,8 +49,32 @@ def massJudgment : Judgment where
   noLeaf g := m!"mass_bound: no rule, hypothesis, or `.terminates` law bounds the mass \
     of{indentExpr g}\nTag a lower bound for it `@[gen_rule]`, or pass one to `mass_bound [_]`."
 
+/-- `SPMF.Cost.Always g Q`: every value `g` produces satisfies `Q` together with its cost. The
+postcondition is given, and the rules push it into the sub-generators. -/
+def alwaysJudgment : Judgment where
+  key := `SPMF.Cost.Always
+  subject? ty := do
+    unless ty.isAppOfArity `SPMF.Cost.Always 3 do return none
+    return some (ty.getArg! 1, fun g => mkApp3 ty.getAppFn (ty.getArg! 0) g (ty.getArg! 2))
+  bridges := #[none, some `SPMF.Cost.Always.of_isBounded, some `SPMF.Cost.Always.of_always]
+  lawSuffix := `cost_bounded
+  noLeaf g := m!"cost_bound: no rule, hypothesis, or `.cost_bounded` law bounds the cost \
+    of{indentExpr g}\nTag a rule for it `@[gen_rule]`, or pass a cost bound to `cost_bound [_]`."
+
+/-- `IsBounded g c` with `c` to be found: a combinator's generator argument, whose cost bound the
+combinator's rule is stated in terms of. Only a fact can supply it. -/
+def isBoundedJudgment : Judgment where
+  key := `IsBounded
+  subject? ty := do
+    unless ty.isAppOfArity `IsBounded 3 do return none
+    return some (ty.getArg! 1, fun g => mkApp3 ty.getAppFn (ty.getArg! 0) g (ty.getArg! 2))
+  bridges := #[none]
+  lawSuffix := `cost_bounded
+  noLeaf g := m!"cost_bound: no hypothesis or `.cost_bounded` law bounds the cost of the \
+    combinator argument{indentExpr g}\nPass a cost bound for it to `cost_bound [_]`."
+
 /-- Every judgment the walker knows, tried in order. -/
-def judgments : Array Judgment := #[massJudgment]
+def judgments : Array Judgment := #[massJudgment, alwaysJudgment, isBoundedJudgment]
 
 /-- Judgment key ↦ combinator head constant ↦ the `@[gen_rule]` rules for it, in declaration
 order. -/
