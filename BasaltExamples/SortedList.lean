@@ -103,27 +103,8 @@ theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=
 one per cons cell and the final nil, plus each element `n`'s `Nat.arbitrary` cost of `n + 1`. -/
 theorem List.genSortedGt.cost_bounded :
     IsCostBounded (List.genSortedGt m) (fun xs => xs.length + xs.sum + xs.length + 1) := by
-  open Lean.Order in
-  delta genSortedGt
-  apply (fix_induct (motive := fun (g : Nat → SPMF.Cost (List Nat)) =>
-    ∀ m, IsBounded (g m) (fun xs => xs.length + xs.sum + xs.length + 1)) _ ?admissible ?step) m
-  case admissible =>
-    exact admissible_pi_apply _ fun _ => admissible_IsBounded _
-  case step =>
-    intro genSortedGt_rec ih m
-    rw [IsBounded_iff]
-    rintro ⟨xs, c⟩ hmem
-    cost_support_simp at hmem
-    obtain ⟨k, rfl, h | h⟩ := hmem
-    · obtain ⟨rfl, rfl⟩ := h
-      simp
-    · obtain ⟨delta, n1, n2, hdelta, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, hn2⟩, hk⟩ := h
-      have hhead : n1 ≤ delta + 1 := IsBounded_iff.mp Nat.arbitrary.cost_bounded (delta, n1) hdelta
-      have htail : n3 ≤ tl.length + tl.sum + tl.length + 1 := ih (m + delta) (tl, n3) htl
-      show 1 + k ≤ ((m + delta) :: tl).length + ((m + delta) :: tl).sum
-        + ((m + delta) :: tl).length + 1
-      simp only [List.length_cons, List.sum_cons]
-      omega
+  cost_fixpoint
+  all_goals simp only [List.length_nil, List.sum_nil, List.length_cons, List.sum_cons]; omega
 
 theorem List.genSorted.cost_bounded :
     IsCostBounded List.genSorted List.genSorted.costBound :=
