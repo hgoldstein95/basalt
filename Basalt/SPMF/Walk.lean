@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Walk.Attr
+import Batteries.Data.List.Basic
 import Lean.Elab.Tactic.Basic
 import Lean.Elab.SyntheticMVars
 import Lean.Meta.RecExt
@@ -14,12 +15,39 @@ import Lean.Meta.Tactic.Assumption
 /-!
 # The Generator Walker
 
-Proves a judgment about a generator by structural recursion on its syntax.
+Proves a judgment about a generator by structural recursion on its syntax, and names the binders of
+what it leaves after the generator's own.
 -/
 
 open Lean Meta Elab Tactic
 
 namespace Basalt.Walk
+
+/-! ## Branch relations -/
+
+/-- Every branch of a list combinator satisfies `P`, collected one `cons` at a time. -/
+@[gen_branches]
+inductive AllBranches {β : Type u} (P : β → Prop) : List β → Prop
+  | nil : AllBranches P []
+  | cons {b : β} {bs : List β} (h : P b) (hs : AllBranches P bs) : AllBranches P (b :: bs)
+
+theorem allBranches_iff {β : Type u} {P : β → Prop} {bs : List β} :
+    AllBranches P bs ↔ ∀ b ∈ bs, P b := by
+  induction bs with
+  | nil => exact ⟨fun _ _ h => (nomatch h), fun _ => .nil⟩
+  | cons b bs ih =>
+    constructor
+    · intro h b' hb'
+      cases h with
+      | cons hb hbs =>
+        cases hb' with
+        | head => exact hb
+        | tail _ hb' => exact ih.mp hbs b' hb'
+    · intro h
+      exact .cons (h b (.head _)) (ih.mpr fun b' hb' => h b' (.tail _ hb'))
+
+attribute [gen_branches] List.Forall₂
+
 
 /-- `apply` that matches `e`'s conclusion against the goal without unfolding it. A judgment may be a
 definition whose body is a `∀`, and `MVarId.apply` then tries the unfolded arities first. Returns
@@ -138,7 +166,14 @@ def law? (j : Judgment) (g : Expr) : MetaM (Option Expr) := do
   unless (← getEnv).contains (head ++ j.lawSuffix) do return none
   return some (← mkConstWithFreshMVarLevels (head ++ j.lawSuffix))
 
-/-! ## Machinery for Keeping Names Consistent -/
+/-! ## Names
+
+What the walk leaves is stated over the values the generator drew, under the generator's names. A
+rule premise that binds a drawn value — a `∀` over data, or a postcondition it hands on — names it
+after the combinator's lambda argument (`let x ← …` binds `x`), or, when the combinator has none,
+after the goal's postcondition's own binders. Its cost, the next data binder, is `n_x`, and a
+hypothesis after the value is `h_x` (a callee's or recursive call's bound, a pivot's range). A
+hypothesis before any value takes the lambda argument's name instead (a `dite` branch's `h`). -/
 
 /-- The names of the lambda arguments of `g`'s head that bind something other than `Unit`: a
 continuation's `delta`, a `dite` branch's `h`. -/
@@ -157,7 +192,8 @@ private def postNames (ty : Expr) : Option (Name × Name) :=
 
 private def prefixed (p : String) (v : Name) : Name := .mkSimple (p ++ v.toString)
 
-/-- `t`, a rule premise, with its binders named as the section docstring says. -/
+/-- `t`, a rule premise, with its binders named after `hint`, the combinator's lambda argument, or
+else after `post`, the goal's postcondition's binders. -/
 private def nameBinders (t : Expr) (hint : Option Name) (post : Option (Name × Name)) :
     MetaM Expr := do
   let value? := hint <|> post.map (·.1)
@@ -216,9 +252,9 @@ private def namePremises (g? : Option Expr) (goalTy : Expr) (premises : List MVa
 
 mutual
 
-/-- Prove `goal` by walking the generator and returning residual goals.  `extras` are the facts the
-caller passed; are kept as syntax because one may be used at several sub-generators, and elaborating
-once would freeze its metavariables at the first. -/
+/-- Prove `goal` by walking the generator, returning the goals no judgment recognizes. `extras` are
+the facts the caller passed, kept as syntax because one may be used at several sub-generators, and
+elaborating once would freeze its metavariables at the first. -/
 partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
   goal.withContext do
   let ty ← whnfR (← instantiateMVars (← goal.getType))
@@ -229,10 +265,9 @@ partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
   for j in judgments do
     if let some (g, restate) ← j.subject? ty then
       return ← bound j extras goal restate g
-  -- The branch premises of a list combinator, built one branch at a time: any `nil`/`cons`
-  -- relation whose last argument is the combinator's branch list.
+  -- The branch premises of a list combinator, built one branch at a time.
   if let some head := ty.getAppFn.constName? then
-    if (← getEnv).contains (head ++ `cons) && (← getEnv).contains (head ++ `nil) then
+    if isBranchList (← getEnv) head then
       let ctor := if (← whnfR ty.appArg!).isAppOfArity ``List.nil 1 then `nil else `cons
       return ← walkAll extras
         (← applyExact goal (← mkConstWithFreshMVarLevels (head ++ ctor)))
@@ -268,9 +303,10 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
           saved.restore
       if let some ex := firstErr then throw ex
     return none
-  -- A leaf: a caller-supplied fact, a hypothesis (a recursive occurrence), or a proved law. The
-  -- fact is committed to before its bridge's premises are walked, so that a failure inside them is
-  -- reported where it happens.
+  -- A leaf: a caller-supplied fact, a hypothesis (a recursive occurrence), or a proved law, about
+  -- `g` or a reduction of it. The fact is committed to before its bridge's premises are walked, so
+  -- that a failure inside them is reported where it happens.
+  let forms := #[g, ← whnfCore g, ← whnfR g]
   let leaf : TermElabM (Option (List MVarId)) := do
     for t in extras do
       let r ← observing? do
@@ -283,22 +319,34 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
       if let some gs := r then return some (← walkAll extras gs)
     -- A hypothesis is tried only if it mentions `g`'s head: unifying one about another generator
     -- unfolds both, and on a generator over a long literal list that exceeds the recursion depth.
-    let mentionsHead : Expr → Bool := match (← whnfCore g).getAppFn with
-      | .const n _ => fun e => (e.find? (·.isConstOf n)).isSome
-      | .fvar x => (·.containsFVar x)
-      | _ => fun _ => true
+    let mentionsHead (e : Expr) : Bool := forms.any fun g => match g.getAppFn with
+      | .const n _ => (e.find? (·.isConstOf n)).isSome
+      | .fvar x => e.containsFVar x
+      | _ => true
     for decl in ← getLCtx do
       unless decl.isImplementationDetail do
         unless ← isProp decl.type do continue
         unless mentionsHead (← instantiateMVars decl.type) do continue
         if let some gs ← tryFact j goal decl.toExpr then
           return some (← walkAll extras (← namePremises none (← goal.getType) gs))
-    if let some law ← law? j g then
-      if let some gs ← tryFact j goal law then
-        return some (← walkAll extras (← namePremises none (← goal.getType) gs))
+    for g in forms do
+      if let some law ← law? j g then
+        if let some gs ← tryFact j goal law then
+          return some (← walkAll extras (← namePremises none (← goal.getType) gs))
     return none
-  for step in if j.leavesFirst then [leaf, rules] else [rules, leaf] do
-    if let some gs ← step then return gs
+  -- A combinator's rules that all fail leave the leaves to try, and their error is reported only if
+  -- no leaf applies either.
+  let saved ← saveState
+  let mut ruleErr : Option Exception := none
+  for (isRules, step) in if j.leavesFirst then [(false, leaf), (true, rules)]
+      else [(true, rules), (false, leaf)] do
+    try
+      if let some gs ← step then return gs
+    catch ex =>
+      unless isRules do throw ex
+      ruleErr := some ex
+      saved.restore
+  if let some ex := ruleErr then throw ex
   throwError j.noLeaf g
 
 end
@@ -308,8 +356,10 @@ end
 /-- `gen.fixpoint_induct`, and the positions of `gen`'s arguments it abstracts: those some recursive
 call changes, as `partial_fixpoint` decided. `none` when `gen` is not a `partial_fixpoint`. -/
 def fixpointSeed? (gen : Name) : MetaM (Option (Name × Array Nat)) := do
-  let some ind ← observing? (realizeGlobalConstNoOverload (mkIdent (gen ++ `fixpoint_induct)))
-    | return none
+  let ind := gen ++ `fixpoint_induct
+  unless (← getEnv).contains ind do
+    unless isReservedName (← getEnv) ind do return none
+    executeReservedNameAction ind
   let (_, _, concl) ← forallMetaTelescope (← inferType (← mkConstWithFreshMVarLevels ind))
   let F := concl.appArg!
   return some (ind, ← forallTelescope (← whnf (← inferType F)) fun ys _ => do

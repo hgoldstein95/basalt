@@ -282,8 +282,8 @@ unfolded and walked.
 **`cost_bound` is the whole structural argument.** It pushes the postcondition "producing `v` took
 at most `<COST> v` choices" backward through the step, with one `@[gen_rule]` rule per combinator —
 the tally of Step 2 is what the rules compute. It leaves one goal per path through the generator,
-stated over the values that path drew; the tactic's docstring (`Basalt/SPMF/CostBound.lean`) says
-how they are named, and `BasaltTest/CostFixpoint.lean` shows the goals `genHeap` and `genBST`
+stated over the values that path drew; the walker (`Basalt/SPMF/Walk.lean`, "Names") says how
+they are named, and `BasaltTest/CostFixpoint.lean` shows the goals `genHeap` and `genBST`
 leave. Nothing about the generator is yours to supply:
 
 - a **recursive occurrence** is bounded by `ih`, at whatever arguments it is called with.

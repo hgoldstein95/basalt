@@ -5,8 +5,9 @@ Authors: Harrison Goldstein
 -/
 import Basalt
 import BasaltExamples.ArbNat
+import BasaltExamples.ArbChar
 
-open RandomChoice ArbNat
+open RandomChoice ArbNat ArbChar
 
 /-!
 # The `cost_bound` Contract
@@ -118,6 +119,45 @@ example : IsCostBounded (listOfMaxLength 3 (chooseNat 0 5 >>= fun x => pure (x +
   cost_bound
   simp at *
   omega
+
+-- The worst case of a list combinator is the largest of its branches', a callee's included.
+/--
+trace: xs : List ℕ
+n_xs : ℕ
+h_xs : n_xs ≤ (List.map (fun x => 1 + List.foldr max 0 [1, 0]) xs).sum
+⊢ n_xs ≤ 2 * xs.length
+-/
+#guard_msgs in
+example : IsCostBounded
+    (vectorOf 3 (oneOf [fun _ => chooseNat 0 5, fun _ => pure 0] (by simp)))
+    (fun xs => 2 * xs.length) := by
+  cost_bound
+  trace_state
+  simp at *
+  omega
+
+example : IsCostBounded
+    (vectorOf 3 (frequency [(1, fun _ => Char.arbitrary), (2, fun _ => pure 'a')] (by simp)))
+    (fun xs => 2 * xs.length) := by
+  cost_bound
+  simp at *
+  omega
+
+/-- A cost bound the caller supplies for a combinator term is used when its rule fails. -/
+example (g : SPMF.Cost Nat) (h : IsBounded (listOf g) fun _ => 5) :
+    IsCostBounded (listOf g >>= fun xs => pure xs) (fun _ => 5) := by
+  cost_bound [h]
+  omega
+
+example (g : SPMF.Cost Nat) (h : IsBounded (listOf g) fun _ => 5) :
+    IsCostBounded (listOf g) (fun _ => 5) := by
+  cost_bound
+  omega
+
+/-- A postcondition over a relation with `nil` and `cons` constructors is left as it is. -/
+example : SPMF.Cost.Always (pure [1, 2] : SPMF.Cost (List Nat)) (fun xs _ => xs.Perm [2, 1]) := by
+  cost_bound
+  exact List.Perm.swap 2 1 []
 
 /-- A cost bound the caller supplies, here one that is no law of anything. -/
 example : IsCostBounded (Nat.arbitrary >>= fun n => pure n) (fun n => n + 2) := by

@@ -144,6 +144,7 @@ theorem le_mass_oneOf {gs : List (Unit → SPMF α)} {hne : gs ≠ []} {cs : Lis
 /-- Branch-wise mass lower bounds for a `frequency`, each paired with the weight it belongs to.
 `List.Forall₂` would do, except that the weights would then have to be read back off the branches;
 carrying them here is what keeps `le_mass_frequency`'s bound free of the branches themselves. -/
+@[gen_branches]
 inductive WeightedBounds : List (Nat × ℝ≥0∞) → List (Nat × (Unit → SPMF α)) → Prop
   | nil : WeightedBounds [] []
   | cons {w : Nat} {c : ℝ≥0∞} {g : Unit → SPMF α} {cs gs}

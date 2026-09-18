@@ -13,7 +13,7 @@ The structural half of a cost proof: `cost_bound` pushes a postcondition on (val
 generator with the `@[gen_rule]` rules for `SPMF.Cost.Always`, leaving one arithmetic goal per path.
 -/
 
-open RandomChoice Lean Meta Elab Tactic
+open RandomChoice Lean Meta Elab Tactic Basalt.Walk
 
 namespace SPMF.Cost
 
@@ -135,47 +135,17 @@ theorem always_coin {r : Rat} {Q : Bool → Nat → Prop} (hq : ∀ a, Q a 1) :
   refine always_bind (always_choose fun k => always_ite ?_ ?_) <;>
     exact fun _ => always_pure (hq _)
 
-/-- The postconditions of a list combinator's branches, one `cons` at a time. -/
-inductive AllBranches (Q : α → Nat → Prop) : List (Unit → SPMF.Cost α) → Prop
-  | nil : AllBranches Q []
-  | cons {g : Unit → SPMF.Cost α} {gs} (h : Always (g ()) Q) (hs : AllBranches Q gs) :
-      AllBranches Q (g :: gs)
-
-theorem AllBranches.always {Q : α → Nat → Prop} {gs : List (Unit → SPMF.Cost α)}
-    (h : AllBranches Q gs) : ∀ g ∈ gs, Always (g ()) Q := by
-  induction h with
-  | nil => simp
-  | cons hg _ ih =>
-    intro g hg'
-    rcases List.mem_cons.mp hg' with rfl | hg'
-    exacts [hg, ih g hg']
-
-/-- `AllBranches` for a weighted branch list. Every branch is asked for the postcondition, whatever
-its weight. -/
-inductive AllWeighted (Q : α → Nat → Prop) : List (Nat × (Unit → SPMF.Cost α)) → Prop
-  | nil : AllWeighted Q []
-  | cons {w : Nat} {g : Unit → SPMF.Cost α} {gs} (h : Always (g ()) Q) (hs : AllWeighted Q gs) :
-      AllWeighted Q ((w, g) :: gs)
-
-theorem AllWeighted.always {Q : α → Nat → Prop} {gs : List (Nat × (Unit → SPMF.Cost α))}
-    (h : AllWeighted Q gs) : ∀ wg ∈ gs, Always (wg.2 ()) Q := by
-  induction h with
-  | nil => simp
-  | cons hg _ ih =>
-    intro wg hwg
-    rcases List.mem_cons.mp hwg with rfl | hwg
-    exacts [hg, ih wg hwg]
-
 @[gen_rule]
 theorem always_oneOf {gs : List (Unit → SPMF.Cost α)} {hne : gs ≠ []} {Q : α → Nat → Prop}
-    (h : AllBranches (fun a n => Q a (1 + n)) gs) : Always (oneOf gs hne : SPMF.Cost α) Q := by
+    (h : AllBranches (fun g => Always (g ()) fun a n => Q a (1 + n)) gs) :
+    Always (oneOf gs hne : SPMF.Cost α) Q := by
   unfold oneOf Helpers.oneOfAux
   refine always_bind (always_map (always_choose fun ⟨i, hge, hle⟩ => ?_))
-  exact h.always _ (List.getElem_mem _)
+  exact allBranches_iff.mp h _ (List.getElem_mem _)
 
 @[gen_rule]
 theorem always_frequency {gs : List (Nat × (Unit → SPMF.Cost α))} {hw : 0 < (gs.map Prod.fst).sum}
-    {Q : α → Nat → Prop} (h : AllWeighted (fun a n => Q a (1 + n)) gs) :
+    {Q : α → Nat → Prop} (h : AllBranches (fun wg => Always (wg.2 ()) fun a n => Q a (1 + n)) gs) :
     Always (frequency gs hw : SPMF.Cost α) Q := by
   unfold frequency Helpers.frequencyAux
   refine always_bind (always_map (always_choose fun ⟨i, _, _⟩ => ?_))
@@ -183,24 +153,19 @@ theorem always_frequency {gs : List (Nat × (Unit → SPMF.Cost α))} {hw : 0 < 
   split
   · obtain ⟨w, g, hg, -, heq⟩ := frequencySelect_mem ‹_›
     rw [heq]
-    exact h.always (w, g) hg
+    exact allBranches_iff.mp h (w, g) hg
   · exact fun _ hp => absurd rfl hp
 
 end SPMF.Cost
 
 namespace Basalt.CostBound
 
-open Basalt.Walk
-
 /-- `goal`, a cost law or a cost bound, restated as `Always`, its postcondition's binders named
 after the cost function's as in a residual goal. -/
 def toAlways (goal : MVarId) : MetaM MVarId := goal.withContext do
   let ty := (← instantiateMVars (← goal.getType)).consumeMData
   if ty.isAppOfArity ``SPMF.Cost.Always 3 then return ← goal.replaceTargetDefEq ty
-  let ty ← if ty.isAppOfArity ``IsCostBounded 3 then
-      pure (mkAppN (mkConst ``IsBounded ty.getAppFn.constLevels!) ty.getAppArgs)
-    else pure ty
-  unless ty.isAppOfArity ``IsBounded 3 do
+  unless ty.isAppOfArity ``IsCostBounded 3 || ty.isAppOfArity ``IsBounded 3 do
     throwError "cost_bound: expected a goal `IsCostBounded (gen …) c`, `IsBounded (gen …) c`, or \
       `SPMF.Cost.Always (gen …) Q`, got{indentExpr ty}"
   let #[α, g, c] := ty.getAppArgs | unreachable!
@@ -221,7 +186,7 @@ def tidy (goal : MVarId) : MetaM MVarId := goal.withContext do
   goal.replaceTargetDefEq (← reduceCtorProjs (← goal.getType))
 
 /-- Walk `goal` (see `cost_bound`), returning the tidied residual goals. -/
-def run (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) := do
+def walkCost (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) := do
   (← walk extras (← toAlways goal)).mapM fun g => tidy g
 
 /-- `cost_bound` proves `IsCostBounded (gen …) c` (or `IsBounded`, or `SPMF.Cost.Always … Q`) up to
@@ -231,12 +196,12 @@ occurrences are closed from the local context, callees from their `.cost_bounded
 cost bound can be passed as `cost_bound [h₁, h₂]`.
 
 In a residual goal, a value drawn by `let x ← …` is named `x`, the choices that draw took `n_x`,
-and what is known about it `h_x` (a callee's or recursive call's bound, or a pivot's range). -/
+and what is known about it `h_x`, as the walker names them (`Basalt/SPMF/Walk.lean`). -/
 syntax (name := costBoundTac) "cost_bound" (" [" term,* "]")? : tactic
 
 elab_rules : tactic
   | `(tactic| cost_bound $[[$args,*]]?) => withMainContext do
-    replaceMainGoal (← run ((args.map (·.getElems)).getD #[]) (← getMainGoal))
+    replaceMainGoal (← walkCost ((args.map (·.getElems)).getD #[]) (← getMainGoal))
 
 end Basalt.CostBound
 
@@ -335,39 +300,21 @@ section worstCase
 
 variable {α β : Type}
 
-/-- Worst-case costs of a list combinator's branches, one `cons` at a time: `k` bounds them all. -/
-inductive MaxBound : Nat → List (Unit → SPMF.Cost α) → Prop
-  | nil : MaxBound 0 []
-  | cons {k ks : Nat} {g : Unit → SPMF.Cost α} {gs}
-      (h : IsBounded (g ()) fun _ => k) (hs : MaxBound ks gs) : MaxBound (max k ks) (g :: gs)
-
-/-- `MaxBound` for a weighted branch list. -/
-inductive WeightedMaxBound : Nat → List (Nat × (Unit → SPMF.Cost α)) → Prop
-  | nil : WeightedMaxBound 0 []
-  | cons {k ks w : Nat} {g : Unit → SPMF.Cost α} {gs}
-      (h : IsBounded (g ()) fun _ => k) (hs : WeightedMaxBound ks gs) :
-      WeightedMaxBound (max k ks) ((w, g) :: gs)
-
 private theorem isBounded_le {x : SPMF.Cost α} {k k' : Nat} (h : IsBounded x fun _ => k)
     (hk : k ≤ k') {Q : α → Nat → Prop} (hq : ∀ a n, n ≤ k' → Q a n) : Always x Q :=
   Always.of_isBounded h fun a n hn => hq a n (Nat.le_trans hn hk)
 
-theorem MaxBound.allBranches {k : Nat} {gs : List (Unit → SPMF.Cost α)} (h : MaxBound k gs)
-    {Q : α → Nat → Prop} (hq : ∀ a n, n ≤ k → Q a n) : AllBranches Q gs := by
+/-- The largest of the branches' worst cases bounds each of them. -/
+private theorem isBounded_foldr_max {γ : Type} {f : γ → SPMF.Cost α} {ks : List Nat} {bs : List γ}
+    (h : List.Forall₂ (fun k b => IsBounded (f b) fun _ => k) ks bs) :
+    ∀ b ∈ bs, IsBounded (f b) fun _ => ks.foldr max 0 := by
   induction h with
-  | nil => exact .nil
-  | cons hg _ ih =>
-    exact .cons (isBounded_le hg (Nat.le_max_left _ _) hq)
-      (ih fun a n hn => hq a n (Nat.le_trans hn (Nat.le_max_right _ _)))
-
-theorem WeightedMaxBound.allWeighted {k : Nat} {gs : List (Nat × (Unit → SPMF.Cost α))}
-    (h : WeightedMaxBound k gs) {Q : α → Nat → Prop} (hq : ∀ a n, n ≤ k → Q a n) :
-    AllWeighted Q gs := by
-  induction h with
-  | nil => exact .nil
-  | cons hg _ ih =>
-    exact .cons (isBounded_le hg (Nat.le_max_left _ _) hq)
-      (ih fun a n hn => hq a n (Nat.le_trans hn (Nat.le_max_right _ _)))
+  | nil => simp
+  | cons hk _ ih =>
+    intro b hb
+    rcases List.mem_cons.mp hb with rfl | hb
+    exacts [IsBounded_mono hk fun _ => Nat.le_max_left _ _,
+      IsBounded_mono (ih b hb) fun _ => Nat.le_max_right _ _]
 
 @[gen_rule]
 theorem isBounded_pure {a : α} : IsBounded (Pure.pure a : SPMF.Cost α) fun _ => 0 := by
@@ -427,15 +374,20 @@ theorem isBounded_coin {r : Rat} : IsBounded (coin r : SPMF.Cost Bool) fun _ => 
   cost_bound; omega
 
 @[gen_rule]
-theorem isBounded_oneOf {gs : List (Unit → SPMF.Cost α)} {hne : gs ≠ []} {k : Nat}
-    (h : MaxBound k gs) : IsBounded (oneOf gs hne : SPMF.Cost α) fun _ => 1 + k :=
-  isBounded_iff_always.mpr (always_oneOf (h.allBranches fun _ _ _ => by omega))
+theorem isBounded_oneOf {gs : List (Unit → SPMF.Cost α)} {hne : gs ≠ []} {ks : List Nat}
+    (h : List.Forall₂ (fun k g => IsBounded (g ()) fun _ => k) ks gs) :
+    IsBounded (oneOf gs hne : SPMF.Cost α) fun _ => 1 + ks.foldr max 0 :=
+  isBounded_iff_always.mpr (always_oneOf (allBranches_iff.mpr fun g hg =>
+    isBounded_le (isBounded_foldr_max (f := fun g => g ()) h g hg) le_rfl fun _ _ _ => by omega))
 
 @[gen_rule]
 theorem isBounded_frequency {gs : List (Nat × (Unit → SPMF.Cost α))}
-    {hw : 0 < (gs.map Prod.fst).sum} {k : Nat} (h : WeightedMaxBound k gs) :
-    IsBounded (frequency gs hw : SPMF.Cost α) fun _ => 1 + k :=
-  isBounded_iff_always.mpr (always_frequency (h.allWeighted fun _ _ _ => by omega))
+    {hw : 0 < (gs.map Prod.fst).sum} {ks : List Nat}
+    (h : List.Forall₂ (fun k wg => IsBounded (wg.2 ()) fun _ => k) ks gs) :
+    IsBounded (frequency gs hw : SPMF.Cost α) fun _ => 1 + ks.foldr max 0 :=
+  isBounded_iff_always.mpr (always_frequency (allBranches_iff.mpr fun wg hwg =>
+    isBounded_le (isBounded_foldr_max (f := fun wg => wg.2 ()) h wg hwg) le_rfl
+      fun _ _ _ => by omega))
 
 @[gen_rule]
 theorem isBounded_vectorOf {n : Nat} {g : SPMF.Cost α} {k : Nat} (hg : IsBounded g fun _ => k) :
