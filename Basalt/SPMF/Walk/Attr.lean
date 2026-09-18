@@ -8,9 +8,10 @@ import Lean.Meta.Basic
 /-!
 # The `@[gen_rule]` Attribute
 
-The judgments the generator walker (`Basalt/SPMF/Walk.lean`) proves, and the registry of their
-per-combinator rules, keyed by judgment and by the combinator's head constant. A rule must conclude
-a statement one of the `judgments` recognizes; that is what makes both keys readable off it.
+The judgments the generator walker (`Basalt/SPMF/Walk.lean`) proves, the registry of their
+per-combinator rules, keyed by judgment and by the combinator's head constant, and the registry of
+the relations a rule collects a list combinator's branches with. A rule must conclude a statement
+one of the `judgments` recognizes; that is what makes both keys readable off it.
 -/
 
 open Lean Meta
@@ -112,6 +113,32 @@ def ruleKey (declName : Name) (type : Expr) : MetaM (Name × Name) :=
           return (j.key, head)
     throwError "gen_rule: `{declName}` must conclude a judgment about a combinator application \
       (one of {judgments.map (·.key)}), not{indentExpr concl}"
+
+/-- The relations a rule premise may use to collect a list combinator's branches. -/
+initialize genBranchesExt : SimplePersistentEnvExtension Name NameSet ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := NameSet.insert
+    addImportedFn := fun ess => ess.foldl (fun s es => es.foldl NameSet.insert s) {}
+  }
+
+/-- Whether `head` is a relation tagged `@[gen_branches]`. -/
+def isBranchList (env : Environment) (head : Name) : Bool :=
+  (genBranchesExt.getState env).contains head
+
+/-- `@[gen_branches]` — let the generator walker build a proof of this relation one branch at a
+time, with its `nil` and `cons` constructors, choosing between them by whether the relation's last
+argument is `[]`. -/
+syntax (name := genBranchesAttr) "gen_branches" : attr
+
+initialize registerBuiltinAttribute {
+  name := `genBranchesAttr
+  descr := "a relation over a list combinator's branches, built by the generator walker"
+  add := fun declName _ kind => do
+    unless kind == .global do throwError "gen_branches: must be a global attribute"
+    unless (← getEnv).contains (declName ++ `nil) && (← getEnv).contains (declName ++ `cons) do
+      throwError "gen_branches: `{declName}` must have constructors `nil` and `cons`"
+    modifyEnv (genBranchesExt.addEntry · declName)
+}
 
 /-- `@[gen_rule]` — teach the generator walker one combinator's rule for one judgment. Later rules
 for the same pair are fallbacks. -/

@@ -58,7 +58,7 @@ elab_rules : tactic
             decreasing argument, unfold it, and apply `cost_bound`"
         let [goal] ← Lean.Elab.Tactic.run goal (evalTactic (← `(tactic| unfold $(mkIdent gen))))
           | throwError "cost_fixpoint: could not unfold `{gen}`"
-        replaceMainGoal (← run extras goal)
+        replaceMainGoal (← walkCost extras goal)
         return
     let ind ← mkConstWithFreshMVarLevels indName
     let (xs, _, concl) ← forallMetaTelescope (← inferType ind)
@@ -96,6 +96,6 @@ elab_rules : tactic
     let (_, s) ← s.introN seed.size (← seed.mapM (binderName gen ·)).toList
     let s ← s.tryClearMany (seedFVars.map (·.fvarId!))
     let s ← s.withContext do s.replaceTargetDefEq (← Core.betaReduce (← instantiateMVars (← s.getType)))
-    replaceMainGoal (← run extras s)
+    replaceMainGoal (← walkCost extras s)
 
 end Basalt.CostFixpoint
