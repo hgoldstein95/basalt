@@ -38,15 +38,24 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   pinned by [BasaltTest/Termination.lean](BasaltTest/Termination.lean). Ranking functions and
   expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). `mass` and its equations:
   [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
-- **The `mass_bound` tactic and its `@[mass_bound]` rules** — rules keyed by the combinator's head
-  constant, later ones fallbacks; [Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean) owns both,
-  with the attribute in [MassBound/Attr.lean](Basalt/SPMF/MassBound/Attr.lean) and the contract
-  pinned by [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean). Adding a combinator to
-  `Combinators.lean` means adding its rule here — nothing else in a termination proof mentions
-  combinators.
+- **The generator walker and its `@[gen_rule]` rules** — one rule per (judgment, combinator), later
+  ones fallbacks; the judgments and the registries (rules, and the `@[gen_branches]` relations that
+  collect a list combinator's branches) are
+  [Basalt/SPMF/Walk/Attr.lean](Basalt/SPMF/Walk/Attr.lean), the walk is
+  [Basalt/SPMF/Walk.lean](Basalt/SPMF/Walk.lean). The mass rules and the `mass_bound` tactic are
+  [Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean), contract pinned by
+  [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean); the cost rules (`SPMF.Cost.Always`) and
+  the `cost_bound` tactic are [Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean), contract
+  pinned by [BasaltTest/CostBound.lean](BasaltTest/CostBound.lean), which also fails the build when
+  a combinator has a rule for one judgment and not the other. Nothing else in a termination or
+  cost proof mentions combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean).
-- **Cost** (`SPMF.Cost`, `IsBounded` and its algebra) — [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean).
+- **Cost** — the interpretation (`SPMF.Cost`, `IsBounded`, its support inversion, expected cost):
+  [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:
+  [Basalt/SPMF/CostFixpoint.lean](Basalt/SPMF/CostFixpoint.lean), contract pinned by
+  [BasaltTest/CostFixpoint.lean](BasaltTest/CostFixpoint.lean). The practical entry is
+  WORKFLOW.md's Recipe 3.
 - **ENNReal arithmetic** — `ennreal_to_real` in [Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean).
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
   [Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)'s module docstring;

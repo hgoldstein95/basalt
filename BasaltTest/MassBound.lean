@@ -13,7 +13,7 @@ open RandomChoice ArbNat ENNReal
 # The `mass_bound` Contract
 
 Pins what `mass_bound` leaves behind: a bound whose shape mirrors the generator's, built from one
-`@[mass_bound]` rule per combinator, and the message for a combinator that has no rule.
+`@[gen_rule]` rule per combinator, and the message for a combinator that has no rule.
 -/
 
 namespace MassBoundTest
@@ -50,7 +50,7 @@ example (b : Bool) : (0 : ℝ≥0∞) ≤ (gen b : SPMF Nat).mass := by
 /--
 error: mass_bound: no rule, hypothesis, or `.terminates` law bounds the mass of
   g
-Tag a lower bound for it `@[mass_bound]`, or pass one to `mass_bound [_]`.
+Tag a lower bound for it `@[gen_rule]`, or pass one to `mass_bound [_]`.
 -/
 #guard_msgs in
 example (g : SPMF Nat) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
@@ -119,5 +119,54 @@ example (g : Nat → SPMF Nat) (c : Nat → ℝ≥0∞) (hrec : ∀ j, c j ≤ (
   mass_bound
   trace_state
   exact zero_le
+
+-- A continuation whose bound depends on a value drawn from anything else falls back to the worst
+-- case over every value.
+/--
+trace: ⊢ 1 ≤ 1 * ⨅ x, 1 ^ x
+-/
+#guard_msgs in
+example : (1 : ℝ≥0∞) ≤
+    (elements [1, 2] (by simp) >>= fun k => vectorOf k (pure 0) : SPMF (List Nat)).mass := by
+  mass_bound
+  trace_state
+  simp
+
+/-- A drawn value is named after its binder, so a fact passed for a sub-generator can mention it. -/
+example (g : Nat → SPMF Nat) (h : ∀ k, k ≤ 3 → 1 ≤ (g k).mass) :
+    (1 : ℝ≥0∞) ≤ (ULift.down <$> choose 0 3 (by omega) >>= fun k => g k.1 : SPMF Nat).mass := by
+  mass_bound [h k.1 k.2.2]
+  simp
+
+/-- A fact over a subtype is matched through the value alone. -/
+example (g : Nat → SPMF Nat) (h : ∀ k : {k // 0 ≤ k ∧ k ≤ 3}, 1 ≤ (g k.1).mass) :
+    (1 : ℝ≥0∞) ≤ (ULift.down <$> choose 0 3 (by omega) >>= fun k => g k.1 : SPMF Nat).mass := by
+  mass_bound
+  simp
+
+/-- A fact's premise that its use does not determine is found among the hypotheses. -/
+example (b : Bool) (g : SPMF Nat) (h : b = true → 1 ≤ g.mass) :
+    (1 : ℝ≥0∞) ≤ (if b = true then g else pure 0 : SPMF Nat).mass := by
+  mass_bound
+  simp
+
+/-- A generator over a long literal alphabet, and one that calls it. -/
+def longChars : List Char :=
+  (List.range 32).map (fun i => Char.ofNat (i + 32)) ++ (List.range 96).map (fun i => Char.ofNat (i + 128))
+
+def genLongChar [Gen G] : G Char := elements longChars (by simp [longChars])
+
+theorem genLongChar.terminates : IsAlmostSurelyTerminating (genLongChar : SPMF Char) := by
+  mass_fixpoint using SPMF.LfpIsOne.one
+  simp
+
+def genLongText [Gen G] (n : Nat) : G (List Char) := listOfMaxLength n genLongChar
+
+/-- A hypothesis about another generator is not tried as a leaf: unifying it with the callee would
+unfold both, and the literal alphabet exceeds the recursion depth. -/
+example (c : ℝ≥0∞) (_hrec : ∀ _ : Unit, c ≤ (genLongText n : SPMF (List Char)).mass) :
+    (1 : ℝ≥0∞) ≤ (genLongChar : SPMF Char).mass := by
+  mass_bound
+  simp
 
 end MassBoundTest

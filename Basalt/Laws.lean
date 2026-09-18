@@ -38,6 +38,9 @@ def IsAlmostSurelyTerminating (g : SPMF α) : Prop :=
 def IsCostBounded (g : SPMF.Cost α) (c : α → Nat) : Prop :=
   IsBounded g c
 
+theorem IsCostBounded.isBounded {g : SPMF.Cost α} {c : α → Nat} (h : IsCostBounded g c) :
+    IsBounded g c := h
+
 /-- A partial generator `IsFilterFree` if all of its mass lands on *successful* outcomes: it never
   actually fails.  -/
 def IsFilterFree (g : SPMF (Option α)) : Prop :=
