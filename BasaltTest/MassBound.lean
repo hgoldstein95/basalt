@@ -13,12 +13,13 @@ open RandomChoice ArbNat ENNReal
 # The `mass_bound` Contract
 
 Pins what `mass_bound` leaves behind: a bound whose shape mirrors the generator's, built from one
-`@[gen_rule]` rule per combinator, and the message for a combinator that has no rule.
+`@[gen_rule]` rule per combinator and walked through the unfolding of any other definition, and the
+message for a generator that has neither.
 -/
 
 namespace MassBoundTest
 
-/-- One branch per combinator the library has a rule for. `Nat.arbitrary` is a callee, not a
+/-- One branch per combinator that takes no generator argument. `Nat.arbitrary` is a callee, not a
 combinator: the tactic finds its `.terminates` law by name. -/
 def gen [Gen G] (b : Bool) : G Nat := do
   let x ← oneOf [
@@ -55,6 +56,17 @@ Tag a lower bound for it `@[gen_rule]`, or pass one to `mass_bound [_]`.
 #guard_msgs in
 example (g : SPMF Nat) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
   mass_bound
+
+-- A definition with no rule and no law is unfolded: `optionGen`'s body draws a coin and branches on
+-- it.
+/--
+trace: ⊢ 1 ≤ 1 * min (1 * 1) 1
+-/
+#guard_msgs in
+example : (1 : ℝ≥0∞) ≤ (optionGen Nat.arbitrary : SPMF (Option Nat)).mass := by
+  mass_bound
+  trace_state
+  simp
 
 /-- The same generator, bounded by a fact the caller supplies instead. -/
 example (g : SPMF Nat) (hg : SPMF.IsPMF g) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by

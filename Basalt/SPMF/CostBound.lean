@@ -101,18 +101,12 @@ theorem always_dite {p : Prop} [Decidable p] {x : p → SPMF.Cost α} {y : ¬p �
 
 @[gen_rule]
 theorem always_choose {lo hi : Nat} {h : lo ≤ hi}
-    {Q : ULift {x : Nat // lo ≤ x ∧ x ≤ hi} → Nat → Prop} (hq : ∀ a, Q a 1) :
+    {Q : ULift {x : Nat // lo ≤ x ∧ x ≤ hi} → Nat → Prop}
+    (hq : ∀ x (hx : lo ≤ x ∧ x ≤ hi), Q ⟨⟨x, hx⟩⟩ 1) :
     Always (choose lo hi h : SPMF.Cost (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) Q := by
-  rintro ⟨a, n⟩ ha
+  rintro ⟨⟨⟨x, hx⟩⟩, n⟩ ha
   obtain rfl := mem_support_choose_iff.mp ha
-  exact hq a
-
-@[gen_rule]
-theorem always_chooseNat {lo hi : Nat} {h : lo ≤ hi} {Q : Nat → Nat → Prop}
-    (hq : ∀ a, lo ≤ a ∧ a ≤ hi → Q a 1) : Always (chooseNat lo hi h : SPMF.Cost Nat) Q := by
-  rintro ⟨a, n⟩ ha
-  obtain ⟨hlo, rfl⟩ := mem_support_chooseNat_iff.mp ha
-  exact hq a hlo
+  exact hq x hx
 
 @[gen_rule]
 theorem always_chooseInt {lo hi : Int} {h : lo ≤ hi} {Q : Int → Nat → Prop}
@@ -125,14 +119,14 @@ theorem always_chooseInt {lo hi : Int} {h : lo ≤ hi} {Q : Int → Nat → Prop
 theorem always_elements {xs : List α} {hne : xs ≠ []} {Q : α → Nat → Prop}
     (hq : ∀ a, a ∈ xs → Q a 1) : Always (elements xs hne : SPMF.Cost α) Q := by
   unfold elements
-  refine always_bind (always_map (always_choose fun ⟨i, hge, hle⟩ => ?_))
+  refine always_bind (always_map (always_choose fun i ⟨hge, hle⟩ => ?_))
   exact always_pure (by simpa using hq _ (List.getElem_mem _))
 
 @[gen_rule]
 theorem always_coin {r : Rat} {Q : Bool → Nat → Prop} (hq : ∀ a, Q a 1) :
     Always (coin r : SPMF.Cost Bool) Q := by
   unfold coin
-  refine always_bind (always_choose fun k => always_ite ?_ ?_) <;>
+  refine always_bind (always_choose fun k _ => always_ite ?_ ?_) <;>
     exact fun _ => always_pure (hq _)
 
 @[gen_rule]
@@ -140,7 +134,7 @@ theorem always_oneOf {gs : List (Unit → SPMF.Cost α)} {hne : gs ≠ []} {Q : 
     (h : AllBranches (fun g => Always (g ()) fun a n => Q a (1 + n)) gs) :
     Always (oneOf gs hne : SPMF.Cost α) Q := by
   unfold oneOf Helpers.oneOfAux
-  refine always_bind (always_map (always_choose fun ⟨i, hge, hle⟩ => ?_))
+  refine always_bind (always_map (always_choose fun i ⟨hge, hle⟩ => ?_))
   exact allBranches_iff.mp h _ (List.getElem_mem _)
 
 @[gen_rule]
@@ -148,7 +142,7 @@ theorem always_frequency {gs : List (Nat × (Unit → SPMF.Cost α))} {hw : 0 < 
     {Q : α → Nat → Prop} (h : AllBranches (fun wg => Always (wg.2 ()) fun a n => Q a (1 + n)) gs) :
     Always (frequency gs hw : SPMF.Cost α) Q := by
   unfold frequency Helpers.frequencyAux
-  refine always_bind (always_map (always_choose fun ⟨i, _, _⟩ => ?_))
+  refine always_bind (always_map (always_choose fun i _ => ?_))
   dsimp only
   split
   · obtain ⟨w, g, hg, -, heq⟩ := frequencySelect_mem ‹_›
@@ -241,7 +235,7 @@ theorem always_listOfMaxLength {k : Nat} {Q : List α → Nat → Prop} (hg : Is
     (hq : ∀ a n, n ≤ 1 + (a.map c).sum → Q a n) :
     Always (listOfMaxLength k g : SPMF.Cost (List α)) Q := by
   unfold listOfMaxLength
-  exact always_bind (always_map (always_choose fun ⟨_, _⟩ =>
+  exact always_bind (always_map (always_choose fun _ _ =>
     always_vectorOf hg fun a n hn => hq a (1 + n) (by omega)))
 
 private theorem isBounded_listOf (hg : IsBounded g c) :
@@ -273,20 +267,6 @@ theorem always_nonEmptyListOf {Q : List α → Nat → Prop}
     (hg : IsBounded g c) (hq : ∀ a n, n ≤ a.length + (a.map c).sum → Q a n) :
     Always (nonEmptyListOf g : SPMF.Cost (List α)) Q :=
   Always.of_isBounded (isBounded_nonEmptyListOf hg) hq
-
-@[gen_rule]
-theorem always_biasedOptionGen {r : Rat} {Q : Option α → Nat → Prop} (hg : IsBounded g c)
-    (hq : ∀ a n, n ≤ 1 + a.elim 0 c → Q a n) :
-    Always (biasedOptionGen r g : SPMF.Cost (Option α)) Q := by
-  unfold biasedOptionGen
-  cost_bound
-  all_goals apply hq; simp only [Option.elim]; omega
-
-@[gen_rule]
-theorem always_optionGen {Q : Option α → Nat → Prop} (hg : IsBounded g c)
-    (hq : ∀ a n, n ≤ 1 + a.elim 0 c → Q a n) :
-    Always (optionGen g : SPMF.Cost (Option α)) Q :=
-  always_biasedOptionGen hg hq
 
 end generatorArgument
 
@@ -355,11 +335,6 @@ theorem isBounded_choose {lo hi : Nat} {h : lo ≤ hi} :
   cost_bound; omega
 
 @[gen_rule]
-theorem isBounded_chooseNat {lo hi : Nat} {h : lo ≤ hi} :
-    IsBounded (chooseNat lo hi h : SPMF.Cost Nat) fun _ => 1 := by
-  cost_bound; omega
-
-@[gen_rule]
 theorem isBounded_chooseInt {lo hi : Int} {h : lo ≤ hi} :
     IsBounded (chooseInt lo hi h : SPMF.Cost Int) fun _ => 1 := by
   cost_bound; omega
@@ -409,20 +384,8 @@ theorem isBounded_listOfMaxLength {n : Nat} {g : SPMF.Cost α} {k : Nat}
     IsBounded (listOfMaxLength n g : SPMF.Cost (List α)) fun _ => 1 + n * k := by
   unfold listOfMaxLength
   refine isBounded_iff_always.mpr (always_bind (always_map (always_choose ?_)))
-  rintro ⟨j, -, hj⟩
+  rintro j ⟨-, hj⟩
   exact isBounded_le (isBounded_vectorOf hg) (Nat.mul_le_mul_right k hj) fun _ _ _ => by omega
-
-@[gen_rule]
-theorem isBounded_biasedOptionGen {r : Rat} {g : SPMF.Cost α} {k : Nat}
-    (hg : IsBounded g fun _ => k) :
-    IsBounded (biasedOptionGen r g : SPMF.Cost (Option α)) fun _ => 1 + k := by
-  cost_bound
-  cases x <;> simp only [Option.elim] at * <;> omega
-
-@[gen_rule]
-theorem isBounded_optionGen {g : SPMF.Cost α} {k : Nat} (hg : IsBounded g fun _ => k) :
-    IsBounded (optionGen g : SPMF.Cost (Option α)) fun _ => 1 + k :=
-  isBounded_biasedOptionGen hg
 
 end worstCase
 

@@ -75,11 +75,47 @@ example : IsCostBounded (nonEmptyListOf Nat.arbitrary)
     (fun xs => xs.length + (xs.map (· + 1)).sum) := by
   cost_bound; omega
 
+-- A definition with no rule is unfolded and walked through: one goal per path through its body, the
+-- draws it names under its names, and those it does not under the goal's.
+/--
+trace: o : Bool
+h : o = true
+x n_x : ℕ
+h_x : n_x ≤ x + 1
+⊢ 1 + (n_x + 0) ≤ 1 + (some x).elim 0 fun x => x + 1
+
+o : Bool
+h : ¬o = true
+⊢ 1 + 0 ≤ 1 + none.elim 0 fun x => x + 1
+-/
+#guard_msgs in
 example : IsCostBounded (optionGen Nat.arbitrary) (fun o => 1 + o.elim 0 (· + 1)) := by
-  cost_bound; omega
+  cost_bound
+  trace_state
+  all_goals simp only [Option.elim]; omega
 
 example : IsCostBounded (biasedOptionGen (1 / 4) Nat.arbitrary) (fun o => 1 + o.elim 0 (· + 1)) := by
-  cost_bound; omega
+  cost_bound
+  all_goals simp only [Option.elim]; omega
+
+/-- A helper with no law. -/
+def twoDigits [Gen G] : G (Nat × Nat) := do
+  let d₁ ← chooseNat 0 9
+  let d₂ ← chooseNat 0 9
+  return (d₁, d₂)
+
+/--
+trace: d₁ : ℕ
+h_d₁ : 0 ≤ d₁ ∧ d₁ ≤ 9
+d₂ : ℕ
+h_d₂ : 0 ≤ d₂ ∧ d₂ ≤ 9
+⊢ 1 + (1 + 0) + 0 ≤ 2
+-/
+#guard_msgs in
+example : IsCostBounded (twoDigits >>= fun p => pure (p.1 + p.2)) (fun _ => 2) := by
+  cost_bound
+  trace_state
+  omega
 
 /--
 error: cost_bound: no rule, hypothesis, or `.cost_bounded` law bounds the cost of
@@ -88,6 +124,22 @@ Tag a rule for it `@[gen_rule]`, or pass a cost bound to `cost_bound [_]`.
 -/
 #guard_msgs in
 example (g : SPMF.Cost Nat) : IsCostBounded (g >>= fun _ => pure 0) (fun _ => 1) := by
+  cost_bound
+
+/-- A helper whose body draws from its argument. -/
+def twice [Gen G] (g : G Nat) : G Nat := do
+  let a ← g
+  let b ← g
+  return a + b
+
+/--
+error: cost_bound: no rule, hypothesis, or `.cost_bounded` law bounds the cost of
+  g
+Tag a rule for it `@[gen_rule]`, or pass a cost bound to `cost_bound [_]`.
+(in the unfolding of `CostBoundTest.twice`)
+-/
+#guard_msgs in
+example (g : SPMF.Cost Nat) : IsCostBounded (twice g) (fun _ => 1) := by
   cost_bound
 
 /--
