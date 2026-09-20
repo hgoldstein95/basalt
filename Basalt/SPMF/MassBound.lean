@@ -114,10 +114,6 @@ theorem le_mass_choose {lo hi : Nat} {h : lo ≤ hi} :
   (mass_choose lo hi h).ge
 
 @[gen_rule]
-theorem le_mass_chooseNat {lo hi : Nat} {h : lo ≤ hi} :
-    (1 : ℝ≥0∞) ≤ (chooseNat lo hi h : SPMF Nat).mass := (mass_chooseNat lo hi h).ge
-
-@[gen_rule]
 theorem le_mass_chooseInt {lo hi : Int} {h : lo ≤ hi} :
     (1 : ℝ≥0∞) ≤ (chooseInt lo hi h : SPMF Int).mass := (mass_chooseInt lo hi h).ge
 
@@ -242,17 +238,5 @@ theorem le_mass_listOfMaxLength {n : Nat} {g : SPMF α} {c : ℝ≥0∞} (hg : c
     (pow_le_pow_right_of_le_one' (min_le_left 1 c) hk.2).trans
       ((pow_le_pow_left' (min_le_right 1 c) k).trans (le_mass_vectorOf hg)))
   rw [one_mul]
-
-@[gen_rule]
-theorem le_mass_biasedOptionGen {r : Rat} {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ g.mass) :
-    min 1 c ≤ (biasedOptionGen r g : SPMF (Option α)).mass := by
-  unfold biasedOptionGen
-  mass_bound
-  simp [min_comm]
-
-@[gen_rule]
-theorem le_mass_optionGen {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ g.mass) :
-    min 1 c ≤ (optionGen g : SPMF (Option α)).mass :=
-  le_mass_biasedOptionGen hg
 
 end SPMF

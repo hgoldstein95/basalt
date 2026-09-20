@@ -166,6 +166,56 @@ def law? (j : Judgment) (g : Expr) : MetaM (Option Expr) := do
   unless (← getEnv).contains (head ++ j.lawSuffix) do return none
   return some (← mkConstWithFreshMVarLevels (head ++ j.lawSuffix))
 
+/-! ## Reading a recursive definition -/
+
+/-- `gen.fixpoint_induct`, and the positions of `gen`'s arguments it abstracts: those some recursive
+call changes, as `partial_fixpoint` decided. `none` when `gen` is not a `partial_fixpoint`. -/
+def fixpointSeed? (gen : Name) : MetaM (Option (Name × Array Nat)) := do
+  let ind := gen ++ `fixpoint_induct
+  unless (← getEnv).contains ind do
+    unless isReservedName (← getEnv) ind do return none
+    executeReservedNameAction ind
+  let (_, _, concl) ← forallMetaTelescope (← inferType (← mkConstWithFreshMVarLevels ind))
+  let F := concl.appArg!
+  return some (ind, ← forallTelescope (← whnf (← inferType F)) fun ys _ => do
+    let body := (mkAppN F ys).headBeta
+    ys.mapM fun y => do
+      let some k := body.getAppArgs.findIdx? (· == y)
+        | throwError "`{gen}`'s fixpoint abstracts something other than an argument"
+      return k)
+
+/-! ## Unfolding a definition -/
+
+/-- The binder name a hygienic lambda of an unfolded body carries (`(·.down.val)`, a `do` block's
+`← e`). `namePremises` takes it as no hint, so what it binds is named after the goal's
+postcondition, as any hint-less draw is. -/
+def unfoldedBinder : Name := `_unfolded
+
+private partial def renameLambdas : Expr → Expr
+  | .lam n d b bi =>
+    .lam (if n.hasMacroScopes then unfoldedBinder else n) (renameLambdas d) (renameLambdas b) bi
+  | .forallE n d b bi => .forallE n (renameLambdas d) (renameLambdas b) bi
+  | .app f a => .app (renameLambdas f) (renameLambdas a)
+  | .letE n t v b nd => .letE n (renameLambdas t) (renameLambdas v) (renameLambdas b) nd
+  | .mdata m e => .mdata m (renameLambdas e)
+  | .proj s i e => .proj s i (renameLambdas e)
+  | e => e
+
+/-- `g` with its head unfolded one step, when the head is a non-recursive definition with no rule:
+a derived combinator or a helper, which is walked through rather than taught to the walker. A
+combinator with a rule, a recursive definition, a matcher, a projection, and an instance are not
+unfolded. Returns the head's name with the body. -/
+def unfold? (g : Expr) : MetaM (Option (Name × Expr)) := do
+  let .const c us := g.getAppFn | return none
+  let env ← getEnv
+  if isCombinator env c || isMatcherCore env c || env.isProjectionFn c then return none
+  if ← isInstance c then return none
+  let some (.defnInfo info) := env.find? c | return none
+  if ← isRecursiveDefinition c then return none
+  if (← observing? (fixpointSeed? c)).join.isSome then return none
+  let v ← instantiateValueLevelParams (.defnInfo info) us
+  return some (c, (renameLambdas v).beta g.getAppArgs)
+
 /-! ## Names
 
 What the walk leaves is stated over the values the generator drew, under the generator's names. A
@@ -248,7 +298,7 @@ private def namePremises (g? : Option Expr) (goalTy : Expr) (premises : List MVa
         (([] : List (Option Name)), hints.toList)
       pure out
   (premises.zip (types.zip hints)).mapM fun (p, t, hint) => do
-    p.replaceTargetDefEq (← nameBinders t hint post)
+    p.replaceTargetDefEq (← nameBinders t (hint.filter (· != unfoldedBinder)) post)
 
 mutual
 
@@ -347,27 +397,15 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
       ruleErr := some ex
       saved.restore
   if let some ex := ruleErr then throw ex
+  -- Unfolding comes last, so that a law or a caller's fact stays an abstraction boundary.
+  for g' in forms do
+    if let some (c, body) ← unfold? g' then
+      let goal ← goal.change (restate body)
+      try return ← walk extras goal
+      catch ex => throwError "{ex.toMessageData}\n(in the unfolding of `{c}`)"
   throwError j.noLeaf g
 
 end
-
-/-! ## Reading a recursive definition -/
-
-/-- `gen.fixpoint_induct`, and the positions of `gen`'s arguments it abstracts: those some recursive
-call changes, as `partial_fixpoint` decided. `none` when `gen` is not a `partial_fixpoint`. -/
-def fixpointSeed? (gen : Name) : MetaM (Option (Name × Array Nat)) := do
-  let ind := gen ++ `fixpoint_induct
-  unless (← getEnv).contains ind do
-    unless isReservedName (← getEnv) ind do return none
-    executeReservedNameAction ind
-  let (_, _, concl) ← forallMetaTelescope (← inferType (← mkConstWithFreshMVarLevels ind))
-  let F := concl.appArg!
-  return some (ind, ← forallTelescope (← whnf (← inferType F)) fun ys _ => do
-    let body := (mkAppN F ys).headBeta
-    ys.mapM fun y => do
-      let some k := body.getAppArgs.findIdx? (· == y)
-        | throwError "`{gen}`'s fixpoint abstracts something other than an argument"
-      return k)
 
 /-- The user-facing name of `gen`'s `k`th binder. -/
 def binderName (gen : Name) (k : Nat) : MetaM Name :=

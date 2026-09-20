@@ -39,8 +39,9 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). `mass` and its equations:
   [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
 - **The generator walker and its `@[gen_rule]` rules** — one rule per (judgment, combinator), later
-  ones fallbacks; the judgments and the registries (rules, and the `@[gen_branches]` relations that
-  collect a list combinator's branches) are
+  ones fallbacks, and a non-recursive definition with none is unfolded; the judgments and the
+  registries (rules, and the `@[gen_branches]` relations that collect a list combinator's branches)
+  are
   [Basalt/SPMF/Walk/Attr.lean](Basalt/SPMF/Walk/Attr.lean), the walk is
   [Basalt/SPMF/Walk.lean](Basalt/SPMF/Walk.lean). The mass rules and the `mass_bound` tactic are
   [Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean), contract pinned by

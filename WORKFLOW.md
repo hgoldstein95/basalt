@@ -224,6 +224,8 @@ generator is yours to supply:
 - a **callee** is discharged by its own `<callee>.terminates` law, found by the naming convention
   (Part 2 above) — `Nat.arbitrary` inside a body needs no mention. Any other fact is passed
   explicitly: `mass_fixpoint [h₁, h₂] using …`.
+- a **helper with no law**, or a combinator with no rule (`optionGen`), is unfolded and walked
+  through when it is not recursive.
 - an **`if`/`dite`** is no different from any other combinator: the bound is the same conditional
   over the branches' bounds, which the arithmetic `split`s — `Tree.genBST` (`BST.lean`) shortcuts on
   an exhausted interval. A conditional on a value drawn inside the step cannot appear in the bound,
@@ -288,8 +290,9 @@ leave. Nothing about the generator is yours to supply:
 
 - a **recursive occurrence** is bounded by `ih`, at whatever arguments it is called with.
 - a **callee** is bounded by its own `<callee>.cost_bounded` law, found by the naming convention
-  (Part 2 above). Any other cost bound is passed explicitly: `cost_fixpoint [h₁, h₂]`.
-- a **combinator that takes a generator** (`listOf`, `optionGen`, …) asks for that generator's cost
+  (Part 2 above). Any other cost bound is passed explicitly: `cost_fixpoint [h₁, h₂]`. A
+  non-recursive helper with no law is unfolded and walked through instead.
+- a **combinator that takes a generator** (`listOf`, `vectorOf`, …) asks for that generator's cost
   law the same way, and the goal states the combinator's bound in terms of it —
   `String.arbitrary_cost` (`ArbString.lean`). A combinator term in that position, which has no law,
   is bounded by its worst case: the most choices any of its runs makes.
@@ -320,12 +323,14 @@ definition to unfold, is `cost_bound` alone (`BasaltTest/CostBound.lean`). A gen
 - **`cost_bound` says nothing bounds the cost of a sub-generator** → it is a callee whose cost law is
   under another name, or the generator argument of a combinator that has no law of its own and no
   worst case (it recurses, or draws from something that does); pass a bound for it:
-  `cost_fixpoint [h]`. A combinator with no `@[gen_rule]` cost rule gets the same message (tag one).
-- **`mass_bound` says nothing bounds the mass of a sub-generator** → it is a combinator with no
-  `@[gen_rule]` mass rule (tag one), a callee whose termination law is under another name (pass it:
-  `mass_bound [h]`), or a recursive occurrence whose fact needs a premise that neither unification
-  nor a hypothesis supplies (`m < n` for a size computed from a draw). Pass that fact instantiated;
-  the drawn values are in scope under the generator's names (`mass_bound [ih _ (… k₁ …)]`).
+  `cost_fixpoint [h]`. A recursive combinator with no `@[gen_rule]` cost rule gets the same message
+  (tag one).
+- **`mass_bound` says nothing bounds the mass of a sub-generator** → it is a recursive combinator
+  with no `@[gen_rule]` mass rule (tag one), a callee whose termination law is under another name
+  (pass it: `mass_bound [h]`), or a recursive occurrence whose fact needs a premise that neither
+  unification nor a hypothesis supplies (`m < n` for a size computed from a draw). Pass that fact
+  instantiated; the drawn values are in scope under the generator's names
+  (`mass_bound [ih _ (… k₁ …)]`).
 - **`mass_bound` leaves `⨅ x, …`** → a continuation's bound depends on a value drawn from something
   other than a uniform pivot (which is averaged instead), so the bound is its worst case over every
   value.
