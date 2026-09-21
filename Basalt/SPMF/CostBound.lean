@@ -24,6 +24,11 @@ def Always (g : SPMF.Cost α) (Q : α → Nat → Prop) : Prop :=
 theorem isBounded_iff_always {g : SPMF.Cost α} {c : α → Nat} :
     IsBounded g c ↔ Always g (fun a n => n ≤ c a) := Iff.rfl
 
+/-- `Always`, read through a specification the always observation equals. -/
+theorem always_of_obs {g : SPMF.Cost α} {w : WPC Mix.demonic α} (h : alwaysObs.spec g = w)
+    {Q : α → Nat → Prop} : Always g Q ↔ w Q :=
+  iff_of_eq (congrFun h Q)
+
 /-! ## Leaves -/
 
 /-- A cost bound is a postcondition, up to consequence. -/
@@ -52,36 +57,29 @@ theorem admissible_Always (Q : α → Nat → Prop) :
 
 One per combinator, each concluding `Always (<combinator> …) Q` for an arbitrary `Q` and asking the
 sub-generators for the postcondition that makes it true: costs add along a bind, and a random choice
-costs `1`. -/
+costs `1`. That accounting is `WPC`'s, so each rule is the combinator's `Obs.map_*` read through
+`alwaysObs`. -/
 
 @[gen_rule]
 theorem always_pure {a : α} {Q : α → Nat → Prop} (h : Q a 0) :
-    Always (Pure.pure a : SPMF.Cost α) Q := by
-  rintro ⟨b, n⟩ hb
-  obtain ⟨rfl, rfl⟩ := mem_support_pure_iff.mp hb
-  exact h
+    Always (Pure.pure a : SPMF.Cost α) Q :=
+  (always_of_obs (alwaysObs.map_pure a)).mpr h
 
 @[gen_rule]
 theorem always_bind {x : SPMF.Cost α} {f : α → SPMF.Cost β} {Q : β → Nat → Prop}
-    (h : Always x fun a n => Always (f a) fun b m => Q b (n + m)) : Always (x >>= f) Q := by
-  rintro ⟨b, k⟩ hb
-  obtain ⟨a, n, m, ha, hb', rfl⟩ := mem_support_bind_iff.mp hb
-  exact h (a, n) ha (b, m) hb'
+    (h : Always x fun a n => Always (f a) fun b m => Q b (n + m)) : Always (x >>= f) Q :=
+  (always_of_obs (alwaysObs.map_bind x f)).mpr h
 
 @[gen_rule]
 theorem always_map {x : SPMF.Cost α} {f : α → β} {Q : β → Nat → Prop}
-    (h : Always x fun a n => Q (f a) n) : Always (f <$> x) Q := by
-  rintro ⟨b, n⟩ hb
-  obtain ⟨a, ha, rfl⟩ := mem_support_map_iff.mp hb
-  exact h (a, n) ha
+    (h : Always x fun a n => Q (f a) n) : Always (f <$> x) Q :=
+  (always_of_obs (alwaysObs.map_map f x)).mpr h
 
 @[gen_rule]
 theorem always_pick {x y : Unit → SPMF.Cost α} {Q : α → Nat → Prop}
     (hx : Always (x ()) fun a n => Q a (1 + n)) (hy : Always (y ()) fun a n => Q a (1 + n)) :
-    Always (pick x y) Q := by
-  rintro ⟨a, k⟩ ha
-  obtain ⟨n, rfl, h | h⟩ := mem_support_pick_iff.mp ha
-  exacts [hx (a, n) h, hy (a, n) h]
+    Always (pick x y) Q :=
+  (always_of_obs (alwaysObs.map_pick x y)).mpr ((Mix.binary_demonic _).mpr ⟨hx, hy⟩)
 
 @[gen_rule]
 theorem always_ite {p : Prop} [Decidable p] {x y : SPMF.Cost α} {Q : α → Nat → Prop}
@@ -103,52 +101,46 @@ theorem always_dite {p : Prop} [Decidable p] {x : p → SPMF.Cost α} {y : ¬p �
 theorem always_choose {lo hi : Nat} {h : lo ≤ hi}
     {Q : ULift {x : Nat // lo ≤ x ∧ x ≤ hi} → Nat → Prop}
     (hq : ∀ x (hx : lo ≤ x ∧ x ≤ hi), Q ⟨⟨x, hx⟩⟩ 1) :
-    Always (choose lo hi h : SPMF.Cost (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) Q := by
-  rintro ⟨⟨⟨x, hx⟩⟩, n⟩ ha
-  obtain rfl := mem_support_choose_iff.mp ha
-  exact hq x hx
+    Always (choose lo hi h : SPMF.Cost (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})) Q :=
+  (always_of_obs (alwaysObs.map_choose lo hi h)).mpr ((Mix.range_demonic _).mpr hq)
 
 @[gen_rule]
 theorem always_chooseInt {lo hi : Int} {h : lo ≤ hi} {Q : Int → Nat → Prop}
-    (hq : ∀ a, lo ≤ a ∧ a ≤ hi → Q a 1) : Always (chooseInt lo hi h : SPMF.Cost Int) Q := by
-  rintro ⟨a, n⟩ ha
-  obtain ⟨hlo, rfl⟩ := mem_support_chooseInt_iff.mp ha
-  exact hq a hlo
+    (hq : ∀ a, lo ≤ a ∧ a ≤ hi → Q a 1) : Always (chooseInt lo hi h : SPMF.Cost Int) Q :=
+  (always_of_obs (alwaysObs.map_chooseInt lo hi h)).mpr
+    ((Mix.range_demonic _).mpr fun x hx => hq (lo + x) ⟨by omega, by omega⟩)
 
 @[gen_rule]
 theorem always_elements {xs : List α} {hne : xs ≠ []} {Q : α → Nat → Prop}
-    (hq : ∀ a, a ∈ xs → Q a 1) : Always (elements xs hne : SPMF.Cost α) Q := by
-  unfold elements
-  refine always_bind (always_map (always_choose fun i ⟨hge, hle⟩ => ?_))
-  exact always_pure (by simpa using hq _ (List.getElem_mem _))
+    (hq : ∀ a, a ∈ xs → Q a 1) : Always (elements xs hne : SPMF.Cost α) Q :=
+  (always_of_obs (alwaysObs.map_elements xs hne)).mpr
+    ((Mix.index_demonic xs hne fun a => Q a 1).mpr hq)
 
 @[gen_rule]
 theorem always_coin {r : Rat} {Q : Bool → Nat → Prop} (hq : ∀ a, Q a 1) :
     Always (coin r : SPMF.Cost Bool) Q := by
-  unfold coin
-  refine always_bind (always_choose fun k _ => always_ite ?_ ?_) <;>
-    exact fun _ => always_pure (hq _)
+  refine (always_of_obs (alwaysObs.map_coin r)).mpr ?_
+  simp only [coin, WPC.choose_bind_apply, WPC.ite_apply]
+  exact (Mix.threshold_demonic r.den_pos _ _).mpr ⟨fun _ => hq true, fun _ => hq false⟩
 
 @[gen_rule]
 theorem always_oneOf {gs : List (Unit → SPMF.Cost α)} {hne : gs ≠ []} {Q : α → Nat → Prop}
     (h : AllBranches (fun g => Always (g ()) fun a n => Q a (1 + n)) gs) :
-    Always (oneOf gs hne : SPMF.Cost α) Q := by
-  unfold oneOf Helpers.oneOfAux
-  refine always_bind (always_map (always_choose fun i ⟨hge, hle⟩ => ?_))
-  exact allBranches_iff.mp h _ (List.getElem_mem _)
+    Always (oneOf gs hne : SPMF.Cost α) Q :=
+  (always_of_obs (alwaysObs.map_oneOf gs hne)).mpr
+    ((Mix.index_demonic gs hne fun g => Always (g ()) fun a n => Q a (1 + n)).mpr
+      (allBranches_iff.mp h))
 
 @[gen_rule]
 theorem always_frequency {gs : List (Nat × (Unit → SPMF.Cost α))} {hw : 0 < (gs.map Prod.fst).sum}
     {Q : α → Nat → Prop} (h : AllBranches (fun wg => Always (wg.2 ()) fun a n => Q a (1 + n)) gs) :
     Always (frequency gs hw : SPMF.Cost α) Q := by
-  unfold frequency Helpers.frequencyAux
-  refine always_bind (always_map (always_choose fun i _ => ?_))
-  dsimp only
-  split
-  · obtain ⟨w, g, hg, -, heq⟩ := frequencySelect_mem ‹_›
-    rw [heq]
-    exact allBranches_iff.mp h (w, g) hg
-  · exact fun _ hp => absurd rfl hp
+  refine (always_of_obs (alwaysObs.map_frequency gs hw (alwaysObs.spec default))).mpr ?_
+  simp only [WPC.choose_bind_apply,
+    Obs.selectD_map (fun w : WPC Mix.demonic α => w fun a n => Q a (1 + n)), List.map_map]
+  refine (Mix.select_demonic _ (by simp [Function.comp_def]) hw _).mpr fun p hp _ => ?_
+  obtain ⟨wg, hwg, rfl⟩ := List.mem_map.mp hp
+  exact allBranches_iff.mp h wg hwg
 
 /-- `permutationOf` draws one insertion index per element of `xs`, so it costs `xs.length`. -/
 @[gen_rule]
