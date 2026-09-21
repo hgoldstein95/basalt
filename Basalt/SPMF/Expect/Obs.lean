@@ -225,8 +225,8 @@ theorem expect_frequency {gs : List (Nat × (Unit → SPMF α))}
     expect (frequency gs h) f
       = (gs.map fun p => (p.1 : ℝ≥0∞) * expect (p.2 ()) f).sum
           / (((gs.map Prod.fst).sum : ℕ) : ℝ≥0∞) := by
-  refine (congrFun (expectObs.map_frequency gs h (expectObs.spec default)) f).trans ?_
-  simp only [WP.choose_bind_apply, Obs.selectD_map (fun w : WP Mix.average α => w f), List.map_map]
+  refine (congrFun (expectObs.map_frequency gs h) f).trans ?_
+  simp only [Obs.select, WP.choose_bind_apply, Obs.selectD_map (fun w : WP Mix.average α => w f), List.map_map]
   refine (Mix.select_average _ ?_ h _).trans ?_
   · simp [Function.comp_def]
   · simp [Function.comp_def, expectObs]

@@ -453,8 +453,8 @@ theorem expect_frequency {gs : List (Nat × (Unit → SPMF.Cost α))}
     SPMF.expect (frequency gs h : SPMF.Cost α) φ
       = (gs.map fun p => (p.1 : ℝ≥0∞) * SPMF.expect (p.2 ()) fun q => φ (q.1, 1 + q.2)).sum
           / (((gs.map Prod.fst).sum : ℕ) : ℝ≥0∞) := by
-  refine (expect_of_obs (expectObs.map_frequency gs h (expectObs.spec default)) φ).trans ?_
-  simp only [WPC.choose_bind_apply,
+  refine (expect_of_obs (expectObs.map_frequency gs h) φ).trans ?_
+  simp only [Obs.select, WPC.choose_bind_apply,
     Obs.selectD_map (fun w : WPC Mix.average α => w fun b n => φ (b, 1 + n)), List.map_map]
   refine (Mix.select_average _ ?_ h _).trans ?_
   · simp [Function.comp_def]

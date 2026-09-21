@@ -529,8 +529,8 @@ theorem support_frequency
     (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
     support (frequency gs h_pos) = {a | ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support} := by
   ext a
-  refine (mem_support_of_may (mayObs.map_frequency gs h_pos (mayObs.spec default))).trans ?_
-  simp only [WP.choose_bind_apply, Obs.selectD_map (fun w : WP Mix.angelic α => w (· = a)), List.map_map]
+  refine (mem_support_of_may (mayObs.map_frequency gs h_pos)).trans ?_
+  simp only [Obs.select, WP.choose_bind_apply, Obs.selectD_map (fun w : WP Mix.angelic α => w (· = a)), List.map_map]
   refine (Mix.select_angelic _ (by simp [Function.comp_def]) h_pos _).trans ?_
   constructor
   · rintro ⟨_, hp, hw, ha⟩

@@ -135,8 +135,8 @@ theorem always_oneOf {gs : List (Unit → SPMF.Cost α)} {hne : gs ≠ []} {Q : 
 theorem always_frequency {gs : List (Nat × (Unit → SPMF.Cost α))} {hw : 0 < (gs.map Prod.fst).sum}
     {Q : α → Nat → Prop} (h : AllBranches (fun wg => Always (wg.2 ()) fun a n => Q a (1 + n)) gs) :
     Always (frequency gs hw : SPMF.Cost α) Q := by
-  refine (always_of_obs (alwaysObs.map_frequency gs hw (alwaysObs.spec default))).mpr ?_
-  simp only [WPC.choose_bind_apply,
+  refine (always_of_obs (alwaysObs.map_frequency gs hw)).mpr ?_
+  simp only [Obs.select, WPC.choose_bind_apply,
     Obs.selectD_map (fun w : WPC Mix.demonic α => w fun a n => Q a (1 + n)), List.map_map]
   refine (Mix.select_demonic _ (by simp [Function.comp_def]) hw _).mpr fun p hp _ => ?_
   obtain ⟨wg, hwg, rfl⟩ := List.mem_map.mp hp

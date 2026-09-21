@@ -146,7 +146,7 @@ theorem sum_harmonic (n : ℕ) :
           rw [hcancel]; ring
       _ = ((n : ℝ≥0∞) + 1) * (harmonic n + 1 / ((n : ℝ≥0∞) + 1)) := by ring
 
-private theorem sum_Icc_harmonic_left {lo hi : Int} :
+theorem sum_Icc_harmonic_left {lo hi : Int} :
     ∑ x ∈ Finset.Icc lo hi, harmonic (x - lo).toNat
       = ∑ k ∈ Finset.range (hi + 1 - lo).toNat, harmonic k := by
   refine Finset.sum_nbij' (fun x => (x - lo).toNat) (fun k => lo + (k : Int))
@@ -156,7 +156,7 @@ private theorem sum_Icc_harmonic_left {lo hi : Int} :
   · simp only [Finset.mem_Icc] at hx; omega
   · simp only [Finset.mem_range] at hk; omega
 
-private theorem sum_Icc_harmonic_right {lo hi : Int} :
+theorem sum_Icc_harmonic_right {lo hi : Int} :
     ∑ x ∈ Finset.Icc lo hi, harmonic (hi - x).toNat
       = ∑ k ∈ Finset.range (hi + 1 - lo).toNat, harmonic k := by
   refine Finset.sum_nbij' (fun x => (hi - x).toNat) (fun k => hi - (k : Int))
