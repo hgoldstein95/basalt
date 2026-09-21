@@ -84,6 +84,12 @@ example : (1 : ℝ≥0∞) ≤ (listOf Nat.arbitrary : SPMF (List Nat)).mass := 
   trace_state
   simp
 
+/-- `permutationOf` draws one index per element and always succeeds, so its bound is `1` for any
+list. -/
+example : (1 : ℝ≥0∞) ≤ (permutationOf [1, 2, 3] : SPMF { ys // [1, 2, 3].Perm ys }).mass := by
+  mass_bound
+  simp
+
 /-- A recursive bound over a tupled seed, the form a family criterion hands over, closes calls whose
 arguments are projections of another seed. -/
 example (g : Int → Int → SPMF Nat) (c : ℝ≥0∞)

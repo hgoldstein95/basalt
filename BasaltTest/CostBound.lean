@@ -75,6 +75,12 @@ example : IsCostBounded (nonEmptyListOf Nat.arbitrary)
     (fun xs => xs.length + (xs.map (· + 1)).sum) := by
   cost_bound; omega
 
+example : IsCostBounded (permutationOf [1, 2, 3] : SPMF.Cost { ys // [1, 2, 3].Perm ys })
+    (fun _ => 3) := by
+  cost_bound
+  simp at *
+  omega
+
 -- A definition with no rule is unfolded and walked through: one goal per path through its body, the
 -- draws it names under its names, and those it does not under the goal's.
 /--
@@ -191,6 +197,13 @@ example : IsCostBounded
 example : IsCostBounded
     (vectorOf 3 (frequency [(1, fun _ => Char.arbitrary), (2, fun _ => pure 'a')] (by simp)))
     (fun xs => 2 * xs.length) := by
+  cost_bound
+  simp at *
+  omega
+
+example : IsCostBounded
+    (vectorOf 2 (permutationOf [1, 2, 3]) : SPMF.Cost (List { ys // [1, 2, 3].Perm ys }))
+    (fun xs => 3 * xs.length) := by
   cost_bound
   simp at *
   omega

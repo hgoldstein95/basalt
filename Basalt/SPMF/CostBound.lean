@@ -150,6 +150,22 @@ theorem always_frequency {gs : List (Nat × (Unit → SPMF.Cost α))} {hw : 0 < 
     exact allBranches_iff.mp h (w, g) hg
   · exact fun _ hp => absurd rfl hp
 
+/-- `permutationOf` draws one insertion index per element of `xs`, so it costs `xs.length`. -/
+@[gen_rule]
+theorem always_permutationOf {xs : List α} {Q : { ys // xs.Perm ys } → Nat → Prop}
+    (hq : ∀ a n, n ≤ xs.length → Q a n) :
+    Always (permutationOf xs : SPMF.Cost { ys // xs.Perm ys }) Q := by
+  induction xs with
+  | nil => rw [permutationOf]; exact always_pure (hq _ _ (by simp))
+  | cons x xs ih =>
+    rw [permutationOf]
+    refine always_bind (ih fun a n hn => ?_)
+    refine always_bind (always_map (always_choose fun k hk => ?_))
+    obtain ⟨-, -⟩ := hk
+    refine always_pure (hq _ _ ?_)
+    simp only [List.length_cons]
+    omega
+
 end SPMF.Cost
 
 namespace Basalt.CostBound
@@ -386,6 +402,11 @@ theorem isBounded_listOfMaxLength {n : Nat} {g : SPMF.Cost α} {k : Nat}
   refine isBounded_iff_always.mpr (always_bind (always_map (always_choose ?_)))
   rintro j ⟨-, hj⟩
   exact isBounded_le (isBounded_vectorOf hg) (Nat.mul_le_mul_right k hj) fun _ _ _ => by omega
+
+@[gen_rule]
+theorem isBounded_permutationOf {xs : List α} :
+    IsBounded (permutationOf xs : SPMF.Cost { ys // xs.Perm ys }) fun _ => xs.length :=
+  isBounded_iff_always.mpr (always_permutationOf fun _ _ h => h)
 
 end worstCase
 
