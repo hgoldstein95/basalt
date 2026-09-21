@@ -239,4 +239,17 @@ theorem le_mass_listOfMaxLength {n : Nat} {g : SPMF α} {c : ℝ≥0∞} (hg : c
       ((pow_le_pow_left' (min_le_right 1 c) k).trans (le_mass_vectorOf hg)))
   rw [one_mul]
 
+/-- `permutationOf` draws one index per element and always succeeds, so its mass is `1`; like
+`elements`, it destructures its draw with a `match`, which no rule walks into. -/
+@[gen_rule]
+theorem le_mass_permutationOf {xs : List α} :
+    (1 : ℝ≥0∞) ≤ (permutationOf xs : SPMF { ys // xs.Perm ys }).mass := by
+  induction xs with
+  | nil => rw [permutationOf]; exact le_mass_pure
+  | cons x xs ih =>
+    rw [permutationOf]
+    exact (one_mul 1).symm.le.trans (le_mass_bind ih fun _ =>
+      (one_mul 1).symm.le.trans
+        (le_mass_bind (le_mass_map le_mass_choose) fun ⟨n, _, _⟩ => le_mass_pure))
+
 end SPMF
