@@ -5,7 +5,7 @@ Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Cost
 import Basalt.SPMF.AverageBound
-import Basalt.SPMF.Walk
+import Basalt.SPMF.Walk.Entry
 
 /-!
 # Computing Expectation Upper Bounds
@@ -191,14 +191,9 @@ namespace Basalt.ExpectBound
 
 open Basalt.Walk
 
-/-- `goal`, with metavariables instantiated and projections out of constructors reduced. -/
-def tidy (goal : MVarId) : MetaM MVarId := goal.withContext do
-  goal.setTag .anonymous
-  goal.replaceTargetDefEq (← reduceCtorProjs (← goal.getType))
-
 /-- Walk `goal`, `SPMF.expect g f ≤ B` at either interpretation, returning the arithmetic goal
 `b ≤ B` for the bound `b` the walk computes, then whatever else the walk left. -/
-def walkExpect (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
+partial def walkExpect (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
   goal.withContext do
   let ty ← whnfR (← instantiateMVars (← goal.getType))
   let bad := m!"expect_bound: expected a goal `SPMF.expect (gen …) f ≤ B`, got{indentExpr ty}"
@@ -209,6 +204,7 @@ def walkExpect (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :
   unless lhs.isAppOfArity ``SPMF.expect 3 do throwError bad
   let g := lhs.getArg! 1
   let f := lhs.getArg! 2
+  if let some cases ← splitMatch? goal g then return ← cases.flatMapM (walkExpect extras)
   let gTy ← instantiateMVars (← inferType g)
   let (obs, post) ← if gTy.isAppOfArity ``SPMF.Cost 1 then do
       let (v, n) := match f with
@@ -218,14 +214,9 @@ def walkExpect (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :
         mkLambdaFVars #[a, c] (← reduceCtorProjs (mkApp f (← mkAppM ``Prod.mk #[a, c])))
       pure (``SPMF.Cost.expectObs, post)
     else pure (``SPMF.expectObs, f)
-  let spec := mkApp (← mkAppOptM ``Obs.spec
-    #[none, none, none, none, none, none, some (mkConst obs [← getDecLevel gTy]), none, some g]) post
-  unless ← isDefEq spec lhs do throwError bad
+  let (bound, structural, rest) ← computeBound extras obs false g post
   let le := ty.appFn!.appFn!
-  let bound ← mkFreshExprMVar (ty.getArg! 0)
-  let structural ← mkFreshExprMVar (mkApp2 le spec bound)
-  let rest ← walk extras structural.mvarId!
-  let arith ← mkFreshExprMVar (mkApp2 le (← instantiateMVars bound) (ty.getArg! 3))
+  let arith ← mkFreshExprMVar (mkApp2 le bound (ty.getArg! 3))
   goal.assign (← mkAppM ``le_trans #[structural, arith])
   (arith.mvarId! :: rest).mapM fun g => tidy g
 

@@ -74,3 +74,9 @@ run_cmd do
         then [``listOf, ``nonEmptyListOf] else []) do
       if (rulesFor env j.key c).isNone then
         throwError "`{c}` has no bridge for the judgment `{j.key}`"
+  -- The support observations share `specGEJudgment`'s key with the others, so each is looked for.
+  for obs in [``SPMF.alwaysObs, ``SPMF.mayObs] do
+    for c in [``vectorOf, ``listOfMaxLength, ``listOf, ``nonEmptyListOf] do
+      let rules := (rulesFor env specGEJudgment.key c).getD #[]
+      unless rules.any fun r => ((env.find? r).get!.type.find? (·.isConstOf obs)).isSome do
+        throwError "`{c}` has no bridge for a lower bound on `{obs}`"

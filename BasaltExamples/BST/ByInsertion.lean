@@ -118,25 +118,29 @@ theorem Tree.foldl_insert_preorder {lo hi : Int} {t : Tree Int} (h : t.isBST lo 
       Tree.foldl_insert_of_gt _ (fun y hy => by have := Tree.mem_preorder_bounds hr y hy; omega),
       ihr hr]
 
-theorem Tree.genBSTByInsertion_mem_support {lo hi : Int} (h : lo ≤ hi) (t : Tree Int) :
-    t ∈ SPMF.support (Tree.genBSTByInsertion lo hi h) ↔ t.isBST lo hi := by
-  unfold Tree.genBSTByInsertion
-  support_simp
-  constructor
-  · rintro ⟨xs, hxs, rfl⟩
-    exact Tree.isBST_foldl_insert (t := Tree.leaf) rfl xs hxs
-  · intro ht
-    exact ⟨t.preorder, Tree.mem_preorder_bounds ht, (Tree.foldl_insert_preorder ht).symm⟩
-
 theorem Tree.genBSTByInsertion.sound_complete {lo hi : Int} (h : lo ≤ hi) :
-    IsSoundAndComplete (Tree.genBSTByInsertion lo hi h) (Tree.isBST lo hi) :=
-  Tree.genBSTByInsertion_mem_support h
+    IsSoundAndComplete (Tree.genBSTByInsertion lo hi h) (Tree.isBST lo hi) := by
+  -- The element generator is a combinator term, which has no law: its halves are passed as facts.
+  have hs : IsSound (chooseInt lo hi h : SPMF Int) (fun x => lo ≤ x ∧ x ≤ hi) := by
+    sound_bound
+    all_goals omega
+  have hc : IsCompleteFor (chooseInt lo hi h : SPMF Int) (fun x => lo ≤ x ∧ x ≤ hi) := by
+    complete_bound
+    exact h_x
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint [hs]
+    exact Tree.isBST_foldl_insert (t := .leaf) rfl xs h_xs
+  case complete =>
+    intro t ht
+    rw [Tree.genBSTByInsertion]; complete_bound [hc]
+    exact ⟨t.preorder, Tree.mem_preorder_bounds ht, Tree.foldl_insert_preorder ht⟩
 
 /-- Inserting a drawn list and shaping the tree directly reach the same trees. -/
 theorem Tree.support_genBSTByInsertion_eq {lo hi : Int} (h : lo ≤ hi) :
     SPMF.support (Tree.genBSTByInsertion lo hi h) = SPMF.support (Tree.genBST lo hi) :=
   Set.ext fun t =>
-    (Tree.genBSTByInsertion_mem_support h t).trans (Tree.genBST.sound_complete t).symm
+    (Tree.genBSTByInsertion.sound_complete h t).trans (Tree.genBST.sound_complete t).symm
 
 /-! ## Termination -/
 
@@ -163,15 +167,10 @@ private theorem cost_mem_replicate {lo hi : Int} (h : lo ≤ hi) (k : Nat) :
     (List.replicate k lo, 2 * k + 1) ∈
       SPMF.support (listOf (chooseInt lo hi h) : SPMF.Cost (List Int)) := by
   induction k with
-  | zero =>
-    rw [listOf]
-    cost_support_simp
-    exact ⟨0, by omega, Or.inl ⟨rfl, rfl⟩⟩
+  | zero => rw [listOf]; complete_bound; exact .inl rfl
   | succ k ih =>
-    rw [listOf]
-    cost_support_simp
-    refine ⟨2 * k + 2, by omega, Or.inr ⟨lo, 1, 2 * k + 1, ⟨⟨le_rfl, h⟩, rfl⟩, ?_, by omega⟩⟩
-    exact ⟨List.replicate k lo, 2 * k + 1, 0, ih, ⟨by simp [List.replicate_succ], rfl⟩, by omega⟩
+    rw [listOf]; complete_bound
+    exact .inr ⟨lo, ⟨le_rfl, h⟩, _, _, ih, by simp [List.replicate_succ], by omega⟩
 
 /-- **There is no cost bound.** `IsCostBounded` charges a run to the value it produced, and this
 generator can spend any number of choices to produce `node leaf lo leaf` — drawing `lo` again is
@@ -185,9 +184,8 @@ theorem Tree.genBSTByInsertion.not_cost_bounded {lo hi : Int} (h : lo ≤ hi) (c
   have hmem : ((node leaf lo leaf : Tree Int), 2 * (k + 1) + 1)
       ∈ SPMF.support (Tree.genBSTByInsertion lo hi h : SPMF.Cost (Tree Int)) := by
     unfold Tree.genBSTByInsertion
-    cost_support_simp
-    exact ⟨List.replicate (k + 1) lo, 2 * (k + 1) + 1, 0, cost_mem_replicate h _,
-      ⟨(Tree.foldl_insert_replicate lo k).symm, rfl⟩, by omega⟩
+    complete_bound
+    exact ⟨_, _, cost_mem_replicate h (k + 1), Tree.foldl_insert_replicate lo k, by omega⟩
   have hle := IsBounded_iff.mp hb _ hmem
   dsimp only at hle
   omega

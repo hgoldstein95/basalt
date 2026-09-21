@@ -5,7 +5,7 @@ Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.AverageBound
 import Basalt.SPMF.Mass
-import Basalt.SPMF.Walk
+import Basalt.SPMF.Walk.Entry
 
 /-!
 # Computing Mass Lower Bounds
@@ -80,18 +80,11 @@ elab_rules : tactic
     -- `SPMF.expect g (fun _ => 1) = g.mass`
     let one ← mkAppOptM ``SPMF.expect_one #[none, g]
     let some (_, lhs, _) := (← inferType one).eq? | throwError bad
-    let gTy ← instantiateMVars (← inferType g)
-    let spec := mkApp (← mkAppOptM ``Obs.spec #[none, none, none, none, none, none,
-      some (mkConst ``SPMF.expectObs [← getDecLevel gTy]), none, some g]) (lhs.getArg! 2)
-    let le := ty.appFn!.appFn!
-    let bound ← mkFreshExprMVar (ty.getArg! 0)
-    let structural ← mkFreshExprMVar (mkApp2 le bound spec)
-    let rest ← walk ((args.map (·.getElems)).getD #[]) structural.mvarId!
-    let arith ← mkFreshExprMVar (mkApp2 le (ty.getArg! 2) (← instantiateMVars bound))
+    let (bound, structural, rest) ←
+      computeBound ((args.map (·.getElems)).getD #[]) ``SPMF.expectObs true g (lhs.getArg! 2)
+    let arith ← mkFreshExprMVar (mkApp2 ty.appFn!.appFn! (ty.getArg! 2) bound)
     goal.assign (← mkAppM ``le_of_le_of_eq #[← mkAppM ``le_trans #[arith, structural], one])
-    -- Tidied afterwards: the tidied bound is equal only by the kernel's `rfl` (`Walk.evalClosed`).
-    let arith ← arith.mvarId!.replaceTargetDefEq (← tidyExpr (← arith.mvarId!.getType))
-    replaceMainGoal (arith :: rest)
+    replaceMainGoal (← (arith.mvarId! :: rest).mapM fun g => tidy g)
 
 end Basalt.MassBound
 

@@ -105,6 +105,34 @@ info: genCoin — 5 draws (seed 0, fuel 10000)
 #guard_msgs in
 #genstats (draws := 5) genCoin
 
+/-! ## The halves, proved separately, are the same line
+
+`.sound` and `.complete` together are `.sound_complete`; one of them alone is not. -/
+
+def genHalves [Gen G] : G Bool := pure true
+
+theorem genHalves.sound : IsSound (genHalves (G := SPMF)) (· = true) := by
+  intro a ha
+  simpa [genHalves] using ha
+
+/-- info: false -/
+#guard_msgs in
+open Lean Elab Meta in
+#eval show CoreM Bool from do
+  let env ← getEnv
+  Prod.fst <$> (GenStats.Command.lawProvedFor env `genHalves `sound_complete).run {} {}
+
+theorem genHalves.complete : IsCompleteFor (genHalves (G := SPMF)) (· = true) := by
+  intro a ha
+  simp [genHalves, ha]
+
+/-- info: true -/
+#guard_msgs in
+open Lean Elab Meta in
+#eval show CoreM Bool from do
+  let env ← getEnv
+  Prod.fst <$> (GenStats.Command.lawProvedFor env `genHalves `sound_complete).run {} {}
+
 /-! ## The partial-generator laws: `productive` and `filter_free` -/
 
 open SPMF in

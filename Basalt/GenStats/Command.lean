@@ -147,19 +147,26 @@ private def mkOptArg : Option Term → CommandElabM Term
   | some f => `(some ($f))
   | none => `(none)
 
-/-- The laws `#genstats` reports on, in report order: the conventional suffix and the constant its
-statement must be headed by. Laws are found by **naming convention** — `genFoo.sound_complete` — and
-there is no registry to fall out of sync with.
+/-- One line of the laws block: its label, and the ways it is proved, each a set of conventionally
+named theorems (the suffix, and the constant its statement must be headed by) that must all exist. -/
+private structure LawSlot where
+  label : Name
+  proofs : Array (Array (Name × Name))
+
+/-- The laws `#genstats` reports on, in report order. Laws are found by **naming convention** —
+`genFoo.sound_complete` — and there is no registry to fall out of sync with.
 
 Only Basalt's own laws appear here. A downstream library that emits laws Basalt has no definition
 for is invisible to this report; that is the cost of not having a registry, and it is preferred to
 a registry that can silently disagree with what was actually proved. -/
-private def lawSlots : Array (Name × Name) := #[
-  (`sound_complete, ``IsSoundAndComplete),
-  (`terminates,     ``IsAlmostSurelyTerminating),
-  (`cost_bounded,   ``IsCostBounded),
-  (`filter_free,    ``IsFilterFree),
-  (`productive,     ``IsProductive)]
+private def lawSlots : Array LawSlot := #[
+  { label := `sound_complete
+    proofs := #[#[(`sound_complete, ``IsSoundAndComplete)],
+      #[(`sound, ``IsSound), (`complete, ``IsCompleteFor)]] },
+  { label := `terminates,   proofs := #[#[(`terminates, ``IsAlmostSurelyTerminating)]] },
+  { label := `cost_bounded, proofs := #[#[(`cost_bounded, ``IsCostBounded)]] },
+  { label := `filter_free,  proofs := #[#[(`filter_free, ``IsFilterFree)]] },
+  { label := `productive,   proofs := #[#[(`productive, ``IsProductive)]] }]
 
 /-- Does `declName.suffix` exist *and* actually state the law?
 
@@ -173,12 +180,15 @@ private def lawProved (env : Environment) (declName : Name) (suffix lawC : Name)
     unless body.isAppOf lawC do return false
     return body.getAppArgs.any fun a => (a.find? (fun x => x.isConstOf declName)).isSome
 
+private def LawSlot.proved (slot : LawSlot) (env : Environment) (declName : Name) : MetaM Bool :=
+  slot.proofs.anyM fun thms => thms.allM fun (suffix, lawC) => lawProved env declName suffix lawC
+
 /-- Testable entry point for the shape check, since a report that silently drops a law looks exactly
 like a generator that has none. See `BasaltTest/LawLine.lean`. -/
-def lawProvedFor (env : Environment) (declName suffix : Name) : MetaM Bool := do
-  match lawSlots.find? (·.1 == suffix) with
+def lawProvedFor (env : Environment) (declName label : Name) : MetaM Bool := do
+  match lawSlots.find? (·.label == label) with
   | none => return false
-  | some (s, lawC) => lawProved env declName s lawC
+  | some slot => slot.proved env declName
 
 /-- The generator's own constant, if the term has one to speak of.
 
@@ -189,7 +199,7 @@ in. A candidate only counts if it carries at least one law, so an adapter that h
 private def genConstant? (e : Expr) : MetaM (Option Name) := do
   let env ← getEnv
   let hasLaw (n : Name) : MetaM Bool :=
-    lawSlots.anyM fun (suffix, lawC) => lawProved env n suffix lawC
+    lawSlots.anyM (·.proved env n)
   let candidates := #[e.getAppFn] ++ e.getAppArgs.map (·.getAppFn)
   for c in candidates do
     if let some n := c.constName? then
@@ -218,8 +228,7 @@ elab_rules : command
         match ← genConstant? (← instantiateMVars gE) with
         | none => pure #[]
         | some n =>
-          lawSlots.mapM fun (suffix, lawC) =>
-            return (suffix.toString, ← lawProved (← getEnv) n suffix lawC)
+          lawSlots.mapM fun slot => return (slot.label.toString, ← slot.proved (← getEnv) n)
       pure (αStx, hasRepr, hasSizeOf, shapes?, laws)
     -- Phase 2: generate the helper functions the output type supports.
     let mut sizeArg? : Option Term := opts.size?

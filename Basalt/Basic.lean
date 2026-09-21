@@ -18,6 +18,9 @@ import Basalt.SPMF.CostBound
 import Basalt.SPMF.CostFixpoint
 import Basalt.SPMF.ExpectBound
 import Basalt.SPMF.ExpectFixpoint
+import Basalt.SPMF.SoundBound
+import Basalt.SPMF.SoundFixpoint
+import Basalt.SPMF.CompleteBound
 import Basalt.Combinators
 import Basalt.PBT
 import Basalt.Tuning

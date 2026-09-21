@@ -147,6 +147,21 @@ example (n : Nat) : IsCostBounded (byCases n) (fun _ => 1) := by
   | _ + 1 => cost_fixpoint; omega
 
 
+-- A `match` on the seed that is stuck is split into its cases before the walk.
+/--
+trace: n : ℕ
+⊢ 0 ≤ 1
+
+n n_1 x : ℕ
+h_x : 0 ≤ x ∧ x ≤ 1
+⊢ 1 ≤ 1
+-/
+#guard_msgs in
+example (n : Nat) : IsCostBounded (byCases n) (fun _ => 1) := by
+  cost_fixpoint
+  trace_state
+  all_goals omega
+
 def fuelled [Gen G] (fuel : Nat) : G (BST.Tree Nat) :=
   if _h : fuel = 0 then pure .leaf
   else

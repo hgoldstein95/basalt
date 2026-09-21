@@ -11,11 +11,11 @@ open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 /-!
 # SPMF Support
 
-The support-inversion lemma family: for each combinator, a characterization of its support as an
-explicit set, packaged as the `mem_support_*_iff` `simp` lemmas that `support_simp`
-(`Basalt/Tactics.lean`) fires on real generator goals. Stated on monad notation
-(`>>=`/`Pure.pure`), which is what do-notation elaborates to. A combinator's lemma is its
-`Obs.map_*` read through the may observation `mayObs`.
+Support inversion for the host constructs (`bind`, `pure`, `map`, `ite`, `dite`, `choose`), stated
+on monad notation, which is what do-notation elaborates to; the may and always observations built
+from them; and the support laws of the list combinators, which the walker's rules bridge. A
+combinator's support is otherwise not a lemma: it is what `sound_bound` and `complete_bound` compute
+from its `Obs.map_*`.
 -/
 
 namespace SPMF
@@ -151,94 +151,6 @@ theorem support_pick
   ext a
   exact (mem_support_of_may (mayObs.map_pick _ _)).trans ((Mix.binary_angelic _).trans
     (or_congr mem_support_iff_may.symm mem_support_iff_may.symm))
-
-@[simp]
-theorem mem_support_pick_iff
-    {x y : SPMF α} :
-    a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
-  simp
-
-/-- Note that the support of `RandomChoice.coin r` only includes both `true` and `false` when the
-bias is strictly in-between 0 and 1, otherwise it will only include one outcome. -/
-@[simp]
-theorem mem_support_coin_iff (h0 : 0 < r) (h1 : r < 1) :
-    b ∈ SPMF.support (RandomChoice.coin r) ↔ b = true ∨ b = false := by
-  have hnum : (0 : ℤ) < r.num := Rat.num_pos.mpr h0
-  have hden : r.num < (r.den : ℤ) := Rat.num_lt_denom_iff.mpr h1
-  refine (mem_support_of_may (mayObs.map_coin r)).trans ?_
-  simp only [coin, WP.choose_bind_apply, WP.ite_apply]
-  refine (Mix.threshold_angelic r.den_pos _ _).trans ?_
-  simp only [hnum, hden, true_and]
-  exact or_congr eq_comm eq_comm
-
-@[simp]
-theorem support_coin (h0 : 0 < r) (h1 : r < 1) :
-    SPMF.support (RandomChoice.coin r) = {true, false} := by
-  ext b
-  rw [mem_support_coin_iff h0 h1, Set.mem_insert_iff, Set.mem_singleton_iff]
-
-@[simp]
-theorem mem_support_biasedOptionGen_iff {r : Rat} {g : SPMF α} (h0 : 0 < r) (h1 : r < 1) :
-    x ∈ (biasedOptionGen r g).support ↔ x = none ∨ (∃ a ∈ g.support, x = some a) := by
-  unfold biasedOptionGen
-  simp
-  constructor <;> intro h
-  . rcases h with ⟨hmem, rfl⟩ | ⟨hmem, a, ha, rfl⟩
-    . left; rfl
-    . right; exists a
-  . rcases h with rfl | ⟨a, hmem, rfl⟩
-    . left
-      constructor
-      . apply (mem_support_coin_iff h0 h1).mpr
-        right; rfl
-      . rfl
-    . right
-      constructor
-      . apply (mem_support_coin_iff h0 h1).mpr
-        left; rfl
-      . exists a
-
-@[simp]
-theorem support_biasedOptionGen
-    {r : Rat}
-    {g : SPMF α}
-    (h0 : 0 < r) (h1 : r < 1) :
-    support (biasedOptionGen r g) = { none } ∪ { some x | x ∈ g.support } := by
-  ext x
-  rw [mem_support_biasedOptionGen_iff h0 h1]
-  simp only [Set.mem_union, Set.mem_singleton_iff, Set.mem_ofPred_eq]
-  exact or_congr_right (exists_congr fun a => and_congr_right fun _ => eq_comm)
-
-@[simp]
-theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
-    n ∈ (chooseNat lo hi h : SPMF Nat).support ↔ lo ≤ n ∧ n ≤ hi := by
-  exact (mem_support_of_may (mayObs.map_chooseNat lo hi h)).trans
-    ((Mix.range_angelic _).trans ⟨fun ⟨_, hx, e⟩ => e ▸ hx, fun h => ⟨n, h, rfl⟩⟩)
-
-@[simp]
-theorem mem_support_chooseInt_iff {lo hi : Int} {h : lo ≤ hi} {n : Int} :
-    n ∈ (chooseInt lo hi h : SPMF Int).support ↔ lo ≤ n ∧ n ≤ hi := by
-  unfold chooseInt
-  simp only [mem_support_bind_iff, mem_support_pure_iff, mem_support_chooseNat_iff]
-  constructor
-  · rintro ⟨k, ⟨-, hk⟩, rfl⟩
-    omega
-  · rintro ⟨h1, h2⟩
-    exact ⟨(n - lo).toNat, ⟨Nat.zero_le _, by omega⟩, by omega⟩
-
-@[simp]
-theorem support_optionGen
-    {g : SPMF α} :
-    support (optionGen g) = {none} ∪ {some x | x ∈ g.support} := by
-  unfold optionGen
-  apply support_biasedOptionGen <;> norm_num
-
-@[simp]
-theorem mem_support_optionGen_iff
-    {g : SPMF α} :
-    x ∈ support (optionGen g) ↔ x = none ∨ (∃ a ∈ g.support, x = some a) := by
-  unfold optionGen
-  apply mem_support_biasedOptionGen_iff <;> norm_num
 
 /-- The support of `vectorOf n g` is the set of all length-`n` list where each element is in `g`'s
 support. -/
@@ -483,25 +395,6 @@ theorem mem_support_permutationOf_iff {α} {xs : List α} {z : { ys // xs.Perm y
     z ∈ support (permutationOf xs : SPMF _) ↔ True := by
   rw [support_permutationOf]; exact iff_of_true (Set.mem_univ z) trivial
 
-/-- The support of `elements xs` is exactly the set of all elements in `xs` -/
-@[simp]
-theorem support_elements
-    {xs : List α}
-    (hne : xs ≠ []) :
-    support (elements xs hne) = { x | x ∈ xs } := by
-  ext a
-  exact (mem_support_of_may (mayObs.map_elements xs hne)).trans
-    ((Mix.index_angelic xs hne (· = a)).trans ⟨fun ⟨_, hg, e⟩ => e ▸ hg, fun h => ⟨a, h, rfl⟩⟩)
-
-/-- Membership form of `support_elements`. -/
-@[simp]
-theorem mem_support_elements_iff
-    [Inhabited α]
-    {xs : List α}
-    (hne : xs ≠ []) :
-    a ∈ support (elements xs hne) ↔ a ∈ xs := by
-  simp [support_elements]
-
 /-- The support of `oneOf gs` is exactly the union of all generators in `gs` -/
 @[simp]
 theorem support_oneOf
@@ -512,14 +405,6 @@ theorem support_oneOf
   exact (mem_support_of_may (mayObs.map_oneOf gs hne)).trans
     ((Mix.index_angelic gs hne fun g => mayObs.spec (g ()) (· = a)).trans
       (exists_congr fun g => and_congr_right fun _ => mem_support_iff_may.symm))
-
-/-- Membership form of `support_oneOf`. -/
-@[simp]
-theorem mem_support_oneOf_iff
-    {gs : List (Unit → SPMF α)}
-    (hne : gs ≠ []) :
-    a ∈ support (oneOf gs hne) ↔ ∃ g ∈ gs, a ∈ (g ()).support := by
-  simp [support_oneOf]
 
 /-- If the sum of weights in `gs` is non-zero, then the support of `frequency gs` is exactly the
 union of the support of the generators in `gs` with non-zero weights. -/
@@ -538,14 +423,6 @@ theorem support_frequency
     exact ⟨w, g, hmem, hw, mem_support_iff_may.mpr ha⟩
   · rintro ⟨w, g, hmem, hw, ha⟩
     exact ⟨_, List.mem_map.mpr ⟨(w, g), hmem, rfl⟩, hw, mem_support_iff_may.mp ha⟩
-
-/-- Membership form of `support_frequency`. -/
-@[simp]
-theorem mem_support_frequency_iff
-    {gs : List (Nat × (Unit → SPMF α))}
-    (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
-    a ∈ (frequency gs h_pos).support ↔ ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support := by
-  simp [support_frequency]
 
 theorem bind_congr_support
     {x : SPMF α}

@@ -24,11 +24,13 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 ## Where things live
 
 - **Writing a generator and proving it correct** — `WORKFLOW.md`: a recipe for each of the three
-  obligations (support, termination, cost) as a skeleton with named holes, the unfolding-idiom
-  table, and a when-stuck table. [BasaltExamples/](BasaltExamples/) holds the worked instances
+  obligations (support, termination, cost) as a skeleton with named holes, the table of judgments
+  (observation, algebra, direction, who supplies the induction), the unfolding-idiom table, and a
+  when-stuck table. [BasaltExamples/](BasaltExamples/) holds the worked instances
   each recipe names. Start there for any per-generator work; do not improvise a proof shape.
-- **The laws** (`IsSoundAndComplete`, `IsAlmostSurelyTerminating`, `IsCostBounded`,
-  `IsFilterFree`, `IsProductive`) and their introduction lemmas — [Basalt/Laws.lean](Basalt/Laws.lean).
+- **The laws** (`IsSoundAndComplete` and its halves `IsSound` and `IsCompleteFor`,
+  `IsAlmostSurelyTerminating`, `IsCostBounded`, `IsFilterFree`, `IsProductive`) and their
+  introduction lemmas — [Basalt/Laws.lean](Basalt/Laws.lean).
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
 - **Observations** — the layer every per-combinator lemma is derived from. `Obs`, the one
   `Obs.map_*` lemma per combinator, the specification monads and the presentation of each shape of
@@ -37,8 +39,16 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean), the cost ones and erasure in
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean). A new combinator needs its `map_` lemma and
   nothing per judgment; [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour.
-- **Support inversion** (`mem_support_*_iff`) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean);
-  the `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactics.lean](Basalt/Tactics.lean).
+- **Support** — a support law is two walks: soundness, a lower bound on `SPMF.alwaysObs` in the
+  demonic algebra (`sound_bound`, [Basalt/SPMF/SoundBound.lean](Basalt/SPMF/SoundBound.lean), and
+  `sound_fixpoint`, [Basalt/SPMF/SoundFixpoint.lean](Basalt/SPMF/SoundFixpoint.lean), pinned by
+  [BasaltTest/SoundBound.lean](BasaltTest/SoundBound.lean)); and completeness, a lower bound on
+  `SPMF.mayObs` in the angelic one, under an induction the user chooses (`complete_bound` and
+  `IsCompleteFor.of_measure`, [Basalt/SPMF/CompleteBound.lean](Basalt/SPMF/CompleteBound.lean),
+  pinned by [BasaltTest/CompleteBound.lean](BasaltTest/CompleteBound.lean)). The practical entry is
+  WORKFLOW.md's Recipe 1. Support inversion outside a law (`mem_support_*_iff`, for a probability
+  goal or a support equation) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean); the
+  `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactics.lean](Basalt/Tactics.lean).
 - **Termination** — the criterion (`IsPMF_of_lfp_eq_one`) and its `LfpIsOne` certificates:
   [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); the `mass_fixpoint` tactic:
   [Basalt/SPMF/MassFixpoint.lean](Basalt/SPMF/MassFixpoint.lean), contract
@@ -51,17 +61,24 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   *shape of choice* in the algebra. The `@[gen_rule]` rules are for the host constructs, once for
   every monotone observation ([Basalt/Obs/Ordered.lean](Basalt/Obs/Ordered.lean)), for the shapes,
   per algebra and direction ([Basalt/SPMF/AverageBound.lean](Basalt/SPMF/AverageBound.lean) for
-  expectations; the demonic and `sup` ones in
+  expectations; the demonic and angelic ones beside the presentations they are derived from, in
+  [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean); the `sup` ones in
   [Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean)), and for bridging a recursive
   combinator's law. The judgments, the per-observation leaves, and the registries are
   [Basalt/SPMF/Walk/Attr.lean](Basalt/SPMF/Walk/Attr.lean); the walk and its side-goal solvers are
-  [Basalt/SPMF/Walk.lean](Basalt/SPMF/Walk.lean). The entry tactics are `mass_bound`
+  [Basalt/SPMF/Walk.lean](Basalt/SPMF/Walk.lean). What an entry tactic is made of — `computeBound`,
+  `fixpointStep`, and the residual handlers — is
+  [Basalt/SPMF/Walk/Entry.lean](Basalt/SPMF/Walk/Entry.lean): a `_bound` tactic restates its goal
+  and relates the computed bound to it, and a `_fixpoint` tactic is `fixpointStep` and its `_bound`
+  (`mass_fixpoint` excepted, which goes through the `LfpIsOne` criterion). The entry tactics are
+  `sound_bound` and `complete_bound` (above), `mass_bound`
   ([Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean), pinned by
   [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean)), `cost_bound`
   ([Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean), pinned by
   [BasaltTest/CostBound.lean](BasaltTest/CostBound.lean)), and `expect_bound`
   ([Basalt/SPMF/ExpectBound.lean](Basalt/SPMF/ExpectBound.lean), pinned by
-  [BasaltTest/ExpectBound.lean](BasaltTest/ExpectBound.lean)), each with its `_fixpoint`.
+  [BasaltTest/ExpectBound.lean](BasaltTest/ExpectBound.lean)), each but `complete_bound` with its
+  `_fixpoint`.
   [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and fails the build when one of the
   combinators it names loses its `@[gen_map]` lemma or a list combinator loses a bridge — it checks
   that list, not the registry, so a *new* combinator with no lemma is not caught. Nothing else in a
@@ -109,9 +126,6 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **`rw [gen]` (or another unfolding) fails or gives a confusing error in a correctness proof** —
   wrong unfolding idiom for the context; the four-idiom table is in `WORKFLOW.md`
   ("Unfolding: one idiom per context").
-- **`simp`/`support_simp` refuses a callee's `.sound_complete` law** — the law is a semireducible
-  `def`, so `simp` cannot see the `↔` inside it; pass the raw `<callee>_mem_support` fact instead.
-  WORKFLOW.md's Recipe 1 notes own this, with the worked examples.
 - **`#genstats` reports `— (not proved)` for a law you proved** — the theorem is not under the
   `<gen>.sound_complete` / `.terminates` / … naming convention, or its statement is not the law
   (both halves are checked). WORKFLOW.md Part 2 owns the convention;

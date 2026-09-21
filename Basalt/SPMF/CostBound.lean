@@ -4,8 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Laws
-import Basalt.Obs.Ordered
-import Basalt.SPMF.Walk
+import Basalt.SPMF.Walk.Entry
 import Mathlib.Data.ENat.Lattice
 
 /-!
@@ -67,75 +66,6 @@ theorem le_spec_of_isCostBounded {x : SPMF.Cost α} {c : α → Nat} {p : α →
 
 end SPMF.Cost
 
-namespace Mix
-
-/-! ## A choice holds when every outcome does -/
-
-@[gen_rule]
-theorem le_demonic_range {lo hi : Nat} {h : lo ≤ hi}
-    {F : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → Prop}
-    {d : (x : Nat) → lo ≤ x ∧ x ≤ hi → Prop} (hF : ∀ x hx, d x hx ≤ F ⟨⟨x, hx⟩⟩) :
-    (∀ x hx, d x hx) ≤ Mix.demonic.range lo hi h F := fun hd _ => hF _ _ (hd _ _)
-
-@[gen_rule]
-theorem le_demonic_binary {t e c d : Prop} (ht : c ≤ t) (he : d ≤ e) :
-    (c ∧ d) ≤ (Mix.demonic.{u}).binary t e := by
-  rintro ⟨hc, hd⟩ a
-  show if _ then t else e
-  split
-  · exact ht hc
-  · exact he hd
-
-@[gen_rule]
-theorem le_demonic_threshold {n : Nat} {k : ℤ} {t e c d : Prop} (ht : c ≤ t) (he : d ≤ e) :
-    (c ∧ d) ≤ (Mix.demonic.{u}).threshold n k t e := by
-  rintro ⟨hc, hd⟩ a
-  show if _ then t else e
-  split
-  · exact ht hc
-  · exact he hd
-
-@[gen_rule]
-theorem le_demonic_index {γ : Type v} {l : List γ} {hne : l ≠ []} {F : γ → Prop}
-    {cs : List Prop} (h : List.Forall₂ (fun c g => c ≤ F g) cs l) :
-    cs.foldr And True ≤ (Mix.demonic.{u}).index l hne F := by
-  intro hcs
-  have key : ∀ g ∈ l, F g := by
-    clear hne
-    induction h with
-    | nil => simp
-    | cons hc _ ih => exact List.forall_mem_cons.mpr ⟨hc hcs.1, ih hcs.2⟩
-  exact (index_demonic l hne F).mpr key
-
-@[gen_rule]
-theorem le_demonic_element {γ : Type v} {l : List γ} {hne : l ≠ []} {F : γ → Prop} :
-    (∀ a ∈ l, F a) ≤ (Mix.demonic.{u}).element l hne F := (index_demonic l hne F).mpr
-
-@[gen_rule]
-theorem le_demonic_select {γ : Type v} {l : List (Nat × γ)} {hpos : 0 < (l.map Prod.fst).sum}
-    {F : γ → Prop} {d : Prop} {cs : List (Nat × Prop)} (h : Weighted (· ≥ ·) F cs l) :
-    (cs.map Prod.snd).foldr And True ≤ (Mix.demonic.{u}).select l hpos F d := by
-  intro hcs
-  have key : ∀ q ∈ l, F q.2 := by
-    clear hpos
-    induction h with
-    | nil => simp
-    | cons hc _ ih => exact List.forall_mem_cons.mpr ⟨hc hcs.1, ih hcs.2⟩
-  refine (select_demonic (l.map fun p => (p.1, F p.2)) (by simp [Function.comp_def]) hpos d).mpr ?_
-  intro p hp _
-  obtain ⟨q, hq, rfl⟩ := List.mem_map.mp hp
-  exact key q hq
-
-@[gen_rule]
-theorem le_demonic_rangeInt {lo hi : ℤ} {h : lo ≤ hi} {F : ℤ → Prop}
-    {d : (x : ℤ) → lo ≤ x ∧ x ≤ hi → Prop} (hF : ∀ x hx, d x hx ≤ F x) :
-    (∀ x hx, d x hx) ≤ (Mix.demonic.{0}).rangeInt lo hi h F := by
-  intro hd a
-  have := a.down.property
-  exact hF _ ⟨by omega, by omega⟩ (hd _ _)
-
-end Mix
-
 namespace Basalt.CostBound
 
 /-- `goal`, a cost law or a cost bound, restated as `Always`, its postcondition's binders named
@@ -152,53 +82,15 @@ def toAlways (goal : MVarId) : MetaM MVarId := goal.withContext do
     mkLambdaFVars #[a, n] (← mkAppM ``LE.le #[n, (mkApp c a).headBeta])
   goal.change (← mkAppM ``SPMF.Cost.Always #[g, post])
 
-/-- `goal` with its metavariables instantiated and `Walk.tidyExpr` applied, in the target and every
-hypothesis. -/
-def tidy (goal : MVarId) : MetaM MVarId := goal.withContext do
-  goal.setTag .anonymous
-  let mut goal := goal
-  for d in ← getLCtx do
-    unless d.isImplementationDetail do
-      let t ← tidyExpr d.type
-      if t != d.type then goal ← goal.replaceLocalDeclDefEq d.fvarId t
-  goal.replaceTargetDefEq (← tidyExpr (← goal.getType))
-
-theorem ite_intro {p : Prop} [Decidable p] {c d : Prop} (hc : ∀ _h : p, c) (hd : ∀ _h : ¬p, d) :
-    if p then c else d := by split <;> simp_all
-
-theorem dite_intro {p : Prop} [Decidable p] {c : p → Prop} {d : ¬p → Prop} (hc : ∀ h, c h)
-    (hd : ∀ h, d h) : if h : p then c h else d h := by split <;> simp_all
-
-/-- One goal per path through a computed weakest precondition: its `∀` and `→` introduced, its `∧`
-and `if` split. -/
-partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
-  let ty := (← reduceCtorProjs (← g.getType)).consumeMData
-  if ty.isConstOf ``True then
-    g.assign (mkConst ``True.intro)
-    return []
-  if ty.isForall then
-    let (_, g) ← g.intro1P
-    return ← splitPaths g
-  if ty.isAppOf ``List.foldr then
-    return ← splitPaths (← g.replaceTargetDefEq (← whnf ty))
-  for lem in [``And.intro, ``dite_intro, ``ite_intro] do
-    if let some gs ← observing? (applyExact g (← mkConstWithFreshMVarLevels lem)) then
-      return ← gs.flatMapM splitPaths
-  return [g]
-
 /-- Walk `goal` (see `cost_bound`), returning the tidied residual goals. -/
-def walkCost (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) := do
+partial def walkCost (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) := do
   let goal ← toAlways goal
   goal.withContext do
-  let ty ← instantiateMVars (← goal.getType)
-  let #[_, g, post] := ty.getAppArgs | throwError "cost_bound: internal error"
-  let gTy ← instantiateMVars (← inferType g)
-  let spec := mkApp (← mkAppOptM ``Obs.spec #[none, none, none, none, none, none,
-    some (mkConst ``SPMF.Cost.alwaysObs [← getDecLevel gTy]), none, some g]) post
-  let wp ← mkFreshExprMVar (mkSort 0)
-  let structural ← mkFreshExprMVar (← mkAppM ``LE.le #[wp, spec])
-  let rest ← walk extras structural.mvarId!
-  let paths ← mkFreshExprMVar (← instantiateMVars wp)
+  let #[_, g, post] := (← instantiateMVars (← goal.getType)).getAppArgs
+    | throwError "cost_bound: internal error"
+  if let some cases ← splitMatch? goal g then return ← cases.flatMapM (walkCost extras)
+  let (wp, structural, rest) ← computeBound extras ``SPMF.Cost.alwaysObs true g post
+  let paths ← mkFreshExprMVar wp
   goal.assign (mkApp structural paths)
   ((← splitPaths paths.mvarId!) ++ rest).mapM fun g => tidy g
 
