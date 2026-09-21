@@ -13,8 +13,7 @@ open RandomChoice ArbNat ArbChar
 # The `cost_bound` Contract
 
 Pins what `cost_bound` leaves behind — one arithmetic goal per path through the generator, named
-after it — the messages for a sub-generator nothing bounds, and that every combinator has a rule
-for each judgment the walker proves.
+after it — and the messages for a sub-generator nothing bounds.
 -/
 
 namespace CostBoundTest
@@ -42,7 +41,7 @@ trace: x : ℕ
 h_x : 0 ≤ x ∧ x ≤ 3
 y n_y : ℕ
 h_y : n_y ≤ y + 1
-⊢ 1 + (n_y + 0) ≤ x + y + 2
+⊢ 1 + n_y ≤ x + y + 2
 -/
 #guard_msgs in
 example : IsCostBounded (do let x ← chooseNat 0 3; let y ← Nat.arbitrary; return x + y)
@@ -84,15 +83,11 @@ example : IsCostBounded (permutationOf [1, 2, 3] : SPMF.Cost { ys // [1, 2, 3].P
 -- A definition with no rule is unfolded and walked through: one goal per path through its body, the
 -- draws it names under its names, and those it does not under the goal's.
 /--
-trace: o : Bool
-h : o = true
-x n_x : ℕ
+trace: x n_x : ℕ
 h_x : n_x ≤ x + 1
-⊢ 1 + (n_x + 0) ≤ 1 + (some x).elim 0 fun x => x + 1
+⊢ 1 + n_x ≤ 1 + (some x).elim 0 fun x => x + 1
 
-o : Bool
-h : ¬o = true
-⊢ 1 + 0 ≤ 1 + none.elim 0 fun x => x + 1
+⊢ 1 ≤ 1 + none.elim 0 fun x => x + 1
 -/
 #guard_msgs in
 example : IsCostBounded (optionGen Nat.arbitrary) (fun o => 1 + o.elim 0 (· + 1)) := by
@@ -115,7 +110,7 @@ trace: d₁ : ℕ
 h_d₁ : 0 ≤ d₁ ∧ d₁ ≤ 9
 d₂ : ℕ
 h_d₂ : 0 ≤ d₂ ∧ d₂ ≤ 9
-⊢ 1 + (1 + 0) + 0 ≤ 2
+⊢ 1 + 1 ≤ 2
 -/
 #guard_msgs in
 example : IsCostBounded (twoDigits >>= fun p => pure (p.1 + p.2)) (fun _ => 2) := by
@@ -124,9 +119,9 @@ example : IsCostBounded (twoDigits >>= fun p => pure (p.1 + p.2)) (fun _ => 2) :
   omega
 
 /--
-error: cost_bound: no rule, hypothesis, or `.cost_bounded` law bounds the cost of
+error: no rule, `@[gen_map]` lemma, hypothesis, or law bounds
   g
-Tag a rule for it `@[gen_rule]`, or pass a cost bound to `cost_bound [_]`.
+Pass a fact about it to the tactic.
 -/
 #guard_msgs in
 example (g : SPMF.Cost Nat) : IsCostBounded (g >>= fun _ => pure 0) (fun _ => 1) := by
@@ -139,9 +134,9 @@ def twice [Gen G] (g : G Nat) : G Nat := do
   return a + b
 
 /--
-error: cost_bound: no rule, hypothesis, or `.cost_bounded` law bounds the cost of
+error: no rule, `@[gen_map]` lemma, hypothesis, or law bounds
   g
-Tag a rule for it `@[gen_rule]`, or pass a cost bound to `cost_bound [_]`.
+Pass a fact about it to the tactic.
 (in the unfolding of `CostBoundTest.twice`)
 -/
 #guard_msgs in
@@ -149,9 +144,9 @@ example (g : SPMF.Cost Nat) : IsCostBounded (twice g) (fun _ => 1) := by
   cost_bound
 
 /--
-error: cost_bound: no hypothesis or `.cost_bounded` law bounds the cost of the combinator argument
+error: no rule, `@[gen_map]` lemma, hypothesis, or law bounds
   g
-Pass a cost bound for it to `cost_bound [_]`.
+Pass a fact about it to the tactic.
 -/
 #guard_msgs in
 example (g : SPMF.Cost Nat) : IsCostBounded (listOf g) (fun _ => 1) := by
@@ -161,7 +156,7 @@ example (g : SPMF.Cost Nat) : IsCostBounded (listOf g) (fun _ => 1) := by
 /--
 trace: xs : List ℕ
 n_xs : ℕ
-h_xs : n_xs ≤ (List.map (fun x => 1 + max 1 0) xs).sum
+h_xs : n_xs ≤ (List.map (fun x => max (1 + 1) (1 + 0)) xs).sum
 ⊢ n_xs ≤ 2 * xs.length
 -/
 #guard_msgs in
@@ -182,7 +177,7 @@ example : IsCostBounded (listOfMaxLength 3 (chooseNat 0 5 >>= fun x => pure (x +
 /--
 trace: xs : List ℕ
 n_xs : ℕ
-h_xs : n_xs ≤ (List.map (fun x => 1 + List.foldr max 0 [1, 0]) xs).sum
+h_xs : n_xs ≤ (List.map (fun x => max (1 + 1) (max (1 + 0) 0)) xs).sum
 ⊢ n_xs ≤ 2 * xs.length
 -/
 #guard_msgs in
@@ -236,17 +231,3 @@ example (g : Int → Int → SPMF.Cost Nat) (ih : ∀ lo hi, IsBounded (g lo hi)
   omega
 
 end CostBoundTest
-
--- Every combinator has a mass rule and a cost rule. The worst-case `IsBounded` rules exist only for
--- the combinators whose runs are bounded.
-open Lean Elab Command Basalt.Walk in
-run_cmd do
-  let reg := genRuleExt.getState (← getEnv)
-  let heads (j : Name) : NameSet :=
-    ((reg.find? j).getD {}).foldl (fun s k _ => s.insert k) {}
-  let mass := heads `SPMF.mass
-  let cost := heads `SPMF.Cost.Always
-  let missing (a b : NameSet) := a.toList.filter (!b.contains ·)
-  unless (missing mass cost).isEmpty && (missing cost mass).isEmpty do
-    throwError "gen_rule: combinators with a mass rule but no cost rule: {missing mass cost}; \
-      with a cost rule but no mass rule: {missing cost mass}"

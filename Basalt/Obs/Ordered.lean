@@ -9,10 +9,38 @@ import Mathlib.Order.Basic
 /-!
 # Observations into an Ordered Algebra
 
-The walker's rules for a bound `O.spec g post ≤ b`, stated once for every observation that is
-monotone in its postcondition: the postcondition is given, and the bound is what the rule computes.
-A combinator with a `@[gen_map]` lemma needs no rule here; its bound is its shape's, in the algebra.
+The walker's rules for a bound `O.spec g post ≤ b` or `b ≤ O.spec g post`, stated once for every
+observation that is monotone in its postcondition: the postcondition is given, and the bound is what
+the rule computes. A combinator with a `@[gen_map]` lemma needs no rule here; its bound is its
+shape's, in the algebra.
 -/
+
+/-- Branch-wise bounds for a weighted choice, each paired with its weight, so that the bound computed
+from them is free of the branches themselves (which under a `dite` carry the branch's proof). `r`
+is the direction. -/
+@[gen_branches]
+inductive Mix.Weighted {γ : Type v} {Ω : Type w} (r : Ω → Ω → Prop) (F : γ → Ω) :
+    List (Nat × Ω) → List (Nat × γ) → Prop
+  | nil : Weighted r F [] []
+  | cons {w : Nat} {c : Ω} {g : γ} {cs gs} (h : r (F g) c) (hs : Weighted r F cs gs) :
+      Weighted r F ((w, c) :: cs) ((w, g) :: gs)
+
+theorem Mix.Weighted.weights {γ : Type v} {Ω : Type w} {r : Ω → Ω → Prop} {F : γ → Ω} {cs gs}
+    (h : Weighted r F cs gs) : (cs.map Prod.fst).sum = (gs.map Prod.fst).sum := by
+  induction h with
+  | nil => rfl
+  | cons _ _ ih => simpa using ih
+
+theorem Mix.Weighted.forall {γ : Type v} {Ω : Type w} {r : Ω → Ω → Prop} {F : γ → Ω} {cs gs}
+    (h : Weighted r F cs gs) {P : Nat × γ → Prop}
+    (hP : ∀ w c g, r (F g) c → (w, c) ∈ cs → P (w, g)) : ∀ q ∈ gs, P q := by
+  induction h with
+  | nil => simp
+  | cons hc _ ih =>
+    intro q hq
+    rcases List.mem_cons.mp hq with rfl | hq
+    · exact hP _ _ _ hc List.mem_cons_self
+    · exact ih (fun w c g hr hm => hP w c g hr (List.mem_cons_of_mem _ hm)) q hq
 
 namespace Obs
 
@@ -51,15 +79,50 @@ theorem spec_ite_le {p : Prop} [Decidable p] {x y : G α} {post : α → Ω} {c 
     O.spec (if p then x else y) post ≤ if p then c else d := by
   split <;> simp_all
 
+/-- The bound may mention the branch's proof. -/
 @[gen_rule]
 theorem spec_dite_le {p : Prop} [Decidable p] {x : p → G α} {y : ¬p → G α} {post : α → Ω}
-    {c d : Ω} (hx : ∀ h, O.spec (x h) post ≤ c) (hy : ∀ h, O.spec (y h) post ≤ d) :
-    O.spec (if h : p then x h else y h) post ≤ if p then c else d := by
+    {c : p → Ω} {d : ¬p → Ω} (hx : ∀ h, O.spec (x h) post ≤ c h)
+    (hy : ∀ h, O.spec (y h) post ≤ d h) :
+    O.spec (if h : p then x h else y h) post ≤ if h : p then c h else d h := by
   split <;> simp_all
 
 theorem spec_le_of_map {g : G α} {w : WP m α} {post : α → Ω} {b : Ω}
     (h : O.spec g = w) (hw : w post ≤ b) : O.spec g post ≤ b :=
   (congrFun h post).le.trans hw
+
+/-! ## Lower bounds -/
+
+@[gen_rule]
+theorem le_spec_pure {a : α} {post : α → Ω} {b : Ω} (hb : b ≤ post a) :
+    b ≤ O.spec (Pure.pure a) post := hb.trans (congrFun (O.map_pure a) post).ge
+
+@[gen_rule, inherit_doc spec_bind_le]
+theorem le_spec_bind [O.Monotone] {x : G α} {k : α → G β} {post : β → Ω} {h : α → Ω} {b : Ω}
+    (hk : ∀ a, h a ≤ O.spec (k a) post) (hx : b ≤ O.spec x h) : b ≤ O.spec (x >>= k) post :=
+  (hx.trans (Monotone.spec_mono x hk)).trans (congrFun (O.map_bind x k) post).ge
+
+@[gen_rule]
+theorem le_spec_map [LawfulMonad G] {x : G α} {f : α → β} {post : β → Ω} {b : Ω}
+    (hx : b ≤ O.spec x (fun a => post (f a))) : b ≤ O.spec (f <$> x) post :=
+  hx.trans (congrFun (O.map_map f x) post).ge
+
+@[gen_rule]
+theorem le_spec_ite {p : Prop} [Decidable p] {x y : G α} {post : α → Ω} {c d : Ω}
+    (hx : p → c ≤ O.spec x post) (hy : ¬p → d ≤ O.spec y post) :
+    (if p then c else d) ≤ O.spec (if p then x else y) post := by
+  split <;> simp_all
+
+@[gen_rule, inherit_doc spec_dite_le]
+theorem le_spec_dite {p : Prop} [Decidable p] {x : p → G α} {y : ¬p → G α} {post : α → Ω}
+    {c : p → Ω} {d : ¬p → Ω} (hx : ∀ h, c h ≤ O.spec (x h) post)
+    (hy : ∀ h, d h ≤ O.spec (y h) post) :
+    (if h : p then c h else d h) ≤ O.spec (if h : p then x h else y h) post := by
+  split <;> simp_all
+
+theorem le_spec_of_map {g : G α} {w : WP m α} {post : α → Ω} {b : Ω}
+    (h : O.spec g = w) (hw : b ≤ w post) : b ≤ O.spec g post :=
+  hw.trans (congrFun h post).ge
 
 end WP
 
@@ -89,16 +152,52 @@ theorem specC_ite_le {p : Prop} [Decidable p] {x y : G α} {post : α → Nat �
     O.spec (if p then x else y) post ≤ if p then c else d := by
   split <;> simp_all
 
+/-- The bound may mention the branch's proof. -/
 @[gen_rule]
-theorem specC_dite_le {p : Prop} [Decidable p] {x : p → G α} {y : ¬p → G α}
-    {post : α → Nat → Ω} {c d : Ω} (hx : ∀ h, O.spec (x h) post ≤ c)
-    (hy : ∀ h, O.spec (y h) post ≤ d) :
-    O.spec (if h : p then x h else y h) post ≤ if p then c else d := by
+theorem specC_dite_le {p : Prop} [Decidable p] {x : p → G α} {y : ¬p → G α} {post : α → Nat → Ω}
+    {c : p → Ω} {d : ¬p → Ω} (hx : ∀ h, O.spec (x h) post ≤ c h)
+    (hy : ∀ h, O.spec (y h) post ≤ d h) :
+    O.spec (if h : p then x h else y h) post ≤ if h : p then c h else d h := by
   split <;> simp_all
 
 theorem specC_le_of_map {g : G α} {w : WPC m α} {post : α → Nat → Ω} {b : Ω}
     (h : O.spec g = w) (hw : w post ≤ b) : O.spec g post ≤ b :=
   (congrFun h post).le.trans hw
+
+/-! ## Lower bounds -/
+
+@[gen_rule]
+theorem le_specC_pure {a : α} {post : α → Nat → Ω} {b : Ω} (hb : b ≤ post a 0) :
+    b ≤ O.spec (Pure.pure a) post := hb.trans (congrFun (O.map_pure a) post).ge
+
+@[gen_rule, inherit_doc spec_bind_le]
+theorem le_specC_bind [O.MonotoneC] {x : G α} {k : α → G β} {post : β → Nat → Ω}
+    {h : α → Nat → Ω} {b : Ω}
+    (hk : ∀ a n, h a n ≤ O.spec (k a) (fun b n' => post b (n + n'))) (hx : b ≤ O.spec x h) :
+    b ≤ O.spec (x >>= k) post :=
+  (hx.trans (MonotoneC.spec_mono x hk)).trans (congrFun (O.map_bind x k) post).ge
+
+@[gen_rule]
+theorem le_specC_map [LawfulMonad G] {x : G α} {f : α → β} {post : β → Nat → Ω} {b : Ω}
+    (hx : b ≤ O.spec x (fun a n => post (f a) n)) : b ≤ O.spec (f <$> x) post :=
+  hx.trans (congrFun (O.map_map f x) post).ge
+
+@[gen_rule]
+theorem le_specC_ite {p : Prop} [Decidable p] {x y : G α} {post : α → Nat → Ω} {c d : Ω}
+    (hx : p → c ≤ O.spec x post) (hy : ¬p → d ≤ O.spec y post) :
+    (if p then c else d) ≤ O.spec (if p then x else y) post := by
+  split <;> simp_all
+
+@[gen_rule, inherit_doc spec_dite_le]
+theorem le_specC_dite {p : Prop} [Decidable p] {x : p → G α} {y : ¬p → G α}
+    {post : α → Nat → Ω} {c : p → Ω} {d : ¬p → Ω} (hx : ∀ h, c h ≤ O.spec (x h) post)
+    (hy : ∀ h, d h ≤ O.spec (y h) post) :
+    (if h : p then c h else d h) ≤ O.spec (if h : p then x h else y h) post := by
+  split <;> simp_all
+
+theorem le_specC_of_map {g : G α} {w : WPC m α} {post : α → Nat → Ω} {b : Ω}
+    (h : O.spec g = w) (hw : b ≤ w post) : b ≤ O.spec g post :=
+  hw.trans (congrFun h post).ge
 
 end WPC
 

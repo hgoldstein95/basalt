@@ -45,22 +45,30 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   pinned by [BasaltTest/Termination.lean](BasaltTest/Termination.lean). Ranking functions and
   expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). The equations of `mass`:
   [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
-- **The generator walker and its `@[gen_rule]` rules** — one rule per (judgment, combinator), later
-  ones fallbacks, and a non-recursive definition with none is unfolded; the judgments and the
-  registries (rules, and the `@[gen_branches]` relations that collect a list combinator's branches)
-  are
-  [Basalt/SPMF/Walk/Attr.lean](Basalt/SPMF/Walk/Attr.lean), the walk is
-  [Basalt/SPMF/Walk.lean](Basalt/SPMF/Walk.lean). The mass rules and the `mass_bound` tactic are
-  [Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean), contract pinned by
-  [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean); the cost rules (`SPMF.Cost.Always`) and
-  the `cost_bound` tactic are [Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean), contract
-  pinned by [BasaltTest/CostBound.lean](BasaltTest/CostBound.lean), which also fails the build when
-  a combinator has a rule for one judgment and not the other. Nothing else in a termination or
-  cost proof mentions combinators.
+- **The generator walker** — one walk proves every judgment, each stated on an observation as a
+  bound `O.spec g post ≤ b` or `b ≤ O.spec g post` that the walk computes from the postcondition. A
+  combinator has no rule: its `@[gen_map]` lemma is applied and rewritten (`@[spec_apply]`) into a
+  *shape of choice* in the algebra. The `@[gen_rule]` rules are for the host constructs, once for
+  every monotone observation ([Basalt/Obs/Ordered.lean](Basalt/Obs/Ordered.lean)), for the shapes,
+  per algebra and direction ([Basalt/SPMF/AverageBound.lean](Basalt/SPMF/AverageBound.lean) for
+  expectations; the demonic and `sup` ones in
+  [Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean)), and for bridging a recursive
+  combinator's law. The judgments, the per-observation leaves, and the registries are
+  [Basalt/SPMF/Walk/Attr.lean](Basalt/SPMF/Walk/Attr.lean); the walk and its side-goal solvers are
+  [Basalt/SPMF/Walk.lean](Basalt/SPMF/Walk.lean). The entry tactics are `mass_bound`
+  ([Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean), pinned by
+  [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean)), `cost_bound`
+  ([Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean), pinned by
+  [BasaltTest/CostBound.lean](BasaltTest/CostBound.lean)), and `expect_bound`
+  ([Basalt/SPMF/ExpectBound.lean](Basalt/SPMF/ExpectBound.lean), pinned by
+  [BasaltTest/ExpectBound.lean](BasaltTest/ExpectBound.lean)), each with its `_fixpoint`.
+  [BasaltTest/Obs.lean](BasaltTest/Obs.lean) fails the build when a combinator has no `@[gen_map]`
+  lemma. Nothing else in a termination, cost, or expectation proof mentions combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
-  [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean).
+  [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean). The practical entry for a bound is
+  WORKFLOW.md's Recipe 4.
 - **Cost** — the interpretation (`SPMF.Cost`, `IsBounded`, its support inversion, expected cost):
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:
   [Basalt/SPMF/CostFixpoint.lean](Basalt/SPMF/CostFixpoint.lean), contract pinned by
@@ -118,6 +126,12 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `runProp` ([Basalt/PBT/Property.lean](Basalt/PBT/Property.lean)) to observe an outcome. The same
   defeq means a runner's `IO TestOutcome` argument does not determine `G`: ascribe the
   interpretation (`(prop : PropM IO Unit)`) at the call site.
+
+- **A walk ignores the hypothesis you have about a combinator term** (`ih : IsBounded (vectorOf n g) …`
+  is in context, and the goal comes back stated through `vectorOf`'s own bridge) — for a generator
+  headed by a combinator the walker tries the combinator's rule or `@[gen_map]` lemma before any
+  fact. `generalize` the term to a variable first, as `isBounded_vectorOf` does in
+  [Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean).
 
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
   `ennreal_to_real` ([Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean)) and finish over `ℝ`.

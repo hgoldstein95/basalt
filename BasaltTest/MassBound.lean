@@ -35,11 +35,14 @@ def gen [Gen G] (b : Bool) : G Nat := do
 /--
 trace: b : Bool
 ⊢ 0 ≤
-    [1, (List.map (fun p => ↑p.1 * p.2) [(1, 1), (2, 1)]).sum / ↑(List.map Prod.fst [(1, 1), (2, 1)]).sum,
-            if b = true then 1 else 1].sum /
-        ↑[1, (List.map (fun p => ↑p.1 * p.2) [(1, 1), (2, 1)]).sum / ↑(List.map Prod.fst [(1, 1), (2, 1)]).sum,
-              if b = true then 1 else 1].length *
-      ((1 / 2 * 1 + 1 / 2 * (1 * 1)) * 1)
+    [1 / 2 + 1 / 2,
+          (List.map (fun p => ↑p.1 * p.2) [(1, 1 / 2 + 1 / 2), (2, 1 / 2 + 1 / 2)]).sum /
+            ↑(List.map Prod.fst [(1, 1 / 2 + 1 / 2), (2, 1 / 2 + 1 / 2)]).sum,
+          if b = true then 1 / 2 + 1 / 2 else 1 / 2 + 1 / 2].sum /
+      ↑[1 / 2 + 1 / 2,
+            (List.map (fun p => ↑p.1 * p.2) [(1, 1 / 2 + 1 / 2), (2, 1 / 2 + 1 / 2)]).sum /
+              ↑(List.map Prod.fst [(1, 1 / 2 + 1 / 2), (2, 1 / 2 + 1 / 2)]).sum,
+            if b = true then 1 / 2 + 1 / 2 else 1 / 2 + 1 / 2].length
 -/
 #guard_msgs in
 example (b : Bool) : (0 : ℝ≥0∞) ≤ (gen b : SPMF Nat).mass := by
@@ -49,9 +52,9 @@ example (b : Bool) : (0 : ℝ≥0∞) ≤ (gen b : SPMF Nat).mass := by
   exact zero_le
 
 /--
-error: mass_bound: no rule, hypothesis, or `.terminates` law bounds the mass of
+error: no rule, `@[gen_map]` lemma, hypothesis, or law bounds
   g
-Tag a lower bound for it `@[gen_rule]`, or pass one to `mass_bound [_]`.
+Pass a fact about it to the tactic.
 -/
 #guard_msgs in
 example (g : SPMF Nat) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
@@ -60,13 +63,13 @@ example (g : SPMF Nat) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
 -- A definition with no rule and no law is unfolded: `optionGen`'s body draws a coin and branches on
 -- it.
 /--
-trace: ⊢ 1 ≤ 1 * min (1 * 1) 1
+trace: ⊢ 1 ≤ ↑1 / ↑2 * 1 + ↑1 / ↑2 * 1
 -/
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤ (optionGen Nat.arbitrary : SPMF (Option Nat)).mass := by
   mass_bound
   trace_state
-  simp
+  simp [ENNReal.inv_two_add_inv_two]
 
 /-- The same generator, bounded by a fact the caller supplies instead. -/
 example (g : SPMF Nat) (hg : SPMF.IsPMF g) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
@@ -76,7 +79,7 @@ example (g : SPMF Nat) (hg : SPMF.IsPMF g) : (1 : ℝ≥0∞) ≤ (g >>= fun _ =
 -- An unbounded-length list combinator only passes termination through: its bound is `1` exactly
 -- when its element generator's is.
 /--
-trace: ⊢ 1 ≤ if 1 ≤ 1 then 1 else 0
+trace: ⊢ 1 ≤ (if 1 ≤ 1 then 1 else 0) * 1
 -/
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤ (listOf Nat.arbitrary : SPMF (List Nat)).mass := by
@@ -113,7 +116,7 @@ example : (1 : ℝ≥0∞) ≤
 -- A later rule for the same combinator is a fallback. A conditional on a drawn value cannot stay a
 -- conditional in a bound outside the draw, so it falls back to the `min` of its branches.
 /--
-trace: ⊢ 1 ≤ 1 * min 1 1
+trace: ⊢ 1 ≤ 1
 -/
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤
@@ -141,7 +144,7 @@ example (g : Nat → SPMF Nat) (c : Nat → ℝ≥0∞) (hrec : ∀ j, c j ≤ (
 -- A continuation whose bound depends on a value drawn from anything else falls back to the worst
 -- case over every value.
 /--
-trace: ⊢ 1 ≤ 1 * ⨅ x, 1 ^ x
+trace: ⊢ 1 ≤ 1
 -/
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤

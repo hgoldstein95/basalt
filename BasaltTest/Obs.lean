@@ -60,3 +60,17 @@ theorem erase_sized {n : Nat} {g : Nat → SPMF.Cost α} :
   map_sized SPMF.Cost.eraseObs n g
 
 end ObsTest
+
+-- Every non-recursive combinator has its `@[gen_map]` lemma, which is all the walker knows of it;
+-- each recursive one has a bridge from its law for every direction it is walked in.
+open Lean Elab Command Basalt.Walk in
+run_cmd do
+  let env ← getEnv
+  let noMap := [``RandomChoice.choose, ``RandomChoice.pick, ``RandomChoice.coin, ``chooseInt,
+    ``elements, ``oneOf, ``frequency].filter (mapFor env · |>.isNone)
+  unless noMap.isEmpty do throwError "combinators with no `@[gen_map]` lemma: {noMap}"
+  for j in [specLEJudgment, specGEJudgment] do
+    for c in [``vectorOf, ``listOfMaxLength] ++ (if j.key == specGEJudgment.key
+        then [``listOf, ``nonEmptyListOf] else []) do
+      if (rulesFor env j.key c).isNone then
+        throwError "`{c}` has no bridge for the judgment `{j.key}`"

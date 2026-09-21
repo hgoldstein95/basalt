@@ -146,7 +146,7 @@ theorem sum_harmonic (n : ℕ) :
           rw [hcancel]; ring
       _ = ((n : ℝ≥0∞) + 1) * (harmonic n + 1 / ((n : ℝ≥0∞) + 1)) := by ring
 
-theorem sum_Icc_harmonic_left {lo hi : Int} :
+private theorem sum_Icc_harmonic_left {lo hi : Int} :
     ∑ x ∈ Finset.Icc lo hi, harmonic (x - lo).toNat
       = ∑ k ∈ Finset.range (hi + 1 - lo).toNat, harmonic k := by
   refine Finset.sum_nbij' (fun x => (x - lo).toNat) (fun k => lo + (k : Int))
@@ -156,7 +156,7 @@ theorem sum_Icc_harmonic_left {lo hi : Int} :
   · simp only [Finset.mem_Icc] at hx; omega
   · simp only [Finset.mem_range] at hk; omega
 
-theorem sum_Icc_harmonic_right {lo hi : Int} :
+private theorem sum_Icc_harmonic_right {lo hi : Int} :
     ∑ x ∈ Finset.Icc lo hi, harmonic (hi - x).toNat
       = ∑ k ∈ Finset.range (hi + 1 - lo).toNat, harmonic k := by
   refine Finset.sum_nbij' (fun x => (hi - x).toNat) (fun k => hi - (k : Int))
@@ -172,100 +172,38 @@ halves each level's contribution. -/
 theorem Tree.genBST.expect_size_le {lo hi : Int} :
     SPMF.expect (Tree.genBST lo hi) (fun t => (t.size : ℝ≥0∞))
       ≤ harmonic (hi + 1 - lo).toNat / 2 := by
-  delta Tree.genBST
-  apply Lean.Order.fix_induct (motive := fun (g : Int → Int → SPMF (Tree Int)) =>
-    ∀ lo hi, SPMF.expect (g lo hi) (fun t => (t.size : ℝ≥0∞))
-      ≤ harmonic (hi + 1 - lo).toNat / 2) _ ?admissible ?step
-  case admissible =>
-    exact Lean.Order.admissible_pi_apply _ fun _ =>
-      Lean.Order.admissible_pi_apply _ fun _ => SPMF.admissible_expect_le _ _
-  case step =>
-    intro genBST_rec ih lo hi
-    by_cases hgt : lo > hi
-    · rw [dif_pos hgt, SPMF.expect_pure]
-      simp [Tree.size]
-    · have hle : lo ≤ hi := by omega
-      rw [dif_neg hgt, SPMF.expect_frequency]
-      simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, Nat.cast_one, one_mul,
-        add_zero, SPMF.expect_pure, Tree.size, Nat.cast_zero, zero_add]
-      rw [show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
-      gcongr
-      -- The node branch: average over the pivot, one `ih` per subtree, then Abel summation.
-      rw [SPMF.expect_bind_chooseInt hle,
-        show (hi - lo + 1).toNat = (hi + 1 - lo).toNat from by omega]
-      set n := (hi + 1 - lo).toNat with hn
-      have hn0 : (n : ℝ≥0∞) ≠ 0 := by
-        simp only [ne_eq, Nat.cast_eq_zero]
-        omega
-      have hinner : ∀ x ∈ Finset.Icc lo hi,
-          SPMF.expect (genBST_rec lo (x - 1) >>= fun l =>
-              genBST_rec (x + 1) hi >>= fun r => Pure.pure (Tree.node l x r))
-            (fun t => (t.size : ℝ≥0∞))
-            ≤ 1 + harmonic (x - lo).toNat / 2 + harmonic (hi - x).toNat / 2 := by
-        intro x _
-        rw [SPMF.expect_bind]
-        have hright : ∀ l : Tree Int,
-            SPMF.expect (genBST_rec (x + 1) hi >>= fun r => Pure.pure (Tree.node l x r))
-              (fun t => (t.size : ℝ≥0∞))
-              ≤ (l.size : ℝ≥0∞) + (1 + harmonic (hi - x).toNat / 2) := by
-          intro l
-          rw [SPMF.expect_bind]
-          simp only [SPMF.expect_pure]
-          calc SPMF.expect (genBST_rec (x + 1) hi)
-                (fun r => ((Tree.node l x r).size : ℝ≥0∞))
-              = SPMF.expect (genBST_rec (x + 1) hi)
-                  (fun r => ((l.size : ℝ≥0∞) + 1) + (r.size : ℝ≥0∞)) := by
-                congr 1
-                funext r
-                simp only [Tree.size]
-                push_cast
-                ring
-            _ = SPMF.expect (genBST_rec (x + 1) hi) (fun _ => (l.size : ℝ≥0∞) + 1)
-                  + SPMF.expect (genBST_rec (x + 1) hi) (fun r => (r.size : ℝ≥0∞)) :=
-                SPMF.expect_add _ _ _
-            _ ≤ ((l.size : ℝ≥0∞) + 1) + harmonic (hi - x).toNat / 2 := by
-                refine add_le_add ?_ ?_
-                · rw [SPMF.expect_const]
-                  exact le_trans (mul_le_mul_left (SPMF.mass_le_one _) _) (one_mul _).le
-                · have h := ih (x + 1) hi
-                  rw [show hi + 1 - (x + 1) = hi - x from by ring] at h
-                  exact h
-            _ = (l.size : ℝ≥0∞) + (1 + harmonic (hi - x).toNat / 2) := by ring
-        calc SPMF.expect (genBST_rec lo (x - 1))
-              (fun l => SPMF.expect (genBST_rec (x + 1) hi >>= fun r =>
-                Pure.pure (Tree.node l x r)) (fun t => (t.size : ℝ≥0∞)))
-            ≤ SPMF.expect (genBST_rec lo (x - 1))
-                (fun l => (l.size : ℝ≥0∞) + (1 + harmonic (hi - x).toNat / 2)) :=
-              SPMF.expect_mono fun l => hright l
-          _ = SPMF.expect (genBST_rec lo (x - 1)) (fun l => (l.size : ℝ≥0∞))
-                + SPMF.expect (genBST_rec lo (x - 1))
-                    (fun _ => 1 + harmonic (hi - x).toNat / 2) := SPMF.expect_add _ _ _
-          _ ≤ harmonic (x - lo).toNat / 2 + (1 + harmonic (hi - x).toNat / 2) := by
-              refine add_le_add ?_ ?_
-              · have h := ih lo (x - 1)
-                rw [show x - 1 + 1 - lo = x - lo from by ring] at h
-                exact h
-              · rw [SPMF.expect_const]
-                exact le_trans (mul_le_mul_left (SPMF.mass_le_one _) _) (one_mul _).le
-          _ = 1 + harmonic (x - lo).toNat / 2 + harmonic (hi - x).toNat / 2 := by ring
-      calc (∑ x ∈ Finset.Icc lo hi,
-              SPMF.expect (genBST_rec lo (x - 1) >>= fun l =>
-                genBST_rec (x + 1) hi >>= fun r => Pure.pure (Tree.node l x r))
-                (fun t => (t.size : ℝ≥0∞))) / (n : ℝ≥0∞)
-          ≤ (∑ x ∈ Finset.Icc lo hi,
-              (1 + harmonic (x - lo).toNat / 2 + harmonic (hi - x).toNat / 2)) / (n : ℝ≥0∞) := by
-            gcongr with x hx
-            exact hinner x hx
-        _ = ((∑ k ∈ Finset.range n, harmonic k) + (n : ℝ≥0∞)) / (n : ℝ≥0∞) := by
-            rw [Finset.sum_add_distrib, Finset.sum_add_distrib, Finset.sum_const, Int.card_Icc]
-            simp only [div_eq_mul_inv, ← Finset.sum_mul]
-            simp only [← div_eq_mul_inv]
-            rw [sum_Icc_harmonic_left, sum_Icc_harmonic_right, ← hn, nsmul_eq_mul, mul_one,
-              add_assoc, ENNReal.add_halves,
-              add_comm ((n : ℝ≥0∞)) (∑ k ∈ Finset.range n, harmonic k)]
-        _ = ((n : ℝ≥0∞) * harmonic n) / (n : ℝ≥0∞) := by rw [sum_harmonic]
-        _ = harmonic n := by
-            rw [mul_comm, ENNReal.mul_div_cancel_right hn0 (by finiteness)]
+  expect_fixpoint
+  split
+  · simp [Tree.size]
+  · rename_i hgt
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, Nat.cast_one, one_mul,
+      add_zero, Tree.size, Nat.cast_zero, zero_add]
+    rw [show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num,
+      show (hi - lo + 1).toNat = (hi + 1 - lo).toNat from by omega]
+    gcongr
+    set n := (hi + 1 - lo).toNat with hn
+    have hn0 : (n : ℝ≥0∞) ≠ 0 := by
+      simp only [ne_eq, Nat.cast_eq_zero]
+      omega
+    have hsummand : ∀ x ∈ Finset.Icc lo hi,
+        (1 + harmonic (hi + 1 - (x + 1)).toNat / 2 + harmonic (x - 1 + 1 - lo).toNat / 2 : ℝ≥0∞)
+          = 1 + harmonic (x - lo).toNat / 2 + harmonic (hi - x).toNat / 2 := by
+      intro x _
+      rw [show hi + 1 - (x + 1) = hi - x by ring, show x - 1 + 1 - lo = x - lo by ring]
+      ring
+    rw [Finset.sum_congr rfl hsummand]
+    calc (∑ x ∈ Finset.Icc lo hi,
+            (1 + harmonic (x - lo).toNat / 2 + harmonic (hi - x).toNat / 2)) / (n : ℝ≥0∞)
+        = ((∑ k ∈ Finset.range n, harmonic k) + (n : ℝ≥0∞)) / (n : ℝ≥0∞) := by
+          rw [Finset.sum_add_distrib, Finset.sum_add_distrib, Finset.sum_const, Int.card_Icc]
+          simp only [div_eq_mul_inv, ← Finset.sum_mul]
+          simp only [← div_eq_mul_inv]
+          rw [sum_Icc_harmonic_left, sum_Icc_harmonic_right, ← hn, nsmul_eq_mul, mul_one,
+            add_assoc, ENNReal.add_halves,
+            add_comm ((n : ℝ≥0∞)) (∑ k ∈ Finset.range n, harmonic k)]
+      _ = ((n : ℝ≥0∞) * harmonic n) / (n : ℝ≥0∞) := by rw [sum_harmonic]
+      _ ≤ harmonic n := by
+          rw [mul_comm, ENNReal.mul_div_cancel_right hn0 (by finiteness)]
 
 end distribution
 

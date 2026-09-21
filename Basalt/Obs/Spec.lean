@@ -50,6 +50,10 @@ namespace Mix
 
 variable {Ω : Type w} (m : Mix.{u} Ω)
 
+/-- A choice from a range, which is not empty. -/
+def range (lo hi : Nat) (_h : lo ≤ hi) (F : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → Ω) : Ω :=
+  m.mix lo hi F
+
 /-- A binary choice. -/
 def binary (t e : Ω) : Ω :=
   m.mix 0 1 fun a => if (a.down.val == 0) = true then t else e
@@ -61,6 +65,10 @@ def threshold (d : Nat) (k : Int) (t e : Ω) : Ω :=
 /-- A choice of a list entry. -/
 def index (l : List γ) (hne : l ≠ []) (F : γ → Ω) : Ω :=
   m.mix 0 (l.length - 1) fun a => F (l[a.down.val]'(Obs.idx_lt hne a.down.property))
+
+/-- A choice of a list entry that is a value: there is nothing under it to bound, so its rules
+speak of the list and not of its entries one by one. -/
+def element (l : List γ) (hne : l ≠ []) (F : γ → Ω) : Ω := m.index l hne F
 
 /-- A choice of a weighted list entry. -/
 def select (l : List (Nat × γ)) (_hpos : 0 < (l.map Prod.fst).sum) (F : γ → Ω) (d : Ω) : Ω :=
@@ -90,6 +98,9 @@ def replicateM (n : Nat) (w : W α) : W (List α) :=
 def index (l : List γ) (hne : l ≠ []) (F : γ → W α) : W α :=
   choose 0 (l.length - 1) (Nat.zero_le _) >>= fun a =>
     F (l[a.down.val]'(idx_lt hne a.down.property))
+
+/-- A uniform list entry. -/
+def element (l : List α) (hne : l ≠ []) : W α := index l hne Pure.pure
 
 /-- A weighted list entry, then `F`; `d` past the end. -/
 def select (l : List (Nat × γ)) (_hpos : 0 < (l.map Prod.fst).sum) (F : γ → W α) (d : W α) :
@@ -148,7 +159,7 @@ theorem pure_apply (a : α) (post : α → Ω) : (Pure.pure a : WP m α) post = 
 
 @[spec_apply]
 theorem choose_apply {lo hi : Nat} {h : lo ≤ hi} (post : _ → Ω) :
-    (choose lo hi h : WP m _) post = m.mix lo hi post := rfl
+    (choose lo hi h : WP m _) post = m.range lo hi h post := rfl
 
 @[spec_apply]
 theorem pick_apply (x y : Unit → WP m α) (post : α → Ω) :
@@ -163,6 +174,10 @@ theorem coin_apply {m : Mix.{0} Ω} (r : Rat) (post : Bool → Ω) :
 @[spec_apply]
 theorem index_apply (l : List γ) (hne : l ≠ []) (F : γ → WP m α) (post : α → Ω) :
     (Obs.index l hne F) post = m.index l hne fun g => F g post := rfl
+
+@[spec_apply]
+theorem element_apply (l : List α) (hne : l ≠ []) (post : α → Ω) :
+    (Obs.element l hne : WP m α) post = m.element l hne post := rfl
 
 @[spec_apply]
 theorem select_apply (l : List (Nat × γ)) (hpos : 0 < (l.map Prod.fst).sum) (F : γ → WP m α)
@@ -220,7 +235,7 @@ theorem pure_apply (a : α) (post : α → Nat → Ω) : (Pure.pure a : WPC m α
 
 @[spec_apply]
 theorem choose_apply {lo hi : Nat} {h : lo ≤ hi} (post : _ → Nat → Ω) :
-    (choose lo hi h : WPC m _) post = m.mix lo hi fun a => post a 1 := rfl
+    (choose lo hi h : WPC m _) post = m.range lo hi h fun a => post a 1 := rfl
 
 @[spec_apply]
 theorem pick_apply (x y : Unit → WPC m α) (post : α → Nat → Ω) :
@@ -236,6 +251,10 @@ theorem coin_apply {m : Mix.{0} Ω} (r : Rat) (post : Bool → Nat → Ω) :
 @[spec_apply]
 theorem index_apply (l : List γ) (hne : l ≠ []) (F : γ → WPC m α) (post : α → Nat → Ω) :
     (Obs.index l hne F) post = m.index l hne fun g => F g fun b n => post b (1 + n) := rfl
+
+@[spec_apply]
+theorem element_apply (l : List α) (hne : l ≠ []) (post : α → Nat → Ω) :
+    (Obs.element l hne : WPC m α) post = m.element l hne fun a => post a 1 := rfl
 
 @[spec_apply]
 theorem select_apply (l : List (Nat × γ)) (hpos : 0 < (l.map Prod.fst).sum) (F : γ → WPC m α)
