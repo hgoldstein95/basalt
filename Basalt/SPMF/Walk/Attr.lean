@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Lean.Meta.Basic
+import Lean.Meta.Tactic.Simp.Attr
 
 /-!
 # The `@[gen_rule]` Attribute
@@ -34,10 +35,23 @@ structure Judgment where
   bridges : Array (Option Name)
   /-- A callee's law for this judgment is `<callee>.<lawSuffix>`. -/
   lawSuffix : Name
+  /-- Further law suffixes, for a judgment that several observations share: a law about another
+  observation fails to bridge. -/
+  moreLawSuffixes : Array Name := #[]
   /-- The error for a leaf nothing closes. -/
   noLeaf : Expr → MessageData
   /-- Whether a fact about a generator is tried before its combinator's rules. -/
   leavesFirst : Bool := false
+  /-- For a judgment stated on an observation: the lemmas, one per family of specification monad,
+  that turn a goal about a combinator into one about the right-hand side of the combinator's
+  `@[gen_map]` lemma. The explicit premises of each are that equation, then the new goal. -/
+  adapters : Array Name := #[]
+  /-- Bridges for a fact whose postcondition differs from the goal's by a constant: each takes the
+  fact, then equations `∀ a, p a = k + h a` that the walker solves for `k`. -/
+  affine : Array Name := #[]
+  /-- A lemma that restates a goal of this judgment, about any generator, as goals of other
+  judgments; tried before the rules when it is in scope. -/
+  reduceTo : Option Name := none
 
 /-- `c ≤ SPMF.mass g`: a lower bound on the mass, computed by the rules. -/
 def massJudgment : Judgment where
@@ -78,9 +92,85 @@ def isBoundedJudgment : Judgment where
   noLeaf g := m!"cost_bound: no hypothesis or `.cost_bounded` law bounds the cost of the \
     combinator argument{indentExpr g}\nPass a cost bound for it to `cost_bound [_]`."
   leavesFirst := true
+  reduceTo := some `SPMF.Cost.isBounded_of_worst
+
+/-- The generator of `O.spec g post`, and how to restate it about another. -/
+private def specSubject? (e : Expr) : Option (Expr × (Expr → Expr)) :=
+  let e := e.headBeta
+  if e.isAppOfArity `Obs.spec 10 then
+    some (e.getArg! 8, fun g => mkAppN e.getAppFn (e.getAppArgs.set! 8 g))
+  else none
+
+/-- `O.spec g post ≤ b`: an upper bound on an observation into an ordered algebra, computed by the
+rules from the postcondition. The rules are stated once for every monotone observation. -/
+def specLEJudgment : Judgment where
+  key := `Obs.spec
+  subject? ty := do
+    unless ty.isAppOfArity ``LE.le 4 do return none
+    let some (g, restate) := specSubject? (ty.getArg! 2) | return none
+    return some (g, fun g => mkApp2 ty.appFn!.appFn! (restate g) (ty.getArg! 3))
+  bridges := #[none]
+  lawSuffix := .anonymous
+  moreLawSuffixes := #[`cost_bounded]
+  noLeaf g := m!"no rule, `@[gen_map]` lemma, or fact bounds the observation of{indentExpr g}\n\
+    Pass a bound for it to the tactic, under the postcondition it is stated with plus a constant."
+  adapters := #[`Obs.spec_le_of_map, `Obs.specC_le_of_map]
+  affine := #[`SPMF.spec_le_add_of_expect_le, `SPMF.Cost.spec_le_add_of_expect_le,
+    `SPMF.Cost.worst_le_add_of_le, `SPMF.Cost.worst_le_add_of_isBounded]
+
+/-- `b ≤ O.spec g post`: the lower bound, as `specLEJudgment`. -/
+def specGEJudgment : Judgment where
+  key := `Obs.spec ++ `ge
+  subject? ty := do
+    unless ty.isAppOfArity ``LE.le 4 do return none
+    let some (g, restate) := specSubject? (ty.getArg! 3) | return none
+    return some (g, fun g => mkApp2 ty.appFn!.appFn! (ty.getArg! 2) (restate g))
+  bridges := #[none]
+  lawSuffix := `terminates
+  moreLawSuffixes := #[`cost_bounded]
+  noLeaf g := m!"no rule, `@[gen_map]` lemma, or fact bounds the observation of{indentExpr g}"
+  adapters := #[`Obs.le_spec_of_map, `Obs.le_specC_of_map]
+  affine := #[`SPMF.le_spec_of_le_mass, `SPMF.le_spec_of_isPMF, `SPMF.Cost.le_spec_of_always,
+    `SPMF.Cost.le_spec_of_isBounded, `SPMF.Cost.le_spec_of_isCostBounded]
+
+/-- The shapes of choice an algebra has rules for. -/
+def mixShapes : Array Name :=
+  #[`Mix.mix, `Mix.binary, `Mix.threshold, `Mix.index, `Mix.select, `Mix.rangeInt]
+
+/-- `‹shape› ≤ b`: an upper bound on a choice in an ordered algebra, from bounds on what its
+outcomes mean. The "generator" is the shape, so a rule is keyed by it. -/
+def mixLEJudgment : Judgment where
+  key := `Mix.mix
+  subject? ty := do
+    unless ty.isAppOfArity ``LE.le 4 do return none
+    let lhs := ty.getArg! 2
+    unless mixShapes.any lhs.isAppOf do return none
+    return some (lhs, fun g => mkApp2 ty.appFn!.appFn! g (ty.getArg! 3))
+  bridges := #[]
+  lawSuffix := .anonymous
+  noLeaf g := m!"no rule bounds the choice{indentExpr g}"
+
+/-- `b ≤ ‹shape›`: the lower bound, as `mixLEJudgment`. -/
+def mixGEJudgment : Judgment where
+  key := `Mix.mix ++ `ge
+  subject? ty := do
+    unless ty.isAppOfArity ``LE.le 4 do return none
+    let rhs := ty.getArg! 3
+    unless mixShapes.any rhs.isAppOf do return none
+    return some (rhs, fun g => mkApp2 ty.appFn!.appFn! (ty.getArg! 2) g)
+  bridges := #[]
+  lawSuffix := .anonymous
+  noLeaf g := m!"no rule bounds the choice{indentExpr g}"
 
 /-- Every judgment the walker knows, tried in order. -/
-def judgments : Array Judgment := #[massJudgment, alwaysJudgment, isBoundedJudgment]
+def judgments : Array Judgment :=
+  #[massJudgment, alwaysJudgment, isBoundedJudgment, specLEJudgment, mixLEJudgment,
+    specGEJudgment, mixGEJudgment]
+
+/-- `@[spec_apply]` — how a specification built from a shape of choice applies to a postcondition.
+The walker rewrites with these after a `@[gen_map]` lemma, to reach the algebra's own shapes. -/
+initialize specApplyExt : SimpExtension ←
+  registerSimpAttr `spec_apply "a specification applied to a postcondition"
 
 /-- Judgment key ↦ combinator head constant ↦ the `@[gen_rule]` rules for it, in declaration
 order. -/
@@ -99,9 +189,22 @@ initialize genRuleExt :
 def rulesFor (env : Environment) (j head : Name) : Option (Array Name) :=
   ((genRuleExt.getState env).find? j).bind (·.find? head)
 
-/-- Whether `head` is a combinator: some judgment has a rule for it. -/
+/-- Combinator head constant ↦ its `@[gen_map]` lemma. -/
+initialize genMapExt : SimplePersistentEnvExtension (Name × Name) (NameMap Name) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun m (k, v) => m.insert k v
+    addImportedFn := fun ess => ess.foldl (fun m es => es.foldl (fun m (k, v) => m.insert k v) m) {}
+  }
+
+/-- The `@[gen_map]` lemma for generators headed by `head`. -/
+def mapFor (env : Environment) (head : Name) : Option Name :=
+  (genMapExt.getState env).find? head
+
+/-- Whether `head` is a combinator: some judgment has a rule for it, or it has a `@[gen_map]`
+lemma. -/
 def isCombinator (env : Environment) (head : Name) : Bool :=
-  (genRuleExt.getState env).any fun _ byHead => byHead.contains head
+  ((genRuleExt.getState env).any fun _ byHead => byHead.contains head)
+    || (genMapExt.getState env).contains head
 
 /-- The judgment a rule concludes and the combinator it is about. -/
 def ruleKey (declName : Name) (type : Expr) : MetaM (Name × Name) :=
@@ -151,6 +254,25 @@ initialize registerBuiltinAttribute {
     unless kind == .global do throwError "gen_rule: must be a global attribute"
     let (j, head) ← MetaM.run' (ruleKey declName (← getConstInfo declName).type)
     modifyEnv (genRuleExt.addEntry · (j, head, declName))
+}
+
+/-- `@[gen_map]` — a combinator's one lemma, `O.spec (<combinator> …) = …` for every observation
+`O`, from which the walker proves any judgment stated on an observation. -/
+syntax (name := genMapAttr) "gen_map" : attr
+
+initialize registerBuiltinAttribute {
+  name := `genMapAttr
+  descr := "the lemma saying that every observation commutes with a generator combinator"
+  add := fun declName _ kind => do
+    unless kind == .global do throwError "gen_map: must be a global attribute"
+    let head ← MetaM.run' <| forallTelescope (← getConstInfo declName).type fun _ concl => do
+      let some (_, lhs, _) := concl.eq? | throwError "gen_map: `{declName}` must conclude an equation"
+      unless lhs.isAppOfArity `Obs.spec 9 do
+        throwError "gen_map: the left-hand side of `{declName}` must be `O.spec (<combinator> …)`"
+      let some head := lhs.appArg!.getAppFn.constName?
+        | throwError "gen_map: `{declName}` must be about a combinator application"
+      return head
+    modifyEnv (genMapExt.addEntry · (head, declName))
 }
 
 end Basalt.Walk

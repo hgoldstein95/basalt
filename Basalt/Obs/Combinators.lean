@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Obs.Basic
+import Basalt.Obs.Spec
 import Basalt.Combinators
 
 /-!
@@ -11,34 +12,13 @@ import Basalt.Combinators
 
 One `map_X` lemma per non-recursive combinator: what an observation of `X` is, written with the
 specification monad's `Monad` and `RandomChoice` operations only, so that it need not be a `Gen`.
-Each right-hand side is a single `choose` followed by its continuation, which is the form the
-presentation lemmas of an algebra read.
+Each right-hand side is one shape of choice (`Basalt/Obs/Spec.lean`), which is what a presentation
+lemma or a walker rule of an algebra reads.
 -/
 
 open RandomChoice
 
 namespace Obs
-
-/-- The entry of a weighted list that offset `n` falls in, or `d` past the end. -/
-def selectD : List (Nat × β) → Nat → β → β
-  | [], _, d => d
-  | (k, x) :: xs, n, d => if n < k then x else selectD xs (n - k) d
-
-theorem selectD_map (f : β → γ) (l : List (Nat × β)) (n : Nat) (d : β) :
-    f (selectD l n d) = selectD (l.map fun p => (p.1, f p.2)) n (f d) := by
-  induction l generalizing n with
-  | nil => rfl
-  | cons hd tl ih =>
-    obtain ⟨k, x⟩ := hd
-    simp only [selectD, List.map_cons]
-    split
-    · rfl
-    · exact ih _
-
-/-- `vectorOf` written with `Monad` operations only. -/
-def replicateM [Monad W] (n : Nat) (w : W α) : W (List α) :=
-  List.foldr (fun m acc => m >>= fun x => acc >>= fun xs => Pure.pure (x :: xs)) (Pure.pure [])
-    (List.replicate n w)
 
 variable {G : Type → Type v} {W : Type → Type w}
   [Gen G] [LawfulMonad G] [Monad W] [RandomChoice W] [LawfulMonad W] (O : Obs G W)
@@ -47,22 +27,18 @@ theorem map_chooseNat (lo hi : Nat) (h : lo ≤ hi) :
     O.spec (chooseNat lo hi h) = (·.down.val) <$> choose lo hi h := by
   simp only [chooseNat, O.map_map, O.map_choose]
 
+@[gen_map]
 theorem map_chooseInt (lo hi : Int) (h : lo ≤ hi) :
-    O.spec (chooseInt lo hi h)
-      = (fun a => lo + (a.down.val : Int)) <$> choose 0 (hi - lo).toNat (Nat.zero_le _) := by
-  simp only [chooseInt, bind_pure_comp, O.map_map, O.map_chooseNat, Functor.map_map]
+    O.spec (chooseInt lo hi h) = rangeInt lo hi h Pure.pure := by
+  unfold chooseInt rangeInt
+  rw [O.map_bind, O.map_chooseNat, bind_map_left]
+  simp only [O.map_pure]
 
-theorem idx_lt {l : List γ} (hne : l ≠ []) {i : Nat} (h : 0 ≤ i ∧ i ≤ l.length - 1) :
-    i < l.length := by
-  have := List.length_pos_iff.mpr hne
-  omega
-
+@[gen_map]
 theorem map_elements (xs : List α) (hne : xs ≠ []) :
-    O.spec (elements xs hne)
-      = (fun a => xs[a.down.val]'(idx_lt hne a.down.property))
-          <$> choose 0 (xs.length - 1) (Nat.zero_le _) := by
-  unfold elements
-  rw [O.map_bind, O.map_map, O.map_choose, bind_map_left, ← bind_pure_comp]
+    O.spec (elements xs hne) = index xs hne Pure.pure := by
+  unfold elements index
+  rw [O.map_bind, O.map_map, O.map_choose, bind_map_left]
   congr 1
   funext ⟨i, h1, h2⟩
   exact O.map_pure _
@@ -77,10 +53,9 @@ theorem map_oneOfAux (l : List (Unit → G α)) (n : Nat) (hlt : ∀ i, i ≤ n 
   funext ⟨i, h1, h2⟩
   rfl
 
+@[gen_map]
 theorem map_oneOf (gs : List (Unit → G α)) (hne : gs ≠ []) :
-    O.spec (oneOf gs hne)
-      = choose 0 (gs.length - 1) (Nat.zero_le _) >>= fun a =>
-          O.spec ((gs[a.down.val]'(idx_lt hne a.down.property)) ()) :=
+    O.spec (oneOf gs hne) = index gs hne fun g => O.spec (g ()) :=
   O.map_oneOfAux gs _ _
 
 omit [LawfulMonad G] [LawfulMonad W] in
@@ -112,12 +87,10 @@ theorem map_frequencyAux (gs : List (Nat × (Unit → G α))) (total : Nat)
   simp only [dif_pos hi]
   exact O.map_frequencySelect gs i (by omega) d
 
-theorem map_frequency (gs : List (Nat × (Unit → G α))) (h : 0 < (gs.map Prod.fst).sum)
-    (d : W α) :
-    O.spec (frequency gs h)
-      = choose 0 ((gs.map Prod.fst).sum - 1) (Nat.zero_le _) >>= fun a =>
-          selectD (gs.map fun p => (p.1, O.spec (p.2 ()))) a.down.val d :=
-  O.map_frequencyAux gs _ rfl h d
+@[gen_map]
+theorem map_frequency (gs : List (Nat × (Unit → G α))) (h : 0 < (gs.map Prod.fst).sum) :
+    O.spec (frequency gs h) = select gs h (fun g => O.spec (g ())) (O.spec default) :=
+  O.map_frequencyAux gs _ rfl h _
 
 omit [LawfulMonad G] [LawfulMonad W] in
 theorem map_vectorOf (n : Nat) (g : G α) : O.spec (vectorOf n g) = replicateM n (O.spec g) := by

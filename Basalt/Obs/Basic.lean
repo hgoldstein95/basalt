@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.RandomChoice
+import Basalt.SPMF.Walk.Attr
 
 /-!
 # Observations
@@ -49,13 +50,17 @@ theorem map_map [LawfulMonad G] [LawfulMonad W] (f : α → β) (x : G α) :
   rw [← bind_pure_comp, O.map_bind, ← bind_pure_comp]
   simp only [O.map_pure]
 
+@[gen_map]
 theorem map_pick (x y : Unit → G α) :
     O.spec (pick x y) = pick (fun u => O.spec (x u)) (fun u => O.spec (y u)) := by
   simp only [pick, O.map_bind, O.map_choose, O.map_ite]
 
+@[gen_map]
 theorem map_coin {G : Type → Type v} {W : Type → Type w}
     [Monad G] [RandomChoice G] [Monad W] [RandomChoice W] (O : Obs G W) (r : Rat) :
     O.spec (coin r) = coin r := by
   simp only [coin, O.map_bind, O.map_choose, O.map_ite, O.map_pure]
+
+attribute [gen_map] map_choose
 
 end Obs
