@@ -89,11 +89,6 @@ open RandomChoice
 
 variable {W : Type u → Type w} [Monad W] [RandomChoice W]
 
-/-- `vectorOf` written with `Monad` operations only. -/
-def replicateM (n : Nat) (w : W α) : W (List α) :=
-  List.foldr (fun m acc => m >>= fun x => acc >>= fun xs => Pure.pure (x :: xs)) (Pure.pure [])
-    (List.replicate n w)
-
 /-- A uniform list entry, then `F`. -/
 def index (l : List γ) (hne : l ≠ []) (F : γ → W α) : W α :=
   choose 0 (l.length - 1) (Nat.zero_le _) >>= fun a =>
