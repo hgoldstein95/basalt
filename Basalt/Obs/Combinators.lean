@@ -36,8 +36,8 @@ theorem map_chooseInt (lo hi : Int) (h : lo ≤ hi) :
 
 @[gen_map]
 theorem map_elements (xs : List α) (hne : xs ≠ []) :
-    O.spec (elements xs hne) = index xs hne Pure.pure := by
-  unfold elements index
+    O.spec (elements xs hne) = element xs hne := by
+  unfold elements element index
   rw [O.map_bind, O.map_map, O.map_choose, bind_map_left]
   congr 1
   funext ⟨i, h1, h2⟩

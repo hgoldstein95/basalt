@@ -215,23 +215,26 @@ names in context. Without `using`, the goal left is `LfpIsOne <computed bound>` 
 finished with `SPMF.LfpIsOne.mono` and a certificate (`BasaltTest/Termination.lean`).
 
 **`mass_bound` is the whole structural argument.** It walks the unfolded generator and *computes* a
-lower bound on its mass — `@[gen_rule]` rules per combinator, so the bound comes out in the
-shape of the do-block (`Basalt/SPMF/MassBound.lean` owns the rules, `Basalt/SPMF/Walk.lean` the walk;
-`BasaltTest/MassBound.lean` shows a generator that uses every one of them). Nothing about the
-generator is yours to supply:
+lower bound on its mass. Mass is the expectation of `1`, and the walk pushes that postexpectation
+backward: a draw is bounded at the bound its continuation computed, so the bound comes out in the
+shape of the do-block and is exact wherever the generator's callees are
+(`Basalt/SPMF/MassBound.lean` owns how a fact is used, `Basalt/SPMF/AverageBound.lean` the bound of
+each shape of choice, `Basalt/SPMF/Walk.lean` the walk; `BasaltTest/MassBound.lean` shows a generator
+that uses every combinator). Nothing about the generator is yours to supply:
 
 - a **recursive occurrence** is discharged by `hrec`, whatever the shape of the seed.
 - a **callee** is discharged by its own `<callee>.terminates` law, found by the naming convention
   (Part 2 above) — `Nat.arbitrary` inside a body needs no mention. Any other fact is passed
   explicitly: `mass_fixpoint [h₁, h₂] using …`.
-- a **helper with no law**, or a combinator with no rule (`optionGen`), is unfolded and walked
-  through when it is not recursive.
+- a **helper with no law**, or a derived combinator (`optionGen`), is unfolded and walked through
+  when it is not recursive.
 - an **`if`/`dite`** is no different from any other combinator: the bound is the same conditional
   over the branches' bounds, which the arithmetic `split`s — `Tree.genBST` (`BST.lean`) shortcuts on
-  an exhausted interval. A conditional on a value drawn inside the step cannot appear in the bound,
-  so there it is the `min` of the branches' instead: `Tree.genLeftist` (`LeftistHeap.lean`) ends
-  its recursive branch in an `if` that orders the two children and `Tree.genHeap` (`Heap.lean`)
-  does not, and their termination proofs are the same text.
+  an exhausted interval. A conditional on a value drawn inside the step belongs to that draw's
+  postexpectation: after a `coin` it is the weighted sum of the branches' bounds, and when the
+  branches have one bound it is that bound. `Tree.genLeftist` (`LeftistHeap.lean`) ends its
+  recursive branch in an `if` that orders the two children and `Tree.genHeap` (`Heap.lean`) does
+  not, and their termination proofs are the same text.
 
 **The arithmetic** has your `F c` on the left, the computed bound on the right, and no generator in
 sight. Try `simp` (`ArbNat.lean`, `SortedList.lean`), then `simp` with the identities the goal needs
@@ -282,8 +285,8 @@ of `<GEN>` changes, unfolds one step, and runs `cost_bound`. A generator with no
 unfolded and walked.
 
 **`cost_bound` is the whole structural argument.** It pushes the postcondition "producing `v` took
-at most `<COST> v` choices" backward through the step, with one `@[gen_rule]` rule per combinator —
-the tally of Step 2 is what the rules compute. It leaves one goal per path through the generator,
+at most `<COST> v` choices" backward through the step, by the same walk as `mass_bound` — the tally
+of Step 2 is what it computes. It leaves one goal per path through the generator,
 stated over the values that path drew; the walker (`Basalt/SPMF/Walk.lean`, "Names") says how
 they are named, and `BasaltTest/CostFixpoint.lean` shows the goals `genHeap` and `genBST`
 leave. Nothing about the generator is yours to supply:
@@ -306,6 +309,29 @@ definition to unfold, is `cost_bound` alone (`BasaltTest/CostBound.lean`). A gen
 `termination_by` is induction on its decreasing argument and `cost_bound` in each case
 (`BasaltTest/CostFixpoint.lean`).
 
+### Recipe 4: Expected Values
+
+Not one of the three obligations: a bound on an expectation (the expected size of what is generated,
+the expected number of choices) when the worst case of Recipe 3 is too coarse or does not exist.
+
+Worked instances: `Nat.arbitrary.expected_cost` (`ArbNat.lean`), at the cost interpretation, and
+`Tree.genBST.expect_size_le` (`BST.lean`), whose arithmetic is a harmonic sum.
+
+```lean
+theorem <GEN>.<NAME> : SPMF.expect (<GEN> <ARGS>) (fun v => <QUANTITY> v) ≤ <BOUND> := by
+  expect_fixpoint
+  <arithmetic>          -- `<computed bound> ≤ <BOUND>`, with `ih` in context
+```
+
+**`expect_fixpoint`** (`Basalt/SPMF/ExpectFixpoint.lean`) inducts as `cost_fixpoint` does and runs
+`expect_bound` (`Basalt/SPMF/ExpectBound.lean`), the same walk again: it pushes `<QUANTITY>` backward
+and computes an upper bound, at `SPMF` or at `SPMF.Cost` (where the quantity sees the choices made,
+and `SPMF.Cost.expectedCost` is accepted). A recursive occurrence is bounded by `ih`, used under
+whatever the walk arrives with as long as that is `ih`'s own quantity plus a constant
+(`(node l x r).size` is `l.size + 1 + r.size`); a callee's bound is passed explicitly,
+`expect_fixpoint [h]`. Only an upper bound can be proved this way: the fixpoint induction starts from
+the generator that never returns. `BasaltTest/ExpectBound.lean` pins the goals.
+
 ## When Stuck
 
 - **`rw [gen]` fails** → wrong unfolding idiom for the context; see the table above.
@@ -320,20 +346,26 @@ definition to unfold, is `cost_bound` alone (`BasaltTest/CostBound.lean`). A gen
 - **`omega` fails in a cost proof** → read the goal: it is the exact inequality your bound must
   satisfy, with every sub-cost's bound in context. Either the cost function is still folded in a
   hypothesis (`simp only [...] at *`), or the bound is too tight.
-- **`cost_bound` says nothing bounds the cost of a sub-generator** → it is a callee whose cost law is
-  under another name, or the generator argument of a combinator that has no law of its own and no
-  worst case (it recurses, or draws from something that does); pass a bound for it:
-  `cost_fixpoint [h]`. A recursive combinator with no `@[gen_rule]` cost rule gets the same message
-  (tag one).
-- **`mass_bound` says nothing bounds the mass of a sub-generator** → it is a recursive combinator
-  with no `@[gen_rule]` mass rule (tag one), a callee whose termination law is under another name
-  (pass it: `mass_bound [h]`), or a recursive occurrence whose fact needs a premise that neither
-  unification nor a hypothesis supplies (`m < n` for a size computed from a draw). Pass that fact
-  instantiated; the drawn values are in scope under the generator's names
-  (`mass_bound [ih _ (… k₁ …)]`).
-- **`mass_bound` leaves `⨅ x, …`** → a continuation's bound depends on a value drawn from something
-  other than a uniform pivot (which is averaged instead), so the bound is its worst case over every
-  value.
+- **`cost_bound` says nothing bounds a sub-generator** → it is a callee whose cost law is under
+  another name, or the generator argument of a combinator that has no law of its own and no worst
+  case (it recurses, or draws from something that does); pass a bound for it: `cost_fixpoint [h]`. A
+  recursive combinator of your own gets the same message: it needs a law and a bridge from it
+  (`SPMF.Cost.le_spec_listOf`, `Basalt/SPMF/CostBound.lean`).
+- **`mass_bound` says nothing bounds a sub-generator** → it is a recursive combinator of your own
+  (bridge its law, as `SPMF.le_spec_listOf` does in `Basalt/SPMF/MassFixpoint.lean`), a callee whose
+  termination law is under another name (pass it: `mass_bound [h]`), or a recursive occurrence whose
+  fact needs a premise that neither unification nor a hypothesis supplies (`m < n` for a size
+  computed from a draw). Pass that fact instantiated; the drawn values are in scope under the
+  generator's names (`mass_bound [ih _ (… k₁ …)]`).
+- **`mass_bound` leaves `⨅ x, …`** → a continuation's bound depends on a value drawn by a callee or
+  a recursive occurrence, of which only the mass is known, so the bound is its worst case over
+  every value. A value drawn by a combinator is averaged over instead.
+- **A walk leaves `0 < r.den`, `0 ≤ r.num`, `r.num ≤ r.den`** → the weight of a `coin r` is not a
+  literal; `SPMF.coin_num_bounds` gives the last two from `0 ≤ r` and `r ≤ 1`.
+- **`expect_bound` says a postcondition is not the fact's plus a constant** → the fact about a
+  callee or a recursive occurrence bounds `expect x h`, and the walk arrived at it with something
+  other than `k + h`. State the fact for the quantity the generator's result is built from, or
+  pass one that is.
 - **`mass_fixpoint` leaves an arithmetic goal that is false** → the structural half is not in doubt;
   the certificate you named is. Re-count the mean offspring.
 - **Finite-domain data (chars, enums)** → skip the machinery: `decide` / `native_decide` on the

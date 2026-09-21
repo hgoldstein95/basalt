@@ -47,7 +47,8 @@ depends on the generator, and you prove the ones that do:
 
 `BasaltExamples/` is a cookbook of worked generators, each carrying proofs of the properties that
 apply to it. `WORKFLOW.md` walks through writing a generator and proving it correct, with a recipe
-for each obligation.
+for each obligation, and one for bounding an expected value (`SPMF.expect`: the expected size of what
+is generated, the expected number of choices).
 
 ## Running Properties
 

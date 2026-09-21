@@ -25,10 +25,8 @@ hc1 : c ≤ 1
 hrec : ∀ (j : ℤ × ℤ), c ≤ (BST.Tree.genBST j.1 j.2).mass
 lo hi : ℤ
 ⊢ 1 / 2 + 0 * c + 1 / 2 * c ^ 2 ≤
-    if lo > hi then 1
-    else
-      (List.map (fun p => ↑p.1 * p.2) [(1, 1), (1, 1 * (c * (c * 1)))]).sum /
-        ↑(List.map Prod.fst [(1, 1), (1, 1 * (c * (c * 1)))]).sum
+    if h : lo > hi then 1
+    else (List.map (fun p => ↑p.1 * p.2) [(1, 1), (1, c * c)]).sum / ↑(List.map Prod.fst [(1, 1), (1, c * c)]).sum
 -/
 #guard_msgs in
 example (lo hi : Int) : IsAlmostSurelyTerminating (BST.Tree.genBST lo hi) := by
@@ -50,7 +48,7 @@ partial_fixpoint
 /--
 trace: case certificate
 b : Bool
-⊢ SPMF.LfpIsOne fun c => 1 / 2 * 1 + 1 / 2 * (c * 1)
+⊢ SPMF.LfpIsOne fun c => 1 / 2 * 1 + 1 / 2 * c
 -/
 #guard_msgs in
 example (b : Bool) : IsAlmostSurelyTerminating (coins b) := by
@@ -172,5 +170,30 @@ example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
     rw [fuelled]
     mass_bound
     simp [ENNReal.inv_two_add_inv_two]
+
+/-- The geometric loop, stopped by a `coin` rather than a `pick`. -/
+def coinLoop [Gen G] : G Nat := do
+  let b ← coin (1 / 2)
+  if b then pure 0 else do
+    let n ← coinLoop
+    pure (n + 1)
+partial_fixpoint
+
+-- A conditional on a drawn value is part of the draw's postexpectation, so the bound is exact: the
+-- literal coin's weights, and the same recurrence as the `pick` loop's.
+/--
+trace: case certificate
+⊢ SPMF.LfpIsOne fun c => ↑1 / ↑2 * 1 + ↑1 / ↑2 * c
+-/
+#guard_msgs in
+example : IsAlmostSurelyTerminating (coinLoop : SPMF Nat) := by
+  mass_fixpoint
+  trace_state
+  exact (SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)).mono fun c _ => by
+    simp [ENNReal.one_sub_inv_two]
+
+theorem coinLoop.terminates : IsAlmostSurelyTerminating (coinLoop : SPMF Nat) := by
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  simp [ENNReal.one_sub_inv_two]
 
 end TerminationTest

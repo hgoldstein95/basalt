@@ -87,7 +87,7 @@ h_l : n_l ≤ 3 * l.size + 1
 r : BST.Tree ℤ
 n_r : ℕ
 h_r : n_r ≤ 3 * r.size + 1
-⊢ 1 + (1 + (n_l + (n_r + 0))) ≤ 3 * (l.node x r).size + 1
+⊢ 1 + (1 + (n_l + n_r)) ≤ 3 * (l.node x r).size + 1
 -/
 #guard_msgs in
 example : IsCostBounded (BST.Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
