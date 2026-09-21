@@ -113,8 +113,8 @@ example : (1 : ℝ≥0∞) ≤
   mass_bound
   simp
 
--- A later rule for the same combinator is a fallback. A conditional on a drawn value cannot stay a
--- conditional in a bound outside the draw, so it falls back to the `min` of its branches.
+-- A conditional on a drawn value belongs to that draw's postexpectation, so both branches are
+-- bounded under it and the draw is averaged: here every path has bound 1, so the bound is 1.
 /--
 trace: ⊢ 1 ≤ 1
 -/
@@ -141,8 +141,8 @@ example (g : Nat → SPMF Nat) (c : Nat → ℝ≥0∞) (hrec : ∀ j, c j ≤ (
   trace_state
   exact zero_le
 
--- A continuation whose bound depends on a value drawn from anything else falls back to the worst
--- case over every value.
+-- A value drawn by a combinator is averaged over, not worst-cased: `elements` is an `index` shape,
+-- and both of its branches bound the continuation by 1.
 /--
 trace: ⊢ 1 ≤ 1
 -/

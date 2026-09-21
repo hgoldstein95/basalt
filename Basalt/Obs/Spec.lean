@@ -142,10 +142,6 @@ theorem choose_bind_apply {lo hi : Nat} {h : lo ≤ hi}
     (k : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → WP m α) (post : α → Ω) :
     (RandomChoice.choose lo hi h >>= k) post = m.mix lo hi fun a => k a post := rfl
 
-theorem map_choose_apply {lo hi : Nat} {h : lo ≤ hi}
-    (f : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → α) (post : α → Ω) :
-    (f <$> RandomChoice.choose lo hi h : WP m α) post = m.mix lo hi fun a => post (f a) := rfl
-
 theorem ite_apply {p : Prop} [Decidable p] (x y : WP m α) (post : α → Ω) :
     (if p then x else y) post = if p then x post else y post := by
   split <;> rfl
@@ -217,10 +213,6 @@ theorem choose_bind_apply {lo hi : Nat} {h : lo ≤ hi}
     (k : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → WPC m α) (post : α → Nat → Ω) :
     (RandomChoice.choose lo hi h >>= k) post
       = m.mix lo hi fun a => k a fun b n => post b (1 + n) := rfl
-
-theorem map_choose_apply {lo hi : Nat} {h : lo ≤ hi}
-    (f : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → α) (post : α → Nat → Ω) :
-    (f <$> RandomChoice.choose lo hi h : WPC m α) post = m.mix lo hi fun a => post (f a) 1 := rfl
 
 theorem ite_apply {p : Prop} [Decidable p] (x y : WPC m α) (post : α → Nat → Ω) :
     (if p then x else y) post = if p then x post else y post := by

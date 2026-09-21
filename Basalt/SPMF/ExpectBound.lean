@@ -41,6 +41,152 @@ theorem SPMF.Cost.spec_le_add_of_expect_le {x : SPMF.Cost α} {φ : α × Nat �
   rw [hp', SPMF.expect_add, SPMF.expect_const]
   exact add_le_add (mul_le_of_le_one_left' (SPMF.mass_le_one x)) hx
 
+/-! ## The list combinators
+
+They have no shape of choice and no `@[gen_map]` lemma, so an upper bound on an expectation over one
+is a rule. Only the mass is used: exactly when the postexpectation is constant, and otherwise at its
+worst case over every list, dually to `le_spec_iInf_of_le_mass` on the mass side. A rule that reads
+the element generator's expectation belongs *before* these, which are the last resort. -/
+
+namespace SPMF
+
+/-- What the missing mass buys: an expectation is at most its postexpectation's largest value,
+whatever the generator. -/
+theorem spec_le_of_const {x : SPMF α} {p : α → ℝ≥0∞} {d : ℝ≥0∞} (hp : ∀ a, p a = d) :
+    SPMF.expectObs.spec x p ≤ d :=
+  SPMF.expect_le_of_support fun a _ => (hp a).le
+
+@[inherit_doc spec_le_of_const]
+theorem spec_le_iSup {x : SPMF α} {p : α → ℝ≥0∞} : SPMF.expectObs.spec x p ≤ ⨆ a, p a :=
+  SPMF.expect_le_of_support fun a _ => le_iSup p a
+
+section listCombinators
+
+variable {α : Type} {g : SPMF α} {d : ℝ≥0∞} {p : List α → ℝ≥0∞}
+
+@[gen_rule] theorem spec_vectorOf_le_const {n : Nat} (hp : ∀ a, p a = d) :
+    SPMF.expectObs.spec (vectorOf n g) p ≤ d := spec_le_of_const hp
+
+@[gen_rule] theorem spec_vectorOf_le {n : Nat} :
+    SPMF.expectObs.spec (vectorOf n g) p ≤ ⨆ a, p a := spec_le_iSup
+
+@[gen_rule] theorem spec_listOfMaxLength_le_const {n : Nat} (hp : ∀ a, p a = d) :
+    SPMF.expectObs.spec (listOfMaxLength n g) p ≤ d := spec_le_of_const hp
+
+@[gen_rule] theorem spec_listOfMaxLength_le {n : Nat} :
+    SPMF.expectObs.spec (listOfMaxLength n g) p ≤ ⨆ a, p a := spec_le_iSup
+
+@[gen_rule] theorem spec_listOf_le_const (hp : ∀ a, p a = d) :
+    SPMF.expectObs.spec (listOf g) p ≤ d := spec_le_of_const hp
+
+@[gen_rule] theorem spec_listOf_le : SPMF.expectObs.spec (listOf g) p ≤ ⨆ a, p a := spec_le_iSup
+
+@[gen_rule] theorem spec_nonEmptyListOf_le_const (hp : ∀ a, p a = d) :
+    SPMF.expectObs.spec (nonEmptyListOf g) p ≤ d := spec_le_of_const hp
+
+@[gen_rule] theorem spec_nonEmptyListOf_le :
+    SPMF.expectObs.spec (nonEmptyListOf g) p ≤ ⨆ a, p a := spec_le_iSup
+
+end listCombinators
+
+end SPMF
+
+/-! ## The list combinators at the cost interpretation
+
+`vectorOf` draws a bounded number of times, so its expected cost is read off the element generator's
+and the rule is exact. The others have only the last resorts below, which at the postexpectation
+`expectedCost` uses are `⊤`; pass a bound to `expect_bound [h]`. For `listOfMaxLength` an exact rule
+is `expectedCost_vectorOf_le` averaged over the length drawn, which its `do` block presents as a
+`match` on the subtype rather than as a `chooseNat` bind. -/
+
+namespace SPMF.Cost
+
+variable {α : Type} {g : SPMF.Cost α} {b k d : ℝ≥0∞} {p : List α → Nat → ℝ≥0∞}
+
+/-- A bind that only relabels the value makes no further choices. -/
+private theorem expectedCost_bind_pure (x : SPMF.Cost α) (h : α → β) :
+    expectedCost (x >>= fun a => Pure.pure (h a) : SPMF.Cost β) = expectedCost x := by
+  unfold expectedCost
+  rw [expect_bind]
+  simp only [expect_pure, Nat.add_zero]
+
+private theorem expectedCost_vectorOf_le {n : Nat} (hg : expectedCost g ≤ b) :
+    expectedCost (vectorOf n g : SPMF.Cost (List α)) ≤ n * b := by
+  induction n with
+  | zero =>
+    show SPMF.expect (Pure.pure [] : SPMF.Cost (List α)) _ ≤ _
+    rw [expect_pure]
+    simp
+  | succ n ih =>
+    rw [vectorOf_succ]
+    show SPMF.expect (g >>= _ : SPMF.Cost (List α)) (fun q => (q.2 : ℝ≥0∞)) ≤ _
+    rw [expect_bind]
+    have hinner : ∀ q : α × Nat,
+        SPMF.expect (vectorOf n g >>= fun xs => Pure.pure (q.1 :: xs) : SPMF.Cost (List α))
+            (fun r => ((q.2 + r.2 : Nat) : ℝ≥0∞))
+          ≤ (q.2 : ℝ≥0∞) + n * b := by
+      intro q
+      have hcast : (fun r : List α × Nat => ((q.2 + r.2 : Nat) : ℝ≥0∞))
+          = fun r => (q.2 : ℝ≥0∞) + (r.2 : ℝ≥0∞) := by funext r; push_cast; rfl
+      rw [hcast, SPMF.expect_add, SPMF.expect_const]
+      refine add_le_add ?_ ((expectedCost_bind_pure _ _).trans_le ih)
+      exact mul_le_of_le_one_left' (SPMF.mass_le_one _)
+    refine (SPMF.expect_mono hinner).trans ?_
+    rw [SPMF.expect_add, SPMF.expect_const]
+    refine (add_le_add hg (mul_le_of_le_one_left' (SPMF.mass_le_one g))).trans ?_
+    push_cast
+    rw [add_mul, one_mul, add_comm]
+
+/-- The affine rules come first: they are the only ones that read the element generator's expected
+cost, and the last resorts below would otherwise shadow them. -/
+@[gen_rule]
+theorem expect_vectorOf_le {n : Nat}
+    (hg : SPMF.Cost.expectObs.spec g (fun _ m => (m : ℝ≥0∞)) ≤ b)
+    (hp : ∀ a m, p a m = k + (m : ℝ≥0∞)) :
+    SPMF.Cost.expectObs.spec (vectorOf n g) p ≤ k + n * b := by
+  show SPMF.expect (vectorOf n g : SPMF.Cost (List α)) (fun q => p q.1 q.2) ≤ _
+  rw [funext fun q : List α × Nat => hp q.1 q.2, SPMF.expect_add, SPMF.expect_const]
+  exact add_le_add (mul_le_of_le_one_left' (SPMF.mass_le_one _))
+    (expectedCost_vectorOf_le hg)
+
+/-! The last resorts, as at `SPMF`: only the mass is used. -/
+
+/-- As `SPMF.spec_le_of_const`, with the choice count in the postexpectation. -/
+theorem specC_le_of_const {x : SPMF.Cost α} {q : α → Nat → ℝ≥0∞} (hq : ∀ a m, q a m = d) :
+    SPMF.Cost.expectObs.spec x q ≤ d :=
+  SPMF.expect_le_of_support fun r _ => (hq r.1 r.2).le
+
+@[inherit_doc specC_le_of_const]
+theorem specC_le_iSup {x : SPMF.Cost α} {q : α → Nat → ℝ≥0∞} :
+    SPMF.Cost.expectObs.spec x q ≤ ⨆ a, ⨆ m, q a m :=
+  SPMF.expect_le_of_support fun r _ => le_iSup₂_of_le r.1 r.2 le_rfl
+
+@[gen_rule] theorem expect_vectorOf_le_const {n : Nat} (hp : ∀ a m, p a m = d) :
+    SPMF.Cost.expectObs.spec (vectorOf n g) p ≤ d := specC_le_of_const hp
+
+@[gen_rule] theorem expect_vectorOf_le_iSup {n : Nat} :
+    SPMF.Cost.expectObs.spec (vectorOf n g) p ≤ ⨆ a, ⨆ m, p a m := specC_le_iSup
+
+@[gen_rule] theorem expect_listOfMaxLength_le_const {n : Nat} (hp : ∀ a m, p a m = d) :
+    SPMF.Cost.expectObs.spec (listOfMaxLength n g) p ≤ d := specC_le_of_const hp
+
+@[gen_rule] theorem expect_listOfMaxLength_le_iSup {n : Nat} :
+    SPMF.Cost.expectObs.spec (listOfMaxLength n g) p ≤ ⨆ a, ⨆ m, p a m := specC_le_iSup
+
+@[gen_rule] theorem expect_listOf_le_const (hp : ∀ a m, p a m = d) :
+    SPMF.Cost.expectObs.spec (listOf g) p ≤ d := specC_le_of_const hp
+
+@[gen_rule] theorem expect_listOf_le_iSup :
+    SPMF.Cost.expectObs.spec (listOf g) p ≤ ⨆ a, ⨆ m, p a m := specC_le_iSup
+
+@[gen_rule] theorem expect_nonEmptyListOf_le_const (hp : ∀ a m, p a m = d) :
+    SPMF.Cost.expectObs.spec (nonEmptyListOf g) p ≤ d := specC_le_of_const hp
+
+@[gen_rule] theorem expect_nonEmptyListOf_le_iSup :
+    SPMF.Cost.expectObs.spec (nonEmptyListOf g) p ≤ ⨆ a, ⨆ m, p a m := specC_le_iSup
+
+end SPMF.Cost
+
 namespace Basalt.ExpectBound
 
 open Basalt.Walk

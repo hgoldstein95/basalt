@@ -31,17 +31,6 @@ theorem Mix.Weighted.weights {γ : Type v} {Ω : Type w} {r : Ω → Ω → Prop
   | nil => rfl
   | cons _ _ ih => simpa using ih
 
-theorem Mix.Weighted.forall {γ : Type v} {Ω : Type w} {r : Ω → Ω → Prop} {F : γ → Ω} {cs gs}
-    (h : Weighted r F cs gs) {P : Nat × γ → Prop}
-    (hP : ∀ w c g, r (F g) c → (w, c) ∈ cs → P (w, g)) : ∀ q ∈ gs, P q := by
-  induction h with
-  | nil => simp
-  | cons hc _ ih =>
-    intro q hq
-    rcases List.mem_cons.mp hq with rfl | hq
-    · exact hP _ _ _ hc List.mem_cons_self
-    · exact ih (fun w c g hr hm => hP w c g hr (List.mem_cons_of_mem _ hm)) q hq
-
 namespace Obs
 
 variable {G : Type u → Type v} {Ω : Type w} [Preorder Ω] {m : Mix.{u} Ω} [Monad G] [RandomChoice G]

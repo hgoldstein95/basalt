@@ -197,27 +197,46 @@ theorem IsPMF_nonEmptyListOf {g : SPMF α} (hg : IsPMF g) : IsPMF (nonEmptyListO
   mass_fixpoint using LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp [ENNReal.one_sub_inv_two]
 
-/-- An unbounded-length list only passes termination through: its bound is `1` exactly when its
-element generator's is, which is the shape that still chains when that generator is a bind. -/
-@[gen_rule]
-theorem le_spec_listOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
-    (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
-    (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (listOf g) p := by
-  refine le_spec_of_le_mass ?_ hp
+private theorem ite_le_mass_listOf {g : SPMF α} {c : ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) : (if 1 ≤ c then 1 else 0) ≤ (listOf g).mass := by
   split
   · exact (IsPMF_listOf (le_antisymm (mass_le_one g)
       (‹1 ≤ c›.trans (hg.trans_eq (expect_one g))))).ge
   · exact zero_le
 
-@[gen_rule]
-theorem le_spec_nonEmptyListOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
-    (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
-    (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (nonEmptyListOf g) p := by
-  refine le_spec_of_le_mass ?_ hp
+private theorem ite_le_mass_nonEmptyListOf {g : SPMF α} {c : ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) :
+    (if 1 ≤ c then 1 else 0) ≤ (nonEmptyListOf g).mass := by
   split
   · exact (IsPMF_nonEmptyListOf (le_antisymm (mass_le_one g)
       (‹1 ≤ c›.trans (hg.trans_eq (expect_one g))))).ge
   · exact zero_le
+
+/-- An unbounded-length list only passes termination through: its bound is `1` exactly when its
+element generator's is, which is the shape that still chains when that generator is a bind. -/
+@[gen_rule]
+theorem le_spec_listOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
+    (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (listOf g) p :=
+  le_spec_of_le_mass (ite_le_mass_listOf hg) hp
+
+@[gen_rule, inherit_doc le_spec_vectorOf_iInf]
+theorem le_spec_listOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) :
+    (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (listOf g) p :=
+  le_spec_iInf_of_le_mass (ite_le_mass_listOf hg)
+
+@[gen_rule, inherit_doc le_spec_listOf]
+theorem le_spec_nonEmptyListOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
+    (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (nonEmptyListOf g) p :=
+  le_spec_of_le_mass (ite_le_mass_nonEmptyListOf hg) hp
+
+@[gen_rule, inherit_doc le_spec_vectorOf_iInf]
+theorem le_spec_nonEmptyListOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) :
+    (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (nonEmptyListOf g) p :=
+  le_spec_iInf_of_le_mass (ite_le_mass_nonEmptyListOf hg)
 
 end combinators
 
