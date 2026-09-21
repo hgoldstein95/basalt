@@ -485,6 +485,45 @@ theorem mem_support_nonEmptylistOf
     xs ∈ (nonEmptyListOf g).support ↔ xs ∈ {xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support} := by
   simp [support_nonEmptyListOf]
 
+/-- The support of `permutationOf xs` is the set of all values of the subtype `{ys // xs ~ ys}`,
+    i.e. all possible permutations of `xs`.  -/
+theorem support_permutationOf {α} {xs : List α} :
+    support (permutationOf xs) = Set.univ := by
+  ext z
+  simp only [Set.mem_univ, iff_true]
+  induction xs with
+  | nil =>
+    obtain ⟨zs, hz⟩ := z
+    have : zs = [] := List.Perm.eq_nil hz.symm
+    subst this
+    rw [permutationOf]
+    simp
+  | cons x xs ih =>
+    obtain ⟨zs, hz⟩ := z
+    -- `x` occurs at some index `n` of `zs`.
+    obtain ⟨n, hn, hxn⟩ := List.mem_iff_getElem.mp (hz.mem_iff.mp List.mem_cons_self)
+    -- Erasing that index and reinserting `x` there recovers `zs` (the inverse of one step).
+    have hinv : (zs.eraseIdx n).insertIdx n x = zs := by
+      rw [← hxn]; exact List.insertIdx_eraseIdx_getElem hn
+    have hle : n ≤ (zs.eraseIdx n).length := by rw [List.length_eraseIdx_of_lt hn]; omega
+    -- Peel the head off both sides to get a permutation of the tail.
+    have hzperm : zs.Perm (x :: zs.eraseIdx n) := by
+      conv_lhs => rw [← hinv]
+      exact List.perm_insertIdx x (zs.eraseIdx n) hle
+    have htail : xs.Perm (zs.eraseIdx n) := List.Perm.cons_inv (hz.trans hzperm)
+    rw [permutationOf]
+    simp only [mem_support_bind_iff, mem_support_map_iff, mem_support_choose_iff, true_and]
+    -- Witnesses: the recursive result `⟨zs.eraseIdx n, htail⟩` and the insertion index `n`.
+    refine ⟨⟨zs.eraseIdx n, htail⟩, ih _, ⟨n, by omega, hle⟩,
+      ⟨ULift.up ⟨n, by omega, hle⟩, rfl⟩, ?_⟩
+    exact mem_support_pure_iff.mpr (Subtype.ext hinv.symm)
+
+/-- Membership form of `support_permutationOf` -/
+@[simp]
+theorem mem_support_permutationOf_iff {α} {xs : List α} {z : { ys // xs.Perm ys }} :
+    z ∈ support (permutationOf xs : SPMF _) ↔ True := by
+  rw [support_permutationOf]; exact iff_of_true (Set.mem_univ z) trivial
+
 /-- The support of `elements xs` is exactly the set of all elements in `xs` -/
 @[simp]
 theorem support_elements
