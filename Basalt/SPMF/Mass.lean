@@ -24,10 +24,6 @@ theorem mass_pick {x y : SPMF α} :
     (pick (fun () => x) (fun () => y)).mass = (1/2 : ℝ≥0∞) * x.mass + (1/2 : ℝ≥0∞) * y.mass := by
   simpa only [expect_one] using expect_pick x y fun _ => 1
 
-theorem tsum_pick {x y : SPMF α} :
-    ∑' a, (pick (fun () => x) (fun () => y)) a = (1/2 : ℝ≥0∞) * (∑' a, x a) + (1/2 : ℝ≥0∞) * (∑' a, y a) :=
-  mass_pick
-
 @[simp]
 theorem mass_bot : Bot.bot (α := SPMF α).mass = 0 := by
   simp only [mass, ENNReal.tsum_eq_zero]

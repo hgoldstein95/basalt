@@ -11,7 +11,9 @@ import Basalt.Obs.Combinators
 
 How a choice presents for each shape a combinator makes it in (a plain range, a binary choice, a
 threshold, a list index, a weighted selection), demonically (`Mix.demonic`, a `∀`) and angelically
-(`Mix.angelic`, an `∃`). These are facts about quantifiers over a range, not about combinators.
+(`Mix.angelic`, an `∃`), in each direction something reads. A shape whose rule splits the choice
+pointwise instead (`Mix.le_demonic_binary`) has no demonic presentation. These are facts about
+quantifiers over a range, not about combinators.
 -/
 
 namespace Mix
@@ -23,30 +25,6 @@ variable {lo hi : Nat}
 theorem range_demonic (F : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → Prop) :
     Mix.demonic.mix lo hi F ↔ ∀ x (hx : lo ≤ x ∧ x ≤ hi), F ⟨⟨x, hx⟩⟩ :=
   ⟨fun h x hx => h ⟨⟨x, hx⟩⟩, fun h a => h a.down.val a.down.property⟩
-
-theorem binary_demonic (F : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ 1} → Prop) :
-    Mix.demonic.mix 0 1 F ↔ F ⟨⟨0, by omega⟩⟩ ∧ F ⟨⟨1, by omega⟩⟩ := by
-  refine ⟨fun h => ⟨h _, h _⟩, ?_⟩
-  rintro ⟨h0, h1⟩ ⟨⟨x, hx⟩⟩
-  obtain rfl | rfl : x = 0 ∨ x = 1 := by omega
-  · exact h0
-  · exact h1
-
-theorem threshold_demonic {d : Nat} {k : Int} (hd : 0 < d) (t e : Prop) :
-    Mix.demonic.mix 0 (d - 1)
-        (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ d - 1} => if (a.down.val : Int) < k then t else e)
-      ↔ (0 < k → t) ∧ (k < d → e) := by
-  constructor
-  · intro h
-    refine ⟨fun hk => ?_, fun hk => ?_⟩
-    · simpa [hk] using h ⟨⟨0, by omega⟩⟩
-    · have : if ((d - 1 : Nat) : Int) < k then t else e := h ⟨⟨d - 1, by omega⟩⟩
-      rwa [if_neg (by omega)] at this
-  · rintro ⟨ht, he⟩ ⟨⟨x, hx⟩⟩
-    show if (x : Int) < k then t else e
-    split
-    · exact ht (by omega)
-    · exact he (by omega)
 
 theorem index_demonic {γ : Type v} (l : List γ) (hne : l ≠ []) (F : γ → Prop) :
     Mix.demonic.mix 0 (l.length - 1)
@@ -86,14 +64,14 @@ theorem select_demonic (l : List (Nat × Prop)) {T : Nat} (hT : T = (l.map Prod.
   rw [← selectD_forall l d, ← hT]
   exact ⟨fun h n hn => h ⟨⟨n, by omega⟩⟩, fun h a => h _ (by have := a.down.property; omega)⟩
 
-/-! ## Prop -/
+/-! ## Angelic -/
 
 theorem range_angelic (F : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → Prop) :
     Mix.angelic.mix lo hi F ↔ ∃ x, ∃ hx : lo ≤ x ∧ x ≤ hi, F ⟨⟨x, hx⟩⟩ :=
   ⟨fun ⟨a, h⟩ => ⟨a.down.val, a.down.property, h⟩, fun ⟨x, hx, h⟩ => ⟨⟨⟨x, hx⟩⟩, h⟩⟩
 
-private theorem exists_binary (F : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ 1} → Prop) :
-    (∃ a, F a) ↔ F ⟨⟨0, by omega⟩⟩ ∨ F ⟨⟨1, by omega⟩⟩ := by
+theorem binary_angelic (F : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ 1} → Prop) :
+    Mix.angelic.mix 0 1 F ↔ F ⟨⟨0, by omega⟩⟩ ∨ F ⟨⟨1, by omega⟩⟩ := by
   constructor
   · rintro ⟨⟨⟨x, hx⟩⟩, h⟩
     obtain rfl | rfl : x = 0 ∨ x = 1 := by omega
@@ -103,12 +81,9 @@ private theorem exists_binary (F : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ 1} �
     · exact ⟨_, h⟩
     · exact ⟨_, h⟩
 
-theorem binary_angelic (F : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ 1} → Prop) :
-    Mix.angelic.mix 0 1 F ↔ F ⟨⟨0, by omega⟩⟩ ∨ F ⟨⟨1, by omega⟩⟩ :=
-  exists_binary F
-
-private theorem exists_threshold {d : Nat} {k : Int} (hd : 0 < d) (t e : Prop) :
-    (∃ a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ d - 1}, if (a.down.val : Int) < k then t else e)
+theorem threshold_angelic {d : Nat} {k : Int} (hd : 0 < d) (t e : Prop) :
+    Mix.angelic.mix 0 (d - 1)
+        (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ d - 1} => if (a.down.val : Int) < k then t else e)
       ↔ (0 < k ∧ t) ∨ (k < d ∧ e) := by
   constructor
   · rintro ⟨⟨⟨x, hx⟩⟩, h⟩
@@ -123,12 +98,6 @@ private theorem exists_threshold {d : Nat} {k : Int} (hd : 0 < d) (t e : Prop) :
     · refine ⟨⟨⟨d - 1, by omega⟩⟩, ?_⟩
       show if ((d - 1 : Nat) : Int) < k then t else e
       rwa [if_neg (by omega)]
-
-theorem threshold_angelic {d : Nat} {k : Int} (hd : 0 < d) (t e : Prop) :
-    Mix.angelic.mix 0 (d - 1)
-        (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ d - 1} => if (a.down.val : Int) < k then t else e)
-      ↔ (0 < k ∧ t) ∨ (k < d ∧ e) :=
-  exists_threshold hd t e
 
 theorem index_angelic {γ : Type v} (l : List γ) (hne : l ≠ []) (F : γ → Prop) :
     Mix.angelic.mix 0 (l.length - 1)
@@ -162,19 +131,13 @@ private theorem selectD_exists (l : List (Nat × Prop)) (d : Prop) :
       · obtain ⟨n, hn, h⟩ := ih.mpr ⟨p, hp, hw, hp2⟩
         exact ⟨k + n, by omega, by rwa [if_neg (by omega), Nat.add_sub_cancel_left]⟩
 
-private theorem exists_select (l : List (Nat × Prop)) {T : Nat} (hT : T = (l.map Prod.fst).sum)
-    (hpos : 0 < T) (d : Prop) :
-    (∃ a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ T - 1}, Obs.selectD l a.down.val d)
-      ↔ ∃ p ∈ l, 0 < p.1 ∧ p.2 := by
-  rw [← selectD_exists l d, ← hT]
-  exact ⟨fun ⟨a, h⟩ => ⟨_, by have := a.down.property; omega, h⟩,
-    fun ⟨n, hn, h⟩ => ⟨⟨⟨n, by omega⟩⟩, h⟩⟩
-
 theorem select_angelic (l : List (Nat × Prop)) {T : Nat} (hT : T = (l.map Prod.fst).sum)
     (hpos : 0 < T) (d : Prop) :
     Mix.angelic.mix 0 (T - 1)
         (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ T - 1} => Obs.selectD l a.down.val d)
-      ↔ ∃ p ∈ l, 0 < p.1 ∧ p.2 :=
-  exists_select l hT hpos d
+      ↔ ∃ p ∈ l, 0 < p.1 ∧ p.2 := by
+  rw [← selectD_exists l d, ← hT]
+  exact ⟨fun ⟨a, h⟩ => ⟨_, by have := a.down.property; omega, h⟩,
+    fun ⟨n, hn, h⟩ => ⟨⟨⟨n, by omega⟩⟩, h⟩⟩
 
 end Mix

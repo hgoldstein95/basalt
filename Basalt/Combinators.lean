@@ -324,35 +324,6 @@ private theorem frequencySelect_le [Gen G] {l1 l2 : List (Nat × (Unit → G α)
         apply IH
         assumption
 
-/-- If `n < sum (fst <$> gs)`, then `frequencySelect gs n h` picks a sub-generator from `gs` that
-has non-zero weight `w`. -/
-theorem frequencySelect_mem [Gen G]
-    {gs : List (Nat × (Unit → G α))}
-    {n : Nat}
-    (h : n < (List.map Prod.fst gs).sum) :
-    ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ Helpers.frequencySelect gs n h = g () := by
-  induction gs generalizing n with
-  | nil => simp at h
-  | cons hd tl ih =>
-    unfold Helpers.frequencySelect
-    obtain ⟨ w, g ⟩ := hd
-    split
-    · exists w, g
-      constructor
-      . apply List.Mem.head
-      . constructor
-        . omega
-        . rfl
-    · have h_remaining_weight : n - w < List.sum (List.map Prod.fst tl) := by
-        simp only [List.map_cons, List.sum_cons] at h
-        omega
-      obtain ⟨w', g', hwg_mem, hwg_pos, hwg_eq⟩ := ih h_remaining_weight
-      exists w', g'
-      constructor
-      . apply List.mem_cons_of_mem
-        assumption
-      . constructor <;> assumption
-
 /-- If two lists `l1, l2 : List (Nat × α)` satisfy `l1 ⊑ l2`, then the sum of their weights
     must be equal -/
 private theorem sumOfWeights_le {α : Type u} [PartialOrder α] {l1 l2 : List (Nat × α)}

@@ -71,6 +71,39 @@ example : SPMF.Cost.expectedCost (Nat.arbitrary : SPMF.Cost Nat) ≤ 2 := by
   ennreal_to_real
   norm_num
 
+-- A list combinator has no shape of choice, so it is bounded by a rule. At the cost interpretation
+-- `vectorOf` reads its element generator's expected cost, which the walk supplies from the fact.
+/--
+trace: ⊢ 0 + ↑5 * 2 ≤ 10
+-/
+#guard_msgs in
+example : SPMF.Cost.expectedCost (vectorOf 5 Nat.arbitrary : SPMF.Cost (List Nat)) ≤ 10 := by
+  expect_bound [Nat.arbitrary.expected_cost]
+  trace_state
+  ennreal_to_real
+  norm_num
+
+-- Elsewhere only the mass is used: a constant postexpectation exactly, and otherwise its worst case
+-- over every value, dually to the `⨅` that `mass_bound` leaves.
+/--
+trace: ⊢ ⨆ a, ↑a.length ≤ ∞
+-/
+#guard_msgs in
+example : SPMF.expect (vectorOf 2 Nat.arbitrary) (fun l => (l.length : ℝ≥0∞)) ≤ ⊤ := by
+  expect_bound
+  trace_state
+  exact le_top
+
+/--
+trace: ⊢ 7 ≤ 7
+-/
+#guard_msgs in
+example : SPMF.expect (listOf Nat.arbitrary >>= fun _ => Pure.pure 0)
+    (fun _ => (7 : ℝ≥0∞)) ≤ 7 := by
+  expect_bound
+  trace_state
+  exact le_rfl
+
 -- The cookbook's expectation bounds are this walk followed by arithmetic:
 -- `Nat.arbitrary.expected_cost` (`ArbNat.lean`) and `Tree.genBST.expect_size_le` (`BST.lean`).
 

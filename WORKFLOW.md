@@ -332,6 +332,12 @@ whatever the walk arrives with as long as that is `ih`'s own quantity plus a con
 `expect_fixpoint [h]`. Only an upper bound can be proved this way: the fixpoint induction starts from
 the generator that never returns. `BasaltTest/ExpectBound.lean` pins the goals.
 
+A **list combinator** has no shape of choice, so it is bounded by a rule rather than averaged. At the
+cost interpretation `vectorOf n g` is exact — `n` times `g`'s expected cost, which the walk takes
+from a fact you pass. Everywhere else only the mass is used: a constant postexpectation exactly, and
+otherwise its worst case over every value (`⨆`), which for an unbounded quantity is `⊤`. When that is
+too coarse, prove the bound separately and pass it: `expect_bound [h]`.
+
 ## When Stuck
 
 - **`rw [gen]` fails** → wrong unfolding idiom for the context; see the table above.

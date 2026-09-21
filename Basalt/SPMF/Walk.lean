@@ -27,28 +27,10 @@ open Lean Meta Elab Tactic
 
 namespace Basalt.Walk
 
-/-! ## Branch relations -/
+/-! ## Branch relations
 
-/-- Every branch of a list combinator satisfies `P`, collected one `cons` at a time. -/
-@[gen_branches]
-inductive AllBranches {β : Type u} (P : β → Prop) : List β → Prop
-  | nil : AllBranches P []
-  | cons {b : β} {bs : List β} (h : P b) (hs : AllBranches P bs) : AllBranches P (b :: bs)
-
-theorem allBranches_iff {β : Type u} {P : β → Prop} {bs : List β} :
-    AllBranches P bs ↔ ∀ b ∈ bs, P b := by
-  induction bs with
-  | nil => exact ⟨fun _ _ h => (nomatch h), fun _ => .nil⟩
-  | cons b bs ih =>
-    constructor
-    · intro h b' hb'
-      cases h with
-      | cons hb hbs =>
-        cases hb' with
-        | head => exact hb
-        | tail _ hb' => exact ih.mp hbs b' hb'
-    · intro h
-      exact .cons (h b (.head _)) (ih.mpr fun b' hb' => h b' (.tail _ hb'))
+The relations a rule collects a list combinator's branches with: `List.Forall₂` for an unweighted
+list, `Mix.Weighted` (`Basalt/Obs/Ordered.lean`) for a weighted one. -/
 
 attribute [gen_branches] List.Forall₂
 

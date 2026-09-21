@@ -99,9 +99,11 @@ namespace SPMF
 
 /-! ## The list combinators
 
-They take a bound on their element generator's mass, and their own is used at a constant
-postexpectation. The unbounded-length ones (`le_spec_listOf`, `le_spec_nonEmptyListOf`, in
-`MassFixpoint.lean`) only turn a terminating element generator into a terminating list generator. -/
+They take a bound on their element generator's mass, and their own is used at the postexpectation
+the walk arrives with: exactly when that is constant, and otherwise at its worst case over every
+list, as `le_spec_iInf_of_le_mass` does for a leaf. The unbounded-length ones (`le_spec_listOf`,
+`le_spec_nonEmptyListOf`, in `MassFixpoint.lean`) only turn a terminating element generator into a
+terminating list generator. -/
 
 private theorem pow_le_mass_vectorOf {n : Nat} {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ g.mass) :
     c ^ n ≤ (vectorOf n g : SPMF (List α)).mass := by
@@ -118,12 +120,15 @@ theorem le_spec_vectorOf {n : Nat} {g : SPMF α} {c d : ℝ≥0∞} {p : List α
     c ^ n * d ≤ expectObs.spec (vectorOf n g) p :=
   le_spec_of_le_mass (pow_le_mass_vectorOf (hg.trans_eq (expect_one g))) hp
 
+/-- The fallback for a postexpectation that depends on the list drawn. -/
 @[gen_rule]
-theorem le_spec_listOfMaxLength {n : Nat} {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
-    (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
-    min 1 c ^ n * d ≤ expectObs.spec (listOfMaxLength n g) p := by
-  refine le_spec_of_le_mass ?_ hp
-  have hg : c ≤ g.mass := hg.trans_eq (expect_one g)
+theorem le_spec_vectorOf_iInf {n : Nat} {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) :
+    c ^ n * ⨅ a, p a ≤ expectObs.spec (vectorOf n g) p :=
+  le_spec_iInf_of_le_mass (pow_le_mass_vectorOf (hg.trans_eq (expect_one g)))
+
+private theorem pow_le_mass_listOfMaxLength {n : Nat} {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ g.mass) :
+    min 1 c ^ n ≤ (listOfMaxLength n g : SPMF (List α)).mass := by
   unfold listOfMaxLength
   rw [← expect_one, expect_bind, expect_map]
   refine le_trans ?_ (Mix.le_average_range (h := Nat.zero_le n) (d := fun _ => min 1 c ^ n)
@@ -134,5 +139,16 @@ theorem le_spec_listOfMaxLength {n : Nat} {g : SPMF α} {c d : ℝ≥0∞} {p : 
     exact (pow_le_pow_right_of_le_one' (min_le_left 1 c) hk.2).trans
       ((pow_le_pow_left' (min_le_right 1 c) k).trans (pow_le_mass_vectorOf hg))
 
+@[gen_rule]
+theorem le_spec_listOfMaxLength {n : Nat} {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
+    min 1 c ^ n * d ≤ expectObs.spec (listOfMaxLength n g) p :=
+  le_spec_of_le_mass (pow_le_mass_listOfMaxLength (hg.trans_eq (expect_one g))) hp
+
+@[gen_rule, inherit_doc le_spec_vectorOf_iInf]
+theorem le_spec_listOfMaxLength_iInf {n : Nat} {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) :
+    min 1 c ^ n * ⨅ a, p a ≤ expectObs.spec (listOfMaxLength n g) p :=
+  le_spec_iInf_of_le_mass (pow_le_mass_listOfMaxLength (hg.trans_eq (expect_one g)))
 
 end SPMF

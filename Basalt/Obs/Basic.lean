@@ -41,10 +41,6 @@ theorem map_ite (p : Prop) [Decidable p] (x y : G α) :
     O.spec (if p then x else y) = if p then O.spec x else O.spec y := by
   split <;> rfl
 
-theorem map_dite (p : Prop) [Decidable p] (x : p → G α) (y : ¬p → G α) :
-    O.spec (if h : p then x h else y h) = if h : p then O.spec (x h) else O.spec (y h) := by
-  split <;> rfl
-
 theorem map_map [LawfulMonad G] [LawfulMonad W] (f : α → β) (x : G α) :
     O.spec (f <$> x) = f <$> O.spec x := by
   rw [← bind_pure_comp, O.map_bind, ← bind_pure_comp]

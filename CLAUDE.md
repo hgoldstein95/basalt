@@ -62,8 +62,10 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [BasaltTest/CostBound.lean](BasaltTest/CostBound.lean)), and `expect_bound`
   ([Basalt/SPMF/ExpectBound.lean](Basalt/SPMF/ExpectBound.lean), pinned by
   [BasaltTest/ExpectBound.lean](BasaltTest/ExpectBound.lean)), each with its `_fixpoint`.
-  [BasaltTest/Obs.lean](BasaltTest/Obs.lean) fails the build when a combinator has no `@[gen_map]`
-  lemma. Nothing else in a termination, cost, or expectation proof mentions combinators.
+  [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and fails the build when one of the
+  combinators it names loses its `@[gen_map]` lemma or a list combinator loses a bridge — it checks
+  that list, not the registry, so a *new* combinator with no lemma is not caught. Nothing else in a
+  termination, cost, or expectation proof mentions combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —

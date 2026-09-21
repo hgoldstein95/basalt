@@ -116,11 +116,6 @@ theorem map_biasedOptionGen (r : Rat) (g : G α) :
   simp only [biasedOptionGen, O.map_bind, O.map_coin, O.map_ite, O.map_pure, O.map_map,
     bind_pure_comp]
 
-theorem map_optionGen (g : G α) :
-    O.spec (optionGen g)
-      = coin (1 / 2) >>= fun b => if b = true then some <$> O.spec g else Pure.pure none :=
-  O.map_biasedOptionGen _ g
-
 /-! ## Into a generator monad
 
 When the target is itself a `Gen`, the right-hand side folds back into the combinator: `O.map_X`
