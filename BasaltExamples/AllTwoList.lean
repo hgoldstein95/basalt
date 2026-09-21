@@ -33,14 +33,20 @@ def genAllTwos [Gen G] : G (List Nat) :=
 partial_fixpoint
 
 theorem genAllTwos.sound_complete : IsSoundAndComplete genAllTwos AllTwos := by
-  intro a
-  induction a with
-  | nil =>
-    rw [genAllTwos]
-    simp [AllTwos]
-  | cons x xs ih =>
-    rw [genAllTwos]
-    simp [ih, AllTwos, and_comm]
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    · simp [AllTwos]
+    · simpa [AllTwos] using h_xs
+  case complete =>
+    intro xs
+    induction xs with
+    | nil => intro _; rw [genAllTwos]; complete_bound
+    | cons x xs ih =>
+      intro h
+      obtain rfl : x = 2 := h x (by simp)
+      rw [genAllTwos]; complete_bound
+      exact ⟨xs, ih fun y hy => h y (by simp [hy]), rfl⟩
 
 theorem genAllTwos.terminates : IsAlmostSurelyTerminating genAllTwos := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)

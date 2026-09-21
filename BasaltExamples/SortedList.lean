@@ -53,44 +53,35 @@ lemma List.sorted_cons_forall_le : List.sorted (x :: xs) → List.Forall (x ≤ 
   case _ => simp
   case _ x xs ih => grind [= sorted.eq_def, sorted, List.forall_cons]
 
-theorem List.genSortedGt_mem_support (xs : List Nat) (m : Nat) :
-    xs ∈ SPMF.support (List.genSortedGt m) ↔ (List.sorted xs ∧ List.Forall (m ≤ ·) xs) := by
-  fun_induction List.sorted generalizing m
-  case _ =>
-    unfold genSortedGt
-    simp
-  case _ x =>
-    unfold genSortedGt
-    simp
-    constructor
-    . grind
-    . intro h
-      exists x - m
-      apply And.intro Nat.arbitrary_mem_support
-      constructor
-      . unfold genSortedGt
-        simp
-      . grind
-  case _ x y xs ih =>
-    unfold genSortedGt
-    simp [ih, List.Forall, List.forall_cons]
-    constructor
-    . grind only [List.forall_iff_forall_mem, List.forall_cons]
-    . intro h
-      exists x - m
-      grind only [
-        List.forall_iff_forall_mem, List.Forall.eq_def, List.Forall.imp, List.sorted_cons_forall_le,
-        sorted.eq_def, Nat.arbitrary_mem_support]
-
 theorem List.genSortedGt.sound_complete :
     IsSoundAndComplete (List.genSortedGt m)
-      (fun xs => List.sorted xs ∧ List.Forall (m ≤ ·) xs) :=
-  fun xs => List.genSortedGt_mem_support xs m
+      (fun xs => List.sorted xs ∧ List.Forall (m ≤ ·) xs) := by
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    · trivial
+    · trivial
+    · cases xs <;> simp_all [List.sorted, List.Forall]
+    · exact (List.forall_cons ..).mpr ⟨by omega, h_xs.2.imp fun _ h => by omega⟩
+  case complete =>
+    intro xs
+    induction xs generalizing m with
+    | nil => intro _; rw [List.genSortedGt]; complete_bound
+    | cons x xs ih =>
+      intro ⟨hs, hf⟩
+      have hx : m ≤ x := List.forall_iff_forall_mem.mp hf x (by simp)
+      obtain ⟨d, rfl⟩ : ∃ d, x = m + d := ⟨x - m, by omega⟩
+      have htl : List.sorted xs := by
+        cases xs with
+        | nil => trivial
+        | cons y ys => exact hs.2
+      rw [List.genSortedGt]; complete_bound
+      exact ⟨d, xs, ih ⟨htl, List.sorted_cons_forall_le hs⟩, rfl⟩
 
 theorem List.genSorted.sound_complete : IsSoundAndComplete List.genSorted List.sorted := by
   intro xs
   unfold genSorted
-  simp [genSortedGt_mem_support, List.forall_iff_forall_mem]
+  simpa [List.forall_iff_forall_mem] using List.genSortedGt.sound_complete (m := 0) xs
 
 theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.genSortedGt m) := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)

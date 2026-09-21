@@ -51,25 +51,19 @@ partial_fixpoint
 
 theorem Tree.genBST.sound_complete :
     IsSoundAndComplete (Tree.genBST lo hi) (Tree.isBST lo hi) := by
-  intro t
-  fun_induction Tree.isBST
-    <;> rw [Tree.genBST]
-    <;> split
-    <;> simp
-  · exact ⟨1, fun _ => Pure.pure .leaf, Or.inl ⟨rfl, rfl⟩, one_pos, by simp⟩
-  · intros
-    omega
-  · constructor
-    · rintro ⟨w, g, hbr, hw, hmem⟩
-      rcases hbr with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
-      · simp at hmem
-      · revert hmem
-        simp
-        grind
-    · rintro ⟨h1, h2, hl, hr⟩
-      refine ⟨1, _, Or.inr ⟨rfl, rfl⟩, one_pos, ?_⟩
-      simp
-      grind
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    all_goals simp_all [Tree.isBST]
+  case complete =>
+    intro t
+    induction t generalizing lo hi with
+    | leaf => intro _; rw [Tree.genBST]; complete_bound
+    | node l x r ihl ihr =>
+      intro ⟨h1, h2, hl, hr⟩
+      rw [Tree.genBST]; complete_bound
+      rw [dif_neg (by omega)]
+      exact ⟨x, ⟨h1, h2⟩, l, ihl hl, r, ihr hr, rfl⟩
 
 /-! ## Termination -/
 

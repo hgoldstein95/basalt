@@ -60,24 +60,19 @@ partial_fixpoint
 
 theorem Tree.genHeap.sound_complete :
     IsSoundAndComplete (Tree.genHeap lo) (Tree.isHeap lo) := by
-  intro t
-  induction t generalizing lo with
-  | leaf =>
-    rw [Tree.genHeap]
-    simp [Tree.isHeap]
-  | node l x r ihl ihr =>
-    rw [Tree.genHeap]
-    support_simp [Tree.isHeap, Tree.node.injEq, Nat.arbitrary_mem_support, true_and]
-    constructor
-    · rintro (h | ⟨d, l', hl', r', hr', hle, hld, hrd⟩)
-      · simp at h
-      · subst hld hle hrd
-        exact ⟨by omega, ihl.mp hl', ihr.mp hr'⟩
-    · rintro ⟨hle, hl, hr⟩
-      right
-      refine ⟨x - lo, l, ?_, r, ?_, rfl, by omega, rfl⟩
-      · rw [show lo + (x - lo) = x by omega]; exact ihl.mpr hl
-      · rw [show lo + (x - lo) = x by omega]; exact ihr.mpr hr
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    all_goals simp_all [Tree.isHeap]
+  case complete =>
+    intro t
+    induction t generalizing lo with
+    | leaf => intro _; rw [Tree.genHeap]; complete_bound
+    | node l x r ihl ihr =>
+      intro ⟨hle, hl, hr⟩
+      obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
+      rw [Tree.genHeap]; complete_bound
+      exact ⟨d, l, ihl hl, r, ihr hr, rfl⟩
 
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)

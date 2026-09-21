@@ -54,11 +54,19 @@ def genTree [Gen G] : G Tree :=
 partial_fixpoint
 
 theorem genTree.sound_complete : IsSoundAndComplete genTree Tree.isAllTwos := by
-  intro t
-  fun_induction Tree.isAllTwos
-    <;> rw [genTree]
-    <;> simp
-  grind
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    all_goals simp_all [Tree.isAllTwos]
+  case complete =>
+    intro t
+    induction t with
+    | leaf => intro _; rw [genTree]; complete_bound
+    | node l v r ihl ihr =>
+      intro ⟨hv, hl, hr⟩
+      subst hv
+      rw [genTree]; complete_bound
+      exact ⟨l, ihl hl, r, ihr hr, rfl⟩
 
 theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)

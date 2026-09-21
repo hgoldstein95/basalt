@@ -41,6 +41,8 @@ the generator at `WithSize G` and close it with `.run n`. See `Basalt/Sized.lean
 depends on the generator, and you prove the ones that do:
 
 - `IsSoundAndComplete g P` — the support of `g` is exactly `P` (nothing invalid, nothing missed).
+  Its halves are laws of their own: `IsSound g P` (nothing invalid) and `IsCompleteFor g P` (nothing
+  missed), for a generator that has only one.
 - `IsAlmostSurelyTerminating g` — `g` terminates with probability 1.
 - `IsCostBounded g c` — producing `v` takes at most `c v` random choices.
 - `IsFilterFree g` / `IsProductive g` — for filtering (`Option`-valued) generators.

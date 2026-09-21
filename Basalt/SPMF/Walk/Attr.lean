@@ -35,8 +35,9 @@ structure Judgment where
   /-- How a fact closes a leaf: `none` uses the fact itself, which must then close the goal; `some b`
   passes it as the first explicit argument of `b`, whose remaining premises are walked. -/
   bridges : Array (Option Name)
-  /-- A callee's law for this judgment is `<callee>.<lawSuffix>`. -/
-  lawSuffix : Name
+  /-- A callee's law for this judgment is `<callee>.<suffix>`, for the first of these that exists
+  and closes the leaf. -/
+  laws : Array Name := #[]
   /-- For a judgment stated on an observation, which side of the `≤` the observation is on (the
   argument index); its leaves are then the observation's (`Judgment.at`). -/
   specSide : Option Nat := none
@@ -54,6 +55,11 @@ structure Judgment where
   /-- A lemma that restates a goal of this judgment, about any generator, as goals of other
   judgments; tried before the rules when it is in scope. -/
   reduceTo : Option Name := none
+  /-- A bound on the subject by itself, for a leaf nothing else closes, in place of `noLeaf`. -/
+  selfLeaf : Option Name := none
+  /-- The registry key of the rules about the subject `g`. Tagging a rule and looking one up both
+  go through this. -/
+  ruleHead? : Expr → MetaM (Option Name) := fun g => pure g.getAppFn.constName?
 
 /-- `IsBounded g c` with `c` to be found: a combinator's generator argument, whose cost bound the
 combinator's rule is stated in terms of. A fact supplies it; failing one, a combinator term's rules
@@ -64,23 +70,49 @@ def isBoundedJudgment : Judgment where
     unless ty.isAppOfArity `IsBounded 3 do return none
     return some (ty.getArg! 1, fun g => mkApp3 ty.getAppFn (ty.getArg! 0) g (ty.getArg! 2))
   bridges := #[none, some `IsCostBounded.isBounded]
-  lawSuffix := `cost_bounded
+  laws := #[`cost_bounded]
   noLeaf g := m!"cost_bound: no hypothesis or `.cost_bounded` law bounds the cost of the \
     combinator argument{indentExpr g}\nPass a cost bound for it to `cost_bound [_]`."
   leavesFirst := true
   reduceTo := some `SPMF.Cost.isBounded_of_worst
+
+/-- `law g R` with `R` to be found, for `law` one half of the support law: a list combinator's
+generator argument, whose support the list's postcondition does not mention. Only a leaf closes
+it. -/
+private def supportJudgment (law : Name) (bridge tactic : Name) (laws : Array Name) : Judgment where
+  key := law
+  subject? ty := do
+    unless ty.isAppOfArity law 3 do return none
+    return some (ty.getArg! 1, fun g => mkApp3 ty.getAppFn (ty.getArg! 0) g (ty.getArg! 2))
+  bridges := #[none, some bridge]
+  laws := laws
+  noLeaf g := m!"{tactic}: no hypothesis or law gives `{law} _ _` of the combinator argument\
+    {indentExpr g}\nProve one and pass it to `{tactic} [_]`."
+  leavesFirst := true
+
+@[inherit_doc supportJudgment]
+def isSoundJudgment : Judgment :=
+  supportJudgment `IsSound `IsSoundAndComplete.sound `sound_bound #[`sound_complete, `sound]
+
+@[inherit_doc supportJudgment]
+def isCompleteForJudgment : Judgment :=
+  supportJudgment `IsCompleteFor `IsSoundAndComplete.complete `complete_bound
+    #[`sound_complete, `complete]
 
 /-- What a leaf of a judgment about one observation is closed with. The rules are shared by every
 observation of a direction; the laws and bridges are not. -/
 structure Observation where
   /-- The `Obs` constant. -/
   obs : Name
-  /-- The affine bridges for an upper bound, and the suffix of a callee's law for one. -/
+  /-- The affine bridges for an upper bound, and the suffixes of a callee's laws for one. -/
   upper : Array Name := #[]
-  upperLaw : Name := .anonymous
+  upperLaw : Array Name := #[]
   /-- The same for a lower bound. -/
   lower : Array Name := #[]
-  lowerLaw : Name := .anonymous
+  lowerLaw : Array Name := #[]
+  /-- A lower bound on the observation of any generator by itself: a recursive occurrence or an
+  unknown callee then stays in the bound, as an exact one, where another observation fails. -/
+  lowerSelf : Option Name := none
 
 /-- The observations the walker has leaves for. -/
 def observations : Array Observation := #[
@@ -88,24 +120,34 @@ def observations : Array Observation := #[
     upper := #[`SPMF.spec_le_add_of_expect_le]
     lower := #[`SPMF.le_spec_one_of_le_mass, `SPMF.le_spec_of_le_mass, `SPMF.le_spec_of_isPMF, `SPMF.le_spec_iInf_of_le_mass,
       `SPMF.le_spec_iInf_of_isPMF]
-    lowerLaw := `terminates },
+    lowerLaw := #[`terminates] },
   { obs := `SPMF.Cost.expectObs
     upper := #[`SPMF.Cost.spec_le_add_of_expect_le] },
   { obs := `SPMF.Cost.alwaysObs
     lower := #[`SPMF.Cost.le_spec_of_always, `SPMF.Cost.le_spec_of_isBounded,
       `SPMF.Cost.le_spec_of_isCostBounded]
-    lowerLaw := `cost_bounded },
+    lowerLaw := #[`cost_bounded] },
   { obs := `SPMF.Cost.worstObs
     upper := #[`SPMF.Cost.worst_le_add_of_le, `SPMF.Cost.worst_le_add_of_isBounded]
-    upperLaw := `cost_bounded }]
+    upperLaw := #[`cost_bounded] },
+  { obs := `SPMF.alwaysObs
+    lower := #[`SPMF.le_always_of_isSound, `SPMF.le_always_of_isSoundAndComplete]
+    lowerLaw := #[`sound_complete, `sound] },
+  { obs := `SPMF.mayObs
+    lower := #[`SPMF.le_may_of_isCompleteFor, `SPMF.le_may_of_isSoundAndComplete,
+      `SPMF.le_may_of_measure]
+    lowerLaw := #[`sound_complete, `complete]
+    lowerSelf := some `SPMF.le_may_self },
+  { obs := `SPMF.Cost.mayObs
+    lowerSelf := some `SPMF.Cost.le_may_self }]
 
 /-- `j` with the leaves of the observation that the goal `ty` is about. -/
 def Judgment.at (j : Judgment) (ty : Expr) : Judgment := Id.run do
   let some side := j.specSide | return j
   let spec := (ty.getArg! side).headBeta
   let some o := observations.find? (spec.getArg! 6 |>.getAppFn.isConstOf ·.obs) | return j
-  return if side == 2 then { j with lawSuffix := o.upperLaw, affine := o.upper }
-    else { j with lawSuffix := o.lowerLaw, affine := o.lower }
+  return if side == 2 then { j with laws := o.upperLaw, affine := o.upper }
+    else { j with laws := o.lowerLaw, affine := o.lower, selfLeaf := o.lowerSelf }
 
 /-- The generator of `O.spec g post`, and how to restate it about another. -/
 private def specSubject? (e : Expr) : Option (Expr × (Expr → Expr)) :=
@@ -123,7 +165,6 @@ def specLEJudgment : Judgment where
     let some (g, restate) := specSubject? (ty.getArg! 2) | return none
     return some (g, fun g => mkApp2 ty.appFn!.appFn! (restate g) (ty.getArg! 3))
   bridges := #[none]
-  lawSuffix := .anonymous
   noLeaf g := m!"no rule, `@[gen_map]` lemma, hypothesis, or law bounds{indentExpr g}\n\
     Pass a fact about it to the tactic."
   adapters := #[`Obs.spec_le_of_map, `Obs.specC_le_of_map]
@@ -137,7 +178,6 @@ def specGEJudgment : Judgment where
     let some (g, restate) := specSubject? (ty.getArg! 3) | return none
     return some (g, fun g => mkApp2 ty.appFn!.appFn! (ty.getArg! 2) (restate g))
   bridges := #[none]
-  lawSuffix := .anonymous
   noLeaf g := m!"no rule, `@[gen_map]` lemma, hypothesis, or law bounds{indentExpr g}\n\
     Pass a fact about it to the tactic."
   adapters := #[`Obs.le_spec_of_map, `Obs.le_specC_of_map]
@@ -146,6 +186,19 @@ def specGEJudgment : Judgment where
 /-- The shapes of choice an algebra has rules for. -/
 def mixShapes : Array Name :=
   #[`Mix.range, `Mix.binary, `Mix.threshold, `Mix.index, `Mix.element, `Mix.select, `Mix.rangeInt]
+
+private def firstExplicit : Expr → Nat → Option Nat
+  | .forallE _ _ b bi, i => if bi.isExplicit then some i else firstExplicit b (i + 1)
+  | _, _ => none
+
+/-- The key of a shape's rules: the shape, then its algebra, which is its first explicit argument.
+Keyed by shape alone, a goal in one algebra tries another's rules first, and when every rule fails
+the error is a unification failure against a lemma about the wrong carrier. -/
+def shapeRuleHead? (shape : Expr) : MetaM (Option Name) := do
+  let some head := shape.getAppFn.constName? | return none
+  let some i := firstExplicit (← getConstInfo head).type 0 | return none
+  let some algebra := (shape.getAppArgs[i]?).bind (·.getAppFn.constName?) | return none
+  return some (head ++ algebra)
 
 /-- `‹shape› ≤ b`: an upper bound on a choice in an ordered algebra, from bounds on what its
 outcomes mean. The "generator" is the shape, so a rule is keyed by it. -/
@@ -157,8 +210,8 @@ def mixLEJudgment : Judgment where
     unless mixShapes.any lhs.isAppOf do return none
     return some (lhs, fun g => mkApp2 ty.appFn!.appFn! g (ty.getArg! 3))
   bridges := #[]
-  lawSuffix := .anonymous
   noLeaf g := m!"no rule bounds the choice{indentExpr g}"
+  ruleHead? := shapeRuleHead?
 
 /-- `b ≤ ‹shape›`: the lower bound, as `mixLEJudgment`. -/
 def mixGEJudgment : Judgment where
@@ -169,12 +222,12 @@ def mixGEJudgment : Judgment where
     unless mixShapes.any rhs.isAppOf do return none
     return some (rhs, fun g => mkApp2 ty.appFn!.appFn! (ty.getArg! 2) g)
   bridges := #[]
-  lawSuffix := .anonymous
   noLeaf g := m!"no rule bounds the choice{indentExpr g}"
+  ruleHead? := shapeRuleHead?
 
 /-- Every judgment the walker knows, tried in order. -/
 def judgments : Array Judgment :=
-  #[isBoundedJudgment, specLEJudgment, mixLEJudgment,
+  #[isBoundedJudgment, isSoundJudgment, isCompleteForJudgment, specLEJudgment, mixLEJudgment,
     specGEJudgment, mixGEJudgment]
 
 /-- `@[spec_apply]` — how a specification built from a shape of choice applies to a postcondition.
@@ -222,7 +275,7 @@ def ruleKey (declName : Name) (type : Expr) : MetaM (Name × Name) :=
     let concl ← whnfR concl
     for j in judgments do
       if let some (g, _) ← j.subject? concl then
-        if let some head := g.getAppFn.constName? then
+        if let some head ← j.ruleHead? g then
           return (j.key, head)
     throwError "gen_rule: `{declName}` must conclude a judgment about a combinator application \
       (one of {judgments.map (·.key)}), not{indentExpr concl}"

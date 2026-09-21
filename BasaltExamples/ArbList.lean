@@ -37,11 +37,14 @@ def List.arbitrary' [Gen G] : G (List Nat) := do
   vectorOf n Nat.arbitrary
 
 theorem List.arbitrary.sound_complete : IsSoundAndComplete List.arbitrary ⊤ := by
+  refine .intro (fun _ _ => trivial) ?complete
   intro xs
-  simp only [Pi.top_apply]
-  induction xs <;> rw [List.arbitrary]
-  case _ => simp
-  case _ x xs ih => simp [ih, Nat.arbitrary_mem_support]
+  induction xs with
+  | nil => intro _; rw [List.arbitrary]; complete_bound
+  | cons x xs ih =>
+    intro _
+    rw [List.arbitrary]; complete_bound
+    exact ⟨x, xs, ih trivial, rfl⟩
 
 theorem List.arbitrary.terminates : IsAlmostSurelyTerminating List.arbitrary := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)

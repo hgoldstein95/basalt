@@ -350,37 +350,6 @@ end erasure
 
 section support
 
-/-- Support inversion for `pick` at the cost interpretation: a branch draw plus one choice. -/
-@[simp]
-theorem mem_support_pick_iff {x y : Unit → SPMF.Cost α} {a : α} {n : Nat} :
-    (a, n) ∈ (pick x y).support ↔
-      ∃ m, n = 1 + m ∧ ((a, m) ∈ (x ()).support ∨ (a, m) ∈ (y ()).support) := by
-  refine (mem_support_of_may (mayObs.map_pick x y)).trans ((Mix.binary_angelic _).trans ?_)
-  constructor
-  · rintro (⟨⟨b, m⟩, hp, rfl, rfl⟩ | ⟨⟨b, m⟩, hp, rfl, rfl⟩)
-    · exact ⟨m, rfl, Or.inl hp⟩
-    · exact ⟨m, rfl, Or.inr hp⟩
-  · rintro ⟨m, rfl, h | h⟩
-    · exact Or.inl ⟨(a, m), h, rfl, rfl⟩
-    · exact Or.inr ⟨(a, m), h, rfl, rfl⟩
-
-@[simp]
-theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n c : Nat} :
-    (n, c) ∈ (chooseNat lo hi h : SPMF.Cost Nat).support ↔ (lo ≤ n ∧ n ≤ hi) ∧ c = 1 :=
-  (mem_support_of_may (mayObs.map_chooseNat lo hi h)).trans ((Mix.range_angelic _).trans
-    ⟨fun ⟨_, hx, e, e'⟩ => ⟨e ▸ hx, e'.symm⟩, fun ⟨hx, e⟩ => ⟨n, hx, rfl, e.symm⟩⟩)
-
-@[simp]
-theorem mem_support_chooseInt_iff {lo hi : Int} {h : lo ≤ hi} {n : Int} {c : Nat} :
-    (n, c) ∈ (chooseInt lo hi h : SPMF.Cost Int).support ↔ (lo ≤ n ∧ n ≤ hi) ∧ c = 1 := by
-  unfold chooseInt
-  simp only [mem_support_bind_iff, mem_support_pure_iff, mem_support_chooseNat_iff]
-  constructor
-  · rintro ⟨k, n1, n2, ⟨⟨-, hk⟩, rfl⟩, ⟨rfl, rfl⟩, rfl⟩
-    exact ⟨by omega, rfl⟩
-  · rintro ⟨⟨h1, h2⟩, rfl⟩
-    exact ⟨(n - lo).toNat, 1, 0, ⟨⟨Nat.zero_le _, by omega⟩, rfl⟩, ⟨by omega, rfl⟩, rfl⟩
-
 end support
 
 end SPMF.Cost

@@ -26,11 +26,15 @@ def Nat.arbitrary [Gen G] : G Nat := do
       pure (n + 1))
 partial_fixpoint
 
-theorem Nat.arbitrary_mem_support : n ∈ SPMF.support Nat.arbitrary := by
-  induction n <;> rw [Nat.arbitrary] <;> simp [*]
-
-theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ :=
-  fun _ => iff_of_true Nat.arbitrary_mem_support trivial
+theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ := by
+  refine .intro (fun _ _ => trivial) ?complete
+  intro n
+  induction n with
+  | zero => intro _; rw [Nat.arbitrary]; complete_bound
+  | succ n ih =>
+    intro _
+    rw [Nat.arbitrary]; complete_bound
+    exact ⟨n, ih trivial, rfl⟩
 
 theorem Nat.arbitrary.terminates : IsAlmostSurelyTerminating Nat.arbitrary := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)

@@ -43,27 +43,22 @@ sorted list is the image of *itself*. -/
 theorem List.mergeSort_of_sorted (h : List.sorted xs) : xs.mergeSort = xs :=
   List.mergeSort_of_pairwise (by simpa using (List.sorted_iff_pairwise xs).mp h)
 
-theorem List.genSortedBySorting_mem_support (ys : List Nat) :
-    ys ∈ SPMF.support List.genSortedBySorting ↔ List.sorted ys := by
-  have harb : ∀ xs : List Nat, xs ∈ SPMF.support (ArbList.List.arbitrary : SPMF (List Nat)) :=
-    fun xs => (ArbList.List.arbitrary.sound_complete xs).mpr trivial
-  unfold List.genSortedBySorting
-  support_simp
-  constructor
-  · rintro ⟨xs, -, rfl⟩
-    exact List.sorted_mergeSort xs
-  · intro h
-    exact ⟨ys, harb ys, (List.mergeSort_of_sorted h).symm⟩
-
 theorem List.genSortedBySorting.sound_complete :
-    IsSoundAndComplete List.genSortedBySorting List.sorted :=
-  List.genSortedBySorting_mem_support
+    IsSoundAndComplete List.genSortedBySorting List.sorted := by
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    exact List.sorted_mergeSort xs
+  case complete =>
+    intro ys h
+    rw [List.genSortedBySorting]; complete_bound
+    exact ⟨ys, List.mergeSort_of_sorted h⟩
 
 /-- Sorting an arbitrary list and building a sorted list in order reach the same lists. -/
 theorem List.support_genSortedBySorting_eq :
     SPMF.support List.genSortedBySorting = SPMF.support List.genSorted :=
   Set.ext fun ys =>
-    (List.genSortedBySorting_mem_support ys).trans (List.genSorted.sound_complete ys).symm
+    (List.genSortedBySorting.sound_complete ys).trans (List.genSorted.sound_complete ys).symm
 
 theorem List.genSortedBySorting.terminates :
     IsAlmostSurelyTerminating List.genSortedBySorting := by

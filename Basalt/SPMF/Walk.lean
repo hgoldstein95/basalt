@@ -14,6 +14,7 @@ import Lean.Meta.Tactic.Assumption
 import Lean.Meta.Tactic.AC.Main
 import Lean.Meta.Tactic.NormCast
 import Lean.Meta.CtorRecognizer
+import Lean.Meta.Match.MatcherApp.Basic
 import Lean.Elab.Tactic.NormCast
 
 /-!
@@ -105,8 +106,8 @@ def reduceCtorProjs (e : Expr) : MetaM Expr := do
     return if r.isProj then .continue else .done r)
 
 /-- `e` with what is already determined computed: an `if` whose condition is closed and decides is
-its branch (a continuation's bound instantiated at `true`), and a closed natural number read off a
-rational is its value (`(1 / 2 : ℚ).den`, a literal coin's weight). Both are definitional. -/
+its branch (a continuation's bound instantiated at `true`), and a closed number read off a rational
+is its value (`(1 / 2 : ℚ).den`, a literal coin's weight). Both are definitional. -/
 def evalClosed (e : Expr) : MetaM Expr := do
   let closed (x : Expr) := !x.hasFVar && !x.hasMVar && !x.hasLooseBVars
   Meta.transform (← instantiateMVars e) (pre := fun x => do
@@ -116,10 +117,16 @@ def evalClosed (e : Expr) : MetaM Expr := do
       if inst.isAppOf ``Decidable.isFalse then return .visit (x.getArg! 4)
     if closed x && x.isApp && (x.find? fun e => e.isConstOf `Rat.num || e.isConstOf `Rat.den).isSome
     then
-      if (← inferType x).isConstOf ``Nat then
-        -- `Rat`'s operations are irreducible, which the kernel's `rfl` does not see.
+      -- `Rat`'s operations are irreducible, which the kernel's `rfl` does not see.
+      let ty ← inferType x
+      if ty.isConstOf ``Nat then
         if let some n := (← withTransparency .all (whnf x)).rawNatLit? then
           return .done (mkNatLit n)
+      if ty.isConstOf ``Int then
+        let v ← withTransparency .all (whnf x)
+        if v.isAppOfArity ``Int.ofNat 1 then
+          if let some n := (← withTransparency .all (whnf v.appArg!)).rawNatLit? then
+            return .done (toExpr (Int.ofNat n))
     return .continue)
 
 /-- What a walk leaves, tidied: projections out of constructors reduced, then `evalClosed`. -/
@@ -252,27 +259,36 @@ def solveCast (goal : MVarId) : MetaM Unit := goal.withContext do
   if res.isSome then throwError "walk: could not prove that {n} is its own cast"
   goal.assign (← mkExpectedTypeHint (← mkEqTrans (← r.getProof) num) (← goal.getType))
 
-/-- The first two binder names of a postcondition: the first argument of `ty`, or of an `O.spec …`
-among its arguments, that is a lambda of two binders. -/
-partial def postNames (ty : Expr) : Option (Name × Name) :=
+/-- The binder names of a postcondition, its value and, at the cost family, its cost: those of the
+first argument of `ty`, or of an `O.spec …` among its arguments, that is a lambda. -/
+partial def postNames (ty : Expr) : Option (Name × Option Name) :=
   ty.getAppArgs.findSome? fun
-    | .lam v _ (.lam n _ _ _) _ => some (v.eraseMacroScopes, n.eraseMacroScopes)
+    | .lam v _ (.lam n _ _ _) _ => some (v.eraseMacroScopes, some n.eraseMacroScopes)
+    | .lam v _ _ _ => some (v.eraseMacroScopes, none)
     | e => if e.isAppOf `Obs.spec then postNames e else none
 
 /-- `ty`, a rule's or a bridge's statement, with the binders of the bound it computes named after
-the generator: `∀ a n, R a n → p a n` and `∀ x hx, d x hx` become `∀ v n_v h_v, …` and `∀ v h_v, …`.
-The paths of a `Prop`-valued bound are introduced under these names, and a user has to be able to
-refer to a drawn value. -/
-def nameBound (ty : Expr) : Option (Name × Name) → Expr
+the generator: `∀ a n, R a n → p a n` and `∀ x hx, d x hx` become `∀ v n_v h_v, …` and `∀ v h_v, …`,
+and `∃ x hx, d x hx` and `∃ a n, …` become `∃ v h_v, …` and `∃ v n_v, …`. The paths of a
+`Prop`-valued bound are introduced under these names, and a user has to be able to refer to a drawn
+value. -/
+def nameBound (ty : Expr) : Option (Name × Option Name) → Expr
   | none => ty
   | some (v, c) =>
     let h := Name.mkSimple s!"h_{v}"
+    let c := c.getD (.mkSimple s!"n_{v}")
     let rename : Expr → Expr
       | .forallE _ d₁ (.forallE _ d₂ (.forallE _ d₃ b bi₃) bi₂) bi₁ =>
         if d₂.isConstOf ``Nat then
           .forallE v d₁ (.forallE c d₂ (.forallE h d₃ b bi₃) bi₂) bi₁
         else .forallE v d₁ (.forallE h d₂ (.forallE `_ d₃ b bi₃) bi₂) bi₁
       | .forallE _ d₁ (.forallE _ d₂ b bi₂) bi₁ => .forallE v d₁ (.forallE h d₂ b bi₂) bi₁
+      | .app (.app (.const ``Exists us₁) t₁) (.lam _ d₁ b₁ bi₁) =>
+        let b₁ := match b₁ with
+          | .app (.app (.const ``Exists us₂) t₂) (.lam _ d₂ b₂ bi₂) =>
+            mkApp2 (.const ``Exists us₂) t₂ (.lam (if d₂.isConstOf ``Nat then c else h) d₂ b₂ bi₂)
+          | b₁ => b₁
+        mkApp2 (.const ``Exists us₁) t₁ (.lam v d₁ b₁ bi₁)
       | e => e
     let rec go : Expr → Expr
       | .forallE n d b bi => .forallE n d (go b) bi
@@ -325,11 +341,10 @@ private def tryFact (j : Judgment) (goal : MVarId) (e : Expr) : MetaM (Option (L
         if j.affine.back? == some bridge && inst == some false then throw ex
   return none
 
-/-- `head`'s law for judgment `j`, under the `<head>.<lawSuffix>` naming convention. -/
-def law? (j : Judgment) (g : Expr) : MetaM (Option Expr) := do
-  let some head := g.getAppFn.constName? | return none
-  if j.lawSuffix.isAnonymous || !(← getEnv).contains (head ++ j.lawSuffix) then return none
-  return some (← mkConstWithFreshMVarLevels (head ++ j.lawSuffix))
+/-- `g`'s head's laws for judgment `j`, under the `<head>.<suffix>` naming convention. -/
+def law? (j : Judgment) (g : Expr) : MetaM (Array Expr) := do
+  let some head := g.getAppFn.constName? | return #[]
+  (j.laws.filter ((← getEnv).contains <| head ++ ·)).mapM (mkConstWithFreshMVarLevels <| head ++ ·)
 
 /-! ## Reading a recursive definition -/
 
@@ -386,7 +401,8 @@ def unfold? (g : Expr) : MetaM (Option (Name × Expr)) := do
 What the walk leaves is stated over the values the generator drew, under the generator's names. A
 rule premise that binds a drawn value — a `∀` over data, or a postcondition it hands on — names it
 after the combinator's lambda argument (`let x ← …` binds `x`), or, when the combinator has none,
-after the goal's postcondition's own binders. Its cost, the next data binder, is `n_x`, and a
+after the goal's postcondition's own binders. At the cost family its cost, the next data binder, is
+`n_x`, and a
 hypothesis after the value is `h_x` (a callee's or recursive call's bound, a pivot's range). A
 hypothesis before any value takes the lambda argument's name instead (a `dite` branch's `h`). -/
 
@@ -402,10 +418,12 @@ private def prefixed (p : String) (v : Name) : Name := .mkSimple (p ++ v.toStrin
 
 /-- `t`, a rule premise, with its binders named after `hint`, the combinator's lambda argument, or
 else after `post`, the goal's postcondition's binders. -/
-private def nameBinders (t : Expr) (hint : Option Name) (post : Option (Name × Name)) :
+private def nameBinders (t : Expr) (hint : Option Name) (post : Option (Name × Option Name)) :
     MetaM Expr := do
   let value? := hint <|> post.map (·.1)
-  let cost? := if hint.isSome then value?.map (prefixed "n_") else post.map (·.2)
+  -- A postcondition of one binder has no cost to name.
+  let cost? := if post.any (·.2.isNone) then none
+    else if hint.isSome then value?.map (prefixed "n_") else post.bind (·.2)
   let rec go (t : Expr) (fvars : Array Expr) (v : Option Name) (k : Nat) (hintUsed : Bool) :
       MetaM Expr := do
     match t with
@@ -428,16 +446,17 @@ private def nameBinders (t : Expr) (hint : Option Name) (post : Option (Name × 
       let t := t.instantiateRev fvars
       unless fvars.isEmpty do return t
       -- A premise that binds nothing may still hand a postcondition on: name its binders.
-      let (some v, some c) := (value?, cost?) | return t
+      let some v := value? | return t
       -- The postcondition is an argument of the judgment, or of the `O.spec …` it is stated on.
       let renameIn (t : Expr) : Option Expr :=
         let args := t.getAppArgs
-        match args.findIdx? (· matches .lam _ _ (.lam ..) _) with
+        match args.findIdx? (·.isLambda) with
         | some i =>
-          match args[i]! with
-          | .lam _ d₁ (.lam _ d₂ b bi₂) bi₁ =>
+          match args[i]!, cost? with
+          | .lam _ d₁ (.lam _ d₂ b bi₂) bi₁, some c =>
             some (mkAppN t.getAppFn (args.set! i (.lam v d₁ (.lam c d₂ b bi₂) bi₁)))
-          | _ => none
+          | .lam _ d₁ b bi₁, none => some (mkAppN t.getAppFn (args.set! i (.lam v d₁ b bi₁)))
+          | _, _ => none
         | none => none
       if let some t' := renameIn t then return t'
       let args := t.getAppArgs
@@ -595,9 +614,11 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
   -- The goal is restated in the reduced form before the rule is applied: matching a rule against
   -- an unreduced branch closes a side condition like `xs ≠ []` by proof irrelevance rather than by
   -- unification, and the side condition then survives as a goal.
+  -- Whether some rule's conclusion unified: one that did not was stated for another observation.
+  let ruleApplied ← IO.mkRef false
   let rules : TermElabM (Option (List MVarId)) := do
     for g' in [g, ← whnfCore g, ← whnfR g] do
-      let some lems := g'.getAppFn.constName?.bind (rulesFor (← getEnv) j.key) | continue
+      let some lems := (← j.ruleHead? g').bind (rulesFor (← getEnv) j.key) | continue
       let goal ← if g' == g then pure goal else goal.change (restate g')
       -- A later rule is a fallback: it runs only when every earlier one failed, and the first
       -- rule's failure is the one reported.
@@ -612,8 +633,7 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
             let tag ← goal.getTag
             let goalTy ← instantiateMVars (← goal.getType)
             let names := if drawTag.isPrefixOf tag then
-                let v := tag.replacePrefix drawTag .anonymous
-                some (v, .mkSimple s!"n_{v}")
+                some (tag.replacePrefix drawTag .anonymous, none)
               else postNames goalTy
             Except.ok <$> applyExact goal
               (← mkExpectedTypeHint rule (nameBound (← inferType rule) names))
@@ -624,6 +644,7 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
             firstErr := firstErr <|> some ex
             saved.restore
             continue
+        ruleApplied.set true
         try
           return some (← walkAll extras (← namePremises (some g') (← goal.getType) premises))
         catch ex =>
@@ -646,6 +667,7 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
               firstErr := firstErr <|> some ex
               saved.restore
               continue
+          ruleApplied.set true
           try
             return some (← walkAll extras (← namePremises (some g') (← goal.getType) gs))
           catch ex =>
@@ -680,7 +702,7 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
         if let some gs ← tryFact j goal decl.toExpr then
           return some (← walkAll extras (← namePremises none (← goal.getType) gs))
     for g in forms do
-      if let some law ← law? j g then
+      for law in ← law? j g do
         if let some gs ← tryFact j goal law then
           return some (← walkAll extras (← namePremises none (← goal.getType) gs))
     return none
@@ -700,13 +722,25 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
       unless isRules do throw ex
       ruleErr := some ex
       saved.restore
-  if let some ex := ruleErr then throw ex
+  -- Where the generator may be left in the bound as itself, a combinator none of whose rules is
+  -- about this observation is one more generator nothing is known about.
+  if let some ex := ruleErr then
+    if j.selfLeaf.isNone || (← ruleApplied.get) then throw ex
   -- Unfolding comes last, so that a law or a caller's fact stays an abstraction boundary.
   for g' in forms do
     if let some (c, body) ← unfold? g' then
       let goal ← goal.change (restate body)
       try return ← walk extras goal
       catch ex => throwError "{ex.toMessageData}\n(in the unfolding of `{c}`)"
+  for g' in forms do
+    if (← matchMatcherApp? g').isSome then
+      throwError "the walk does not enter a `match`:{indentExpr g'}\nOne on the generator's \
+        arguments is split before the walk when the generator is headed by it; one on a drawn \
+        value is not supported."
+  if let some self := j.selfLeaf then
+    let lem ← mkConstWithFreshMVarLevels self
+    let names := postNames (← instantiateMVars (← goal.getType))
+    return ← applyExact goal (← mkExpectedTypeHint lem (nameBound (← inferType lem) names))
   throwError j.noLeaf g
 
 end

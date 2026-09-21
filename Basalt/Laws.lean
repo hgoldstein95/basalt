@@ -21,6 +21,26 @@ there is no bundle: which of them apply depends on the generator, and you prove 
 def IsSoundAndComplete (g : SPMF α) (P : α → Prop) : Prop :=
   ∀ a, a ∈ SPMF.support g ↔ P a
 
+/-- A generator `g` `IsSound` with respect to `P` if every value in its support satisfies `P`. A
+size-bounded generator is sound and deliberately not complete. -/
+def IsSound (g : SPMF α) (P : α → Prop) : Prop :=
+  ∀ a ∈ SPMF.support g, P a
+
+/-- A generator `g` `IsCompleteFor` a predicate `P` if every value satisfying `P` is in its
+support. -/
+def IsCompleteFor (g : SPMF α) (P : α → Prop) : Prop :=
+  ∀ a, P a → a ∈ SPMF.support g
+
+theorem IsSoundAndComplete.intro {g : SPMF α} {P : α → Prop} (sound : IsSound g P)
+    (complete : IsCompleteFor g P) : IsSoundAndComplete g P :=
+  fun a => ⟨sound a, complete a⟩
+
+theorem IsSoundAndComplete.sound {g : SPMF α} {P : α → Prop} (h : IsSoundAndComplete g P) :
+    IsSound g P := fun a ha => (h a).mp ha
+
+theorem IsSoundAndComplete.complete {g : SPMF α} {P : α → Prop} (h : IsSoundAndComplete g P) :
+    IsCompleteFor g P := fun a ha => (h a).mpr ha
+
 /-- Soundness and completeness transfers along a support equation. -/
 theorem IsSoundAndComplete.of_support_eq {g g' : SPMF α} {P : α → Prop}
     (h : SPMF.support g' = SPMF.support g) (hg : IsSoundAndComplete g P) :
