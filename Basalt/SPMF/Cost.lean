@@ -268,7 +268,7 @@ open scoped ENNReal
 noncomputable def erase (g : SPMF.Cost α) : SPMF α := SPMF.bind g fun p => SPMF.pure p.1
 
 /-- The erasure observation. A generator's two interpretations agree on values wherever `erase`
-commutes with it, which for a combinator is its `Obs.spec_*` lemma. -/
+commutes with it, which for a combinator is its `Obs.map_*` lemma read at this observation. -/
 noncomputable def eraseObs : Obs SPMF.Cost.{u} SPMF where
   spec := erase
   map_pure a := SPMF.pure_bind (a, 0) _
@@ -291,66 +291,7 @@ theorem expect_erase (g : SPMF.Cost α) (f : α → ℝ≥0∞) :
   rw [SPMF.bind_eq, SPMF.expect_bind]
   simp only [SPMF.pure_eq, SPMF.expect_pure]
 
-theorem erase_pure (a : α) : erase (Pure.pure a : SPMF.Cost α) = Pure.pure a :=
-  eraseObs.map_pure a
-
-theorem erase_bind (x : SPMF.Cost α) (k : α → SPMF.Cost β) :
-    erase (x >>= k) = erase x >>= fun a => erase (k a) :=
-  eraseObs.map_bind x k
-
-theorem erase_map (f : α → β) (x : SPMF.Cost α) : erase (f <$> x) = f <$> erase x :=
-  eraseObs.map_map f x
-
-theorem erase_pick (x y : Unit → SPMF.Cost α) :
-    erase (pick x y) = pick (fun u => erase (x u)) (fun u => erase (y u)) :=
-  eraseObs.map_pick x y
-
-theorem erase_coin (r : Rat) : erase (coin r : SPMF.Cost Bool) = coin r :=
-  eraseObs.map_coin r
-
-theorem erase_chooseNat (lo hi : Nat) (h : lo ≤ hi) :
-    erase (chooseNat lo hi h : SPMF.Cost Nat) = chooseNat lo hi h :=
-  eraseObs.spec_chooseNat lo hi h
-
-theorem erase_chooseInt (lo hi : Int) (h : lo ≤ hi) :
-    erase (chooseInt lo hi h : SPMF.Cost Int) = chooseInt lo hi h :=
-  eraseObs.spec_chooseInt lo hi h
-
-theorem erase_elements (xs : List α) (hne : xs ≠ []) :
-    erase (elements xs hne : SPMF.Cost α) = elements xs hne :=
-  eraseObs.spec_elements xs hne
-
-theorem erase_oneOf (gs : List (Unit → SPMF.Cost α)) (hne : gs ≠ []) :
-    erase (oneOf gs hne) = oneOf (gs.map fun g u => erase (g u)) (by simpa using hne) :=
-  eraseObs.spec_oneOf gs hne
-
-theorem erase_frequency (gs : List (Nat × (Unit → SPMF.Cost α)))
-    (h : 0 < (gs.map Prod.fst).sum) :
-    erase (frequency gs h)
-      = frequency (gs.map fun p => (p.1, fun u => erase (p.2 u)))
-          (by simpa [Function.comp_def] using h) :=
-  eraseObs.spec_frequency gs h
-
-theorem erase_vectorOf {α : Type} (n : Nat) (g : SPMF.Cost α) :
-    erase (vectorOf n g) = vectorOf n (erase g) :=
-  eraseObs.spec_vectorOf n g
-
-theorem erase_listOfMaxLength (n : Nat) (g : SPMF.Cost α) :
-    erase (listOfMaxLength n g) = listOfMaxLength n (erase g) :=
-  eraseObs.spec_listOfMaxLength n g
-
-theorem erase_biasedOptionGen (r : Rat) (g : SPMF.Cost α) :
-    erase (biasedOptionGen r g) = biasedOptionGen r (erase g) :=
-  eraseObs.spec_biasedOptionGen r g
-
-theorem erase_optionGen (g : SPMF.Cost α) : erase (optionGen g) = optionGen (erase g) :=
-  eraseObs.spec_optionGen g
-
 end erasure
-
-section support
-
-end support
 
 end SPMF.Cost
 

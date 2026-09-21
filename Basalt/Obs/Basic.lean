@@ -26,14 +26,6 @@ structure Obs (G : Type u → Type v) (W : Type u → Type w)
 
 namespace Obs
 
-/-- The identity observation, which reads a `map_*` lemma backwards in a target that is itself a
-generator monad. -/
-def refl (G : Type u → Type v) [Monad G] [RandomChoice G] : Obs G G where
-  spec x := x
-  map_pure _ := rfl
-  map_bind _ _ := rfl
-  map_choose _ _ _ := rfl
-
 variable {G : Type u → Type v} {W : Type u → Type w}
   [Monad G] [RandomChoice G] [Monad W] [RandomChoice W] (O : Obs G W)
 
