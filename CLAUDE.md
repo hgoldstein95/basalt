@@ -30,13 +30,20 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **The laws** (`IsSoundAndComplete`, `IsAlmostSurelyTerminating`, `IsCostBounded`,
   `IsFilterFree`, `IsProductive`) and their introduction lemmas — [Basalt/Laws.lean](Basalt/Laws.lean).
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
+- **Observations** — the layer every per-combinator lemma is derived from. `Obs`, the one
+  `Obs.map_*` lemma per combinator, the specification monads and the presentation of each shape of
+  choice: [Basalt/Obs/](Basalt/Obs/). An observation lives with its interpretation — the
+  expectation one in [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean), may and always in
+  [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean), the cost ones and erasure in
+  [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean). A new combinator needs its `map_` lemma and
+  nothing per judgment; [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour.
 - **Support inversion** (`mem_support_*_iff`) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean);
   the `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactics.lean](Basalt/Tactics.lean).
 - **Termination** — the criterion (`IsPMF_of_lfp_eq_one`) and its `LfpIsOne` certificates:
   [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); the `mass_fixpoint` tactic:
   [Basalt/SPMF/MassFixpoint.lean](Basalt/SPMF/MassFixpoint.lean), contract
   pinned by [BasaltTest/Termination.lean](BasaltTest/Termination.lean). Ranking functions and
-  expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). `mass` and its equations:
+  expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). The equations of `mass`:
   [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
 - **The generator walker and its `@[gen_rule]` rules** — one rule per (judgment, combinator), later
   ones fallbacks, and a non-recursive definition with none is unfolded; the judgments and the
@@ -51,6 +58,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   a combinator has a rule for one judgment and not the other. Nothing else in a termination or
   cost proof mentions combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
+  [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
+  [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
   [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean).
 - **Cost** — the interpretation (`SPMF.Cost`, `IsBounded`, its support inversion, expected cost):
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:

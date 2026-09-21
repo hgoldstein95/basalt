@@ -120,7 +120,10 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
 
 ## Repository layout
 
-- `Basalt/` — the library.
+- `Basalt/` — the library. `Basalt/Obs/` is the layer its per-combinator lemmas are derived from:
+  a judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
+  `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
+  saying that every observation commutes with it.
 - `BasaltExamples/` — worked generators with correctness proofs. Because each file proves its
   generator's laws, this directory is also most of the effective regression suite for the library's
   lemma sets and tactics.
