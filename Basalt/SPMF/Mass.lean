@@ -18,7 +18,8 @@ namespace SPMF
 
 section mass
 
-@[simp]
+set_option linter.deprecated false in
+@[simp, deprecated "use `mass_oneOf`" (since := "2026-09-22")]
 theorem mass_pick {x y : SPMF α} :
     (pick (fun () => x) (fun () => y)).mass = (1/2 : ℝ≥0∞) * x.mass + (1/2 : ℝ≥0∞) * y.mass := by
   simpa only [expect_one] using expect_pick x y fun _ => 1

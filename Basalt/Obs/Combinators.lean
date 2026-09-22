@@ -43,12 +43,6 @@ theorem map_elements (xs : List α) (hne : xs ≠ []) :
   funext ⟨i, h1, h2⟩
   exact O.map_pure _
 
-@[gen_map]
-theorem map_oneOf (gs : List (Unit → G α)) (hne : gs ≠ []) :
-    O.spec (oneOf gs hne) = index gs hne fun g => O.spec (g ()) := by
-  unfold oneOf index
-  rw [O.map_bind, O.map_map, O.map_choose, bind_map_left]
-
 omit [LawfulMonad G] [LawfulMonad W] in
 theorem map_frequencyAux (gs : List (Nat × (Unit → G α))) (n : Nat)
     (h : n < (gs.map Prod.fst).sum) (d : W α) :
@@ -75,5 +69,14 @@ theorem map_frequency (gs : List (Nat × (Unit → G α))) (h : 0 < (gs.map Prod
   have hi : i < (gs.map Prod.fst).sum := by omega
   simp only [dif_pos hi]
   exact O.map_frequencyAux gs i hi _
+
+/-- `oneOf` is `Obs.index` at every universe: unlike the other combinators it draws no `Nat`, so
+neither the generator's element type nor its laws are confined to `Type`. -/
+@[gen_map]
+theorem map_oneOf {G : Type u → Type v} {W : Type u → Type w} [Gen G] [Monad W] [RandomChoice W]
+    (O : Obs G W) {α : Type u} (gs : List (Unit → G α)) (hne : gs ≠ []) :
+    O.spec (oneOf gs hne) = index gs hne fun g => O.spec (g ()) := by
+  unfold oneOf index
+  rw [O.map_bind, O.map_choose]
 
 end Obs

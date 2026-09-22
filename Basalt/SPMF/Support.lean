@@ -144,13 +144,25 @@ theorem mem_support_of_may {g : SPMF α} {w : WP Mix.angelic α} (h : mayObs.spe
 
 end observations
 
-@[simp]
+set_option linter.deprecated false in
+@[simp, deprecated "use `support_oneOf`" (since := "2026-09-22")]
 theorem support_pick
     {x y : SPMF α} :
     (pick (fun () => x) (fun () => y)).support = x.support ∪ y.support := by
   ext a
   exact (mem_support_of_may (mayObs.map_pick _ _)).trans ((Mix.binary_angelic _).trans
     (or_congr mem_support_iff_may.symm mem_support_iff_may.symm))
+
+/-- The support of `oneOf gs` is exactly the union of all generators in `gs` -/
+@[simp]
+theorem support_oneOf
+    {gs : List (Unit → SPMF α)}
+    (hne : gs ≠ []) :
+    support (oneOf gs hne) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
+  ext a
+  exact (mem_support_of_may (mayObs.map_oneOf gs hne)).trans
+    ((Mix.index_angelic gs hne fun g => mayObs.spec (g ()) (· = a)).trans
+      (exists_congr fun g => and_congr_right fun _ => mem_support_iff_may.symm))
 
 /-- The support of `vectorOf n g` is the set of all length-`n` list where each element is in `g`'s
 support. -/
@@ -249,7 +261,7 @@ theorem support_listOf
       contradiction
     . intro h
       unfold listOf
-      simp [support_pick]
+      simp [support_oneOf]
   | cons x xs' IH =>
     constructor
     . dsimp
@@ -257,13 +269,13 @@ theorem support_listOf
       cases hy with
       | head =>
         unfold listOf at h
-        simp [support_pick] at h
+        simp [support_oneOf] at h
         obtain ⟨h1, _⟩ := h
         assumption
       | tail =>
         rename_i hy
         unfold listOf at h
-        simp [support_pick] at h
+        simp [support_oneOf] at h
         obtain ⟨_, h2⟩ := h
         rw [IH] at h2
         apply h2
@@ -271,7 +283,7 @@ theorem support_listOf
     . intro h
       rw [Set.mem_ofPred_eq] at h
       unfold listOf
-      simp [support_pick]
+      simp [support_oneOf]
       constructor
       . apply h
         apply List.mem_cons_self
@@ -294,7 +306,7 @@ theorem support_nonEmptyListOf
     constructor
     . intro h
       unfold nonEmptyListOf at h
-      simp [support_pick] at h
+      simp [support_oneOf] at h
     . intro ⟨hneq, hmem⟩
       contradiction
   | cons x xs' IH =>
@@ -307,12 +319,12 @@ theorem support_nonEmptyListOf
         cases hy with
         | head =>
           unfold nonEmptyListOf at hy
-          simp [support_pick] at hy
+          simp [support_oneOf] at hy
           rcases hy with ⟨h, _⟩ | ⟨h, _⟩ <;> assumption
         | tail =>
           rename_i hmem
           unfold nonEmptyListOf at hy
-          simp [support_pick] at hy
+          simp [support_oneOf] at hy
           rcases hy with ⟨_, hxs⟩ | ⟨_, hxs⟩
           · subst hxs
             contradiction
@@ -321,7 +333,7 @@ theorem support_nonEmptyListOf
     . intro h
       rw [Set.mem_ofPred_eq] at h
       unfold nonEmptyListOf
-      simp [support_pick]
+      simp [support_oneOf]
       obtain ⟨h1, h2⟩ := h
       have hx : x ∈ g.support := by
         apply h2
@@ -394,17 +406,6 @@ theorem support_permutationOf {α} {xs : List α} :
 theorem mem_support_permutationOf_iff {α} {xs : List α} {z : { ys // xs.Perm ys }} :
     z ∈ support (permutationOf xs : SPMF _) ↔ True := by
   rw [support_permutationOf]; exact iff_of_true (Set.mem_univ z) trivial
-
-/-- The support of `oneOf gs` is exactly the union of all generators in `gs` -/
-@[simp]
-theorem support_oneOf
-    {gs : List (Unit → SPMF α)}
-    (hne : gs ≠ []) :
-    support (oneOf gs hne) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
-  ext a
-  exact (mem_support_of_may (mayObs.map_oneOf gs hne)).trans
-    ((Mix.index_angelic gs hne fun g => mayObs.spec (g ()) (· = a)).trans
-      (exists_congr fun g => and_congr_right fun _ => mem_support_iff_may.symm))
 
 /-- If the sum of weights in `gs` is non-zero, then the support of `frequency gs` is exactly the
 union of the support of the generators in `gs` with non-zero weights. -/

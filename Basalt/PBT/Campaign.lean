@@ -88,7 +88,7 @@ def ioCampaign (T : Property) (runs : Nat) (maxDiscardRatio : Nat := 10) : IO Un
 /-- Test `T` at `Plausible.Gen`, where choices come from Plausible's `StdGen`.
 
 The `size` handed to `Plausible.Gen.run` is inert: Basalt generators bound their own recursion (via
-`pick`/`partial_fixpoint`) and no combinator reads Plausible's size parameter. -/
+`partial_fixpoint`) and no combinator reads Plausible's size parameter. -/
 def plausibleCampaign (T : Property) (runs : Nat) (maxDiscardRatio : Nat := 10) : IO Unit :=
   campaign "Plausible.Gen" (Plausible.Gen.run (runProp (T Plausible.Gen)) 0) runs maxDiscardRatio
 

@@ -97,7 +97,7 @@ example : IsCostBounded (BST.Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
 
 /-- A parameter the recursion keeps fixed may come after one it changes. -/
 def g [Gen G] (n : Nat) (b : Bool) : G Nat :=
-  pick (fun () => pure 0) (fun () => g (n + 1) b >>= fun k => pure (k + 1))
+  oneOf [fun _ => pure 0, fun _ => g (n + 1) b >>= fun k => pure (k + 1)]
 partial_fixpoint
 
 -- A bound that mentions the seed is restated at each recursive call's.
@@ -165,10 +165,10 @@ example (n : Nat) : IsCostBounded (byCases n) (fun _ => 1) := by
 def fuelled [Gen G] (fuel : Nat) : G (BST.Tree Nat) :=
   if _h : fuel = 0 then pure .leaf
   else
-    pick (fun () => pure .leaf) (fun () => do
+    oneOf [fun _ => pure .leaf, fun _ => do
       let l ← fuelled (fuel - 1)
       let r ← fuelled (fuel - 1)
-      return .node l 0 r)
+      return .node l 0 r]
 termination_by fuel
 
 /--

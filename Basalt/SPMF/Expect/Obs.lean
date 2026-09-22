@@ -33,6 +33,7 @@ theorem range_average (lo hi : Nat) (m : Nat → ℝ≥0∞) :
   rw [ENNReal.tsum_mul_left, one_div, mul_comm, div_eq_mul_inv]
   exact congrArg (· * _) (SPMF.tsum_subtype_Icc lo hi m)
 
+@[deprecated "use `index_average`" (since := "2026-09-22")]
 theorem binary_average (F : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ 1} → ℝ≥0∞) :
     Mix.average.mix 0 1 F = (1/2 : ℝ≥0∞) * F ⟨⟨0, by omega⟩⟩ + (1/2 : ℝ≥0∞) * F ⟨⟨1, by omega⟩⟩ := by
   have hF : F = fun a => (fun n : Nat => if n = 0 then F ⟨⟨0, by omega⟩⟩ else F ⟨⟨1, by omega⟩⟩)
@@ -167,6 +168,8 @@ theorem expect_choose {lo hi : Nat} (h : lo ≤ hi)
   obtain rfl : f = fun a => m a.down.val := funext hm
   exact Mix.range_average lo hi m
 
+set_option linter.deprecated false in
+@[deprecated "use `expect_oneOf`" (since := "2026-09-22")]
 theorem expect_pick (x y : SPMF α) (f : α → ℝ≥0∞) :
     expect (pick (fun () => x) (fun () => y)) f
       = (1/2 : ℝ≥0∞) * expect x f + (1/2 : ℝ≥0∞) * expect y f :=
@@ -257,11 +260,20 @@ end apply
 
 section prob
 
+set_option linter.deprecated false in
+@[deprecated "use `prob_oneOf`" (since := "2026-09-22")]
 theorem prob_pick (x y : SPMF α) (E : Set α) :
     prob (pick (fun () => x) (fun () => y)) E
       = (1/2 : ℝ≥0∞) * prob x E + (1/2 : ℝ≥0∞) * prob y E := by
   unfold prob
   rw [expect_pick]
+
+/-- The probability of an event under a uniform choice is the average of the branch
+probabilities. -/
+theorem prob_oneOf {gs : List (Unit → SPMF α)} (hne : gs ≠ []) (E : Set α) :
+    prob (oneOf gs hne) E = (gs.map fun g => prob (g ()) E).sum / (gs.length : ℝ≥0∞) := by
+  unfold prob
+  exact expect_oneOf hne _
 
 theorem prob_frequency {gs : List (Nat × (Unit → SPMF α))}
     (h : 0 < (gs.map Prod.fst).sum) (E : Set α) :

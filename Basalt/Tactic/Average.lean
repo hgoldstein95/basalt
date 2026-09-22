@@ -24,6 +24,7 @@ theorem average_mix_mono {lo hi : Nat} {F F' : ULift.{u} {x : Nat // lo ≤ x �
     (h : ∀ a, F a ≤ F' a) : Mix.average.mix lo hi F ≤ Mix.average.mix lo hi F' :=
   ENNReal.tsum_le_tsum fun a => by gcongr; exact h a
 
+set_option linter.deprecated false in
 private theorem binary_average' (c d : ℝ≥0∞) :
     Mix.average.mix.{u} 0 1 (fun a => if (a.down.val == 0) = true then c else d)
       = (1/2 : ℝ≥0∞) * c + (1/2 : ℝ≥0∞) * d :=
@@ -94,7 +95,8 @@ theorem average_range_le {lo hi : Nat} {h : lo ≤ hi}
       ≤ (∑ x ∈ Finset.Icc lo hi, d x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) :=
   (average_mix_mono fun a => hF a.down.val a.down.property).trans (range_average lo hi d).le
 
-@[gen_rule]
+set_option linter.deprecated false in
+@[gen_rule, deprecated "use `average_index_le`" (since := "2026-09-22")]
 theorem average_binary_le {t e c d : ℝ≥0∞} (ht : t ≤ c) (he : e ≤ d) :
     (Mix.average.{u}).binary t e ≤ (1/2 : ℝ≥0∞) * c + (1/2 : ℝ≥0∞) * d :=
   (average_mix_mono fun _ => by split <;> assumption).trans (binary_average' c d).le
@@ -160,7 +162,8 @@ theorem le_average_range {lo hi : Nat} {h : lo ≤ hi}
       ≤ Mix.average.range lo hi h F :=
   (range_average lo hi d).ge.trans (average_mix_mono fun a => hF a.down.val a.down.property)
 
-@[gen_rule]
+set_option linter.deprecated false in
+@[gen_rule, deprecated "use `le_average_index`" (since := "2026-09-22")]
 theorem le_average_binary {t e c d : ℝ≥0∞} (ht : c ≤ t) (he : d ≤ e) :
     (1/2 : ℝ≥0∞) * c + (1/2 : ℝ≥0∞) * d ≤ (Mix.average.{u}).binary t e :=
   (binary_average' c d).ge.trans (average_mix_mono fun _ => by split <;> assumption)

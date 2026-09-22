@@ -6,7 +6,7 @@ Authors: Harrison Goldstein
 import Mathlib.Algebra.Group.Defs
 import Mathlib.Algebra.Group.Nat.Defs
 import Mathlib.Data.Real.Basic
-import Basalt.Gen
+import Basalt.Combinators
 
 /-!
 # Generating a Type with Structure
@@ -27,6 +27,6 @@ namespace Monoid
 
 /-- Generates a type paired with a `Monoid` instance, choosing uniformly between `ℕ` and `ℝ`. -/
 def genMonoid [Gen G] : G (Σ (α : Type), Monoid α) :=
-  pick (fun () => pure ⟨ℕ, Nat.instMonoid⟩) (fun () => pure ⟨ℝ, Real.instMonoid⟩)
+  oneOf [fun _ => pure ⟨ℕ, Nat.instMonoid⟩, fun _ => pure ⟨ℝ, Real.instMonoid⟩]
 
 end Monoid

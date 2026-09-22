@@ -41,20 +41,21 @@ example (lo hi : Int) : IsAlmostSurelyTerminating (BST.Tree.genBST lo hi) := by
 
 /-- A generator whose arguments never change has the `Unit` seed. -/
 def coins [Gen G] (b : Bool) : G Nat :=
-  pick (fun () => pure 0) (fun () => do let n ← coins b; pure (if b then n + 1 else n))
+  oneOf [fun _ => pure 0, fun _ => do let n ← coins b; pure (if b then n + 1 else n)]
 partial_fixpoint
 
 -- Without a certificate, `F` is the computed bound and the certificate is the goal.
 /--
 trace: case certificate
 b : Bool
-⊢ SPMF.LfpIsOne fun c => 1 / 2 * 1 + 1 / 2 * c
+⊢ SPMF.LfpIsOne fun c => [1, c].sum / ↑[1, c].length
 -/
 #guard_msgs in
 example (b : Bool) : IsAlmostSurelyTerminating (coins b) := by
   mass_fixpoint
   trace_state
-  exact SPMF.LfpIsOne.mono (SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)) fun c _ => by simp
+  exact SPMF.LfpIsOne.mono (SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)) fun c _ => by
+    simp [ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Weights that depend on the seed. -/
 def countdown [Gen G] (n : Nat) : G Nat :=
@@ -129,7 +130,7 @@ example (n : Nat) (h : 0 < n) : IsAlmostSurelyTerminating (byCases n h) := by
 def passThrough [Gen G] (n k : Nat) : G Nat :=
   match n with
   | 0 => pure k
-  | _ + 1 => pick (fun () => pure 0) (fun () => passThrough n (k + 1))
+  | _ + 1 => oneOf [fun _ => pure 0, fun _ => passThrough n (k + 1)]
 partial_fixpoint
 
 -- A goal that has already split on an argument outside the seed keeps the split, and the `match`
@@ -140,17 +141,17 @@ c : ℝ≥0∞
 hc1 : c ≤ 1
 k : ℕ
 hrec : ∀ (j : ℕ), c ≤ (passThrough (m + 1) j).mass
-⊢ 1 - 1 / 2 + 1 / 2 * c ≤ 1 / 2 * 1 + 1 / 2 * c
+⊢ 1 - 1 / 2 + 1 / 2 * c ≤ [1, c].sum / ↑[1, c].length
 -/
 #guard_msgs in
 example (m k : Nat) : IsAlmostSurelyTerminating (passThrough (m + 1) k) := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
   trace_state
-  simp [ENNReal.one_sub_inv_two]
+  simp [ENNReal.one_sub_inv_two, ENNReal.div_eq_inv_mul, mul_add]
 
 def fuelled [Gen G] (fuel : Nat) : G Nat :=
   if _h : fuel = 0 then pure 0
-  else pick (fun () => pure 0) (fun () => fuelled (fuel - 1))
+  else oneOf [fun _ => pure 0, fun _ => fuelled (fuel - 1)]
 termination_by fuel
 
 /--
@@ -169,9 +170,9 @@ example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
     apply SPMF.IsPMF.of_one_le
     rw [fuelled]
     mass_bound
-    simp [ENNReal.inv_two_add_inv_two]
+    norm_num [ENNReal.div_self]
 
-/-- The geometric loop, stopped by a `coin` rather than a `pick`. -/
+/-- The geometric loop, stopped by a `coin` rather than a two-branch `oneOf`. -/
 def coinLoop [Gen G] : G Nat := do
   let b ← coin (1 / 2)
   if b then pure 0 else do
@@ -180,7 +181,7 @@ def coinLoop [Gen G] : G Nat := do
 partial_fixpoint
 
 -- A conditional on a drawn value is part of the draw's postexpectation, so the bound is exact: the
--- literal coin's weights, and the same recurrence as the `pick` loop's.
+-- literal coin's weights, and the same recurrence as the `oneOf` loop's.
 /--
 trace: case certificate
 ⊢ SPMF.LfpIsOne fun c => ↑1 / ↑2 * 1 + ↑1 / ↑2 * c

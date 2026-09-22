@@ -356,6 +356,8 @@ open scoped ENNReal
 noncomputable def expectedCost (g : SPMF.Cost α) : ℝ≥0∞ :=
   SPMF.expect g (fun p => (p.2 : ℝ≥0∞))
 
+set_option linter.deprecated false in
+@[deprecated "use `expect_oneOf`" (since := "2026-09-22")]
 theorem expect_pick (x y : Unit → SPMF.Cost α) (φ : α × Nat → ℝ≥0∞) :
     SPMF.expect (pick x y : SPMF.Cost α) φ
       = (1/2 : ℝ≥0∞) * SPMF.expect (x ()) (fun p => φ (p.1, 1 + p.2))

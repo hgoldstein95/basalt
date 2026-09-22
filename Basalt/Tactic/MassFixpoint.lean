@@ -190,12 +190,12 @@ variable {α : Type*}
 /-- If a generator `g` is an SPMF, then `listOf g` is also an SPMF. -/
 theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) : IsPMF (listOf g) := by
   mass_fixpoint using LfpIsOne.affine (m := 1 / 2) (by norm_num)
-  simp [ENNReal.one_sub_inv_two]
+  simp [ENNReal.one_sub_inv_two, div_eq_mul_inv, add_mul, mul_comm]
 
 /-- If a generator `g` is an SPMF, then `nonEmptyListOf g` is also an SPMF. -/
 theorem IsPMF_nonEmptyListOf {g : SPMF α} (hg : IsPMF g) : IsPMF (nonEmptyListOf g) := by
   mass_fixpoint using LfpIsOne.affine (m := 1 / 2) (by norm_num)
-  simp [ENNReal.one_sub_inv_two]
+  simp [ENNReal.one_sub_inv_two, div_eq_mul_inv, add_mul, mul_comm]
 
 private theorem ite_le_mass_listOf {g : SPMF α} {c : ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) : (if 1 ≤ c then 1 else 0) ≤ (listOf g).mass := by

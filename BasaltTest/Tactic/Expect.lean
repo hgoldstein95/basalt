@@ -46,13 +46,15 @@ example (b : Bool) : SPMF.expect
 
 -- At the cost interpretation the same rules see the choices made so far: `WPC` counts them.
 /--
-trace: ⊢ (List.map (fun p => ↑p.1 * p.2) [(1, ↑(1 + 0)), (2, 1 / 2 * ↑(1 + (1 + 0)) + 1 / 2 * ↑(1 + (1 + 1)))]).sum /
-      ↑(List.map Prod.fst [(1, ↑(1 + 0)), (2, 1 / 2 * ↑(1 + (1 + 0)) + 1 / 2 * ↑(1 + (1 + 1)))]).sum ≤
+trace: ⊢ (List.map (fun p => ↑p.1 * p.2)
+          [(1, ↑(1 + 0)), (2, [↑(1 + (1 + 0)), ↑(1 + (1 + 1))].sum / ↑[↑(1 + (1 + 0)), ↑(1 + (1 + 1))].length)]).sum /
+      ↑(List.map Prod.fst
+            [(1, ↑(1 + 0)), (2, [↑(1 + (1 + 0)), ↑(1 + (1 + 1))].sum / ↑[↑(1 + (1 + 0)), ↑(1 + (1 + 1))].length)]).sum ≤
     ∞
 -/
 #guard_msgs in
 example : SPMF.Cost.expectedCost
-    (frequency [(1, fun () => pure 0), (2, fun () => pick (fun () => pure 1) (fun () => elements [4, 5]))]
+    (frequency [(1, fun () => pure 0), (2, fun () => oneOf [fun () => pure 1, fun () => elements [4, 5]])]
       : SPMF.Cost Nat) ≤ ⊤ := by
   expect_bound
   trace_state
@@ -62,12 +64,13 @@ example : SPMF.Cost.expectedCost
 /--
 trace: arbitrary : SPMF.Cost ℕ
 ih : (SPMF.expect arbitrary fun p => ↑p.2) ≤ 2
-⊢ 1 / 2 * ↑(1 + 0) + 1 / 2 * (1 + 2) ≤ 2
+⊢ [↑(1 + 0), 1 + 2].sum / ↑[↑(1 + 0), 1 + 2].length ≤ 2
 -/
 #guard_msgs in
 example : SPMF.Cost.expectedCost (Nat.arbitrary : SPMF.Cost Nat) ≤ 2 := by
   expect_fixpoint
   trace_state
+  norm_num
   ennreal_to_real
   norm_num
 

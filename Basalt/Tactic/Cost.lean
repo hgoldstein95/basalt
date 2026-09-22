@@ -228,7 +228,9 @@ namespace Mix
     (hF : ∀ x (hx : lo ≤ x ∧ x ≤ hi), F ⟨⟨x, hx⟩⟩ ≤ d) : Mix.sup.range lo hi h F ≤ d :=
   iSup_le fun a => hF _ a.down.property
 
-@[gen_rule] theorem sup_binary_le {t e c d : ℕ∞} (ht : t ≤ c) (he : e ≤ d) :
+set_option linter.deprecated false in
+@[gen_rule, deprecated "use `sup_index_le`" (since := "2026-09-22")]
+theorem sup_binary_le {t e c d : ℕ∞} (ht : t ≤ c) (he : e ≤ d) :
     (Mix.sup.{u}).binary t e ≤ max c d := by
   refine iSup_le fun a => ?_
   dsimp only

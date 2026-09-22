@@ -55,10 +55,11 @@ def elements [Gen G] (xs : List α) (hne : xs ≠ [] := by gen_side_condition) :
 
 /-- Picks one of the generators in `gs` at random.  This combinator takes as input a proof that `gs`
 is non-empty, discharged by `gen_side_condition` when omitted. -/
-def oneOf [Gen G] (gs : List (Unit → G α)) (hne : gs ≠ [] := by gen_side_condition) : G α := do
-  let i ← ULift.down <$> RandomChoice.choose 0 (gs.length - 1) (Nat.zero_le _)
-  (gs[i.val]'(by
-    have := i.property.2
+def oneOf {G : Type u → Type v} {α : Type u} [Gen G] (gs : List (Unit → G α))
+    (hne : gs ≠ [] := by gen_side_condition) : G α := do
+  let i ← RandomChoice.choose 0 (gs.length - 1) (Nat.zero_le _)
+  (gs[i.down.val]'(by
+    have := i.down.property.2
     have : 0 < gs.length := length_pos_iff.mpr hne
     omega)) ()
 
@@ -104,28 +105,6 @@ produced by the generator `g`. -/
 def listOfMaxLength [Gen G] (n : Nat) (g : G α) : G (List α) := do
   let ⟨k, _⟩ ← ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le n)
   vectorOf k g
-
-/-- Generates a (possibly empty) list with unbounded length where each element is produced using
-`g`.  Note: this produces the empty list 50% of the time, so for production generators, you should
-consider using other combinators, e.g. `listOfMaxLength`. -/
-def listOf [Gen G] (g : G α) : G (List α) := do
-  RandomChoice.pick
-    (fun () => pure [])
-    (fun () => do
-      let x ← g
-      let xs ← listOf g
-      return x :: xs)
-partial_fixpoint
-
-/-- Generates a *non-empty* list with unbounded length, where each element is produced using `g`. -/
-def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
-  RandomChoice.pick
-    (fun () => do let x ← g; pure [x])
-    (fun () => do
-      let x ← g
-      let xs ← nonEmptyListOf g
-      return x :: xs)
-partial_fixpoint
 
 /-- Generates a random permutation of the list `xs`, along with a proof
     that the resultant list is indeed a permutation of `xs`.
@@ -276,11 +255,11 @@ private theorem sumOfWeights_le {α : Type u} [PartialOrder α] {l1 l2 : List (N
 
 /-- Two draws whose (equal) upper bounds are written differently agree: the bound appears in the
 type of the drawn value, so it can only be transported where it is a variable. -/
-private theorem bind_choose_congr [Gen G] {β : Type} {n n' : Nat} (hn : n = n')
-    (f : (i : Nat) → i ≤ n → G β) :
-    ((ULift.down <$> RandomChoice.choose 0 n (Nat.zero_le _)) >>= fun i => f i.val i.property.2)
-      = ((ULift.down <$> RandomChoice.choose 0 n' (Nat.zero_le _)) >>= fun i =>
-          f i.val (by have := i.property.2; omega)) := by
+private theorem bind_choose_congr {G : Type u → Type v} [Gen G] {β : Type u} {n n' : Nat}
+    (hn : n = n') (f : (i : Nat) → i ≤ n → G β) :
+    (RandomChoice.choose 0 n (Nat.zero_le _) >>= fun i => f i.down.val i.down.property.2)
+      = (RandomChoice.choose 0 n' (Nat.zero_le _) >>= fun i =>
+          f i.down.val (by have := i.down.property.2; omega)) := by
   subst hn
   rfl
 
@@ -292,8 +271,8 @@ private theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) 
   have h1len : 0 < l1.length := List.length_pos_iff.mpr h1
   have h2len : 0 < l2.length := List.length_pos_iff.mpr h2
   rw [show oneOf l1 h1
-        = (ULift.down <$> RandomChoice.choose 0 (l2.length - 1) (Nat.zero_le _)) >>= fun i =>
-            (l1[i.val]'(by have := i.property.2; omega)) ()
+        = RandomChoice.choose 0 (l2.length - 1) (Nat.zero_le _) >>= fun i =>
+            (l1[i.down.val]'(by have := i.down.property.2; omega)) ()
       from bind_choose_congr (by omega) (fun i hi => (l1[i]'(by omega)) ())]
   simp only [oneOf]
   apply MonoBind.bind_mono_right
@@ -387,6 +366,38 @@ theorem monotone_listOfMaxLength [Gen G] {γ : Sort w} [PartialOrder γ]
     apply monotone_vectorOf
     assumption
 
+end monotonicity
+
+/-! ## Recursive combinators
+
+`partial_fixpoint` rebuilds each body's monotonicity proof from the `@[partial_fixpoint_monotone]`
+lemmas in scope at the definition, so a combinator whose body recurses under `oneOf` has to come
+after `monotone_oneOf`. -/
+
+section recursive_combinators
+
+/-- Generates a (possibly empty) list with unbounded length where each element is produced using
+`g`.  Note: this produces the empty list 50% of the time, so for production generators, you should
+consider using other combinators, e.g. `listOfMaxLength`. -/
+def listOf [Gen G] (g : G α) : G (List α) := do
+  oneOf [
+    fun _ => pure [],
+    fun _ => do
+      let x ← g
+      let xs ← listOf g
+      return x :: xs]
+partial_fixpoint
+
+/-- Generates a *non-empty* list with unbounded length, where each element is produced using `g`. -/
+def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
+  oneOf [
+    fun _ => do let x ← g; pure [x],
+    fun _ => do
+      let x ← g
+      let xs ← nonEmptyListOf g
+      return x :: xs]
+partial_fixpoint
+
 @[partial_fixpoint_monotone]
 theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (g : γ → G α) (hg : monotone g) :
@@ -402,16 +413,17 @@ theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
   · intro z hz
     subst hw
     unfold listOf
-    simp only [RandomChoice.pick]
-    apply MonoBind.bind_mono_right
-    intro n
-    split
+    apply oneOf_le
+    refine ⟨rfl, ?_⟩
+    rintro (_ | _ | i) h1 h2 <;> intro _
     · apply PartialOrder.rel_refl
     · apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
       apply MonoBind.bind_mono_right
       intro a
       apply MonoBind.bind_mono_left
       assumption
+    · simp at h1
+      omega
 
 @[partial_fixpoint_monotone]
 theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
@@ -428,10 +440,9 @@ theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
   · intro z hz
     subst hw
     unfold nonEmptyListOf
-    simp only [RandomChoice.pick]
-    apply MonoBind.bind_mono_right
-    intro n
-    split
+    apply oneOf_le
+    refine ⟨rfl, ?_⟩
+    rintro (_ | _ | i) h1 h2 <;> intro _
     · unfold monotone at hg
       apply MonoBind.bind_mono_left
       apply hg
@@ -441,5 +452,7 @@ theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
       intro a
       apply MonoBind.bind_mono_left
       assumption
+    · simp at h1
+      omega
 
-end monotonicity
+end recursive_combinators

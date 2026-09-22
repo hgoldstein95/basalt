@@ -9,11 +9,11 @@ import Basalt.Obs.Ordered
 /-!
 # Presentations of a Choice in `Prop`
 
-How a choice presents for each shape a combinator makes it in (a plain range, a binary choice, a
-threshold, a list index, a weighted selection), demonically (`Mix.demonic`, a `∀`) and angelically
-(`Mix.angelic`, an `∃`), and the walker's lower-bound rules for each shape in the two algebras. A
-shape whose rule splits the choice pointwise instead (`Mix.le_demonic_binary`) has no demonic
-presentation. These are facts about quantifiers over a range, not about combinators.
+How a choice presents for each shape a combinator makes it in (a plain range, a threshold, a list
+index, a weighted selection), demonically (`Mix.demonic`, a `∀`) and angelically (`Mix.angelic`, an
+`∃`), and the walker's lower-bound rules for each shape in the two algebras. A shape whose rule
+splits the choice pointwise instead (`Mix.le_demonic_threshold`) has no demonic presentation. These
+are facts about quantifiers over a range, not about combinators.
 -/
 
 namespace Mix
@@ -70,6 +70,7 @@ theorem range_angelic (F : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → Prop
     Mix.angelic.mix lo hi F ↔ ∃ x, ∃ hx : lo ≤ x ∧ x ≤ hi, F ⟨⟨x, hx⟩⟩ :=
   ⟨fun ⟨a, h⟩ => ⟨a.down.val, a.down.property, h⟩, fun ⟨x, hx, h⟩ => ⟨⟨⟨x, hx⟩⟩, h⟩⟩
 
+@[deprecated "use `index_angelic`" (since := "2026-09-22")]
 theorem binary_angelic (F : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ 1} → Prop) :
     Mix.angelic.mix 0 1 F ↔ F ⟨⟨0, by omega⟩⟩ ∨ F ⟨⟨1, by omega⟩⟩ := by
   constructor
@@ -148,7 +149,8 @@ theorem le_demonic_range {lo hi : Nat} {h : lo ≤ hi}
     {d : (x : Nat) → lo ≤ x ∧ x ≤ hi → Prop} (hF : ∀ x hx, d x hx ≤ F ⟨⟨x, hx⟩⟩) :
     (∀ x hx, d x hx) ≤ Mix.demonic.range lo hi h F := fun hd _ => hF _ _ (hd _ _)
 
-@[gen_rule]
+set_option linter.deprecated false in
+@[gen_rule, deprecated "use `le_demonic_index`" (since := "2026-09-22")]
 theorem le_demonic_binary {t e c d : Prop} (ht : c ≤ t) (he : d ≤ e) :
     (c ∧ d) ≤ (Mix.demonic.{u}).binary t e := by
   rintro ⟨hc, hd⟩ a
@@ -215,7 +217,8 @@ theorem le_angelic_range {lo hi : Nat} {h : lo ≤ hi}
     {d : (x : Nat) → lo ≤ x ∧ x ≤ hi → Prop} (hF : ∀ x hx, d x hx ≤ F ⟨⟨x, hx⟩⟩) :
     (∃ x hx, d x hx) ≤ Mix.angelic.range lo hi h F := fun ⟨x, hx, hd⟩ => ⟨_, hF x hx hd⟩
 
-@[gen_rule]
+set_option linter.deprecated false in
+@[gen_rule, deprecated "use `le_angelic_index`" (since := "2026-09-22")]
 theorem le_angelic_binary {t e c d : Prop} (ht : c ≤ t) (he : d ≤ e) :
     (c ∨ d) ≤ (Mix.angelic.{u}).binary t e := by
   intro h

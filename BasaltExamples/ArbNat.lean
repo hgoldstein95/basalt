@@ -19,11 +19,11 @@ namespace ArbNat
 
 /-- Generates an arbitrary natural number: flip a coin to stop at `0` or recurse and add one. -/
 def Nat.arbitrary [Gen G] : G Nat := do
-  pick
-    (fun () => pure 0)
-    (fun () => do
+  oneOf [
+    fun _ => pure 0,
+    fun _ => do
       let n ← Nat.arbitrary
-      pure (n + 1))
+      pure (n + 1)]
 partial_fixpoint
 
 theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ := by
@@ -38,7 +38,7 @@ theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ := b
 
 theorem Nat.arbitrary.terminates : IsAlmostSurelyTerminating Nat.arbitrary := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
-  simp
+  simp [ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Producing `n` costs `n + 1` random choices (one per increment, plus the final stop). -/
 theorem Nat.arbitrary.cost_bounded :
@@ -53,6 +53,7 @@ open scoped ENNReal
 theorem Nat.arbitrary.expected_cost :
     SPMF.Cost.expectedCost (Nat.arbitrary : SPMF.Cost Nat) ≤ 2 := by
   expect_fixpoint
+  norm_num
   ennreal_to_real
   norm_num
 

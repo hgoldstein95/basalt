@@ -119,10 +119,11 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 
 - **A `partial_fixpoint` definition fails to elaborate**, complaining about monotonicity rather
   than about any combinator — a combinator in the recursive body has no
-  `@[partial_fixpoint_monotone]` lemma. The tagged lemmas in
-  [Basalt/Combinators.lean](Basalt/Combinators.lean) (and
-  [RandomChoice.lean](Basalt/RandomChoice.lean)) are the models. The same applies inside a
-  `@[tunable]` body: the attribute rebuilds the fixpoint's monotonicity proof
+  `@[partial_fixpoint_monotone]` lemma *in scope where the definition is elaborated*: either none
+  is tagged, or the tagged one comes later in the same file. The tagged lemmas in
+  [Basalt/Combinators.lean](Basalt/Combinators.lean) are the models, and that file's own recursive
+  combinators sit after them for this reason. The same applies inside a `@[tunable]` body: the
+  attribute rebuilds the fixpoint's monotonicity proof
   ([Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)).
 - **`rw [gen]` (or another unfolding) fails or gives a confusing error in a correctness proof** —
   wrong unfolding idiom for the context; the four-idiom table is in `WORKFLOW.md`

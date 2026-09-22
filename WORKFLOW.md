@@ -40,13 +40,12 @@ Determine a reasonable cost bound for generation: a function `c : α → Nat` su
 value `v` never takes more than `c v` random choices. Count the choices your generator makes per
 constructor of the output:
 
-- each `pick` is 1 choice;
 - each `chooseNat` / `choose` / `elements` is 1 choice;
 - each `oneOf` / `frequency` is 1 choice *plus* the cost of the selected branch;
 - a call to another generator costs whatever that generator's bound says.
 
 For a list generator that flips a coin per element, the bound is `fun xs => xs.length + 1` (one
-`pick` per cons, one for the nil). When a generated *value* feeds a later recursion (e.g.
+`oneOf` per cons, one for the nil). When a generated *value* feeds a later recursion (e.g.
 `Nat.arbitrary` producing an `n` by counting coin flips), the value itself shows up in the bound
 (`fun n => n + 1`).
 
@@ -239,9 +238,10 @@ no recursion — including one that only post-processes a callee — is the firs
 | Shrinking seed, mean offspring `> 1` | `SPMF.LfpIsOne.ranking …` with `mass_fixpoint per_seed` (below) | a function of `c` and the seed |
 
 `m` is weights-on-recursive-branches over total weights, counting each branch once per recursive
-call: a uniform `pick` with one recursive branch has `m = 1/2`; `frequency [(2, leaf…), (1, node…)]`
-with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a quadratic, `a = 2/3`, `d = 1/3`; a uniform
-`pick` between a leaf and two calls is the quadratic `a = d = 1/2`. **A critical generator
+call: a two-branch `oneOf` with one recursive branch has `m = 1/2`;
+`frequency [(2, leaf…), (1, node…)]` with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a
+quadratic, `a = 2/3`, `d = 1/3`; a two-branch `oneOf` between a leaf and two calls is the quadratic
+`a = d = 1/2`. **A critical generator
 (`m = 1`) terminates but has infinite expected size** (`AllTwoTree.genTree_expectedSteps_infinite`)
 — reweight it if you can. The side conditions of a certificate are closed numerals: `by norm_num`,
 or `by ennreal_to_real; norm_num`.
