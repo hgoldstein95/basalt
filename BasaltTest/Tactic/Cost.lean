@@ -6,6 +6,7 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.ArbChar
 import BasaltExamples.ArbNat
+import BasaltTest.OptionGen
 
 /-!
 # The `cost_bound` Contract

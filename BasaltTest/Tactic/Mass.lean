@@ -6,6 +6,7 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.ArbNat
 import BasaltExamples.SortedList
+import BasaltTest.OptionGen
 
 /-!
 # The `mass_bound` Contract
