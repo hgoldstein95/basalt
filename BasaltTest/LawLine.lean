@@ -69,10 +69,10 @@ open Lean Elab Meta in
 `terminates` names the divergence count it was *not* proved by. -/
 
 theorem genCoin.sound_complete : IsSoundAndComplete (genCoin (G := SPMF)) (fun _ => True) := by
-  intro a
   constructor
-  · intro _; trivial
-  · intro _
+  · solve_by_elim
+  · unfold IsCompleteFor
+    intro a
     cases a <;> simp [genCoin, SPMF.support_oneOf]
 
 /--

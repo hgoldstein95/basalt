@@ -136,12 +136,6 @@ theorem Tree.genBSTByInsertion.sound_complete {lo hi : Int} (h : lo ≤ hi) :
     rw [Tree.genBSTByInsertion]; complete_bound [hc]
     exact ⟨t.preorder, Tree.mem_preorder_bounds ht, Tree.foldl_insert_preorder ht⟩
 
-/-- Inserting a drawn list and shaping the tree directly reach the same trees. -/
-theorem Tree.support_genBSTByInsertion_eq {lo hi : Int} (h : lo ≤ hi) :
-    SPMF.support (Tree.genBSTByInsertion lo hi h) = SPMF.support (Tree.genBST lo hi) :=
-  Set.ext fun t =>
-    (Tree.genBSTByInsertion.sound_complete h t).trans (Tree.genBST.sound_complete t).symm
-
 /-! ## Termination -/
 
 theorem Tree.genBSTByInsertion.terminates {lo hi : Int} (h : lo ≤ hi) :

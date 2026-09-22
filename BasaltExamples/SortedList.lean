@@ -79,9 +79,8 @@ theorem List.genSortedGt.sound_complete :
       exact ⟨d, xs, ih ⟨htl, List.sorted_cons_forall_le hs⟩, rfl⟩
 
 theorem List.genSorted.sound_complete : IsSoundAndComplete List.genSorted List.sorted := by
-  intro xs
   unfold genSorted
-  simpa [List.forall_iff_forall_mem] using List.genSortedGt.sound_complete (m := 0) xs
+  simpa [List.forall_iff_forall_mem] using List.genSortedGt.sound_complete (m := 0)
 
 theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.genSortedGt m) := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
