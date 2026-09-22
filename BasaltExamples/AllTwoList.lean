@@ -25,11 +25,11 @@ def AllTwos.cost (l : List Nat) : Nat := l.length + 1
 
 /-- Generates a list of all `2`s: flip a coin to stop with `[]`, or prepend a `2` and recurse. -/
 def genAllTwos [Gen G] : G (List Nat) :=
-  pick
-    (fun () => pure [])
-    (fun () => do
+  oneOf [
+    fun _ => pure [],
+    fun _ => do
       let xs ← genAllTwos
-      return 2 :: xs)
+      return 2 :: xs]
 partial_fixpoint
 
 theorem genAllTwos.sound_complete : IsSoundAndComplete genAllTwos AllTwos := by
@@ -50,7 +50,7 @@ theorem genAllTwos.sound_complete : IsSoundAndComplete genAllTwos AllTwos := by
 
 theorem genAllTwos.terminates : IsAlmostSurelyTerminating genAllTwos := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
-  simp
+  simp [ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genAllTwos.cost_bounded : IsCostBounded genAllTwos AllTwos.cost := by
   cost_fixpoint

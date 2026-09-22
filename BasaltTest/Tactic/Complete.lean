@@ -27,14 +27,14 @@ Both recursive occurrences must appear: a hypothesis of the induction that close
 would drop it from the precondition silently. -/
 
 def genHeap [Gen G] (lo : Nat) : G Heap.Tree :=
-  pick
-    (fun () => pure .leaf)
-    (fun () => do
+  oneOf [
+    fun _ => pure .leaf,
+    fun _ => do
       let delta ← Nat.arbitrary
       let x := lo + delta
       let l ← genHeap x
       let r ← genHeap x
-      return .node l x r)
+      return .node l x r]
 partial_fixpoint
 
 /--
@@ -120,13 +120,13 @@ The induction hypothesis of `IsCompleteFor.of_measure` closes the recursive occu
 precondition has no generator in it. -/
 
 def genSortedGt [Gen G] (m : Nat) : G (List Nat) := do
-  pick
-    (fun () => pure [])
-    (fun () => do
+  oneOf [
+    fun _ => pure [],
+    fun _ => do
       let delta ← Nat.arbitrary
       let x := m + delta
       let xs ← genSortedGt x
-      return x :: xs)
+      return x :: xs]
 partial_fixpoint
 
 open SortedList in
@@ -166,7 +166,7 @@ def gen [Gen G] (b : Bool) : G Nat := do
     fun () => frequency [(1, fun () => chooseNat 0 3), (0, fun () => elements [4, 5])],
     fun () => if b then Nat.arbitrary else (·.down.val) <$> choose 0 1 (by simp)
   ]
-  let y ← pick (fun () => pure 1) (fun () => chooseInt 0 2 >>= fun z => pure z.toNat)
+  let y ← oneOf [fun () => pure 1, fun () => chooseInt 0 2 >>= fun z => pure z.toNat]
   let c ← coin (1/3)
   return (if c then x + y else 0)
 

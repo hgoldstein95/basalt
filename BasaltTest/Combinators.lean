@@ -54,9 +54,9 @@ deriving Repr
 -- (This generator tests that we can use `oneOf` in functions marked as `partial_fixpoint`)
 def myGen [Gen G] : G NatOrFloat :=
   oneOf [
-    fun _ => RandomChoice.pick
-      (fun _ => pure (NatOrFloat.Nat 1))
-      (fun _ => pure (NatOrFloat.Float 1.0)),
+    fun _ => oneOf
+      [fun _ => pure (NatOrFloat.Nat 1),
+       fun _ => pure (NatOrFloat.Float 1.0)],
     fun _ => do
       let natOrFloat ← myGen
       match natOrFloat with

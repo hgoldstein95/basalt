@@ -48,14 +48,14 @@ def Tree.isHeap (lo : Nat) : Tree → Prop
 
 /-- Generates an arbitrary min-heap whose values are all at least `lo`. -/
 def Tree.genHeap [Gen G] (lo : Nat) : G Tree :=
-  pick
-    (fun () => pure leaf)
-    (fun () => do
+  oneOf [
+    fun _ => pure leaf,
+    fun _ => do
       let delta ← Nat.arbitrary
       let x := lo + delta
       let l ← Tree.genHeap x
       let r ← Tree.genHeap x
-      return node l x r)
+      return node l x r]
 partial_fixpoint
 
 theorem Tree.genHeap.sound_complete :
@@ -77,7 +77,7 @@ theorem Tree.genHeap.sound_complete :
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
     (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
-  simp [sq]
+  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/
 theorem Tree.genHeap.cost_bounded :

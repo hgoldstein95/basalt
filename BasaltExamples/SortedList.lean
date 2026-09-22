@@ -23,13 +23,13 @@ namespace SortedList
 /-- Generates a sorted list whose every element is at least `m`: stop with `[]`, or draw a gap with
 `Nat.arbitrary`, emit `m + gap`, and recurse with that as the new lower bound. -/
 def List.genSortedGt [Gen G] (m : Nat) : G (List Nat) := do
-  pick
-    (fun () => pure [])
-    (fun () => do
+  oneOf [
+    fun _ => pure [],
+    fun _ => do
       let delta ← Nat.arbitrary
       let x := m + delta
       let xs ← List.genSortedGt x
-      return x :: xs)
+      return x :: xs]
 partial_fixpoint
 
 /-- Generates an arbitrary sorted list, i.e. one with lower bound `0`. -/
@@ -85,7 +85,7 @@ theorem List.genSorted.sound_complete : IsSoundAndComplete List.genSorted List.s
 
 theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.genSortedGt m) := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
-  simp
+  simp [ENNReal.div_eq_inv_mul, mul_add]
 
 theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=
   List.genSortedGt.terminates 0

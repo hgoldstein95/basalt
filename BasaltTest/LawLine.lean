@@ -18,7 +18,7 @@ must not be laundered into a ✓.
 -/
 
 def genCoin [Gen G] : G Bool :=
-  RandomChoice.pick (fun () => pure true) (fun () => pure false)
+  oneOf [fun _ => pure true, fun _ => pure false]
 
 /-! ## No laws: the block is absent
 
@@ -73,7 +73,7 @@ theorem genCoin.sound_complete : IsSoundAndComplete (genCoin (G := SPMF)) (fun _
   constructor
   · intro _; trivial
   · intro _
-    cases a <;> simp [genCoin, SPMF.support_pick]
+    cases a <;> simp [genCoin, SPMF.support_oneOf]
 
 /--
 info: genCoin — 5 draws (seed 0, fuel 10000)
@@ -138,11 +138,11 @@ open Lean Elab Meta in
 open SPMF in
 
 def genMaybe [Gen G] : G (Option Nat) :=
-  RandomChoice.pick (fun () => pure none) (fun () => pure (some 0))
+  oneOf [fun _ => pure none, fun _ => pure (some 0)]
 
 theorem genMaybe.productive : IsProductive (genMaybe (G := SPMF)) :=
   IsProductive_of_mem_support (a := 0)
-    (by simp [genMaybe, SPMF.support_pick, SPMF.support_pure])
+    (by simp [genMaybe, SPMF.support_oneOf, SPMF.support_pure])
 
 /--
 info: genMaybe — 5 draws (seed 0, fuel 10000)
@@ -176,16 +176,16 @@ info: genMaybe — 5 draws (seed 0, fuel 10000)
 
 open SPMF in
 def genSurely [Gen G] : G (Option Nat) :=
-  RandomChoice.pick (fun () => pure (some 0)) (fun () => pure (some 1))
+  oneOf [fun _ => pure (some 0), fun _ => pure (some 1)]
 
 theorem genSurely.filter_free : IsFilterFree (genSurely (G := SPMF)) := by
   have hmass : SPMF.IsPMF (genSurely (G := SPMF)) := by
     mass_fixpoint using SPMF.LfpIsOne.one
-    simp [ENNReal.inv_two_add_inv_two]
+    norm_num [ENNReal.div_self]
   rw [IsFilterFree_iff_massNone_eq_zero hmass]
   show (genSurely (G := SPMF)) none = 0
   rw [SPMF.apply_eq_zero_iff]
-  simp [genSurely, SPMF.support_pick, SPMF.support_pure]
+  simp [genSurely, SPMF.support_oneOf, SPMF.support_pure]
 
 theorem genSurely.productive : IsProductive (genSurely (G := SPMF)) :=
   IsProductive_of_IsFilterFree genSurely.filter_free

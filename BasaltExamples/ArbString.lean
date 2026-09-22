@@ -56,15 +56,15 @@ theorem NonEmptyString.arbitrary_terminates : IsAlmostSurelyTerminating NonEmpty
   mass_fixpoint using SPMF.LfpIsOne.one
   simp
 
-/-- `listOf`'s bound with `Char.arbitrary`'s per-element cost of `1`: one `pick` and one character
-per element, plus the `pick` that ends the list. -/
+/-- `listOf`'s bound with `Char.arbitrary`'s per-element cost of `1`: one `oneOf` and one character
+per element, plus the `oneOf` that ends the list. -/
 theorem String.arbitrary_cost :
     IsCostBounded String.arbitrary (fun s => 2 * s.length + 1) := by
   cost_fixpoint
   simp only [String.length_ofList, List.map_const', List.sum_replicate, smul_eq_mul] at *
   omega
 
-/-- `String.arbitrary`'s bound less the final `pick`: `nonEmptyListOf` draws its last element
+/-- `String.arbitrary`'s bound less the final `oneOf`: `nonEmptyListOf` draws its last element
 directly. -/
 theorem NonEmptyString.arbitrary_cost :
     IsCostBounded NonEmptyString.arbitrary (fun s => 2 * s.length) := by

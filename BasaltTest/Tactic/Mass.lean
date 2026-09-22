@@ -28,22 +28,23 @@ def gen [Gen G] (b : Bool) : G Nat := do
     fun () => frequency [(1, fun () => chooseNat 0 3), (2, fun () => elements [4, 5])],
     fun () => if b then Nat.arbitrary else (·.down.val) <$> choose 0 1 (by simp)
   ]
-  let y ← pick (fun () => pure 1) (fun () => chooseInt 0 2 >>= fun z => pure z.toNat)
+  let y ← oneOf [fun () => pure 1, fun () => chooseInt 0 2 >>= fun z => pure z.toNat]
   return x + y
 
 -- The residual goal is pure `ℝ≥0∞` arithmetic in the shape of the do-block: `oneOf`'s average over
--- three branches, one of them `frequency`'s weighted average and one a conditional, times `pick`'s.
+-- three branches, one of them `frequency`'s weighted average and one a conditional, times the
+-- two-branch `oneOf`'s.
 /--
 trace: b : Bool
 ⊢ 0 ≤
-    [1 / 2 + 1 / 2,
-          (List.map (fun p => ↑p.1 * p.2) [(1, 1 / 2 + 1 / 2), (2, 1 / 2 + 1 / 2)]).sum /
-            ↑(List.map Prod.fst [(1, 1 / 2 + 1 / 2), (2, 1 / 2 + 1 / 2)]).sum,
-          if b = true then 1 / 2 + 1 / 2 else 1 / 2 + 1 / 2].sum /
-      ↑[1 / 2 + 1 / 2,
-            (List.map (fun p => ↑p.1 * p.2) [(1, 1 / 2 + 1 / 2), (2, 1 / 2 + 1 / 2)]).sum /
-              ↑(List.map Prod.fst [(1, 1 / 2 + 1 / 2), (2, 1 / 2 + 1 / 2)]).sum,
-            if b = true then 1 / 2 + 1 / 2 else 1 / 2 + 1 / 2].length
+    [[1, 1].sum / ↑[1, 1].length,
+          (List.map (fun p => ↑p.1 * p.2) [(1, [1, 1].sum / ↑[1, 1].length), (2, [1, 1].sum / ↑[1, 1].length)]).sum /
+            ↑(List.map Prod.fst [(1, [1, 1].sum / ↑[1, 1].length), (2, [1, 1].sum / ↑[1, 1].length)]).sum,
+          if b = true then [1, 1].sum / (1 + 1) else [1, 1].sum / ↑[1, 1].length].sum /
+      ↑[[1, 1].sum / ↑[1, 1].length,
+            (List.map (fun p => ↑p.1 * p.2) [(1, [1, 1].sum / ↑[1, 1].length), (2, [1, 1].sum / ↑[1, 1].length)]).sum /
+              ↑(List.map Prod.fst [(1, [1, 1].sum / ↑[1, 1].length), (2, [1, 1].sum / ↑[1, 1].length)]).sum,
+            if b = true then [1, 1].sum / (1 + 1) else [1, 1].sum / ↑[1, 1].length].length
 -/
 #guard_msgs in
 example (b : Bool) : (0 : ℝ≥0∞) ≤ (gen b : SPMF Nat).mass := by

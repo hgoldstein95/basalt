@@ -26,8 +26,8 @@ def myGen [Gen G] : G α := ...
 | `GenStats.StatGen` | seeded, fuel-guarded execution that counts choices (drives `#genstats`) |
 | `Fuzz.FuzzGen` | choices read from a byte buffer, so a coverage-guided fuzzer drives generation |
 
-`RandomChoice.choose` is the only source of randomness; every combinator (`pick`, `elements`,
-`oneOf`, `frequency`, `listOf`, …) is built on it. Recursive generators are defined by
+`RandomChoice.choose` is the only source of randomness; every combinator (`elements`, `oneOf`,
+`frequency`, `listOf`, …) is built on it. Recursive generators are defined by
 `partial_fixpoint` over the `CCPO`.
 
 A generator that branches on a size adds a `[Sized G]` constraint and reads it with `getSize` or

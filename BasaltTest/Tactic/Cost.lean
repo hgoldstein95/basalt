@@ -26,7 +26,7 @@ def gen [Gen G] (b : Bool) : G Nat := do
     fun () => frequency [(1, fun () => chooseNat 0 3), (2, fun () => elements [4, 5])],
     fun () => if b then Nat.arbitrary else (·.down.val) <$> choose 0 1 (by simp)
   ]
-  let y ← pick (fun () => pure 1) (fun () => chooseInt 0 2 >>= fun z => pure z.toNat)
+  let y ← oneOf [fun () => pure 1, fun () => chooseInt 0 2 >>= fun z => pure z.toNat]
   let c ← coin (1 / 3)
   if h : c then return x + y else return x
 
@@ -154,20 +154,6 @@ example (g : SPMF.Cost Nat) : IsCostBounded (listOf g) (fun _ => 1) := by
   cost_bound
 
 -- A combinator term passed as a generator argument is bounded by its worst case.
-/--
-trace: xs : List ℕ
-n_xs : ℕ
-h_xs : n_xs ≤ (List.map (fun x => max (1 + 1) (1 + 0)) xs).sum
-⊢ n_xs ≤ 2 * xs.length
--/
-#guard_msgs in
-example : IsCostBounded (vectorOf 3 (pick (fun _ => chooseNat 0 5) (fun _ => pure 0)))
-    (fun xs => 2 * xs.length) := by
-  cost_bound
-  trace_state
-  simp at *
-  omega
-
 example : IsCostBounded (listOfMaxLength 3 (chooseNat 0 5 >>= fun x => pure (x + 1)))
     (fun xs => 1 + xs.length) := by
   cost_bound

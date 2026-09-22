@@ -44,9 +44,9 @@ private def propLt9 : PropM FuzzGen Unit := forAll (chooseNat 0 9) (· < 9)
 /-- info: pass -/
 #guard_msgs in #eval IO.println (render (runOne propLt9 (bytes [])))
 
-/- `pick` reads one byte and takes bit 0: even → first branch, odd → second. -/
+/- A two-branch `oneOf` reads one byte and takes bit 0: even → first branch, odd → second. -/
 private def propPick : PropM FuzzGen Unit :=
-  forAll (pick (fun () => pure 100) (fun () => pure 200)) (fun n => n == 100)
+  forAll (oneOf [fun _ => pure 100, fun _ => pure 200]) (fun n => n == 100)
 
 /- Even byte → first branch. -/
 /-- info: pass -/

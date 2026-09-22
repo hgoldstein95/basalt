@@ -63,8 +63,9 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
     prob (listOf g) {xs | xs.length = k} = (1/2 : ℝ≥0∞) ^ (k + 1) := by
   induction k with
   | zero =>
-    rw [listOf, prob_pick, prob_pure]
-    simp only [Set.mem_ofPred_eq, List.length_nil]
+    rw [listOf, prob_oneOf]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil, prob_pure, Set.mem_ofPred_eq]
     have hz : prob (g >>= fun x => listOf g >>= fun xs => Pure.pure (x :: xs))
         {xs | xs.length = 0} = 0 := by
       rw [prob_eq_zero_iff]
@@ -75,8 +76,9 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
     rw [hz]
     norm_num
   | succ k ih =>
-    rw [listOf, prob_pick, prob_pure]
-    simp only [Set.mem_ofPred_eq, List.length_nil]
+    rw [listOf, prob_oneOf]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil, prob_pure, Set.mem_ofPred_eq]
     rw [if_neg (by omega)]
     have hstep : prob (g >>= fun x => listOf g >>= fun xs => Pure.pure (x :: xs))
         {xs | xs.length = k + 1} = (1/2 : ℝ≥0∞) ^ (k + 1) := by
@@ -106,8 +108,9 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
             expect_congr_support fun x _ => hinner x
         _ = g.mass * (1/2 : ℝ≥0∞) ^ (k + 1) := expect_const _ _
         _ = (1/2 : ℝ≥0∞) ^ (k + 1) := by rw [hg, one_mul]
-    rw [hstep, mul_zero, zero_add, pow_succ]
-    ring
+    rw [hstep]
+    simp only [zero_add, add_zero]
+    norm_num [pow_succ, div_eq_mul_inv, one_div]
 
 /-- No `IsPMF` hypothesis: missing mass only lowers the expectation. -/
 theorem expect_listOf_length_le (g : SPMF α) :
@@ -119,8 +122,10 @@ theorem expect_listOf_length_le (g : SPMF α) :
   case admissible => exact admissible_expect_le _ _
   case step =>
     intro listOf_rec ih
-    rw [expect_pick, expect_pure, expect_bind]
-    simp only [List.length_nil, Nat.cast_zero, mul_zero, zero_add]
+    rw [expect_oneOf]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil, expect_pure, Nat.cast_zero, add_zero, zero_add]
+    rw [ENNReal.div_eq_inv_mul, ← one_div]
     have hinner : ∀ x : α,
         expect (listOf_rec >>= fun xs => Pure.pure (x :: xs))
           (fun xs => (xs.length : ℝ≥0∞)) ≤ 2 := by
@@ -145,6 +150,7 @@ theorem expect_listOf_length_le (g : SPMF α) :
           rw [one_div]
           exact ENNReal.inv_mul_cancel (by norm_num) (by norm_num)
     apply half
+    rw [expect_bind]
     refine le_trans (expect_mono fun x => hinner x) ?_
     rw [expect_const]
     calc g.mass * 2 ≤ 1 * 2 := mul_le_mul_left (mass_le_one g) _
