@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt.Combinators
 import Basalt.Gen
 
-open RandomChoice
-
 /-!
 # Arbitrary Characters (definitions)
 
@@ -15,6 +13,8 @@ The generator definition for `ArbChar`, split from its proofs (`BasaltExamples/A
 that `ArbString` can depend on just the definition. `Char.arbitrary` draws a uniformly random
 alphanumeric character with the `elements` combinator.
 -/
+
+open RandomChoice
 
 namespace ArbChar
 

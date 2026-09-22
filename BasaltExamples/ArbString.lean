@@ -8,8 +8,6 @@ import Basalt
 import BasaltExamples.ArbChar
 import BasaltExamples.ArbString.Def
 
-open RandomChoice ArbChar
-
 /-!
 # Arbitrary Strings
 
@@ -18,6 +16,8 @@ alphanumeric string. Each property is proved first for the underlying `genCharLi
 transported across `String.ofList`. The `genCharList` proofs mirror `List.arbitrary`'s, with
 `Char.arbitrary` in place of `Nat.arbitrary`.
 -/
+
+open RandomChoice ArbChar
 
 namespace ArbString
 

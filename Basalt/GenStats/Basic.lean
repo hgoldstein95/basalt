@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt.Gen
 import Basalt.Random
 
-open Lean.Order
-
 /-!
 # Generator Statistics
 
@@ -15,6 +13,8 @@ Empirical measurements to back up the proofs in the rest of the repository: `Gen
 seeded, fuel-guarded, choice-counting interpretation of `Gen`, and `GenStats.report` renders draws
 from it as the deterministic text summary that `#genstats` (`Basalt.GenStats.Command`) prints.
 -/
+
+open Lean.Order
 
 namespace GenStats
 

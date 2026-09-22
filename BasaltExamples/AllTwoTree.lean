@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt
 
-open RandomChoice
-
 /-!
 # Trees of All Twos
 
@@ -21,6 +19,8 @@ the *same* shape:
 The `expectedSteps` theorems at the end make the contrast quantitative: `3` for the weighted
 generator versus `⊤` for the critical one.
 -/
+
+open RandomChoice
 
 namespace AllTwoTree
 

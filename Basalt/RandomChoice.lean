@@ -3,13 +3,13 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-open Lean.Order
-
 /-!
 # Abstracting Over Random Choices
 
 This file defines a type class and associated operations for random choices.
 -/
+
+open Lean.Order
 
 class RandomChoice (m : Type u → Type v) where
   /-- An inclusive choice over a nonempty range of natural numbers. -/

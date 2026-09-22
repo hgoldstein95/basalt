@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt
 
-open RandomChoice SPMF ENNReal
-
 /-!
 # One Lemma per Combinator
 
@@ -14,6 +12,8 @@ Pins the contract of `Basalt/Obs/`: a combinator the library knows nothing about
 lemma, and each judgment about it, at either interpretation, is that lemma read through an
 observation and a presentation of its choice.
 -/
+
+open RandomChoice SPMF ENNReal
 
 namespace ObsTest
 

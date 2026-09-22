@@ -8,8 +8,6 @@ import BasaltExamples.BST
 import BasaltExamples.Heap
 import BasaltExamples.LeftistHeap
 
-open RandomChoice
-
 /-!
 # The `sound_bound` and `sound_fixpoint` Contract
 
@@ -17,6 +15,8 @@ Pins the step `sound_fixpoint` leaves: the recursive function named after the ge
 the arguments its recursive calls change, and one goal per path, stated on the value the path built
 under the generator's own names.
 -/
+
+open RandomChoice
 
 namespace SoundBoundTest
 

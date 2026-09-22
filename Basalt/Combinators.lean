@@ -3,11 +3,8 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-
 import Basalt.Gen
 import Basalt.RandomChoice
-
-open Lean.Order
 
 /-!
 # Generator Combinators
@@ -15,6 +12,8 @@ open Lean.Order
 Derived combinators (`chooseNat`, `elements`, `oneOf`, `frequency`, `listOf`, …), all built on
 `RandomChoice.choose`.
 -/
+
+open Lean.Order
 
 open List
 

@@ -8,14 +8,14 @@ import BasaltExamples.BST
 import BasaltExamples.Heap
 import BasaltExamples.SortedList.BySorting
 
-open RandomChoice ArbNat
-
 /-!
 # The `cost_fixpoint` Contract
 
 Pins the step `cost_fixpoint` leaves: the recursive function named after the generator, `ih` over
 the arguments its recursive calls change, and the `cost_bound` residuals.
 -/
+
+open RandomChoice ArbNat
 
 namespace CostFixpointTest
 

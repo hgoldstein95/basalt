@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt.RandomChoice
 
-open Lean.Order
-
 /-!
 # Generator Typeclass
 
@@ -14,6 +12,8 @@ open Lean.Order
 order-theoretic structure that lets it represent potentially non-terminating computations (via
 `partial_fixpoint`).
 -/
+
+open Lean.Order
 
 /-- A type constructor `g` is a `Gen` if it has all of the operations necessary for (potentially
 diverging) random monadic programming. -/

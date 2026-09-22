@@ -7,8 +7,6 @@ import Basalt
 import BasaltExamples.ArbNat
 import BasaltExamples.SortedList
 
-open RandomChoice ArbNat ENNReal
-
 /-!
 # The `mass_bound` Contract
 
@@ -16,6 +14,8 @@ Pins what `mass_bound` leaves behind: a bound whose shape mirrors the generator'
 `@[gen_rule]` rule per combinator and walked through the unfolding of any other definition, and the
 message for a generator that has neither.
 -/
+
+open RandomChoice ArbNat ENNReal
 
 namespace MassBoundTest
 

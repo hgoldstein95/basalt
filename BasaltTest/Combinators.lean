@@ -5,14 +5,14 @@ Authors: Harrison Goldstein
 -/
 import Basalt
 
-open NNReal ENNReal
-
 /-!
 # Facts about the combinators
 
 Concrete `frequency` branch probabilities, computed with `SPMF.frequency_apply` and friends and
 pinned here as regression tests, plus a check that `oneOf` works under `partial_fixpoint`.
 -/
+
+open NNReal ENNReal
 
 namespace FrequencyExamples
 

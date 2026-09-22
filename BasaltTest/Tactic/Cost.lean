@@ -7,14 +7,14 @@ import Basalt
 import BasaltExamples.ArbChar
 import BasaltExamples.ArbNat
 
-open RandomChoice ArbNat ArbChar
-
 /-!
 # The `cost_bound` Contract
 
 Pins what `cost_bound` leaves behind — one arithmetic goal per path through the generator, named
 after it — and the messages for a sub-generator nothing bounds.
 -/
+
+open RandomChoice ArbNat ArbChar
 
 namespace CostBoundTest
 

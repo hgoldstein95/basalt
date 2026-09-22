@@ -9,8 +9,6 @@ import Mathlib.Tactic.Bound
 import Mathlib.Tactic.Finiteness
 import Mathlib.Tactic.Positivity
 
-open scoped ENNReal NNReal
-
 /-!
 # ENNReal proof automation
 
@@ -22,6 +20,8 @@ open scoped ENNReal NNReal
    with side conditions discharged by the extended `finiteness`. Finish with
    `norm_num` / `linarith` / `nlinarith` / `field_simp`.
 -/
+
+open scoped ENNReal NNReal
 
 /-! ## `finiteness` extensions -/
 

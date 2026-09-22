@@ -5,14 +5,14 @@ Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Support
 
-open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
-
 /-!
 # SPMF Mass
 
 The equations of `SPMF.mass` for each combinator, each the combinator's expectation equation at the
 postcondition `1`, and `SPMF.IsPMF` (mass exactly 1).
 -/
+
+open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
 namespace SPMF
 

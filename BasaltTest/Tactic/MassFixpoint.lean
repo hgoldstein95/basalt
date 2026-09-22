@@ -6,14 +6,14 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.BST
 
-open RandomChoice ENNReal
-
 /-!
 # The `mass_fixpoint` Contract
 
 Pins what `mass_fixpoint` leaves behind: the context it introduces over a tupled seed, the
 certificate goal when no certificate is named, and its failures.
 -/
+
+open RandomChoice ENNReal
 
 namespace MassFixpointTest
 

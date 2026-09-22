@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt.Gen
 
-open Lean.Order
-
 /-!
 # Size-Parameterized Generators
 
@@ -14,6 +12,8 @@ open Lean.Order
 to any generator monad `G`; `OptionT` preserves both. `MonoSized` is the side condition that lets
 `sized` and `resize` appear in the body of a `partial_fixpoint`.
 -/
+
+open Lean.Order
 
 /-- A monad with an ambient size parameter. -/
 class Sized (g : Type u → Type v) where

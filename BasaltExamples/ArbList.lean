@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.ArbNat
 
-open RandomChoice ArbNat
-
 /-!
 # Arbitrary Lists
 
@@ -17,6 +15,8 @@ a coin to stop, otherwise draw a `Nat.arbitrary` head and recurse for the tail. 
 then fill it); it is exercised in `BasaltTest/IO.lean`, but the laws below are all stated about
 `List.arbitrary`.
 -/
+
+open RandomChoice ArbNat
 
 namespace ArbList
 

@@ -7,13 +7,13 @@ import Basalt
 import BasaltExamples.ArbNat
 import BasaltExamples.BST
 
-open RandomChoice ENNReal ArbNat BST
-
 /-!
 # The `expect_bound` and `expect_fixpoint` Contract
 
 Pins the arithmetic goal an expectation walk leaves, at both interpretations.
 -/
+
+open RandomChoice ENNReal ArbNat BST
 
 namespace ExpectBoundTest
 
