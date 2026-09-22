@@ -318,8 +318,8 @@ theorem <GEN>.cost_bounded : IsCostBounded (<GEN> <ARGS>) <COST> := by
   all_goals simp only [<COST>'s equations]; omega   -- one goal per path through <GEN>
 ```
 
-**`cost_fixpoint`** (`Basalt/Tactic/CostFixpoint.lean`) inducts over the arguments some recursive call
-of `<GEN>` changes, unfolds one step, and runs `cost_bound`. A generator with no recursion is
+**`cost_fixpoint`** (`Basalt/Tactic/CostFixpoint.lean`) inducts over the arguments some recursive
+call of `<GEN>` changes, unfolds one step, and runs `cost_bound`. A generator with no recursion is
 unfolded and walked.
 
 **`cost_bound` is the whole structural argument.** It pushes the postcondition "producing `v` took
@@ -343,8 +343,8 @@ leave. Nothing about the generator is yours to supply:
 sub-costs unfold too (`AllTwoTree.lean`). If `omega` fails, the bound is too tight: the failing goal
 is exactly the linear inequality that doesn't hold, with each sub-cost's bound as a hypothesis.
 Adjust the bound in Step 2; nothing else in the proof changes. A bare combinator term, which has no
-definition to unfold, is `cost_bound` alone (`BasaltTest/Tactic/Cost.lean`). A generator recursive by
-`termination_by` is induction on its decreasing argument and `cost_bound` in each case
+definition to unfold, is `cost_bound` alone (`BasaltTest/Tactic/Cost.lean`). A generator recursive
+by `termination_by` is induction on its decreasing argument and `cost_bound` in each case
 (`BasaltTest/Tactic/CostFixpoint.lean`).
 
 ### Recipe 4: Expected Values
@@ -381,7 +381,8 @@ too coarse, prove the bound separately and pass it: `expect_bound [h]`.
 - **`rw [gen]` fails** → wrong unfolding idiom for the context; see the table above.
 - **A `mem_support` fact outside a support law won't simplify** (a probability goal,
   `SPMF.prob_eq_zero_iff`) → `support_simp` / `cost_support_simp`; their docstrings
-  (`Basalt/Tactic/Support.lean`) say what the sets contain. Inside a support law, use Recipe 1's tactics.
+  (`Basalt/Tactic/Support.lean`) say what the sets contain. Inside a support law, use Recipe 1's
+  tactics.
 - **The completeness witness for a draw** → it is almost always the inverse of the index arithmetic
   (`x - lo` when the recursion ran at `lo + d`). Substitute it *before* unfolding
   (`obtain ⟨d, rfl⟩ : ∃ d, x = lo + d`), so that the equation at the end of the goal is `rfl`.
@@ -406,8 +407,8 @@ too coarse, prove the bound separately and pass it: `expect_bound [h]`.
   recursive combinator of your own gets the same message: it needs a law and a bridge from it
   (`SPMF.Cost.le_spec_listOf`, `Basalt/Tactic/Cost.lean`).
 - **`mass_bound` says nothing bounds a sub-generator** → it is a recursive combinator of your own
-  (bridge its law, as `SPMF.le_spec_listOf` does in `Basalt/Tactic/MassFixpoint.lean`), a callee whose
-  termination law is under another name (pass it: `mass_bound [h]`), or a recursive occurrence whose
+  (bridge its law, as `SPMF.le_spec_listOf` does in `Basalt/Tactic/MassFixpoint.lean`), a callee
+  whose termination law is under another name (pass it: `mass_bound [h]`), or a recursive occurrence whose
   fact needs a premise that neither unification nor a hypothesis supplies (`m < n` for a size
   computed from a draw). Pass that fact instantiated; the drawn values are in scope under the
   generator's names (`mass_bound [ih _ (… k₁ …)]`).
@@ -428,5 +429,6 @@ too coarse, prove the bound separately and pass it: `expect_bound [h]`.
 ## Prior Art
 
 For the *theory* behind the termination recipe — the least-fixed-point criterion and its
-certificates — see `Basalt/SPMF/Termination.lean` (the tactic is `Basalt/Tactic/MassFixpoint.lean`); for the ranking-function certificate and why
-critical generators have infinite expected size, `Basalt/SPMF/Ranking.lean`.
+certificates — see `Basalt/SPMF/Termination.lean` (the tactic is `Basalt/Tactic/MassFixpoint.lean`);
+for the ranking-function certificate and why critical generators have infinite expected size,
+`Basalt/SPMF/Ranking.lean`.

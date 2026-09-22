@@ -123,10 +123,22 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
 
 ## Repository layout
 
-- `Basalt/` — the library. `Basalt/Obs/` is the layer its per-combinator lemmas are derived from:
-  a judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
-  `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
-  saying that every observation commutes with it.
+- `Basalt/` — the library, in four tiers:
+  - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean`, and
+    `Laws.lean`, the properties a generator may be proved to have;
+  - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
+    expectations, cost, almost-sure termination), `IO.lean`, `PlausibleGen.lean`, `OptionT.lean`,
+    `GenStats/`, and the opt-in `Fuzz/`;
+  - *the proof machinery*: `Obs/`, the layer every per-combinator lemma is derived from — a
+    judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
+    `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
+    saying that every observation commutes with it — and `Walk/`, the judgment-agnostic walk over
+    observations that every proof obligation is discharged by;
+  - *what a proof calls*: `Tactic/`, one entry tactic per judgment over that walk, plus the support
+    and `ℝ≥0∞` helpers; and `PBT/` and `Tuning/`, the front ends above.
+
+  `Basalt.lean` is the only module that imports the library wholesale; every other module, inside
+  the library and out, imports the narrowest thing it needs.
 - `BasaltExamples/` — worked generators with correctness proofs. Because each file proves its
   generator's laws, this directory is also most of the effective regression suite for the library's
   lemma sets and tactics.
