@@ -185,40 +185,11 @@ end SPMF.Cost
 
 /-! ## Worst-case costs
 
-A combinator term passed as a generator argument has no law to supply its cost bound. Its worst
-case, the most choices any run can make, is an observation: choice counts into `ℕ∞`, where a choice
-is as costly as its costliest outcome. `ℕ∞` and not `ℕ`, because the supremum over an unbounded
-generator's support has to exist for `map_bind` to hold. -/
-
-/-- A choice is as large as its largest outcome. -/
-noncomputable def Mix.sup : Mix.{u} ℕ∞ where mix _ _ F := ⨆ a, F a
+A combinator term passed as a generator argument has no law to supply its cost bound; its worst
+case, the most choices any run can make, is `SPMF.Cost.worstObs`, and these are its bounds in the
+`sup` algebra. -/
 
 namespace SPMF.Cost
-
-/-- The worst-case observation. -/
-noncomputable def worstObs : Obs SPMF.Cost.{u} (WPC Mix.sup) where
-  spec g := fun post => ⨆ p ∈ SPMF.support g, post p.1 p.2
-  map_pure a := by
-    funext post
-    refine le_antisymm (iSup₂_le ?_) (le_iSup₂_of_le (a, 0) (mem_support_pure_iff.mpr ⟨rfl, rfl⟩) le_rfl)
-    rintro ⟨b, n⟩ hp
-    obtain ⟨rfl, rfl⟩ := mem_support_pure_iff.mp hp
-    exact le_rfl
-  map_bind x k := by
-    funext post
-    refine le_antisymm (iSup₂_le ?_) (iSup₂_le fun p hp => iSup₂_le fun q hq => ?_)
-    · rintro ⟨b, n⟩ hp
-      obtain ⟨a, n1, n2, h1, h2, rfl⟩ := mem_support_bind_iff.mp hp
-      exact le_iSup₂_of_le (a, n1) h1 (le_iSup₂_of_le (b, n2) h2 le_rfl)
-    · exact le_iSup₂_of_le (q.1, p.2 + q.2)
-        (mem_support_bind_iff.mpr ⟨p.1, p.2, q.2, hp, hq, rfl⟩) le_rfl
-  map_choose lo hi h := by
-    funext post
-    refine le_antisymm (iSup₂_le ?_) (iSup_le fun a => ?_)
-    · rintro ⟨a, c⟩ hp
-      obtain rfl := mem_support_choose_iff.mp hp
-      exact le_iSup (fun a => post a 1) a
-    · exact le_iSup₂_of_le (a, 1) (mem_support_choose_iff.mpr rfl) le_rfl
 
 instance : worstObs.MonotoneC :=
   ⟨fun _ _ _ h => iSup₂_mono fun p _ => h p.1 p.2⟩

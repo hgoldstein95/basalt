@@ -3,6 +3,7 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Mathlib.Data.ENat.Lattice
 import Basalt.RandomChoice
 import Basalt.SPMF.Support
 
@@ -24,6 +25,11 @@ namespace SPMF
 abbrev Cost (α : Type u) : Type u := SPMF (α × Nat)
 
 end SPMF
+
+/-- A choice is as large as its largest outcome: the algebra the worst-case observation lands in.
+`ℕ∞` and not `ℕ`, because the supremum over an unbounded generator's support has to exist for
+`Obs.map_bind` to hold. -/
+noncomputable def Mix.sup : Mix.{u} ℕ∞ where mix _ _ F := ⨆ a, F a
 
 namespace SPMF.Cost
 
@@ -245,6 +251,32 @@ def alwaysObs : Obs SPMF.Cost.{u} (WPC Mix.demonic) where
     · rintro hq ⟨a, c⟩ hp
       obtain rfl := mem_support_choose_iff.mp hp
       exact hq a
+
+/-- The worst-case observation: the most choices any run of the generator can make. -/
+noncomputable def worstObs : Obs SPMF.Cost.{u} (WPC Mix.sup) where
+  spec g := fun post => ⨆ p ∈ SPMF.support g, post p.1 p.2
+  map_pure a := by
+    funext post
+    refine le_antisymm (iSup₂_le ?_)
+      (le_iSup₂_of_le (a, 0) (mem_support_pure_iff.mpr ⟨rfl, rfl⟩) le_rfl)
+    rintro ⟨b, n⟩ hp
+    obtain ⟨rfl, rfl⟩ := mem_support_pure_iff.mp hp
+    exact le_rfl
+  map_bind x k := by
+    funext post
+    refine le_antisymm (iSup₂_le ?_) (iSup₂_le fun p hp => iSup₂_le fun q hq => ?_)
+    · rintro ⟨b, n⟩ hp
+      obtain ⟨a, n1, n2, h1, h2, rfl⟩ := mem_support_bind_iff.mp hp
+      exact le_iSup₂_of_le (a, n1) h1 (le_iSup₂_of_le (b, n2) h2 le_rfl)
+    · exact le_iSup₂_of_le (q.1, p.2 + q.2)
+        (mem_support_bind_iff.mpr ⟨p.1, p.2, q.2, hp, hq, rfl⟩) le_rfl
+  map_choose lo hi h := by
+    funext post
+    refine le_antisymm (iSup₂_le ?_) (iSup_le fun a => ?_)
+    · rintro ⟨a, c⟩ hp
+      obtain rfl := mem_support_choose_iff.mp hp
+      exact le_iSup (fun a => post a 1) a
+    · exact le_iSup₂_of_le (a, 1) (mem_support_choose_iff.mpr rfl) le_rfl
 
 /-- Support membership, read through a specification the may observation equals. -/
 theorem mem_support_of_may {g : SPMF.Cost α} {w : WPC Mix.angelic α} (h : mayObs.spec g = w)
