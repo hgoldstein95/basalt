@@ -12,26 +12,26 @@ import Basalt.Walk.Entry
 
 `expect_bound` pushes a postexpectation through a generator with the rules of
 `Basalt/Obs/Ordered.lean` and `Basalt/Tactic/Average.lean`, and computes an upper bound on its
-expectation, leaving `ℝ≥0∞` arithmetic. What is specific to the judgment is here: how a fact about
-a sub-generator is used.
+expectation, leaving `ℝ≥0∞` arithmetic; `expect_fixpoint` first inducts over a recursive generator's
+fixpoint. What is specific to the judgment is here: how a fact about a sub-generator is used.
 -/
 
 open ENNReal RandomChoice Lean Meta Elab Tactic
-
-instance : SPMF.Cost.expectObs.MonotoneC := ⟨fun _ _ _ h => SPMF.expect_mono fun p => h p.1 p.2⟩
 
 /-! ## Leaves
 
 A fact bounds a sub-generator's expectation under its own postexpectation `h`; the walk arrives with
 `k + h`, and the missing mass only helps. -/
 
-theorem SPMF.spec_le_add_of_expect_le {x : SPMF α} {h p : α → ℝ≥0∞} {k B : ℝ≥0∞}
+@[obs_leaf]
+theorem SPMF.expect_le_add_of_le {x : SPMF α} {h p : α → ℝ≥0∞} {k B : ℝ≥0∞}
     (hx : SPMF.expect x h ≤ B) (hp : ∀ a, p a = k + h a) : SPMF.expectObs.spec x p ≤ k + B := by
   show SPMF.expect x p ≤ k + B
   rw [funext hp, SPMF.expect_add, SPMF.expect_const]
   exact add_le_add (mul_le_of_le_one_left' (SPMF.mass_le_one x)) hx
 
-theorem SPMF.Cost.spec_le_add_of_expect_le {x : SPMF.Cost α} {φ : α × Nat → ℝ≥0∞}
+@[obs_leaf]
+theorem SPMF.Cost.expect_le_add_of_le {x : SPMF.Cost α} {φ : α × Nat → ℝ≥0∞}
     {h p : α → Nat → ℝ≥0∞} {k B : ℝ≥0∞} (hx : SPMF.expect x φ ≤ B)
     (hφ : ∀ a n, φ (a, n) = h a n) (hp : ∀ a n, p a n = k + h a n) :
     SPMF.Cost.expectObs.spec x p ≤ k + B := by
@@ -45,20 +45,21 @@ theorem SPMF.Cost.spec_le_add_of_expect_le {x : SPMF.Cost α} {φ : α × Nat �
 
 A generator the walk cannot enter — a list combinator, which has no shape of choice and no
 `@[gen_map]` lemma — is bounded using only its mass: exactly when the postexpectation is constant,
-and otherwise at its worst case over every value, dually to `le_spec_iInf_of_le_mass` on the mass
-side. They are the observation's `upperSelf` (`Basalt/Walk/Attr.lean`), so they are tried after
-every rule and every fact, and a rule that reads the element generator's expectation wins. -/
+and otherwise at its worst case over every value, dually to `le_expect_iInf_of_le_mass` on the mass
+side. They are `@[obs_leaf self]`, so they are tried after every rule and every fact, and a rule
+that reads the element generator's expectation wins. -/
 
 namespace SPMF
 
 /-- What the missing mass buys: an expectation is at most its postexpectation's largest value,
 whatever the generator. -/
-theorem spec_le_of_const {x : SPMF α} {p : α → ℝ≥0∞} {d : ℝ≥0∞} (hp : ∀ a, p a = d) :
+@[obs_leaf self]
+theorem expect_le_of_const {x : SPMF α} {p : α → ℝ≥0∞} {d : ℝ≥0∞} (hp : ∀ a, p a = d) :
     SPMF.expectObs.spec x p ≤ d :=
   SPMF.expect_le_of_support fun a _ => (hp a).le
 
-@[inherit_doc spec_le_of_const]
-theorem spec_le_iSup {x : SPMF α} {p : α → ℝ≥0∞} : SPMF.expectObs.spec x p ≤ ⨆ a, p a :=
+@[obs_leaf self, inherit_doc expect_le_of_const]
+theorem expect_le_iSup {x : SPMF α} {p : α → ℝ≥0∞} : SPMF.expectObs.spec x p ≤ ⨆ a, p a :=
   SPMF.expect_le_of_support fun a _ => le_iSup p a
 
 
@@ -124,13 +125,14 @@ theorem expect_vectorOf_le {n : Nat}
 
 /-! The last resorts, as at `SPMF`: only the mass is used. -/
 
-/-- As `SPMF.spec_le_of_const`, with the choice count in the postexpectation. -/
-theorem specC_le_of_const {x : SPMF.Cost α} {q : α → Nat → ℝ≥0∞} (hq : ∀ a m, q a m = d) :
+/-- As `SPMF.expect_le_of_const`, with the choice count in the postexpectation. -/
+@[obs_leaf self]
+theorem expect_le_of_const {x : SPMF.Cost α} {q : α → Nat → ℝ≥0∞} (hq : ∀ a m, q a m = d) :
     SPMF.Cost.expectObs.spec x q ≤ d :=
   SPMF.expect_le_of_support fun r _ => (hq r.1 r.2).le
 
-@[inherit_doc specC_le_of_const]
-theorem specC_le_iSup {x : SPMF.Cost α} {q : α → Nat → ℝ≥0∞} :
+@[obs_leaf self, inherit_doc expect_le_of_const]
+theorem expect_le_iSup {x : SPMF.Cost α} {q : α → Nat → ℝ≥0∞} :
     SPMF.Cost.expectObs.spec x q ≤ ⨆ a, ⨆ m, q a m :=
   SPMF.expect_le_of_support fun r _ => le_iSup₂_of_le r.1 r.2 le_rfl
 
@@ -157,11 +159,13 @@ def parseExpect (tac : String) (goal : MVarId) :
   return (lhs.getArg! 1, lhs.getArg! 2, ty.getArg! 3, goal)
 
 /-- Walk `goal`, `SPMF.expect g f ≤ B` at either interpretation, returning the arithmetic goal
-`b ≤ B` for the bound `b` the walk computes, then whatever else the walk left. -/
-partial def walkExpect (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) := do
-  let (g, f, B, goal) ← parseExpect "expect_bound" goal
+`b ≤ B` for the bound `b` the walk computes, then whatever else the walk left. `tac` is the caller,
+for the errors. -/
+partial def walkExpect (tac : String) (extras : Array Term) (goal : MVarId) :
+    TermElabM (List MVarId) := do
+  let (g, f, B, goal) ← parseExpect tac goal
   goal.withContext do
-  if let some cases ← splitMatch? goal g then return ← cases.flatMapM (walkExpect extras)
+  if let some cases ← splitMatch? goal g then return ← cases.flatMapM (walkExpect tac extras)
   let gTy ← instantiateMVars (← inferType g)
   let (obs, post) ← if gTy.isAppOfArity ``SPMF.Cost 1 then do
       let (v, n) := match f with
@@ -171,20 +175,33 @@ partial def walkExpect (extras : Array Term) (goal : MVarId) : TermElabM (List M
         mkLambdaFVars #[a, c] (← reduceCtorProjs (mkApp f (← mkAppM ``Prod.mk #[a, c])))
       pure (``SPMF.Cost.expectObs, post)
     else pure (``SPMF.expectObs, f)
-  let (bound, structural, rest) ← computeBound extras obs false g post
-  let arith ← mkFreshExprMVar (← mkAppM ``LE.le #[bound, B])
-  goal.assign (← mkAppM ``le_trans #[structural, arith])
-  (arith.mvarId! :: rest).mapM fun g => tidy g
+  arithBound extras obs false g post B goal
 
 /-- `expect_bound` replaces a goal `SPMF.expect (gen …) f ≤ B`, at `SPMF` or `SPMF.Cost` (where
 `SPMF.Cost.expectedCost` is also accepted), by the `ℝ≥0∞` inequality `b ≤ B`, where `b` is the bound
 it computes by pushing `f` through `gen`'s syntax. A recursive occurrence or a callee is bounded by a
 hypothesis or by a fact passed as `expect_bound [h₁, h₂]`, stated under a postexpectation that
 differs from the one the walk arrives with by a constant. -/
-syntax (name := expectBoundTac) "expect_bound" (" [" term,* "]")? : tactic
+syntax (name := expectBoundTac) "expect_bound" (walkFacts)? : tactic
 
 elab_rules : tactic
-  | `(tactic| expect_bound $[[$args,*]]?) => withMainContext do
-    replaceMainGoal (← walkExpect ((args.map (·.getElems)).getD #[]) (← getMainGoal))
+  | `(tactic| expect_bound $[$fs]?) => withMainContext do
+    replaceMainGoal (← walkExpect "expect_bound" (walkFacts.terms fs) (← getMainGoal))
+
+/-- `expect_fixpoint` proves `SPMF.expect (gen a₁ … aₙ) f ≤ B`, at `SPMF` or `SPMF.Cost`, up to
+arithmetic. It inducts with `gen.fixpoint_induct` over the arguments some recursive call of `gen`
+changes, admissible because `SPMF.expect` is continuous, unfolds one step, and runs `expect_bound`
+(extra facts go in `expect_fixpoint [h₁, h₂]`). The first goal is the arithmetic one; in it the
+recursive function is named after `gen`, the bound on its every call is `ih`, and the changing
+arguments keep their names. Only an upper bound can be proved this way. -/
+syntax (name := expectFixpointTac) "expect_fixpoint" (walkFacts)? : tactic
+
+elab_rules : tactic
+  | `(tactic| expect_fixpoint $[$fs]?) => withMainContext do
+    let (x, f, B, goal) ← parseExpect "expect_fixpoint" (← getMainGoal)
+    goal.withContext do
+    let adm ← mkAppM ``SPMF.admissible_expect_le #[f, B]
+    replaceMainGoal (← walkExpect "expect_fixpoint" (walkFacts.terms fs)
+      (← fixpointStep "expect_fixpoint" "expect_bound" x adm goal))
 
 end Basalt.ExpectBound

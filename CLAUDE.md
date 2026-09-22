@@ -40,8 +40,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean). A new combinator needs its `map_` lemma and
   nothing per judgment; [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour.
 - **Support** — a support law is two walks: soundness, a lower bound on `SPMF.alwaysObs` in the
-  demonic algebra (`sound_bound`, [Basalt/Tactic/Sound.lean](Basalt/Tactic/Sound.lean), and
-  `sound_fixpoint`, [Basalt/Tactic/SoundFixpoint.lean](Basalt/Tactic/SoundFixpoint.lean), pinned by
+  demonic algebra (`sound_bound` and `sound_fixpoint`,
+  [Basalt/Tactic/Sound.lean](Basalt/Tactic/Sound.lean), pinned by
   [BasaltTest/Tactic/Sound.lean](BasaltTest/Tactic/Sound.lean)); and completeness, a lower bound on
   `SPMF.mayObs` in the angelic one, under an induction the user chooses (`complete_bound` and
   `IsCompleteFor.of_measure`, [Basalt/Tactic/Complete.lean](Basalt/Tactic/Complete.lean), pinned by
@@ -65,7 +65,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   expectations; the demonic and angelic ones beside the presentations they are derived from, in
   [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean); the `sup` ones in
   [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean)), and for bridging a recursive combinator's
-  law. The judgments, the per-observation leaves, and the registries are
+  law. What closes a leaf of a bound on one observation is tagged `@[obs_leaf]` beside the tactic
+  that uses it. The judgments, the law naming convention, and the registries are
   [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean); the walk and its side-goal solvers are
   [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean). What an entry tactic is made of —
   `computeBound`, `fixpointStep`, and the residual handlers — is
@@ -79,10 +80,11 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [BasaltTest/Tactic/Cost.lean](BasaltTest/Tactic/Cost.lean)), and `expect_bound`
   ([Basalt/Tactic/Expect.lean](Basalt/Tactic/Expect.lean), pinned by
   [BasaltTest/Tactic/Expect.lean](BasaltTest/Tactic/Expect.lean)), each but `complete_bound` with
-  its `_fixpoint`. [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and fails the build when
-  one of the combinators it names loses its `@[gen_map]` lemma or a list combinator loses a bridge —
-  it checks that list, not the registry, so a *new* combinator with no lemma is not caught. Nothing
-  else in a termination, cost, or expectation proof mentions combinators.
+  its `_fixpoint` in the same file. [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and
+  fails the build when one of the combinators it names loses its `@[gen_map]` lemma or a list
+  combinator loses a bridge — it checks that list, not the registry, so a *new* combinator with no
+  lemma is not caught. Nothing else in a termination, cost, or expectation proof mentions
+  combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
@@ -90,7 +92,7 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   for a bound is WORKFLOW.md's Recipe 4.
 - **Cost** — the interpretation (`SPMF.Cost`, `IsBounded`, its support inversion, expected cost):
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:
-  [Basalt/Tactic/CostFixpoint.lean](Basalt/Tactic/CostFixpoint.lean), contract pinned by
+  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean), contract pinned by
   [BasaltTest/Tactic/CostFixpoint.lean](BasaltTest/Tactic/CostFixpoint.lean). The practical entry is
   WORKFLOW.md's Recipe 3.
 - **ENNReal arithmetic** — `ennreal_to_real` in
@@ -126,12 +128,13 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   attribute rebuilds the fixpoint's monotonicity proof
   ([Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)).
 - **`rw [gen]` (or another unfolding) fails or gives a confusing error in a correctness proof** —
-  wrong unfolding idiom for the context; the four-idiom table is in `WORKFLOW.md`
+  wrong unfolding idiom for the context; the unfolding-idiom table is in `WORKFLOW.md`
   ("Unfolding: one idiom per context").
 - **`#genstats` reports `— (not proved)` for a law you proved** — the theorem is not under the
   `<gen>.sound_complete` / `.terminates` / … naming convention, or its statement is not the law
-  (both halves are checked). WORKFLOW.md Part 2 owns the convention;
-  [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean)'s `lawProved` implements the check.
+  (both halves are checked). `lawConventions` ([Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean)) owns
+  the convention; [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean)'s `lawProved`
+  implements the check.
 - **Drawing from a generator inside a property fails with `failed to synthesize instance Gen
   (PropM G)`** — `PropM G` is deliberately not a `Gen`, so a bare `←` on a generator elaborates it at
   the ambient `PropM G` instead of lifting it. Wrap the draw in `generate`
@@ -195,5 +198,5 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - Declaration docstrings explain design tension, not just signature — where rule 4 admits one.
 - `BasaltExamples/` files are cookbook entries: a generator plus proofs of the correctness
   properties that apply to it, nothing else — no `#eval`/`#guard_msgs`. Anything pinned or run
-  for effect belongs in `BasaltTest/`; anything with a `sorry` belongs in `BasaltExperiments/`.
+  for effect belongs in `BasaltTest/`; nothing built has a `sorry`.
 - Lean toolchain is pinned in `lean-toolchain`; deps in `lakefile.toml` / `lake-manifest.json`.

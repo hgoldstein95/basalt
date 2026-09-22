@@ -256,4 +256,13 @@ error: complete_bound: expected a goal `a ∈ SPMF.support (gen …)` or `IsComp
 example : IsSound (genHeap lo) (Heap.Tree.isHeap lo) := by
   complete_bound
 
+/--
+error: complete_bound: expected a goal `a ∈ SPMF.support (gen …)` or `IsCompleteFor (gen …) P`, got
+  IsSoundAndComplete (genHeap lo) (Heap.Tree.isHeap lo)
+Split the law into its halves first: `refine .intro ?sound ?complete`.
+-/
+#guard_msgs in
+example : IsSoundAndComplete (genHeap lo) (Heap.Tree.isHeap lo) := by
+  complete_bound
+
 end CompleteBoundTest

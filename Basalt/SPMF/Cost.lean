@@ -31,6 +31,12 @@ end SPMF
 `Obs.map_bind` to hold. -/
 noncomputable def Mix.sup : Mix.{u} ℕ∞ where mix _ _ F := ⨆ a, F a
 
+/-- Moves a cast out of a worst-case bound computed in `ℕ∞`, which the walker reads a cost bound off
+with `norm_cast`; Mathlib's `Nat.cast_max` needs a linear ordered ring. -/
+@[norm_cast]
+theorem ENat.coe_max' (a b : ℕ) : ((max a b : ℕ) : ℕ∞) = max (a : ℕ∞) (b : ℕ∞) :=
+  Nat.mono_cast.map_max
+
 namespace SPMF.Cost
 
 instance instInhabited : Inhabited (SPMF.Cost α) where
@@ -278,12 +284,25 @@ noncomputable def worstObs : Obs SPMF.Cost.{u} (WPC Mix.sup) where
       exact le_iSup (fun a => post a 1) a
     · exact le_iSup₂_of_le (a, 1) (mem_support_choose_iff.mpr rfl) le_rfl
 
+instance : expectObs.MonotoneC := ⟨fun _ _ _ h => SPMF.expect_mono fun p => h p.1 p.2⟩
+
+instance : mayObs.MonotoneC := ⟨fun _ _ _ h ⟨q, hq, hp⟩ => ⟨q, hq, h _ _ hp⟩⟩
+
+instance : alwaysObs.MonotoneC := ⟨fun _ _ _ h hp _ ha => h _ _ (hp _ ha)⟩
+
+instance : worstObs.MonotoneC := ⟨fun _ _ _ h => iSup₂_mono fun p _ => h p.1 p.2⟩
+
 /-- Support membership, read through a specification the may observation equals. -/
 theorem mem_support_of_may {g : SPMF.Cost α} {w : WPC Mix.angelic α} (h : mayObs.spec g = w)
     {a : α} {n : Nat} : (a, n) ∈ SPMF.support g ↔ w fun b m => b = a ∧ m = n := by
   refine Iff.trans ⟨fun h => ⟨(a, n), h, rfl, rfl⟩, ?_⟩ (iff_of_eq (congrFun h _))
   rintro ⟨⟨b, m⟩, hp, rfl, rfl⟩
   exact hp
+
+/-- A run with its cost is the may observation at the postcondition `fun b m => b = a ∧ m = n`. -/
+theorem mem_support_iff_may {g : SPMF.Cost α} {a : α} {n : Nat} :
+    (a, n) ∈ SPMF.support g ↔ mayObs.spec g fun b m => b = a ∧ m = n :=
+  mem_support_of_may rfl
 
 /-- An expectation, read through a specification the expectation observation equals. -/
 theorem expect_of_obs {g : SPMF.Cost α} {w : WPC Mix.average α} (h : expectObs.spec g = w)
@@ -355,14 +374,6 @@ open scoped ENNReal
 /-- The expected number of random choices a cost-tracking generator makes. -/
 noncomputable def expectedCost (g : SPMF.Cost α) : ℝ≥0∞ :=
   SPMF.expect g (fun p => (p.2 : ℝ≥0∞))
-
-set_option linter.deprecated false in
-@[deprecated "use `expect_oneOf`" (since := "2026-09-22")]
-theorem expect_pick (x y : Unit → SPMF.Cost α) (φ : α × Nat → ℝ≥0∞) :
-    SPMF.expect (pick x y : SPMF.Cost α) φ
-      = (1/2 : ℝ≥0∞) * SPMF.expect (x ()) (fun p => φ (p.1, 1 + p.2))
-        + (1/2 : ℝ≥0∞) * SPMF.expect (y ()) (fun p => φ (p.1, 1 + p.2)) :=
-  (expect_of_obs (expectObs.map_pick x y) φ).trans (Mix.binary_average _)
 
 theorem expect_coin {r : Rat} (h0 : 0 ≤ r) (h1 : r ≤ 1) (φ : Bool × Nat → ℝ≥0∞) :
     SPMF.expect (coin r : SPMF.Cost Bool) φ

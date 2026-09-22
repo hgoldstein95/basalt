@@ -3,22 +3,23 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Basalt.Laws
 import Basalt.SPMF.Termination
 import Basalt.Tactic.Mass
 
 /-!
 # The `mass_fixpoint` Tactic
 
-`mass_fixpoint` reduces a `.terminates` law to the termination criterion of `Termination.lean`: it
-builds the family over the generator's seed, unfolds one step, and runs `mass_bound`. The list
-combinators' termination facts live here because they are proved with it.
+`mass_fixpoint` reduces a `.terminates` law to the termination criterion of
+`Basalt/SPMF/Termination.lean`: it builds the family over the generator's seed, unfolds one step, and
+runs `mass_bound`. The list combinators' termination facts live here because they are proved with it.
 -/
 
 open ENNReal RandomChoice
 
 namespace Basalt.MassFixpoint
 
-open Lean Meta Elab Tactic Basalt.Walk
+open Lean Meta Elab Tactic Basalt.Walk Basalt.MassBound
 
 /-- Right-nested tuple of `es` (`Unit` when empty), with its type. -/
 private def mkTuple (es : Array Expr) : MetaM Expr := do
@@ -45,14 +46,14 @@ seed (`LfpIsOne.ranking`): `c : Seed → ℝ≥0∞`, `hrec : ∀ j, c j ≤ (ge
 `T c seed ≤ <bound>`; without `using`, `T` is the computed bound as a function of `c` and the seed.
 A certificate over the seed selects this mode without the keyword. -/
 syntax (name := massFixpointTac)
-  "mass_fixpoint" (&" per_seed")? (" [" term,* "]")? (" using " term)? : tactic
+  "mass_fixpoint" (&" per_seed")? (walkFacts)? (" using " term)? : tactic
 
 elab_rules : tactic
-  | `(tactic| mass_fixpoint $[per_seed%$perSeedTk]? $[[$extras,*]]? $[using $cert]?) =>
+  | `(tactic| mass_fixpoint $[per_seed%$perSeedTk]? $[$fs]? $[using $cert]?) =>
   withMainContext do
     let goal ← getMainGoal
     let ty := (← instantiateMVars (← goal.getType)).consumeMData
-    let some x := (if ty.isAppOfArity `IsAlmostSurelyTerminating 2 then some ty.appArg!
+    let some x := (if ty.isAppOfArity ``IsAlmostSurelyTerminating 2 then some ty.appArg!
         else if ty.isAppOfArity ``SPMF.IsPMF 2 then some ty.appArg! else none)
       | throwError "mass_fixpoint: expected a goal `IsAlmostSurelyTerminating (gen …)`, \
           got{indentExpr ty}"
@@ -149,9 +150,7 @@ elab_rules : tactic
     evalTactic (← `(tactic| first
       | conv_rhs => rw [$genId:ident]
       | conv_rhs => unfold $genId:ident))
-    match extras with
-    | some extras => evalTactic (← `(tactic| mass_bound [$extras,*]))
-    | none => evalTactic (← `(tactic| mass_bound))
+    replaceMainGoal (← walkMass (walkFacts.terms fs) (← getMainGoal))
     if cert.isNone then
       let arith ← getMainGoal
       arith.withContext do
@@ -215,28 +214,28 @@ private theorem ite_le_mass_nonEmptyListOf {g : SPMF α} {c : ℝ≥0∞}
 /-- An unbounded-length list only passes termination through: its bound is `1` exactly when its
 element generator's is, which is the shape that still chains when that generator is a bind. -/
 @[gen_rule]
-theorem le_spec_listOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
+theorem le_expect_listOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
     (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (listOf g) p :=
-  le_spec_of_le_mass (ite_le_mass_listOf hg) hp
+  le_expect_of_le_mass (ite_le_mass_listOf hg) hp
 
-@[gen_rule, inherit_doc le_spec_vectorOf_iInf]
-theorem le_spec_listOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
+@[gen_rule, inherit_doc le_expect_vectorOf_iInf]
+theorem le_expect_listOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) :
     (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (listOf g) p :=
-  le_spec_iInf_of_le_mass (ite_le_mass_listOf hg)
+  le_expect_iInf_of_le_mass (ite_le_mass_listOf hg)
 
-@[gen_rule, inherit_doc le_spec_listOf]
-theorem le_spec_nonEmptyListOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
+@[gen_rule, inherit_doc le_expect_listOf]
+theorem le_expect_nonEmptyListOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
     (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (nonEmptyListOf g) p :=
-  le_spec_of_le_mass (ite_le_mass_nonEmptyListOf hg) hp
+  le_expect_of_le_mass (ite_le_mass_nonEmptyListOf hg) hp
 
-@[gen_rule, inherit_doc le_spec_vectorOf_iInf]
-theorem le_spec_nonEmptyListOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
+@[gen_rule, inherit_doc le_expect_vectorOf_iInf]
+theorem le_expect_nonEmptyListOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) :
     (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (nonEmptyListOf g) p :=
-  le_spec_iInf_of_le_mass (ite_le_mass_nonEmptyListOf hg)
+  le_expect_iInf_of_le_mass (ite_le_mass_nonEmptyListOf hg)
 
 end combinators
 

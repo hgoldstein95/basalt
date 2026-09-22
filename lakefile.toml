@@ -14,10 +14,6 @@ globs = ["BasaltExamples.+"]
 name = "BasaltTest"
 globs = ["BasaltTest.+"]
 
-[[lean_lib]]
-name = "BasaltExperiments"
-globs = ["BasaltExperiments.+"]
-
 # The code `basalt-fuzz` fuzzes: generators, properties, and the buggy operations under test. This
 # is the *only* SanitizerCoverage-instrumented library, which is what confines libFuzzer's coverage
 # feedback to the code under test instead of Basalt's plumbing (fuzz-run/README.md).

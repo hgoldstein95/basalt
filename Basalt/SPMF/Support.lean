@@ -133,6 +133,10 @@ def alwaysObs : Obs SPMF.{u} (WP Mix.demonic) where
     funext Q; apply propext
     exact ⟨fun hq x => hq x (mem_support_choose_iff.mpr trivial), fun hq a _ => hq a⟩
 
+instance : mayObs.Monotone := ⟨fun _ _ _ h ⟨a, ha, hp⟩ => ⟨a, ha, h a hp⟩⟩
+
+instance : alwaysObs.Monotone := ⟨fun _ _ _ h hp a ha => h a (hp a ha)⟩
+
 /-- Support membership is the may observation at the postcondition `(· = a)`. -/
 theorem mem_support_iff_may {g : SPMF α} {a : α} : a ∈ g.support ↔ mayObs.spec g (· = a) :=
   ⟨fun h => ⟨a, h, rfl⟩, fun ⟨_, hb, e⟩ => e ▸ hb⟩
@@ -143,15 +147,6 @@ theorem mem_support_of_may {g : SPMF α} {w : WP Mix.angelic α} (h : mayObs.spe
   mem_support_iff_may.trans (iff_of_eq (congrFun h _))
 
 end observations
-
-set_option linter.deprecated false in
-@[simp, deprecated "use `support_oneOf`" (since := "2026-09-22")]
-theorem support_pick
-    {x y : SPMF α} :
-    (pick (fun () => x) (fun () => y)).support = x.support ∪ y.support := by
-  ext a
-  exact (mem_support_of_may (mayObs.map_pick _ _)).trans ((Mix.binary_angelic _).trans
-    (or_congr mem_support_iff_may.symm mem_support_iff_may.symm))
 
 /-- The support of `oneOf gs` is exactly the union of all generators in `gs` -/
 @[simp]

@@ -7,6 +7,7 @@ import Lean.Elab.Command
 import Lean.Elab.SyntheticMVars
 import Basalt.GenStats.Basic
 import Basalt.Laws
+import Basalt.Walk.Attr
 
 /-!
 # The `#genstats` Command
@@ -148,11 +149,11 @@ private def mkOptArg : Option Term → CommandElabM Term
   | some f => `(some ($f))
   | none => `(none)
 
-/-- One line of the laws block: its label, and the ways it is proved, each a set of conventionally
-named theorems (the suffix, and the constant its statement must be headed by) that must all exist. -/
+/-- One line of the laws block: its label, and the ways it is proved, each a set of suffixes of
+conventionally named theorems (`Basalt.Walk.lawConventions`) that must all exist. -/
 private structure LawSlot where
   label : Name
-  proofs : Array (Array (Name × Name))
+  proofs : Array (Array Name)
 
 /-- The laws `#genstats` reports on, in report order. Laws are found by **naming convention** —
 `genFoo.sound_complete` — and there is no registry to fall out of sync with.
@@ -161,28 +162,27 @@ Only Basalt's own laws appear here. A downstream library that emits laws Basalt 
 for is invisible to this report; that is the cost of not having a registry, and it is preferred to
 a registry that can silently disagree with what was actually proved. -/
 private def lawSlots : Array LawSlot := #[
-  { label := `sound_complete
-    proofs := #[#[(`sound_complete, ``IsSoundAndComplete)],
-      #[(`sound, ``IsSound), (`complete, ``IsCompleteFor)]] },
-  { label := `terminates,   proofs := #[#[(`terminates, ``IsAlmostSurelyTerminating)]] },
-  { label := `cost_bounded, proofs := #[#[(`cost_bounded, ``IsCostBounded)]] },
-  { label := `filter_free,  proofs := #[#[(`filter_free, ``IsFilterFree)]] },
-  { label := `productive,   proofs := #[#[(`productive, ``IsProductive)]] }]
+  { label := `sound_complete, proofs := #[#[`sound_complete], #[`sound, `complete]] },
+  { label := `terminates,     proofs := #[#[`terminates]] },
+  { label := `cost_bounded,   proofs := #[#[`cost_bounded]] },
+  { label := `filter_free,    proofs := #[#[`filter_free]] },
+  { label := `productive,     proofs := #[#[`productive]] }]
 
-/-- Does `declName.suffix` exist *and* actually state the law?
+/-- Does `declName.suffix` exist *and* actually state the law the convention names?
 
 **The statement is checked, not just the name.** A `theorem genFoo.sound_complete` that happens to
 say something else — or says it about a different generator — must not be reported as a proof, so
 the conclusion has to be headed by the law's constant and to mention `declName`. Without this the
 report would launder any conventionally-named theorem into a ✓. -/
-private def lawProved (env : Environment) (declName : Name) (suffix lawC : Name) : MetaM Bool := do
+private def lawProved (env : Environment) (declName : Name) (suffix : Name) : MetaM Bool := do
+  let some (_, lawC) := Basalt.Walk.lawConventions.find? (·.1 == suffix) | return false
   let some ci := env.find? (declName ++ suffix) | return false
   forallTelescope ci.type fun _ body => do
     unless body.isAppOf lawC do return false
     return body.getAppArgs.any fun a => (a.find? (fun x => x.isConstOf declName)).isSome
 
 private def LawSlot.proved (slot : LawSlot) (env : Environment) (declName : Name) : MetaM Bool :=
-  slot.proofs.anyM fun thms => thms.allM fun (suffix, lawC) => lawProved env declName suffix lawC
+  slot.proofs.anyM fun thms => thms.allM (lawProved env declName)
 
 /-- Testable entry point for the shape check, since a report that silently drops a law looks exactly
 like a generator that has none. See `BasaltTest/LawLine.lean`. -/

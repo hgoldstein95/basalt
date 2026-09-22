@@ -128,8 +128,8 @@ obligation that can fail outright for this shape (Step 2).
 
 **Name the laws `<GEN>.sound_complete`, `<GEN>.terminates`, `<GEN>.cost_bounded`.** The dot is not
 cosmetic: `#genstats` discovers laws by exactly this naming convention and reports which ones a
-generator carries beside the statistics it merely *measured* (`Basalt/GenStats/Command.lean`,
-`lawSlots`). A law under any other name is invisible to the report — the generator will show
+generator carries beside the statistics it merely *measured*, and the walk closes a callee by the
+same convention (`lawConventions`, `Basalt/Walk/Attr.lean`). A law under any other name is invisible to the report — the generator will show
 `— (not proved)` for something you proved. The statement is checked too, not just the name, so a
 conventionally-named theorem that says something else cannot be laundered into a ✓. Automated
 synthesis that emits the same convention reports identically to hand-written generators.
@@ -176,7 +176,7 @@ theorem <GEN>.sound_complete : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) :
       exact ⟨d, l, ih₁ ‹_›, r, ih₂ ‹_›, rfl⟩   -- 4. a witness per draw; the IHs for recursive ones
 ```
 
-**`sound_fixpoint`** (`Basalt/Tactic/SoundFixpoint.lean`) inducts over the arguments some recursive
+**`sound_fixpoint`** (`Basalt/Tactic/Sound.lean`) inducts over the arguments some recursive
 call of `<GEN>` changes, unfolds one step, and runs `sound_bound` (`Basalt/Tactic/Sound.lean`),
 which is `cost_bound` at the support interpretation: one goal per path, the drawn values and what is
 known of them in context under the generator's names. A recursive occurrence is closed by `ih`, a
@@ -250,7 +250,7 @@ or `by ennreal_to_real; norm_num`.
 changes; a tuple of them, or none), unfolds one step, and runs `mass_bound`. It leaves `c`,
 `hc1 : c ≤ 1`, `hrec` (the bound on every recursive occurrence), and the seed under its own binder
 names in context. Without `using`, the goal left is `LfpIsOne <computed bound>` instead, to be
-finished with `SPMF.LfpIsOne.mono` and a certificate (`BasaltTest/Termination.lean`).
+finished with `SPMF.LfpIsOne.mono` and a certificate (`BasaltTest/Tactic/MassFixpoint.lean`).
 
 **`mass_bound` is the whole structural argument.** It walks the unfolded generator and *computes* a
 lower bound on its mass. Mass is the expectation of `1`, and the walk pushes that postexpectation
@@ -283,7 +283,7 @@ argument typed by another, goes through `SPMF.IsPMF_of_lfp_eq_one_uniform` on an
 (`SPMF.IsPMF_retry`, `Basalt/SPMF/Failure.lean`). A bare combinator term, which has no definition
 to unfold, is `SPMF.IsPMF.of_one_le` and `mass_bound` (`BasaltTest/Combinators.lean`). A generator
 recursive by `termination_by` has no fixpoint: induct on its decreasing argument and close each case
-with the same two (`BasaltTest/Termination.lean`).
+with the same two (`BasaltTest/Tactic/MassFixpoint.lean`).
 
 **Shrinking seed** (`Tree.genWeightedBST`, `BST/Weighted.lean`) is the one regime with real
 content, and the one where the bound is not a single `F c`: `mass_fixpoint per_seed` takes the
@@ -318,7 +318,7 @@ theorem <GEN>.cost_bounded : IsCostBounded (<GEN> <ARGS>) <COST> := by
   all_goals simp only [<COST>'s equations]; omega   -- one goal per path through <GEN>
 ```
 
-**`cost_fixpoint`** (`Basalt/Tactic/CostFixpoint.lean`) inducts over the arguments some recursive
+**`cost_fixpoint`** (`Basalt/Tactic/Cost.lean`) inducts over the arguments some recursive
 call of `<GEN>` changes, unfolds one step, and runs `cost_bound`. A generator with no recursion is
 unfolded and walked.
 
@@ -361,7 +361,7 @@ theorem <GEN>.<NAME> : SPMF.expect (<GEN> <ARGS>) (fun v => <QUANTITY> v) ≤ <B
   <arithmetic>          -- `<computed bound> ≤ <BOUND>`, with `ih` in context
 ```
 
-**`expect_fixpoint`** (`Basalt/Tactic/ExpectFixpoint.lean`) inducts as `cost_fixpoint` does and runs
+**`expect_fixpoint`** (`Basalt/Tactic/Expect.lean`) inducts as `cost_fixpoint` does and runs
 `expect_bound` (`Basalt/Tactic/Expect.lean`), the same walk again: it pushes `<QUANTITY>` backward
 and computes an upper bound, at `SPMF` or at `SPMF.Cost` (where the quantity sees the choices made,
 and `SPMF.Cost.expectedCost` is accepted). A recursive occurrence is bounded by `ih`, used under
@@ -405,9 +405,9 @@ too coarse, prove the bound separately and pass it: `expect_bound [h]`.
   another name, or the generator argument of a combinator that has no law of its own and no worst
   case (it recurses, or draws from something that does); pass a bound for it: `cost_fixpoint [h]`. A
   recursive combinator of your own gets the same message: it needs a law and a bridge from it
-  (`SPMF.Cost.le_spec_listOf`, `Basalt/Tactic/Cost.lean`).
+  (`SPMF.Cost.le_always_listOf`, `Basalt/Tactic/Cost.lean`).
 - **`mass_bound` says nothing bounds a sub-generator** → it is a recursive combinator of your own
-  (bridge its law, as `SPMF.le_spec_listOf` does in `Basalt/Tactic/MassFixpoint.lean`), a callee
+  (bridge its law, as `SPMF.le_expect_listOf` does in `Basalt/Tactic/MassFixpoint.lean`), a callee
   whose termination law is under another name (pass it: `mass_bound [h]`), or a recursive occurrence whose
   fact needs a premise that neither unification nor a hypothesis supplies (`m < n` for a size
   computed from a draw). Pass that fact instantiated; the drawn values are in scope under the

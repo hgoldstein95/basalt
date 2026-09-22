@@ -194,7 +194,7 @@ example : IsSound (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := by
 /-! The combined law is split by hand; the tactics take a half. -/
 
 /--
-error: sound_bound: expected a goal `IsSound (gen …) P`, got
+error: sound_fixpoint: expected a goal `IsSound (gen …) P`, got
   IsSoundAndComplete (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo)
 Split the law into its halves first: `refine .intro ?sound ?complete`.
 -/

@@ -11,7 +11,8 @@ import Basalt.Walk.Entry
 
 The structural half of a soundness proof. `IsSound g P` is a lower bound, by `True`, on
 `SPMF.alwaysObs` in the demonic algebra, so `sound_bound` computes the weakest precondition of `P`
-and splits it into one goal per path, as `cost_bound` does at the cost interpretation.
+and splits it into one goal per path, as `cost_bound` does at the cost interpretation;
+`sound_fixpoint` first inducts over a recursive generator's fixpoint.
 -/
 
 open RandomChoice Lean Meta Elab Tactic Basalt.Walk
@@ -25,16 +26,16 @@ theorem admissible_isSound (P : α → Prop) : admissible fun x : SPMF α => IsS
   obtain ⟨x, hxc, hxa⟩ := ha
   exact ih x hxc a hxa
 
-instance : alwaysObs.Monotone := ⟨fun _ _ _ h hp a ha => h a (hp a ha)⟩
-
 /-! ## Leaves
 
 A fact about a sub-generator is used under the postcondition the walk arrives with: what it has to
 imply is the bound. -/
 
+@[obs_leaf]
 theorem le_always_of_isSound {x : SPMF α} {R p : α → Prop} (hx : IsSound x R) :
     (∀ a, R a → p a) ≤ alwaysObs.spec x p := fun h a ha => h a (hx a ha)
 
+@[obs_leaf]
 theorem le_always_of_isSoundAndComplete {x : SPMF α} {R p : α → Prop}
     (hx : IsSoundAndComplete x R) : (∀ a, R a → p a) ≤ alwaysObs.spec x p :=
   le_always_of_isSound hx.sound
@@ -80,23 +81,29 @@ end SPMF
 
 namespace Basalt.SoundBound
 
-/-- Walk `goal` (see `sound_bound`), returning the tidied residual goals. -/
-partial def walkSound (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
-  goal.withContext do
+open Basalt.Walk
+
+/-- `goal`, which must be `IsSound (gen …) P`: the value type, the generator, and the predicate.
+`tac` is the caller, for the error. -/
+def parseSound (tac : String) (goal : MVarId) : MetaM (Expr × Expr × Expr) := do
   let ty ← whnfR (← instantiateMVars (← goal.getType))
   unless ty.isAppOfArity ``IsSound 3 do
     let hint := if ty.isAppOf ``IsSoundAndComplete then
       m!"\nSplit the law into its halves first: `refine .intro ?sound ?complete`." else m!""
-    throwError "sound_bound: expected a goal `IsSound (gen …) P`, got{indentExpr ty}{hint}"
+    throwError "{tac}: expected a goal `IsSound (gen …) P`, got{indentExpr ty}{hint}"
   let #[α, g, P] := ty.getAppArgs | unreachable!
-  if let some cases ← splitMatch? goal g then return ← cases.flatMapM (walkSound extras)
+  return (α, g, P)
+
+/-- Walk `goal` (see `sound_bound`), returning the tidied residual goals. `tac` is the caller, for
+the errors. -/
+partial def walkSound (tac : String) (extras : Array Term) (goal : MVarId) :
+    TermElabM (List MVarId) := goal.withContext do
+  let (α, g, P) ← parseSound tac goal
+  if let some cases ← splitMatch? goal g then return ← cases.flatMapM (walkSound tac extras)
   -- A predicate that is not a lambda is given a binder, for the walk to name a last draw after.
   let post ← if P.isLambda then pure P else
     withLocalDeclD `v α fun v => mkLambdaFVars #[v] (mkApp P v)
-  let (wp, structural, rest) ← computeBound extras ``SPMF.alwaysObs true g post
-  let paths ← mkFreshExprMVar wp
-  goal.assign (mkApp structural paths)
-  ((← splitPaths paths.mvarId!) ++ rest).mapM fun g => tidy g
+  pathsBound extras ``SPMF.alwaysObs g post goal
 
 /-- `sound_bound` proves `IsSound (gen …) P` up to what `P` says: it walks `gen`'s syntax, pushing
 `P` into each sub-generator, and leaves one goal per path through `gen`, which is `P` of the value
@@ -105,10 +112,26 @@ that path built. Recursive occurrences are closed from the local context, callee
 
 In a residual goal, a value drawn by `let x ← …` is named `x` and what is known about it `h_x`, as
 the walker names them (`Basalt/Walk/Basic.lean`). -/
-syntax (name := soundBoundTac) "sound_bound" (" [" term,* "]")? : tactic
+syntax (name := soundBoundTac) "sound_bound" (walkFacts)? : tactic
 
 elab_rules : tactic
-  | `(tactic| sound_bound $[[$args,*]]?) => withMainContext do
-    replaceMainGoal (← walkSound ((args.map (·.getElems)).getD #[]) (← getMainGoal))
+  | `(tactic| sound_bound $[$fs]?) => withMainContext do
+    replaceMainGoal (← walkSound "sound_bound" (walkFacts.terms fs) (← getMainGoal))
+
+/-- `sound_fixpoint` proves `IsSound (gen a₁ … aₙ) P` up to what `P` says. It inducts with
+`gen.fixpoint_induct` over the arguments some recursive call of `gen` changes, admissible because
+support is continuous, unfolds one step, and runs `sound_bound` (extra facts go in
+`sound_fixpoint [h₁, h₂]`). In each residual goal the recursive function is named after `gen`, the
+soundness of its every call is `ih`, and the changing arguments keep their names. A `gen` that is not
+recursive is unfolded and walked. -/
+syntax (name := soundFixpointTac) "sound_fixpoint" (walkFacts)? : tactic
+
+elab_rules : tactic
+  | `(tactic| sound_fixpoint $[$fs]?) => withMainContext do
+    let goal ← getMainGoal
+    let (_, g, P) ← parseSound "sound_fixpoint" goal
+    let adm ← mkAppM ``SPMF.admissible_isSound #[P]
+    replaceMainGoal (← walkSound "sound_fixpoint" (walkFacts.terms fs)
+      (← fixpointStep "sound_fixpoint" "sound_bound" g adm goal))
 
 end Basalt.SoundBound

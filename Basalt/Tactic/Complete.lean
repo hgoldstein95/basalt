@@ -20,22 +20,24 @@ open RandomChoice Lean Meta Elab Tactic Basalt.Walk
 
 namespace SPMF
 
-instance : mayObs.Monotone := ⟨fun _ _ _ h ⟨a, ha, hp⟩ => ⟨a, ha, h a hp⟩⟩
-
 /-! ## Leaves -/
 
+@[obs_leaf]
 theorem le_may_of_isCompleteFor {x : SPMF α} {R p : α → Prop} (hx : IsCompleteFor x R) :
     (∃ a, R a ∧ p a) ≤ mayObs.spec x p := fun ⟨a, hR, hp⟩ => ⟨a, hx a hR, hp⟩
 
+@[obs_leaf]
 theorem le_may_of_isSoundAndComplete {x : SPMF α} {R p : α → Prop}
     (hx : IsSoundAndComplete x R) : (∃ a, R a ∧ p a) ≤ mayObs.spec x p :=
   le_may_of_isCompleteFor hx.complete
 
 /-- The reflexive leaf: a generator nothing is known about is reached through its own support. -/
+@[obs_leaf self]
 theorem le_may_self {x : SPMF α} {p : α → Prop} :
     (∃ a, a ∈ x.support ∧ p a) ≤ mayObs.spec x p := fun ⟨a, ha, hp⟩ => ⟨a, ha, hp⟩
 
 /-- The induction hypothesis of `IsCompleteFor.of_measure`, as a leaf. -/
+@[obs_leaf]
 theorem le_may_of_measure {σ α : Type} {gen : σ → SPMF α} {P : σ → α → Prop} {μ : σ → α → Nat}
     {n : Nat} (ih : ∀ s a, μ s a < n → P s a → a ∈ (gen s).support) (s : σ) (p : α → Prop) :
     (∃ a, (μ s a < n ∧ P s a) ∧ p a) ≤ mayObs.spec (gen s) p :=
@@ -85,12 +87,7 @@ A run with its cost, `(a, n) ∈ SPMF.support g`, is the may observation at `fun
 There is no law to find here, so a callee stays in the precondition as a recursive occurrence
 does. -/
 
-instance : mayObs.MonotoneC := ⟨fun _ _ _ h ⟨q, hq, hp⟩ => ⟨q, hq, h _ _ hp⟩⟩
-
-theorem mem_support_iff_may {g : SPMF.Cost α} {a : α} {n : Nat} :
-    (a, n) ∈ SPMF.support g ↔ mayObs.spec g fun b m => b = a ∧ m = n :=
-  mem_support_of_may rfl
-
+@[obs_leaf self]
 theorem le_may_self {x : SPMF.Cost α} {p : α → Nat → Prop} :
     (∃ a n, (a, n) ∈ SPMF.support x ∧ p a n) ≤ mayObs.spec x p :=
   fun ⟨a, n, ha, hp⟩ => ⟨(a, n), ha, hp⟩
@@ -127,8 +124,10 @@ partial def walkComplete (extras : Array Term) (goal : MVarId) : TermElabM (List
     goal := g
   goal.withContext do
   let ty ← whnfR (← instantiateMVars (← goal.getType))
+  let hint := if ty.isAppOf ``IsSoundAndComplete then
+    m!"\nSplit the law into its halves first: `refine .intro ?sound ?complete`." else m!""
   let bad := m!"complete_bound: expected a goal `a ∈ SPMF.support (gen …)` or \
-    `IsCompleteFor (gen …) P`, got{indentExpr ty}"
+    `IsCompleteFor (gen …) P`, got{indentExpr ty}{hint}"
   unless ty.isAppOfArity ``Membership.mem 5 do throwError bad
   let support ← whnfR (ty.getArg! 3)
   unless support.isAppOfArity ``SPMF.support 2 do throwError bad
@@ -160,10 +159,10 @@ callee is reached through its `.sound_complete` or `.complete` law, or a fact pa
 
 There is no `complete_fixpoint`: choose an induction on the value or on `P`, unfold `gen` with
 `rw [gen]`, and then run this. -/
-syntax (name := completeBoundTac) "complete_bound" (" [" term,* "]")? : tactic
+syntax (name := completeBoundTac) "complete_bound" (walkFacts)? : tactic
 
 elab_rules : tactic
-  | `(tactic| complete_bound $[[$args,*]]?) => withMainContext do
-    replaceMainGoal (← walkComplete ((args.map (·.getElems)).getD #[]) (← getMainGoal))
+  | `(tactic| complete_bound $[$fs]?) => withMainContext do
+    replaceMainGoal (← walkComplete (walkFacts.terms fs) (← getMainGoal))
 
 end Basalt.CompleteBound

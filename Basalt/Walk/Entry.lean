@@ -12,15 +12,37 @@ import Basalt.Walk.Basic
 /-!
 # The Walker's Entry Points
 
-What a `_bound` or `_fixpoint` tactic is made of. A `_bound` tactic restates its goal, has
-`computeBound` walk it, and hands what that computed to a residual handler (`splitPaths`,
-`prunePaths`, or arithmetic); a `_fixpoint` tactic is `fixpointStep`, then its `_bound`. Nothing
-here dispatches on the judgment.
+What a `_bound` or `_fixpoint` tactic is made of. A `_bound` tactic restates its goal, walks it, and
+hands what the walk computed to a residual handler: `pathsBound` splits a demonic precondition into
+paths, `prunePaths` prunes an angelic one, and `arithBound` leaves arithmetic. A `_fixpoint` tactic
+is `fixpointStep`, then its `_bound`. Nothing here dispatches on the judgment.
 -/
-
 open Lean Meta Elab Tactic Lean.Order
 
 namespace Basalt.Walk
+
+/-- The facts a caller passes a walk, `[h₁, h₂]`: each is tried at every leaf. -/
+syntax walkFacts := " [" term,* "]"
+
+/-- The terms of `walkFacts`, none when they are absent. -/
+def walkFacts.terms : Option (TSyntax ``walkFacts) → Array Term
+  | some stx => match stx with
+    | `(walkFacts| [$ts,*]) => ts.getElems
+    | _ => #[]
+  | none => #[]
+
+/-! ## Introducing a conditional precondition -/
+
+theorem ite_intro {p : Prop} [Decidable p] {c d : Prop} (hc : ∀ _h : p, c) (hd : ∀ _h : ¬p, d) :
+    if p then c else d := by split <;> simp_all
+
+theorem dite_intro {p : Prop} [Decidable p] {c : p → Prop} {d : ¬p → Prop} (hc : ∀ h, c h)
+    (hd : ∀ h, d h) : if h : p then c h else d h := by split <;> simp_all
+
+theorem dite_const {p : Prop} [Decidable p] {c : Prop} : (if _h : p then c else c) = c := by
+  split <;> rfl
+
+/-! ## Computing a bound -/
 
 /-- `b ≤ O.spec g post` when `lower`, and `O.spec g post ≤ b` otherwise, walked: the bound `b` it
 computed, the proof of the inequality, and the goals the walk left. `O` is the observation `obs`. -/
@@ -174,5 +196,28 @@ def prunePaths (g : MVarId) : TermElabM (List MVarId) := g.withContext do
       false_and, and_false, exists_false, exists_prop, exists_eq_right, ite_self,
       Basalt.Walk.dite_const]))
   return pruned.getD [g]
+
+
+/-- Prove `goal`, which is `O.spec g post` for `O` the observation `obs` into `Prop`, by the walk of
+a lower bound: one goal per path through the precondition it computed (`splitPaths`), then whatever
+else the walk left, tidied. -/
+def pathsBound (extras : Array Term) (obs : Name) (g post : Expr) (goal : MVarId) :
+    TermElabM (List MVarId) := do
+  let (pre, structural, rest) ← computeBound extras obs true g post
+  let paths ← mkFreshExprMVar pre
+  goal.assign (mkApp structural paths)
+  ((← splitPaths paths.mvarId!) ++ rest).mapM fun g => tidy g
+
+/-- Prove `goal`, which is `other ≤ O.spec g post` when `lower` and `O.spec g post ≤ other`
+otherwise, for `O` the observation `obs`: the arithmetic goal relating `other` to the bound the walk
+computed, then whatever else the walk left, tidied. -/
+def arithBound (extras : Array Term) (obs : Name) (lower : Bool) (g post other : Expr)
+    (goal : MVarId) : TermElabM (List MVarId) := do
+  let (b, structural, rest) ← computeBound extras obs lower g post
+  let arith ← mkFreshExprMVar (← if lower then mkAppM ``LE.le #[other, b]
+    else mkAppM ``LE.le #[b, other])
+  goal.assign (← if lower then mkAppM ``le_trans #[arith, structural]
+    else mkAppM ``le_trans #[structural, arith])
+  (arith.mvarId! :: rest).mapM fun g => tidy g
 
 end Basalt.Walk

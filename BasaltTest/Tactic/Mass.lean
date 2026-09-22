@@ -192,4 +192,25 @@ example (c : ℝ≥0∞) (_hrec : ∀ _ : Unit, c ≤ (genLongText n : SPMF (Lis
   mass_bound
   simp
 
+/-- A generator defined by cases on its argument. -/
+def byCases [Gen G] (n : Nat) : G Nat :=
+  match n with
+  | 0 => pure 0
+  | _ + 1 => chooseNat 0 1
+
+-- A `match` on the seed that is stuck is split into its cases before the walk.
+/--
+trace: n : ℕ
+⊢ 1 ≤ 1
+
+n n_1 : ℕ
+⊢ 1 ≤ 1
+-/
+#guard_msgs in
+example (n : Nat) : (1 : ℝ≥0∞) ≤ (byCases n : SPMF Nat).mass := by
+  unfold byCases
+  mass_bound
+  trace_state
+  all_goals simp
+
 end MassBoundTest

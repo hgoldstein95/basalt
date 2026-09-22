@@ -299,10 +299,11 @@ def nameBound (ty : Expr) : Option (Name × Option Name) → Expr
         else e
     go ty
 
-/-- Close `goal`, a leaf of judgment `j`, with the fact `e` through one of `j`'s bridges, `e`'s
-binders possibly instantiated by `instBinders` first. Returns the bridge's premises, not yet
-walked; `none` if `e` does not apply. -/
-private def tryFact (j : Judgment) (goal : MVarId) (e : Expr) : MetaM (Option (List MVarId)) := do
+/-- Close `goal`, a leaf of judgment `j`, with the fact `e` through one of `j`'s bridges or one of
+the observation's `leaves`, `e`'s binders possibly instantiated by `instBinders` first. Returns the
+bridge's premises, not yet walked; `none` if `e` does not apply. -/
+private def tryFact (j : Judgment) (leaves : Leaves) (goal : MVarId) (e : Expr) :
+    MetaM (Option (List MVarId)) := do
   for inst in [none, some true, some false] do
     let e ← match inst with
       | none => pure (some e)
@@ -324,7 +325,7 @@ private def tryFact (j : Judgment) (goal : MVarId) (e : Expr) : MetaM (Option (L
         if (← instantiateMVars e).hasExprMVar then failure
         return gs
       if let some gs := r then return some gs
-    for bridge in j.affine do
+    for bridge in leaves.facts do
       let saved ← saveState
       let some sides ← observing? (do
         let cand ← applyBridge bridge e
@@ -338,13 +339,16 @@ private def tryFact (j : Judgment) (goal : MVarId) (e : Expr) : MetaM (Option (L
         return some []
       catch ex =>
         saved.restore
-        if j.affine.back? == some bridge && inst == some false then throw ex
+        if leaves.facts.back? == some bridge && inst == some false then throw ex
   return none
 
-/-- `g`'s head's laws for judgment `j`, under the `<head>.<suffix>` naming convention. -/
-def law? (j : Judgment) (g : Expr) : MetaM (Array Expr) := do
+/-- `g`'s head's laws, under the naming convention (`lawConventions`). -/
+def law? (g : Expr) : MetaM (Array Expr) := do
   let some head := g.getAppFn.constName? | return #[]
-  (j.laws.filter ((← getEnv).contains <| head ++ ·)).mapM (mkConstWithFreshMVarLevels <| head ++ ·)
+  let env ← getEnv
+  (lawConventions.filterMap fun (suffix, _) =>
+    if env.contains (head ++ suffix) then some (head ++ suffix) else none).mapM
+    mkConstWithFreshMVarLevels
 
 /-! ## Reading a recursive definition -/
 
@@ -553,6 +557,30 @@ def applyMap (adapter mapLem : Name) (goal : MVarId) : MetaM (List MVarId) := go
     if bi.isExplicit && !(← y.mvarId!.isAssigned) then return some y.mvarId! else return none
   return hw' :: sides.toList
 
+/-- The first of `cands` that proves `goal`: each is applied, then what it left is finished, and
+the state is restored after a failure. A later candidate is a fallback, tried only when every earlier
+one failed. When all fail, the error reported is that of the first one that applied, which was
+stated for this goal and failed further down, over that of one that never unified. `none` when there
+is no candidate. -/
+private def firstApplying (cands : Array α) (apply : α → TermElabM β)
+    (finish : β → TermElabM γ) : TermElabM (Option γ) := do
+  let saved ← saveState
+  let mut firstErr : Option Exception := none
+  let mut appliedErr : Option Exception := none
+  for c in cands do
+    let applied ← try Except.ok <$> apply c catch ex => pure (Except.error ex)
+    match applied with
+    | .error ex =>
+      firstErr := firstErr <|> some ex
+      saved.restore
+    | .ok b =>
+      try return some (← finish b)
+      catch ex =>
+        appliedErr := appliedErr <|> some ex
+        saved.restore
+  if let some ex := appliedErr <|> firstErr then throw ex
+  return none
+
 mutual
 
 /-- Prove `goal` by walking the generator, returning the goals no judgment recognizes. `extras` are
@@ -567,7 +595,7 @@ partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
     return ← walk extras goal
   for j in judgments do
     if let some (g, restate) ← j.subject? ty then
-      return ← bound (j.at ty) extras goal restate g
+      return ← bound j (← j.leaves ty) extras goal restate g
   -- The branch premises of a list combinator, built one branch at a time.
   if let some head := ty.getAppFn.constName? then
     if isBranchList (← getEnv) head then
@@ -606,85 +634,42 @@ partial def walkAll (extras : Array Term) (goals : List MVarId) : TermElabM (Lis
   goals.flatMapM (walk extras)
 
 /-- The case of `walk` for a goal of judgment `j` about `g`: a rule for `g`'s combinator, or `g` is
-a leaf. -/
-partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate : Expr → Expr)
-    (g : Expr) : TermElabM (List MVarId) := goal.withContext do
+a leaf, closed by a fact or by one of the observation's `leaves`. -/
+partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal : MVarId)
+    (restate : Expr → Expr) (g : Expr) : TermElabM (List MVarId) := goal.withContext do
   -- The reductions cover a branch that is still a redex or a projection (`(fun () => …) ()`,
   -- `p.2 ()`); no combinator is reducible, so no reduction can turn one combinator into another.
   -- The goal is restated in the reduced form before the rule is applied: matching a rule against
   -- an unreduced branch closes a side condition like `xs ≠ []` by proof irrelevance rather than by
   -- unification, and the side condition then survives as a goal.
+  let forms := #[g, ← whnfCore g, ← whnfR g]
   -- Whether some rule's conclusion unified: one that did not was stated for another observation.
   let ruleApplied ← IO.mkRef false
+  let finish (g' : Expr) (goal : MVarId) (premises : List MVarId) := do
+    ruleApplied.set true
+    walkAll extras (← namePremises (some g') (← goal.getType) premises)
+  let applyRule (goal : MVarId) (lem : Name) : TermElabM (List MVarId) := do
+    let rule ← mkConstWithFreshMVarLevels lem
+    let tag ← goal.getTag
+    let goalTy ← instantiateMVars (← goal.getType)
+    let names := if drawTag.isPrefixOf tag then some (tag.replacePrefix drawTag .anonymous, none)
+      else postNames goalTy
+    applyExact goal (← mkExpectedTypeHint rule (nameBound (← inferType rule) names))
   let rules : TermElabM (Option (List MVarId)) := do
-    for g' in [g, ← whnfCore g, ← whnfR g] do
+    for g' in forms do
       let some lems := (← j.ruleHead? g').bind (rulesFor (← getEnv) j.key) | continue
       let goal ← if g' == g then pure goal else goal.change (restate g')
-      -- A later rule is a fallback: it runs only when every earlier one failed, and the first
-      -- rule's failure is the one reported.
-      -- A rule that applied and failed further down is what to report, not one that was stated
-      -- for another family of specification monad and never unified.
-      let saved ← saveState
-      let mut firstErr : Option Exception := none
-      let mut appliedErr : Option Exception := none
-      for lem in lems do
-        let applied ← try
-            let rule ← mkConstWithFreshMVarLevels lem
-            let tag ← goal.getTag
-            let goalTy ← instantiateMVars (← goal.getType)
-            let names := if drawTag.isPrefixOf tag then
-                some (tag.replacePrefix drawTag .anonymous, none)
-              else postNames goalTy
-            Except.ok <$> applyExact goal
-              (← mkExpectedTypeHint rule (nameBound (← inferType rule) names))
-          catch ex => pure (Except.error ex)
-        let premises ← match applied with
-          | .ok premises => pure premises
-          | .error ex =>
-            firstErr := firstErr <|> some ex
-            saved.restore
-            continue
-        ruleApplied.set true
-        try
-          return some (← walkAll extras (← namePremises (some g') (← goal.getType) premises))
-        catch ex =>
-          appliedErr := appliedErr <|> some ex
-          saved.restore
-      if let some ex := appliedErr <|> firstErr then throw ex
+      if let some gs ← firstApplying lems (applyRule goal) (finish g' goal) then return some gs
     unless j.adapters.isEmpty do
-      for g' in [g, ← whnfCore g, ← whnfR g] do
+      for g' in forms do
         let some mapLem := g'.getAppFn.constName?.bind (mapFor (← getEnv)) | continue
         let goal ← if g' == g then pure goal else goal.change (restate g')
-        let saved ← saveState
-        let mut firstErr : Option Exception := none
-        let mut appliedErr : Option Exception := none
-        for adapter in j.adapters do
-          let applied ← try Except.ok <$> applyMap adapter mapLem goal
-            catch ex => pure (Except.error ex)
-          let gs ← match applied with
-            | .ok gs => pure gs
-            | .error ex =>
-              firstErr := firstErr <|> some ex
-              saved.restore
-              continue
-          ruleApplied.set true
-          try
-            return some (← walkAll extras (← namePremises (some g') (← goal.getType) gs))
-          catch ex =>
-            appliedErr := appliedErr <|> some ex
-            saved.restore
-        if let some ex := appliedErr <|> firstErr then throw ex
+        if let some gs ← firstApplying j.adapters (applyMap · mapLem goal) (finish g' goal) then
+          return some gs
     return none
   -- A leaf: a caller-supplied fact, a hypothesis (a recursive occurrence), or a proved law, about
   -- `g` or a reduction of it. The fact is committed to before its bridge's premises are walked, so
   -- that a failure inside them is reported where it happens.
-  let forms := #[g, ← whnfCore g, ← whnfR g]
-  -- A self leaf that stands in for a rule per combinator applies only where such a rule could be.
-  let selfLeaf ← do
-    if !j.selfLeafIsRule then pure j.selfLeaf else
-    let env ← getEnv
-    pure <| if forms.any fun g => (g.getAppFn.constName?.map (isCombinator env ·)).getD false
-      then j.selfLeaf else #[]
   let leaf : TermElabM (Option (List MVarId)) := do
     for t in extras do
       let r ← observing? do
@@ -692,7 +677,7 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
           let e ← Term.elabTerm t none
           Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
           instantiateMVars e
-        let some gs ← tryFact j goal e | failure
+        let some gs ← tryFact j leaves goal e | failure
         namePremises none (← goal.getType) gs
       if let some gs := r then return some (← walkAll extras gs)
     -- A hypothesis is tried only if it mentions `g`'s head: unifying one about another generator
@@ -705,11 +690,11 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
       unless decl.isImplementationDetail do
         unless ← isProp decl.type do continue
         unless mentionsHead (← instantiateMVars decl.type) do continue
-        if let some gs ← tryFact j goal decl.toExpr then
+        if let some gs ← tryFact j leaves goal decl.toExpr then
           return some (← walkAll extras (← namePremises none (← goal.getType) gs))
     for g in forms do
-      for law in ← law? j g do
-        if let some gs ← tryFact j goal law then
+      for law in ← law? g do
+        if let some gs ← tryFact j leaves goal law then
           return some (← walkAll extras (← namePremises none (← goal.getType) gs))
     return none
   -- A combinator's rules that all fail leave the leaves to try, and their error is reported only if
@@ -728,10 +713,16 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
       unless isRules do throw ex
       ruleErr := some ex
       saved.restore
+  -- A self leaf that stands in for a rule per combinator applies only where such a rule could be.
+  let self ← do
+    if !leaves.selfOnlyCombinators then pure leaves.self else
+    let env ← getEnv
+    pure <| if forms.any fun g => (g.getAppFn.constName?.map (isCombinator env ·)).getD false
+      then leaves.self else #[]
   -- Where the generator may be left in the bound as itself, a combinator none of whose rules is
   -- about this observation is one more generator nothing is known about.
   if let some ex := ruleErr then
-    if selfLeaf.isEmpty || (← ruleApplied.get) then throw ex
+    if self.isEmpty || (← ruleApplied.get) then throw ex
   -- Unfolding comes last, so that a law or a caller's fact stays an abstraction boundary.
   for g' in forms do
     if let some (c, body) ← unfold? g' then
@@ -745,17 +736,13 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
         value is not supported."
   -- A bound on the generator by itself, the tightest first: a later one is a fallback, as a later
   -- rule is.
-  let saved ← saveState
-  for self in selfLeaf do
-    let lem ← mkConstWithFreshMVarLevels self
+  let applySelf (lem : Name) : TermElabM (List MVarId) := do
+    let lem ← mkConstWithFreshMVarLevels lem
     let names := postNames (← instantiateMVars (← goal.getType))
-    let r ← try
-        let premises ← applyExact goal (← mkExpectedTypeHint lem (nameBound (← inferType lem) names))
-        some <$> walkAll extras (← namePremises (some g) (← goal.getType) premises)
-      catch _ =>
-        saved.restore
-        pure none
-    if let some gs := r then return gs
+    applyExact goal (← mkExpectedTypeHint lem (nameBound (← inferType lem) names))
+  if let some (some gs) ← observing? (firstApplying self applySelf fun premises => do
+      walkAll extras (← namePremises (some g) (← goal.getType) premises)) then
+    return gs
   throwError j.noLeaf g
 
 end

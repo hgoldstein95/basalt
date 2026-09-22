@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Obs.Combinators
+import Basalt.Obs.Ordered
 import Basalt.Obs.Spec
 import Basalt.SPMF.Expect.Basic
 
@@ -32,22 +33,6 @@ theorem range_average (lo hi : Nat) (m : Nat → ℝ≥0∞) :
   show ∑' a : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi}, _ * m a.down.val = _
   rw [ENNReal.tsum_mul_left, one_div, mul_comm, div_eq_mul_inv]
   exact congrArg (· * _) (SPMF.tsum_subtype_Icc lo hi m)
-
-@[deprecated "use `index_average`" (since := "2026-09-22")]
-theorem binary_average (F : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ 1} → ℝ≥0∞) :
-    Mix.average.mix 0 1 F = (1/2 : ℝ≥0∞) * F ⟨⟨0, by omega⟩⟩ + (1/2 : ℝ≥0∞) * F ⟨⟨1, by omega⟩⟩ := by
-  have hF : F = fun a => (fun n : Nat => if n = 0 then F ⟨⟨0, by omega⟩⟩ else F ⟨⟨1, by omega⟩⟩)
-      a.down.val := by
-    funext ⟨⟨n, h0, h1⟩⟩
-    rcases Nat.le_one_iff_eq_zero_or_eq_one.mp h1 with rfl | rfl <;> simp
-  refine (congrArg (Mix.average.mix 0 1) hF).trans ((range_average 0 1 fun n : Nat =>
-    if n = 0 then F ⟨⟨0, by omega⟩⟩ else F ⟨⟨1, by omega⟩⟩).trans ?_)
-  have hIcc : Finset.Icc 0 1 = ({0, 1} : Finset ℕ) := by decide
-  rw [hIcc, Finset.sum_insert (by decide), Finset.sum_singleton]
-  simp only [if_pos, Nat.one_ne_zero, if_false]
-  norm_num
-  rw [ENNReal.add_div]
-  congr 1 <;> rw [ENNReal.div_eq_inv_mul]
 
 private theorem sum_ite_lt {d : Nat} {k : ℤ} (hd : 0 < d) (h0 : 0 ≤ k) (hk : k ≤ d)
     (t e : ℝ≥0∞) :
@@ -156,37 +141,14 @@ noncomputable def expectObs : Obs SPMF.{u} (WP Mix.average) where
   map_bind x k := by funext f; exact expect_bind x k f
   map_choose _ _ _ := rfl
 
+instance : expectObs.Monotone := ⟨fun _ _ _ h => expect_mono h⟩
+
 section expect
-
-/-- Expectation over a uniform `choose` is the average over the range. The summand is taken in
-`Nat` form `m` (with `hm` bridging) so callers avoid `choose`'s `ULift` subtype. -/
-theorem expect_choose {lo hi : Nat} (h : lo ≤ hi)
-    (f : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → ℝ≥0∞) (m : Nat → ℝ≥0∞)
-    (hm : ∀ a, f a = m a.down.val) :
-    expect (choose lo hi h : SPMF _) f
-      = (∑ x ∈ Finset.Icc lo hi, m x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
-  obtain rfl : f = fun a => m a.down.val := funext hm
-  exact Mix.range_average lo hi m
-
-set_option linter.deprecated false in
-@[deprecated "use `expect_oneOf`" (since := "2026-09-22")]
-theorem expect_pick (x y : SPMF α) (f : α → ℝ≥0∞) :
-    expect (pick (fun () => x) (fun () => y)) f
-      = (1/2 : ℝ≥0∞) * expect x f + (1/2 : ℝ≥0∞) * expect y f :=
-  (congrFun (expectObs.map_pick (fun () => x) (fun () => y)) f).trans (Mix.binary_average _)
 
 theorem expect_chooseNat {lo hi : Nat} (h : lo ≤ hi) (f : Nat → ℝ≥0∞) :
     expect (chooseNat lo hi h) f
       = (∑ x ∈ Finset.Icc lo hi, f x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) :=
   (congrFun (expectObs.map_chooseNat lo hi h) f).trans (Mix.range_average lo hi f)
-
-/-- Expectation through a uniform `chooseNat` pivot is the average of the per-pivot
-expectations. -/
-theorem expect_bind_chooseNat {lo hi : Nat} (h : lo ≤ hi)
-    {g : Nat → SPMF α} (f : α → ℝ≥0∞) :
-    expect (chooseNat lo hi h >>= g) f
-      = (∑ x ∈ Finset.Icc lo hi, expect (g x) f) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) := by
-  rw [expect_bind, expect_chooseNat]
 
 theorem expect_chooseInt {lo hi : Int} (h : lo ≤ hi) (f : Int → ℝ≥0∞) :
     expect (chooseInt lo hi h) f
@@ -203,13 +165,6 @@ theorem expect_chooseInt {lo hi : Int} (h : lo ≤ hi) (f : Int → ℝ≥0∞) 
   refine (congrFun (expectObs.map_chooseInt lo hi h) f).trans ?_
   rw [← hreindex, ← hcard]
   exact Mix.range_average 0 (hi - lo).toNat fun k => f (lo + (k : Int))
-
-/-- `chooseInt` form of `expect_bind_chooseNat`. -/
-theorem expect_bind_chooseInt {lo hi : Int} (h : lo ≤ hi)
-    {g : Int → SPMF α} (f : α → ℝ≥0∞) :
-    expect (chooseInt lo hi h >>= g) f
-      = (∑ x ∈ Finset.Icc lo hi, expect (g x) f) / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞) := by
-  rw [expect_bind, expect_chooseInt]
 
 /-- The expectation over a uniform element is the average. -/
 theorem expect_elements {xs : List α} (hne : xs ≠ []) (f : α → ℝ≥0∞) :
@@ -259,14 +214,6 @@ theorem frequency_apply
 end apply
 
 section prob
-
-set_option linter.deprecated false in
-@[deprecated "use `prob_oneOf`" (since := "2026-09-22")]
-theorem prob_pick (x y : SPMF α) (E : Set α) :
-    prob (pick (fun () => x) (fun () => y)) E
-      = (1/2 : ℝ≥0∞) * prob x E + (1/2 : ℝ≥0∞) * prob y E := by
-  unfold prob
-  rw [expect_pick]
 
 /-- The probability of an event under a uniform choice is the average of the branch
 probabilities. -/

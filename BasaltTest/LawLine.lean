@@ -217,3 +217,14 @@ info: genSurely — 5 draws (seed 0, fuel 10000)
 -/
 #guard_msgs in
 #genstats (draws := 5) genSurely
+
+/-! ## Every law the naming convention names exists
+
+`lawConventions` names each law by quoted name, so a renamed law would silently stop being found by
+`#genstats` and by the walker's leaves. -/
+
+open Lean Elab Command in
+run_cmd do
+  for (suffix, law) in Basalt.Walk.lawConventions do
+    unless (← getEnv).contains law do
+      throwError "the law `{law}` of the convention `.{suffix}` does not exist"
