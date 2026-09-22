@@ -44,15 +44,16 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `sound_fixpoint`, [Basalt/Tactic/SoundFixpoint.lean](Basalt/Tactic/SoundFixpoint.lean), pinned by
   [BasaltTest/Tactic/Sound.lean](BasaltTest/Tactic/Sound.lean)); and completeness, a lower bound on
   `SPMF.mayObs` in the angelic one, under an induction the user chooses (`complete_bound` and
-  `IsCompleteFor.of_measure`, [Basalt/Tactic/Complete.lean](Basalt/Tactic/Complete.lean),
-  pinned by [BasaltTest/Tactic/Complete.lean](BasaltTest/Tactic/Complete.lean)). The practical entry is
+  `IsCompleteFor.of_measure`, [Basalt/Tactic/Complete.lean](Basalt/Tactic/Complete.lean), pinned by
+  [BasaltTest/Tactic/Complete.lean](BasaltTest/Tactic/Complete.lean)). The practical entry is
   WORKFLOW.md's Recipe 1. Support inversion outside a law (`mem_support_*_iff`, for a probability
   goal or a support equation) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean); the
-  `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactic/Support.lean](Basalt/Tactic/Support.lean).
+  `support_simp` / `cost_support_simp` wrappers —
+  [Basalt/Tactic/Support.lean](Basalt/Tactic/Support.lean).
 - **Termination** — the criterion (`IsPMF_of_lfp_eq_one`) and its `LfpIsOne` certificates:
   [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); the `mass_fixpoint` tactic:
-  [Basalt/Tactic/MassFixpoint.lean](Basalt/Tactic/MassFixpoint.lean), contract
-  pinned by [BasaltTest/Tactic/MassFixpoint.lean](BasaltTest/Tactic/MassFixpoint.lean). Ranking functions and
+  [Basalt/Tactic/MassFixpoint.lean](Basalt/Tactic/MassFixpoint.lean), contract pinned by
+  [BasaltTest/Tactic/MassFixpoint.lean](BasaltTest/Tactic/MassFixpoint.lean). Ranking functions and
   expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). The equations of `mass`:
   [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
 - **The generator walker** — one walk proves every judgment, each stated on an observation as a
@@ -63,13 +64,13 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   per algebra and direction ([Basalt/Tactic/Average.lean](Basalt/Tactic/Average.lean) for
   expectations; the demonic and angelic ones beside the presentations they are derived from, in
   [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean); the `sup` ones in
-  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean)), and for bridging a recursive
-  combinator's law. The judgments, the per-observation leaves, and the registries are
+  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean)), and for bridging a recursive combinator's
+  law. The judgments, the per-observation leaves, and the registries are
   [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean); the walk and its side-goal solvers are
-  [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean). What an entry tactic is made of — `computeBound`,
-  `fixpointStep`, and the residual handlers — is
-  [Basalt/Walk/Entry.lean](Basalt/Walk/Entry.lean): a `_bound` tactic restates its goal
-  and relates the computed bound to it, and a `_fixpoint` tactic is `fixpointStep` and its `_bound`
+  [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean). What an entry tactic is made of —
+  `computeBound`, `fixpointStep`, and the residual handlers — is
+  [Basalt/Walk/Entry.lean](Basalt/Walk/Entry.lean): a `_bound` tactic restates its goal and relates
+  the computed bound to it, and a `_fixpoint` tactic is `fixpointStep` and its `_bound`
   (`mass_fixpoint` excepted, which goes through the `LfpIsOne` criterion). The entry tactics are
   `sound_bound` and `complete_bound` (above), `mass_bound`
   ([Basalt/Tactic/Mass.lean](Basalt/Tactic/Mass.lean), pinned by
@@ -77,23 +78,23 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   ([Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean), pinned by
   [BasaltTest/Tactic/Cost.lean](BasaltTest/Tactic/Cost.lean)), and `expect_bound`
   ([Basalt/Tactic/Expect.lean](Basalt/Tactic/Expect.lean), pinned by
-  [BasaltTest/Tactic/Expect.lean](BasaltTest/Tactic/Expect.lean)), each but `complete_bound` with its
-  `_fixpoint`.
-  [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and fails the build when one of the
-  combinators it names loses its `@[gen_map]` lemma or a list combinator loses a bridge — it checks
-  that list, not the registry, so a *new* combinator with no lemma is not caught. Nothing else in a
-  termination, cost, or expectation proof mentions combinators.
+  [BasaltTest/Tactic/Expect.lean](BasaltTest/Tactic/Expect.lean)), each but `complete_bound` with
+  its `_fixpoint`. [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and fails the build when
+  one of the combinators it names loses its `@[gen_map]` lemma or a list combinator loses a bridge —
+  it checks that list, not the registry, so a *new* combinator with no lemma is not caught. Nothing
+  else in a termination, cost, or expectation proof mentions combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
-  [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean). The practical entry for a bound is
-  WORKFLOW.md's Recipe 4.
+  [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean). The practical entry
+  for a bound is WORKFLOW.md's Recipe 4.
 - **Cost** — the interpretation (`SPMF.Cost`, `IsBounded`, its support inversion, expected cost):
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:
   [Basalt/Tactic/CostFixpoint.lean](Basalt/Tactic/CostFixpoint.lean), contract pinned by
   [BasaltTest/Tactic/CostFixpoint.lean](BasaltTest/Tactic/CostFixpoint.lean). The practical entry is
   WORKFLOW.md's Recipe 3.
-- **ENNReal arithmetic** — `ennreal_to_real` in [Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean).
+- **ENNReal arithmetic** — `ennreal_to_real` in
+  [Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean).
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
   [Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)'s module docstring;
   [BasaltTest/Tuning.lean](BasaltTest/Tuning.lean) is the full tour.
@@ -185,6 +186,11 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 
 - Every module opens with the MIT copyright header and a `/-! # … -/` module docstring, sized and
   scoped per the documentation rules above.
+- Imports: the narrowest module that supplies what the file names, never an umbrella — `Basalt.lean`
+  is the only wholesale import of the library and nothing inside the library may import it. Upstream
+  imports (`Lean`, `Batteries`, `Mathlib`, `Plausible`) come first, then Basalt's, each block
+  alphabetical. An import whose only use is inside a macro body or a `@[gen_rule]` registry is
+  load-bearing at the tactic's *use* sites, so it stays even though the module compiles without it.
 - Declaration docstrings explain design tension, not just signature — where rule 4 admits one.
 - `BasaltExamples/` files are cookbook entries: a generator plus proofs of the correctness
   properties that apply to it, nothing else — no `#eval`/`#guard_msgs`. Anything pinned or run

@@ -115,9 +115,9 @@ the root references `__sanitizer_cov_8bit_counters_init`; no `Basalt` object doe
 
 **The link closure must stay Mathlib-free.** A `#eval` runs generators in the interpreter, but a
 compiled executable links the native code of its entire import closure, and importing the `Basalt`
-umbrella reaches Mathlib through `Basalt.SPMF` — 1440 modules, against the dozen-odd first-party ones
-the fuzzer needs. Generator *definitions* need only `Gen`/`Combinators`; only their *proofs* need
-Mathlib. So every module the executable imports imports the narrowest thing it can — which is also
+umbrella reaches Mathlib through `Basalt.SPMF.Basic` — 1440 modules, against the dozen-odd
+first-party ones the fuzzer needs. Generator *definitions* need only `Gen`/`Combinators`; only their
+*proofs* need Mathlib. So every module the executable imports imports the narrowest thing it can — which is also
 why `Basalt/PlausibleGen.lean` imports `Plausible.Gen` and not the `Plausible` umbrella, whose tactic
 frontend and deriving handlers would join the link. This used to fence itself, since Mathlib's native
 code was not built; now that Lake derives the closure it would simply be built into the fuzzer, which
