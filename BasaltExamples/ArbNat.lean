@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt
 
-open RandomChoice
-
 /-!
 # Arbitrary Natural Numbers
 
@@ -14,6 +12,8 @@ open RandomChoice
 whether to increment. It is the simplest recursive generator in the cookbook and a building block
 for several others (`ArbList`, `SortedList`, `Heap`).
 -/
+
+open RandomChoice
 
 namespace ArbNat
 

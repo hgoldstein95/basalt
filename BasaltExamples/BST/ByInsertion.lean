@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.BST
 
-open RandomChoice
-
 /-!
 # Binary Search Trees by Insertion
 
@@ -21,6 +19,8 @@ inherent rather than an artifact of a loose bound: the draw has no length limit,
 collapse arbitrarily long draws onto the same tree, so no cost function of the output tree can exist
 (`Tree.genBSTByInsertion.not_cost_bounded`).
 -/
+
+open RandomChoice
 
 namespace BST
 

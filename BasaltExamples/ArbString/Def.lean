@@ -7,8 +7,6 @@ import Basalt.Combinators
 import Basalt.Gen
 import BasaltExamples.ArbChar.Def
 
-open RandomChoice ArbChar
-
 /-!
 # Arbitrary Strings (definitions)
 
@@ -17,6 +15,8 @@ The generator definitions for `ArbString`, split from their proofs
 recursive generator of alphanumeric character lists with the same subcritical shape as
 `List.arbitrary`.
 -/
+
+open RandomChoice ArbChar
 
 namespace ArbString
 

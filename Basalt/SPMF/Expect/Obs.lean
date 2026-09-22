@@ -7,8 +7,6 @@ import Basalt.Obs.Combinators
 import Basalt.Obs.Spec
 import Basalt.SPMF.Expect.Basic
 
-open RandomChoice NNReal ENNReal
-
 /-!
 # The Expectation Observation
 
@@ -16,6 +14,8 @@ open RandomChoice NNReal ENNReal
 the expectation equation of each combinator, which is its `Obs.map_*` lemma read through one of
 those presentations.
 -/
+
+open RandomChoice NNReal ENNReal
 
 /-- In `ℝ≥0∞` a uniform choice is the average, written as `SPMF`'s `choose` computes it so that
 `expectObs` preserves `choose` by `rfl`. -/

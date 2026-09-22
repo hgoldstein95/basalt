@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt.Obs.Presentation
 import Basalt.SPMF.Expect.Obs
 
-open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
-
 /-!
 # SPMF Support
 
@@ -17,6 +15,8 @@ from them; and the support laws of the list combinators, which the walker's rule
 combinator's support is otherwise not a lemma: it is what `sound_bound` and `complete_bound` compute
 from its `Obs.map_*`.
 -/
+
+open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
 namespace SPMF
 

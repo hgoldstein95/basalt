@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Basic
 
-open Lean.Order RandomChoice NNReal ENNReal
-
 /-!
 # Expected Values and Event Probabilities
 
@@ -14,6 +12,8 @@ open Lean.Order RandomChoice NNReal ENNReal
 (the probability of an event): their monad equations, their order and support properties, and
 continuity of `expect` along a chain. Every other fact about a distribution is read off these.
 -/
+
+open Lean.Order RandomChoice NNReal ENNReal
 
 namespace SPMF
 

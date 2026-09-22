@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt.RandomChoice
 import Basalt.SPMF.Support
 
-open RandomChoice
-
 /-!
 # Cost-Tracking SPMF
 
@@ -17,6 +15,8 @@ list generator makes `O(|xs|)` choices to generate `xs`." Its observations land 
 `bind` and `choose` do the cost accounting, so a combinator's lemma is its `Obs.map_*` read through
 one of them.
 -/
+
+open RandomChoice
 
 namespace SPMF
 

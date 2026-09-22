@@ -1,15 +1,20 @@
+/-
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein
+-/
 import Basalt
 import BasaltExamples.AllTwoTree
 import BasaltExamples.BST
 import BasaltExamples.BST.Weighted
-
-open RandomChoice
 
 /-!
 # `#genstats` Examples
 
 `#genstats` draws from a generator and summarizes its distribution
 -/
+
+open RandomChoice
 
 namespace GenStatsExamples
 

@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt.Combinators
 import BasaltExamples.ArbNat
 
-open RandomChoice ArbNat
-
 /-!
 # Leftist Heaps
 
@@ -17,6 +15,8 @@ generator builds both children independently and then puts the higher-rank one o
 `if` is the only difference from `genHeap` — including in the termination proof, which is
 **critical** in the same way and the same text.
 -/
+
+open RandomChoice ArbNat
 
 namespace LeftistHeap
 

@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt
 
-open RandomChoice
-
 /-!
 # Lists of All Twos
 
@@ -14,6 +12,8 @@ The minimal recursive generator: `genAllTwos` produces lists whose every element
 element is fixed, this isolates the list-shape recursion (a subcritical branching process) from any
 element generation, making it the simplest place to see the support / termination / cost recipe.
 -/
+
+open RandomChoice
 
 namespace AllTwoList
 

@@ -7,8 +7,6 @@ import Batteries.Data.Char
 import Basalt
 import BasaltExamples.ArbChar.Def
 
-open RandomChoice
-
 /-!
 # Arbitrary Characters
 
@@ -16,6 +14,8 @@ Correctness proofs for `Char.arbitrary` (defined in `BasaltExamples/ArbChar.Def`
 uniformly random alphanumeric character. Because it is a single `elements` draw over a fixed list,
 it is not recursive: it always terminates and costs exactly one choice.
 -/
+
+open RandomChoice
 
 namespace ArbChar
 

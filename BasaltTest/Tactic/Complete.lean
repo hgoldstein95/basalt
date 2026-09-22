@@ -8,8 +8,6 @@ import BasaltExamples.BST
 import BasaltExamples.Heap
 import BasaltExamples.SortedList
 
-open RandomChoice ArbNat
-
 /-!
 # The `complete_bound` Contract
 
@@ -18,6 +16,8 @@ refuted branches pruned and the surviving ones not chosen between, and a recursi
 itself. The recursive generators are copies of the cookbook's that carry no law, which the walk would
 otherwise close a recursive occurrence with.
 -/
+
+open RandomChoice ArbNat
 
 namespace CompleteBoundTest
 

@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Mathlib.Analysis.SpecificLimits.Basic
 import Basalt.SPMF.Termination
 
-open Lean.Order RandomChoice NNReal ENNReal
-
 /-!
 # Partial Generators
 
@@ -22,6 +20,8 @@ This file provides lemmas for working with partial generators that can be interp
 - `SPMF.retry_apply` — retrying yields the conditional distribution given success.
 - `SPMF.retry_attempts` — the retry loop takes `1 / massSome` draws in expectation.
 -/
+
+open Lean.Order RandomChoice NNReal ENNReal
 
 namespace SPMF
 

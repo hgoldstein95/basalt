@@ -6,10 +6,6 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.BST
 
-open RandomChoice
-open SPMF
-open scoped NNReal ENNReal
-
 /-!
 # Weighted Binary Search Trees
 
@@ -23,6 +19,10 @@ applies. Termination instead goes through a ranking function on the seed `(lo, h
 fact that the interval genuinely shrinks. The machinery (`bstLevel`, `bstRank`) lives here since it
 is used nowhere else, instantiated at recursion weight `w = 5/6` and drift `ε = 1/6`.
 -/
+
+open RandomChoice
+open SPMF
+open scoped NNReal ENNReal
 
 namespace BST
 

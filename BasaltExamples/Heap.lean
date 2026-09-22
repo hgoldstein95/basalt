@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.ArbNat
 
-open RandomChoice ArbNat
-
 /-!
 # Min-Heaps
 
@@ -17,6 +15,8 @@ value as the new lower bound. Like `SortedList`, the recursion re-indexes the se
 recursing on *two* children makes the mean offspring exactly `1`, so this is a **critical**
 generator (almost surely terminating, infinite expected size).
 -/
+
+open RandomChoice ArbNat
 
 namespace Heap
 

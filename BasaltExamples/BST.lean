@@ -6,11 +6,11 @@ Authors: Harrison Goldstein
 import Basalt
 import Basalt.Combinators
 
-open RandomChoice
-
 /-!
 # Binary Search Trees
 -/
+
+open RandomChoice
 
 namespace BST
 

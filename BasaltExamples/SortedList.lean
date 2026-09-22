@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.ArbNat
 
-open RandomChoice ArbNat
-
 /-!
 # Sorted Lists
 
@@ -17,6 +15,8 @@ one plus a `Nat.arbitrary` gap, threading the running lower bound `m` through th
 *re-indexes the seed* (`genSortedGt x` for a new `x`), so `m` is the seed of its termination proof.
 The public `genSorted` and its laws are the `m = 0` specializations.
 -/
+
+open RandomChoice ArbNat
 
 namespace SortedList
 

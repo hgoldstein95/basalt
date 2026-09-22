@@ -8,8 +8,6 @@ import Mathlib.Algebra.Group.Nat.Defs
 import Mathlib.Data.Real.Basic
 import Basalt.Gen
 
-open RandomChoice
-
 /-!
 # Generating a Type with Structure
 
@@ -22,6 +20,8 @@ Unlike the other examples, this file states no correctness laws — the property
 there is no established validity predicate for "an arbitrary monoid." It is kept as a demonstration
 of what the representation is capable of expressing.
 -/
+
+open RandomChoice
 
 namespace Monoid
 

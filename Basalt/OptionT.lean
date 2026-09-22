@@ -5,13 +5,13 @@ Authors: Harrison Goldstein
 -/
 import Basalt.Gen
 
-open Lean.Order RandomChoice
-
 /-!
 # Generic Lifting into `OptionT`
 
 An explicit `Option` layer over *any* generator monad `G` is itself a generator monad.
 -/
+
+open Lean.Order RandomChoice
 
 instance instRandomChoiceOptionT {G : Type → Type} [Monad G] [RandomChoice G] :
     RandomChoice (OptionT G) where

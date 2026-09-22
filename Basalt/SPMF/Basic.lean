@@ -7,8 +7,6 @@ import Mathlib.MeasureTheory.Measure.Dirac
 import Mathlib.Topology.Instances.ENNReal.Lemmas
 import Basalt.RandomChoice
 
-open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
-
 /-!
 # Sub-Probability Mass Functions
 
@@ -16,6 +14,8 @@ This file defines a type of sub-probability mass functions, similar to `PMF` fro
 `support` (the values with nonzero mass) and its `mass` (the total probability of producing a value,
 as opposed to diverging — always ≤ 1).
 -/
+
+open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
 /-- A sub-probability mass function is similar to a PMF, but the total mass may be less than 1. -/
 def SPMF.{u} (α : Type u) : Type u := {μ : α → ℝ≥0∞ // (∑' a, μ a) ≤ 1}

@@ -5,14 +5,14 @@ Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Mass
 
-open RandomChoice NNReal ENNReal
-
 /-!
 # Expectations of the List Combinators
 
 Event probabilities and expected lengths for `vectorOf` and `listOf`, by induction or fixpoint
 induction over the equations of `Basalt/SPMF/Expect/Obs.lean`.
 -/
+
+open RandomChoice NNReal ENNReal
 
 namespace SPMF
 

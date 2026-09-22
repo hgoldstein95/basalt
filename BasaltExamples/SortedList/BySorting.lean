@@ -7,8 +7,6 @@ import Basalt
 import BasaltExamples.ArbList
 import BasaltExamples.SortedList
 
-open RandomChoice
-
 /-!
 # Sorted Lists by Sorting
 
@@ -19,6 +17,8 @@ open RandomChoice
 post-processing step over a generator whose laws are already proved, none of its three proofs needs
 `fix_induct` or an induction on the generated value.
 -/
+
+open RandomChoice
 
 namespace SortedList
 
