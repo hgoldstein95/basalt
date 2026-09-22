@@ -54,12 +54,6 @@ theorem List.genSortedBySorting.sound_complete :
     rw [List.genSortedBySorting]; complete_bound
     exact ⟨ys, List.mergeSort_of_sorted h⟩
 
-/-- Sorting an arbitrary list and building a sorted list in order reach the same lists. -/
-theorem List.support_genSortedBySorting_eq :
-    SPMF.support List.genSortedBySorting = SPMF.support List.genSorted :=
-  Set.ext fun ys =>
-    (List.genSortedBySorting.sound_complete ys).trans (List.genSorted.sound_complete ys).symm
-
 theorem List.genSortedBySorting.terminates :
     IsAlmostSurelyTerminating List.genSortedBySorting := by
   mass_fixpoint using SPMF.LfpIsOne.one

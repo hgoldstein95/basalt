@@ -13,12 +13,6 @@ The basic, mostly orthogonal, correctness properties a PBT generator may have, a
 there is no bundle: which of them apply depends on the generator, and you prove the ones that do.
 -/
 
-/-- We say that a generator `g` `IsSoundAndComplete` with respect to a predicate `P` if, when
-  interpreted as an `SPMF`, all values in the support of `g` satisfy `P` and all values satisfying
-  `P` are in the support of `g`. -/
-def IsSoundAndComplete (g : SPMF α) (P : α → Prop) : Prop :=
-  ∀ a, a ∈ SPMF.support g ↔ P a
-
 /-- A generator `g` `IsSound` with respect to `P` if every value in its support satisfies `P`. A
 size-bounded generator is sound and deliberately not complete. -/
 def IsSound (g : SPMF α) (P : α → Prop) : Prop :=
@@ -29,21 +23,27 @@ support. -/
 def IsCompleteFor (g : SPMF α) (P : α → Prop) : Prop :=
   ∀ a, P a → a ∈ SPMF.support g
 
+/-- We say that a generator `g` `IsSoundAndComplete` with respect to a predicate `P` if, when
+  interpreted as an `SPMF`, all values in the support of `g` satisfy `P` and all values satisfying
+  `P` are in the support of `g`. -/
+def IsSoundAndComplete (g : SPMF α) (P : α → Prop) : Prop :=
+  IsSound g P ∧ IsCompleteFor g P
+
 theorem IsSoundAndComplete.intro {g : SPMF α} {P : α → Prop} (sound : IsSound g P)
     (complete : IsCompleteFor g P) : IsSoundAndComplete g P :=
-  fun a => ⟨sound a, complete a⟩
+  ⟨sound, complete⟩
 
 theorem IsSoundAndComplete.sound {g : SPMF α} {P : α → Prop} (h : IsSoundAndComplete g P) :
-    IsSound g P := fun a ha => (h a).mp ha
+    IsSound g P := h.1
 
 theorem IsSoundAndComplete.complete {g : SPMF α} {P : α → Prop} (h : IsSoundAndComplete g P) :
-    IsCompleteFor g P := fun a ha => (h a).mpr ha
+    IsCompleteFor g P := h.2
 
 /-- Soundness and completeness transfers along a support equation. -/
 theorem IsSoundAndComplete.of_support_eq {g g' : SPMF α} {P : α → Prop}
     (h : SPMF.support g' = SPMF.support g) (hg : IsSoundAndComplete g P) :
-    IsSoundAndComplete g' P :=
-  fun a => (h ▸ Iff.rfl : a ∈ SPMF.support g' ↔ a ∈ SPMF.support g).trans (hg a)
+    IsSoundAndComplete g' P := by
+  grind only [IsSoundAndComplete, IsSound, IsCompleteFor]
 
 /-- We say that a generator `g` `IsAlmostSurelyTerminating` if, when interpreted as an `SPMF`, its
 mass sums to 1 (i.e., it is a true `PMF`): every infinite path through the generator has probability
