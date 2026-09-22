@@ -3,8 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF
 import Mathlib.Analysis.SpecificLimits.Basic
+import Basalt.SPMF.Termination
 
 open Lean.Order RandomChoice NNReal ENNReal
 

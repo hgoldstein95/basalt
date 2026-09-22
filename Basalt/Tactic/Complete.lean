@@ -4,7 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Laws
-import Basalt.SPMF.Walk.Entry
+import Basalt.Walk.Entry
 
 /-!
 # Walking Completeness

@@ -19,7 +19,7 @@ supported platforms, and limitations.
 
 ## Design
 
-### The interpretation (`Basalt/Fuzz/Core.lean`)
+### The interpretation (`Basalt/Fuzz/Basic.lean`)
 
 `FuzzGen` is `StateT FuzzState Option` over the byte buffer and a read cursor — a *pure* state monad,
 so one fuzzer input is a pure function `ByteArray → TestOutcome` (`runOne`). That makes the C
@@ -574,4 +574,4 @@ it.
 
 Basalt-side reading: `Basalt/RandomChoice.lean` (`choose`), `Basalt/Gen.lean` (the bundle and its
 auto-instance), `Basalt/PBT/` (the interpretation-agnostic property and campaign API),
-`Basalt/PlausibleGen.lean` and `Basalt/GenStats.lean` (the flat-order `CCPO`/`MonoBind` recipe).
+`Basalt/PlausibleGen.lean` and `Basalt/GenStats/Basic.lean` (the flat-order `CCPO`/`MonoBind` recipe).

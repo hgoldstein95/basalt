@@ -4,7 +4,6 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Gen
-import Basalt.SPMF
 import Basalt.SPMF.Cost
 import Basalt.SPMF.Failure
 

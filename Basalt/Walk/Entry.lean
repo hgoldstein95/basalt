@@ -3,7 +3,7 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Walk
+import Basalt.Walk.Basic
 import Basalt.Obs.Presentation
 import Lean.Meta.Tactic.Split
 import Mathlib.Order.PropInstances

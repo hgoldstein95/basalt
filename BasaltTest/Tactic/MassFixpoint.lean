@@ -15,7 +15,7 @@ Pins what `mass_fixpoint` leaves behind: the context it introduces over a tupled
 certificate goal when no certificate is named, and its failures.
 -/
 
-namespace TerminationTest
+namespace MassFixpointTest
 
 -- The seed is the tuple of arguments the recursion changes, introduced under their binder names,
 -- and the goal is the certificate's `F c` against the bound `mass_bound` computed.
@@ -154,7 +154,7 @@ def fuelled [Gen G] (fuel : Nat) : G Nat :=
 termination_by fuel
 
 /--
-error: mass_fixpoint: `TerminationTest.fuelled` is recursive but not a `partial_fixpoint`; induct on its decreasing argument, unfold it, and apply `SPMF.IsPMF.of_one_le` and `mass_bound`
+error: mass_fixpoint: `MassFixpointTest.fuelled` is recursive but not a `partial_fixpoint`; induct on its decreasing argument, unfold it, and apply `SPMF.IsPMF.of_one_le` and `mass_bound`
 -/
 #guard_msgs in
 example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
@@ -196,4 +196,4 @@ theorem coinLoop.terminates : IsAlmostSurelyTerminating (coinLoop : SPMF Nat) :=
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp [ENNReal.one_sub_inv_two]
 
-end TerminationTest
+end MassFixpointTest

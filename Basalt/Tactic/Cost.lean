@@ -4,7 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Laws
-import Basalt.SPMF.Walk.Entry
+import Basalt.Walk.Entry
 import Mathlib.Data.ENat.Lattice
 
 /-!
@@ -100,7 +100,7 @@ and leaves one goal per path through `gen`. Recursive occurrences are closed fro
 callees from their `.cost_bounded` law; any other cost bound can be passed as `cost_bound [h₁, h₂]`.
 
 In a residual goal, a value drawn by `let x ← …` is named `x`, the choices that draw took `n_x`,
-and what is known about it `h_x`, as the walker names them (`Basalt/SPMF/Walk.lean`). -/
+and what is known about it `h_x`, as the walker names them (`Basalt/Walk/Basic.lean`). -/
 syntax (name := costBoundTac) "cost_bound" (" [" term,* "]")? : tactic
 
 elab_rules : tactic

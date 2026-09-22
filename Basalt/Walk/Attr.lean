@@ -9,7 +9,7 @@ import Lean.Meta.Tactic.Simp.Attr
 /-!
 # The Walker's Judgments and Registries
 
-The judgments the generator walker (`Basalt/SPMF/Walk.lean`) proves and the leaves each observation
+The judgments the generator walker (`Basalt/Walk/Basic.lean`) proves and the leaves each observation
 closes them with; the registry of `@[gen_rule]` rules, keyed by judgment and by the head constant of
 what the rule is about; the registry of `@[gen_map]` lemmas, keyed by combinator; the `@[spec_apply]`
 simp set; and the `@[gen_branches]` relations a rule collects a list combinator's branches with. A

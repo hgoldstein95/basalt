@@ -177,17 +177,17 @@ theorem <GEN>.sound_complete : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) :
       exact ⟨d, l, ih₁ ‹_›, r, ih₂ ‹_›, rfl⟩   -- 4. a witness per draw; the IHs for recursive ones
 ```
 
-**`sound_fixpoint`** (`Basalt/SPMF/SoundFixpoint.lean`) inducts over the arguments some recursive
-call of `<GEN>` changes, unfolds one step, and runs `sound_bound` (`Basalt/SPMF/SoundBound.lean`),
+**`sound_fixpoint`** (`Basalt/Tactic/SoundFixpoint.lean`) inducts over the arguments some recursive
+call of `<GEN>` changes, unfolds one step, and runs `sound_bound` (`Basalt/Tactic/Sound.lean`),
 which is `cost_bound` at the support interpretation: one goal per path, the drawn values and what is
 known of them in context under the generator's names. A recursive occurrence is closed by `ih`, a
 callee by its `.sound_complete` or `.sound` law, anything else by a fact: `sound_fixpoint [h]`.
-`BasaltTest/SoundBound.lean` shows the goals `genHeap`, `genBST`, and `genLeftist` leave.
+`BasaltTest/Tactic/Sound.lean` shows the goals `genHeap`, `genBST`, and `genLeftist` leave.
 
-**`complete_bound`** (`Basalt/SPMF/CompleteBound.lean`) turns `a ∈ SPMF.support (<GEN> …)`, after one
+**`complete_bound`** (`Basalt/Tactic/Complete.lean`) turns `a ∈ SPMF.support (<GEN> …)`, after one
 unfolding, into a precondition for the step to produce `a`: an `∃` for each draw, an `∨` for each
 choice, and last the equation between `a` and the value built. On `IsCompleteFor g P` it introduces
-`a` and `P a` first. `BasaltTest/CompleteBound.lean` shows the goals. What to expect of it:
+`a` and `P a` first. `BasaltTest/Tactic/Complete.lean` shows the goals. What to expect of it:
 
 - a **callee** contributes its predicate, from its `.sound_complete` or `.complete` law; a fact is
   passed as `complete_bound [h]`.
@@ -211,7 +211,7 @@ Notes:
 - **Completeness by a measure**, when no structural induction fits or the script has to be fixed in
   advance: `apply IsCompleteFor.of_measure μ fun n ih s a hn hP => ?_` and then
   `rw [<GEN>]; complete_bound` leave a goal with no generator in it. `μ` is a measure of seed and
-  value that every recursive call decreases (`BasaltTest/CompleteBound.lean`).
+  value that every recursive call decreases (`BasaltTest/Tactic/Complete.lean`).
 - **A law that transfers along a support equation** is `IsSoundAndComplete.of_support_eq`, or the
   callee's law applied to the value: `List.genSorted.sound_complete` (`SortedList.lean`).
 
@@ -256,8 +256,8 @@ finished with `SPMF.LfpIsOne.mono` and a certificate (`BasaltTest/Termination.le
 lower bound on its mass. Mass is the expectation of `1`, and the walk pushes that postexpectation
 backward: a draw is bounded at the bound its continuation computed, so the bound comes out in the
 shape of the do-block and is exact wherever the generator's callees are
-(`Basalt/SPMF/MassBound.lean` owns how a fact is used, `Basalt/SPMF/AverageBound.lean` the bound of
-each shape of choice, `Basalt/SPMF/Walk.lean` the walk; `BasaltTest/MassBound.lean` shows a generator
+(`Basalt/Tactic/Mass.lean` owns how a fact is used, `Basalt/Tactic/Average.lean` the bound of
+each shape of choice, `Basalt/Walk/Basic.lean` the walk; `BasaltTest/Tactic/Mass.lean` shows a generator
 that uses every combinator). Nothing about the generator is yours to supply:
 
 - a **recursive occurrence** is discharged by `hrec`, whatever the shape of the seed.
@@ -277,7 +277,7 @@ that uses every combinator). Nothing about the generator is yours to supply:
 **The arithmetic** has your `F c` on the left, the computed bound on the right, and no generator in
 sight. Try `simp` (`ArbNat.lean`, `SortedList.lean`), then `simp` with the identities the goal needs
 (`simp [sq, ENNReal.div_eq_inv_mul, mul_add]` in `LeftistHeap.lean` and `AllTwoTree.lean`), then
-`ennreal_to_real` (`Basalt/ENNRealAuto.lean`) and `nlinarith`. If it looks *false*, your
+`ennreal_to_real` (`Basalt/Tactic/ENNReal.lean`) and `nlinarith`. If it looks *false*, your
 certificate is wrong, not your proof. A generator that is not a `Gen` term, or whose seed has an
 argument typed by another, goes through `SPMF.IsPMF_of_lfp_eq_one_uniform` on an explicit family
 (`SPMF.IsPMF_retry`, `Basalt/SPMF/Failure.lean`). A bare combinator term, which has no definition
@@ -318,15 +318,15 @@ theorem <GEN>.cost_bounded : IsCostBounded (<GEN> <ARGS>) <COST> := by
   all_goals simp only [<COST>'s equations]; omega   -- one goal per path through <GEN>
 ```
 
-**`cost_fixpoint`** (`Basalt/SPMF/CostFixpoint.lean`) inducts over the arguments some recursive call
+**`cost_fixpoint`** (`Basalt/Tactic/CostFixpoint.lean`) inducts over the arguments some recursive call
 of `<GEN>` changes, unfolds one step, and runs `cost_bound`. A generator with no recursion is
 unfolded and walked.
 
 **`cost_bound` is the whole structural argument.** It pushes the postcondition "producing `v` took
 at most `<COST> v` choices" backward through the step, by the same walk as `mass_bound` — the tally
 of Step 2 is what it computes. It leaves one goal per path through the generator,
-stated over the values that path drew; the walker (`Basalt/SPMF/Walk.lean`, "Names") says how
-they are named, and `BasaltTest/CostFixpoint.lean` shows the goals `genHeap` and `genBST`
+stated over the values that path drew; the walker (`Basalt/Walk/Basic.lean`, "Names") says how
+they are named, and `BasaltTest/Tactic/CostFixpoint.lean` shows the goals `genHeap` and `genBST`
 leave. Nothing about the generator is yours to supply:
 
 - a **recursive occurrence** is bounded by `ih`, at whatever arguments it is called with.
@@ -343,9 +343,9 @@ leave. Nothing about the generator is yours to supply:
 sub-costs unfold too (`AllTwoTree.lean`). If `omega` fails, the bound is too tight: the failing goal
 is exactly the linear inequality that doesn't hold, with each sub-cost's bound as a hypothesis.
 Adjust the bound in Step 2; nothing else in the proof changes. A bare combinator term, which has no
-definition to unfold, is `cost_bound` alone (`BasaltTest/CostBound.lean`). A generator recursive by
+definition to unfold, is `cost_bound` alone (`BasaltTest/Tactic/Cost.lean`). A generator recursive by
 `termination_by` is induction on its decreasing argument and `cost_bound` in each case
-(`BasaltTest/CostFixpoint.lean`).
+(`BasaltTest/Tactic/CostFixpoint.lean`).
 
 ### Recipe 4: Expected Values
 
@@ -361,14 +361,14 @@ theorem <GEN>.<NAME> : SPMF.expect (<GEN> <ARGS>) (fun v => <QUANTITY> v) ≤ <B
   <arithmetic>          -- `<computed bound> ≤ <BOUND>`, with `ih` in context
 ```
 
-**`expect_fixpoint`** (`Basalt/SPMF/ExpectFixpoint.lean`) inducts as `cost_fixpoint` does and runs
-`expect_bound` (`Basalt/SPMF/ExpectBound.lean`), the same walk again: it pushes `<QUANTITY>` backward
+**`expect_fixpoint`** (`Basalt/Tactic/ExpectFixpoint.lean`) inducts as `cost_fixpoint` does and runs
+`expect_bound` (`Basalt/Tactic/Expect.lean`), the same walk again: it pushes `<QUANTITY>` backward
 and computes an upper bound, at `SPMF` or at `SPMF.Cost` (where the quantity sees the choices made,
 and `SPMF.Cost.expectedCost` is accepted). A recursive occurrence is bounded by `ih`, used under
 whatever the walk arrives with as long as that is `ih`'s own quantity plus a constant
 (`(node l x r).size` is `l.size + 1 + r.size`); a callee's bound is passed explicitly,
 `expect_fixpoint [h]`. Only an upper bound can be proved this way: the fixpoint induction starts from
-the generator that never returns. `BasaltTest/ExpectBound.lean` pins the goals.
+the generator that never returns. `BasaltTest/Tactic/Expect.lean` pins the goals.
 
 A **list combinator** has no shape of choice, so it is bounded by a rule rather than averaged. At the
 cost interpretation `vectorOf n g` is exact — `n` times `g`'s expected cost, which the walk takes
@@ -381,7 +381,7 @@ too coarse, prove the bound separately and pass it: `expect_bound [h]`.
 - **`rw [gen]` fails** → wrong unfolding idiom for the context; see the table above.
 - **A `mem_support` fact outside a support law won't simplify** (a probability goal,
   `SPMF.prob_eq_zero_iff`) → `support_simp` / `cost_support_simp`; their docstrings
-  (`Basalt/Tactics.lean`) say what the sets contain. Inside a support law, use Recipe 1's tactics.
+  (`Basalt/Tactic/Support.lean`) say what the sets contain. Inside a support law, use Recipe 1's tactics.
 - **The completeness witness for a draw** → it is almost always the inverse of the index arithmetic
   (`x - lo` when the recursion ran at `lo + d`). Substitute it *before* unfolding
   (`obtain ⟨d, rfl⟩ : ∃ d, x = lo + d`), so that the equation at the end of the goal is `rfl`.
@@ -404,9 +404,9 @@ too coarse, prove the bound separately and pass it: `expect_bound [h]`.
   another name, or the generator argument of a combinator that has no law of its own and no worst
   case (it recurses, or draws from something that does); pass a bound for it: `cost_fixpoint [h]`. A
   recursive combinator of your own gets the same message: it needs a law and a bridge from it
-  (`SPMF.Cost.le_spec_listOf`, `Basalt/SPMF/CostBound.lean`).
+  (`SPMF.Cost.le_spec_listOf`, `Basalt/Tactic/Cost.lean`).
 - **`mass_bound` says nothing bounds a sub-generator** → it is a recursive combinator of your own
-  (bridge its law, as `SPMF.le_spec_listOf` does in `Basalt/SPMF/MassFixpoint.lean`), a callee whose
+  (bridge its law, as `SPMF.le_spec_listOf` does in `Basalt/Tactic/MassFixpoint.lean`), a callee whose
   termination law is under another name (pass it: `mass_bound [h]`), or a recursive occurrence whose
   fact needs a premise that neither unification nor a hypothesis supplies (`m < n` for a size
   computed from a draw). Pass that fact instantiated; the drawn values are in scope under the
@@ -428,5 +428,5 @@ too coarse, prove the bound separately and pass it: `expect_bound [h]`.
 ## Prior Art
 
 For the *theory* behind the termination recipe — the least-fixed-point criterion and its
-certificates — see `Basalt/SPMF/Termination.lean` (the tactic is `Basalt/SPMF/MassFixpoint.lean`); for the ranking-function certificate and why
+certificates — see `Basalt/SPMF/Termination.lean` (the tactic is `Basalt/Tactic/MassFixpoint.lean`); for the ranking-function certificate and why
 critical generators have infinite expected size, `Basalt/SPMF/Ranking.lean`.

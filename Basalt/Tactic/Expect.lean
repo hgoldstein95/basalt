@@ -4,14 +4,14 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Cost
-import Basalt.SPMF.AverageBound
-import Basalt.SPMF.Walk.Entry
+import Basalt.Tactic.Average
+import Basalt.Walk.Entry
 
 /-!
 # Computing Expectation Upper Bounds
 
 `expect_bound` pushes a postexpectation through a generator with the rules of
-`Basalt/Obs/Ordered.lean` and `Basalt/SPMF/AverageBound.lean`, and computes an upper bound on its
+`Basalt/Obs/Ordered.lean` and `Basalt/Tactic/Average.lean`, and computes an upper bound on its
 expectation, leaving `ℝ≥0∞` arithmetic. What is specific to the judgment is here: how a fact about
 a sub-generator is used.
 -/
@@ -46,7 +46,7 @@ theorem SPMF.Cost.spec_le_add_of_expect_le {x : SPMF.Cost α} {φ : α × Nat �
 A generator the walk cannot enter — a list combinator, which has no shape of choice and no
 `@[gen_map]` lemma — is bounded using only its mass: exactly when the postexpectation is constant,
 and otherwise at its worst case over every value, dually to `le_spec_iInf_of_le_mass` on the mass
-side. They are the observation's `upperSelf` (`Basalt/SPMF/Walk/Attr.lean`), so they are tried after
+side. They are the observation's `upperSelf` (`Basalt/Walk/Attr.lean`), so they are tried after
 every rule and every fact, and a rule that reads the element generator's expectation wins. -/
 
 namespace SPMF
