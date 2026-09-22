@@ -55,8 +55,12 @@ structure Judgment where
   /-- A lemma that restates a goal of this judgment, about any generator, as goals of other
   judgments; tried before the rules when it is in scope. -/
   reduceTo : Option Name := none
-  /-- A bound on the subject by itself, for a leaf nothing else closes, in place of `noLeaf`. -/
-  selfLeaf : Option Name := none
+  /-- Bounds on the subject by itself, tried in order for a leaf nothing else closes, in place of
+  `noLeaf`. -/
+  selfLeaf : Array Name := #[]
+  /-- Whether `selfLeaf` stands in for a rule per combinator, and so applies only to a generator
+  the walker knows as one. A generator nothing is known about is then still `noLeaf`'s error. -/
+  selfLeafIsRule : Bool := false
   /-- The registry key of the rules about the subject `g`. Tagging a rule and looking one up both
   go through this. -/
   ruleHead? : Expr → MetaM (Option Name) := fun g => pure g.getAppFn.constName?
@@ -110,19 +114,26 @@ structure Observation where
   /-- The same for a lower bound. -/
   lower : Array Name := #[]
   lowerLaw : Array Name := #[]
-  /-- A lower bound on the observation of any generator by itself: a recursive occurrence or an
-  unknown callee then stays in the bound, as an exact one, where another observation fails. -/
-  lowerSelf : Option Name := none
+  /-- Lower bounds on the observation of any generator, tried in order: a recursive occurrence or
+  an unknown callee then stays in the bound, as an exact one, where another observation fails. -/
+  lowerSelf : Array Name := #[]
+  /-- The same for an upper bound, where what a generator gives is what the missing mass allows.
+  These stand in for a rule per combinator — a list combinator has no shape of choice for the walk
+  to enter — so they apply only to a combinator, and a generator nothing is known about is still an
+  error. -/
+  upperSelf : Array Name := #[]
 
 /-- The observations the walker has leaves for. -/
 def observations : Array Observation := #[
   { obs := `SPMF.expectObs
     upper := #[`SPMF.spec_le_add_of_expect_le]
+    upperSelf := #[`SPMF.spec_le_of_const, `SPMF.spec_le_iSup]
     lower := #[`SPMF.le_spec_one_of_le_mass, `SPMF.le_spec_of_le_mass, `SPMF.le_spec_of_isPMF, `SPMF.le_spec_iInf_of_le_mass,
       `SPMF.le_spec_iInf_of_isPMF]
     lowerLaw := #[`terminates] },
   { obs := `SPMF.Cost.expectObs
-    upper := #[`SPMF.Cost.spec_le_add_of_expect_le] },
+    upper := #[`SPMF.Cost.spec_le_add_of_expect_le]
+    upperSelf := #[`SPMF.Cost.specC_le_of_const, `SPMF.Cost.specC_le_iSup] },
   { obs := `SPMF.Cost.alwaysObs
     lower := #[`SPMF.Cost.le_spec_of_always, `SPMF.Cost.le_spec_of_isBounded,
       `SPMF.Cost.le_spec_of_isCostBounded]
@@ -137,16 +148,18 @@ def observations : Array Observation := #[
     lower := #[`SPMF.le_may_of_isCompleteFor, `SPMF.le_may_of_isSoundAndComplete,
       `SPMF.le_may_of_measure]
     lowerLaw := #[`sound_complete, `complete]
-    lowerSelf := some `SPMF.le_may_self },
+    lowerSelf := #[`SPMF.le_may_self] },
   { obs := `SPMF.Cost.mayObs
-    lowerSelf := some `SPMF.Cost.le_may_self }]
+    lowerSelf := #[`SPMF.Cost.le_may_self] }]
 
 /-- `j` with the leaves of the observation that the goal `ty` is about. -/
 def Judgment.at (j : Judgment) (ty : Expr) : Judgment := Id.run do
   let some side := j.specSide | return j
   let spec := (ty.getArg! side).headBeta
   let some o := observations.find? (spec.getArg! 6 |>.getAppFn.isConstOf ·.obs) | return j
-  return if side == 2 then { j with laws := o.upperLaw, affine := o.upper }
+  return if side == 2 then
+      { j with laws := o.upperLaw, affine := o.upper, selfLeaf := o.upperSelf,
+               selfLeafIsRule := true }
     else { j with laws := o.lowerLaw, affine := o.lower, selfLeaf := o.lowerSelf }
 
 /-- The generator of `O.spec g post`, and how to restate it about another. -/

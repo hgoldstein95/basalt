@@ -679,6 +679,12 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
   -- `g` or a reduction of it. The fact is committed to before its bridge's premises are walked, so
   -- that a failure inside them is reported where it happens.
   let forms := #[g, ← whnfCore g, ← whnfR g]
+  -- A self leaf that stands in for a rule per combinator applies only where such a rule could be.
+  let selfLeaf ← do
+    if !j.selfLeafIsRule then pure j.selfLeaf else
+    let env ← getEnv
+    pure <| if forms.any fun g => (g.getAppFn.constName?.map (isCombinator env ·)).getD false
+      then j.selfLeaf else #[]
   let leaf : TermElabM (Option (List MVarId)) := do
     for t in extras do
       let r ← observing? do
@@ -725,7 +731,7 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
   -- Where the generator may be left in the bound as itself, a combinator none of whose rules is
   -- about this observation is one more generator nothing is known about.
   if let some ex := ruleErr then
-    if j.selfLeaf.isNone || (← ruleApplied.get) then throw ex
+    if selfLeaf.isEmpty || (← ruleApplied.get) then throw ex
   -- Unfolding comes last, so that a law or a caller's fact stays an abstraction boundary.
   for g' in forms do
     if let some (c, body) ← unfold? g' then
@@ -737,10 +743,19 @@ partial def bound (j : Judgment) (extras : Array Term) (goal : MVarId) (restate 
       throwError "the walk does not enter a `match`:{indentExpr g'}\nOne on the generator's \
         arguments is split before the walk when the generator is headed by it; one on a drawn \
         value is not supported."
-  if let some self := j.selfLeaf then
+  -- A bound on the generator by itself, the tightest first: a later one is a fallback, as a later
+  -- rule is.
+  let saved ← saveState
+  for self in selfLeaf do
     let lem ← mkConstWithFreshMVarLevels self
     let names := postNames (← instantiateMVars (← goal.getType))
-    return ← applyExact goal (← mkExpectedTypeHint lem (nameBound (← inferType lem) names))
+    let r ← try
+        let premises ← applyExact goal (← mkExpectedTypeHint lem (nameBound (← inferType lem) names))
+        some <$> walkAll extras (← namePremises (some g) (← goal.getType) premises)
+      catch _ =>
+        saved.restore
+        pure none
+    if let some gs := r then return gs
   throwError j.noLeaf g
 
 end
