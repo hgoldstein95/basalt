@@ -264,8 +264,8 @@ that uses every combinator). Nothing about the generator is yours to supply:
 - a **callee** is discharged by its own `<callee>.terminates` law, found by the naming convention
   (Part 2 above) — `Nat.arbitrary` inside a body needs no mention. Any other fact is passed
   explicitly: `mass_fixpoint [h₁, h₂] using …`.
-- a **helper with no law**, or a derived combinator (`optionGen`), is unfolded and walked through
-  when it is not recursive.
+- a **helper with no law**, or a derived combinator (`optionGen`, `BasaltTest/OptionGen.lean`), is
+  unfolded and walked through when it is not recursive.
 - an **`if`/`dite`** is no different from any other combinator: the bound is the same conditional
   over the branches' bounds, which the arithmetic `split`s — `Tree.genBST` (`BST.lean`) shortcuts on
   an exhausted interval. A conditional on a value drawn inside the step belongs to that draw's
