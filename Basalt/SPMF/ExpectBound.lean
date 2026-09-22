@@ -41,12 +41,13 @@ theorem SPMF.Cost.spec_le_add_of_expect_le {x : SPMF.Cost α} {φ : α × Nat �
   rw [hp', SPMF.expect_add, SPMF.expect_const]
   exact add_le_add (mul_le_of_le_one_left' (SPMF.mass_le_one x)) hx
 
-/-! ## The list combinators
+/-! ## The last resorts
 
-They have no shape of choice and no `@[gen_map]` lemma, so an upper bound on an expectation over one
-is a rule. Only the mass is used: exactly when the postexpectation is constant, and otherwise at its
-worst case over every list, dually to `le_spec_iInf_of_le_mass` on the mass side. A rule that reads
-the element generator's expectation belongs *before* these, which are the last resort. -/
+A generator the walk cannot enter — a list combinator, which has no shape of choice and no
+`@[gen_map]` lemma — is bounded using only its mass: exactly when the postexpectation is constant,
+and otherwise at its worst case over every value, dually to `le_spec_iInf_of_le_mass` on the mass
+side. They are the observation's `upperSelf` (`Basalt/SPMF/Walk/Attr.lean`), so they are tried after
+every rule and every fact, and a rule that reads the element generator's expectation wins. -/
 
 namespace SPMF
 
@@ -60,44 +61,16 @@ theorem spec_le_of_const {x : SPMF α} {p : α → ℝ≥0∞} {d : ℝ≥0∞} 
 theorem spec_le_iSup {x : SPMF α} {p : α → ℝ≥0∞} : SPMF.expectObs.spec x p ≤ ⨆ a, p a :=
   SPMF.expect_le_of_support fun a _ => le_iSup p a
 
-section listCombinators
-
-variable {α : Type} {g : SPMF α} {d : ℝ≥0∞} {p : List α → ℝ≥0∞}
-
-@[gen_rule] theorem spec_vectorOf_le_const {n : Nat} (hp : ∀ a, p a = d) :
-    SPMF.expectObs.spec (vectorOf n g) p ≤ d := spec_le_of_const hp
-
-@[gen_rule] theorem spec_vectorOf_le {n : Nat} :
-    SPMF.expectObs.spec (vectorOf n g) p ≤ ⨆ a, p a := spec_le_iSup
-
-@[gen_rule] theorem spec_listOfMaxLength_le_const {n : Nat} (hp : ∀ a, p a = d) :
-    SPMF.expectObs.spec (listOfMaxLength n g) p ≤ d := spec_le_of_const hp
-
-@[gen_rule] theorem spec_listOfMaxLength_le {n : Nat} :
-    SPMF.expectObs.spec (listOfMaxLength n g) p ≤ ⨆ a, p a := spec_le_iSup
-
-@[gen_rule] theorem spec_listOf_le_const (hp : ∀ a, p a = d) :
-    SPMF.expectObs.spec (listOf g) p ≤ d := spec_le_of_const hp
-
-@[gen_rule] theorem spec_listOf_le : SPMF.expectObs.spec (listOf g) p ≤ ⨆ a, p a := spec_le_iSup
-
-@[gen_rule] theorem spec_nonEmptyListOf_le_const (hp : ∀ a, p a = d) :
-    SPMF.expectObs.spec (nonEmptyListOf g) p ≤ d := spec_le_of_const hp
-
-@[gen_rule] theorem spec_nonEmptyListOf_le :
-    SPMF.expectObs.spec (nonEmptyListOf g) p ≤ ⨆ a, p a := spec_le_iSup
-
-end listCombinators
 
 end SPMF
 
-/-! ## The list combinators at the cost interpretation
+/-! ## The cost interpretation
 
 `vectorOf` draws a bounded number of times, so its expected cost is read off the element generator's
-and the rule is exact. The others have only the last resorts below, which at the postexpectation
-`expectedCost` uses are `⊤`; pass a bound to `expect_bound [h]`. For `listOfMaxLength` an exact rule
-is `expectedCost_vectorOf_le` averaged over the length drawn, which its `do` block presents as a
-`match` on the subtype rather than as a `chooseNat` bind. -/
+and its rule is exact. The other list combinators have only the last resorts below, which at the
+postexpectation `expectedCost` uses are `⊤`; pass a bound to `expect_bound [h]`. For
+`listOfMaxLength` an exact rule is `expectedCost_vectorOf_le` averaged over the length drawn, which
+its `do` block presents as a `match` on the subtype rather than as a `chooseNat` bind. -/
 
 namespace SPMF.Cost
 
@@ -137,8 +110,8 @@ private theorem expectedCost_vectorOf_le {n : Nat} (hg : expectedCost g ≤ b) :
     push_cast
     rw [add_mul, one_mul, add_comm]
 
-/-- The affine rules come first: they are the only ones that read the element generator's expected
-cost, and the last resorts below would otherwise shadow them. -/
+/-- The only rule that reads the element generator's expected cost; the last resorts below apply
+when it does not. -/
 @[gen_rule]
 theorem expect_vectorOf_le {n : Nat}
     (hg : SPMF.Cost.expectObs.spec g (fun _ m => (m : ℝ≥0∞)) ≤ b)
@@ -161,49 +134,33 @@ theorem specC_le_iSup {x : SPMF.Cost α} {q : α → Nat → ℝ≥0∞} :
     SPMF.Cost.expectObs.spec x q ≤ ⨆ a, ⨆ m, q a m :=
   SPMF.expect_le_of_support fun r _ => le_iSup₂_of_le r.1 r.2 le_rfl
 
-@[gen_rule] theorem expect_vectorOf_le_const {n : Nat} (hp : ∀ a m, p a m = d) :
-    SPMF.Cost.expectObs.spec (vectorOf n g) p ≤ d := specC_le_of_const hp
-
-@[gen_rule] theorem expect_vectorOf_le_iSup {n : Nat} :
-    SPMF.Cost.expectObs.spec (vectorOf n g) p ≤ ⨆ a, ⨆ m, p a m := specC_le_iSup
-
-@[gen_rule] theorem expect_listOfMaxLength_le_const {n : Nat} (hp : ∀ a m, p a m = d) :
-    SPMF.Cost.expectObs.spec (listOfMaxLength n g) p ≤ d := specC_le_of_const hp
-
-@[gen_rule] theorem expect_listOfMaxLength_le_iSup {n : Nat} :
-    SPMF.Cost.expectObs.spec (listOfMaxLength n g) p ≤ ⨆ a, ⨆ m, p a m := specC_le_iSup
-
-@[gen_rule] theorem expect_listOf_le_const (hp : ∀ a m, p a m = d) :
-    SPMF.Cost.expectObs.spec (listOf g) p ≤ d := specC_le_of_const hp
-
-@[gen_rule] theorem expect_listOf_le_iSup :
-    SPMF.Cost.expectObs.spec (listOf g) p ≤ ⨆ a, ⨆ m, p a m := specC_le_iSup
-
-@[gen_rule] theorem expect_nonEmptyListOf_le_const (hp : ∀ a m, p a m = d) :
-    SPMF.Cost.expectObs.spec (nonEmptyListOf g) p ≤ d := specC_le_of_const hp
-
-@[gen_rule] theorem expect_nonEmptyListOf_le_iSup :
-    SPMF.Cost.expectObs.spec (nonEmptyListOf g) p ≤ ⨆ a, ⨆ m, p a m := specC_le_iSup
-
 end SPMF.Cost
 
 namespace Basalt.ExpectBound
 
 open Basalt.Walk
 
-/-- Walk `goal`, `SPMF.expect g f ≤ B` at either interpretation, returning the arithmetic goal
-`b ≤ B` for the bound `b` the walk computes, then whatever else the walk left. -/
-partial def walkExpect (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
-  goal.withContext do
+/-- `goal`, an expectation bound at either interpretation, with `SPMF.Cost.expectedCost` unfolded:
+the generator, the postexpectation, the bound, and the goal restated in that form. `tac` is the
+caller, for the error. -/
+def parseExpect (tac : String) (goal : MVarId) :
+    MetaM (Expr × Expr × Expr × MVarId) := goal.withContext do
   let ty ← whnfR (← instantiateMVars (← goal.getType))
-  let bad := m!"expect_bound: expected a goal `SPMF.expect (gen …) f ≤ B`, got{indentExpr ty}"
+  let bad := m!"{tac}: expected a goal `SPMF.expect (gen …) f ≤ B`, got{indentExpr ty}"
   unless ty.isAppOfArity ``LE.le 4 do throwError bad
   let mut lhs := ty.getArg! 2
   if lhs.isAppOf ``SPMF.Cost.expectedCost then
     lhs := ((← unfoldDefinition? lhs).getD lhs).headBeta
   unless lhs.isAppOfArity ``SPMF.expect 3 do throwError bad
-  let g := lhs.getArg! 1
-  let f := lhs.getArg! 2
+  let goal ← if lhs == ty.getArg! 2 then pure goal
+    else goal.change (mkApp2 ty.appFn!.appFn! lhs (ty.getArg! 3))
+  return (lhs.getArg! 1, lhs.getArg! 2, ty.getArg! 3, goal)
+
+/-- Walk `goal`, `SPMF.expect g f ≤ B` at either interpretation, returning the arithmetic goal
+`b ≤ B` for the bound `b` the walk computes, then whatever else the walk left. -/
+partial def walkExpect (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) := do
+  let (g, f, B, goal) ← parseExpect "expect_bound" goal
+  goal.withContext do
   if let some cases ← splitMatch? goal g then return ← cases.flatMapM (walkExpect extras)
   let gTy ← instantiateMVars (← inferType g)
   let (obs, post) ← if gTy.isAppOfArity ``SPMF.Cost 1 then do
@@ -215,8 +172,7 @@ partial def walkExpect (extras : Array Term) (goal : MVarId) : TermElabM (List M
       pure (``SPMF.Cost.expectObs, post)
     else pure (``SPMF.expectObs, f)
   let (bound, structural, rest) ← computeBound extras obs false g post
-  let le := ty.appFn!.appFn!
-  let arith ← mkFreshExprMVar (mkApp2 le bound (ty.getArg! 3))
+  let arith ← mkFreshExprMVar (← mkAppM ``LE.le #[bound, B])
   goal.assign (← mkAppM ``le_trans #[structural, arith])
   (arith.mvarId! :: rest).mapM fun g => tidy g
 

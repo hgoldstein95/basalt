@@ -30,22 +30,10 @@ syntax (name := expectFixpointTac) "expect_fixpoint" (" [" term,* "]")? : tactic
 elab_rules : tactic
   | `(tactic| expect_fixpoint $[[$extras,*]]?) => withMainContext do
     let extras := (extras.map (·.getElems)).getD #[]
-    let goal ← getMainGoal
-    let ty ← whnfR (← instantiateMVars (← goal.getType))
-    let bad := m!"expect_fixpoint: expected a goal `SPMF.expect (gen …) f ≤ B`, got{indentExpr ty}"
-    unless ty.isAppOfArity ``LE.le 4 do throwError bad
-    let mut lhs := ty.getArg! 2
-    if lhs.isAppOf ``SPMF.Cost.expectedCost then
-      lhs := ((← unfoldDefinition? lhs).getD lhs).headBeta
-    unless lhs.isAppOfArity ``SPMF.expect 3 do throwError bad
-    let le := ty.appFn!.appFn!
-    let ty := mkApp2 le lhs (ty.getArg! 3)
-    let goal ← goal.change ty
+    let (x, f, B, goal) ← parseExpect "expect_fixpoint" (← getMainGoal)
     goal.withContext do
-    let x := lhs.getArg! 1
-    let f := lhs.getArg! 2
-    let B := ty.getArg! 3
     let adm ← mkAppM ``SPMF.admissible_expect_le #[f, B]
-    replaceMainGoal (← walkExpect extras (← fixpointStep "expect_fixpoint" "expect_bound" x adm goal))
+    replaceMainGoal
+      (← walkExpect extras (← fixpointStep "expect_fixpoint" "expect_bound" x adm goal))
 
 end Basalt.ExpectFixpoint
