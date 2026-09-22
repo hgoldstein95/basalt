@@ -36,14 +36,11 @@ import Basalt.Sized
 import Basalt.Tactic.Average
 import Basalt.Tactic.Complete
 import Basalt.Tactic.Cost
-import Basalt.Tactic.CostFixpoint
 import Basalt.Tactic.ENNReal
 import Basalt.Tactic.Expect
-import Basalt.Tactic.ExpectFixpoint
 import Basalt.Tactic.Mass
 import Basalt.Tactic.MassFixpoint
 import Basalt.Tactic.Sound
-import Basalt.Tactic.SoundFixpoint
 import Basalt.Tactic.Support
 import Basalt.Tuning.Attr
 import Basalt.Tuning.Basic

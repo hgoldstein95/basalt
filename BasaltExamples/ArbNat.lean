@@ -23,7 +23,8 @@ def Nat.arbitrary [Gen G] : G Nat := do
     fun _ => pure 0,
     fun _ => do
       let n ← Nat.arbitrary
-      pure (n + 1)]
+      pure (n + 1)
+  ]
 partial_fixpoint
 
 theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ := by

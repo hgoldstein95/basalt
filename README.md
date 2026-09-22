@@ -144,7 +144,6 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
   lemma sets and tactics.
 - `BasaltTest/` — regression tests, named for the library module they guard when one exists;
   `LawLine.lean` has no library counterpart (it pins the `#genstats` law-reporting contract).
-- `BasaltExperiments/` — spikes; the only place with `sorry`s, and not built by default.
 - `BasaltFuzz/` — the generators, properties, and buggy operations the `basalt-fuzz` executable
   fuzzes. Two things set this directory apart, both explained in `fuzz-run/README.md`: it is linked
   into a native executable, so it must stay Mathlib-free, and it is the only

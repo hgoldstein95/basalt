@@ -54,11 +54,6 @@ variable {Ω : Type w} (m : Mix.{u} Ω)
 def range (lo hi : Nat) (_h : lo ≤ hi) (F : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → Ω) : Ω :=
   m.mix lo hi F
 
-/-- A binary choice. -/
-@[deprecated "use `Mix.index`" (since := "2026-09-22")]
-def binary (t e : Ω) : Ω :=
-  m.mix 0 1 fun a => if (a.down.val == 0) = true then t else e
-
 /-- A choice among `d` outcomes, the first `k` of which mean `t`. -/
 def threshold (d : Nat) (k : Int) (t e : Ω) : Ω :=
   m.mix 0 (d - 1) fun a => if (a.down.val : Int) < k then t else e
@@ -153,12 +148,6 @@ theorem pure_apply (a : α) (post : α → Ω) : (Pure.pure a : WP m α) post = 
 theorem choose_apply {lo hi : Nat} {h : lo ≤ hi} (post : _ → Ω) :
     (choose lo hi h : WP m _) post = m.range lo hi h post := rfl
 
-set_option linter.deprecated false in
-@[spec_apply, deprecated "use `index_apply`" (since := "2026-09-22")]
-theorem pick_apply (x y : Unit → WP m α) (post : α → Ω) :
-    (pick x y) post = m.binary (x () post) (y () post) :=
-  congrArg (m.mix 0 1) (funext fun _ => ite_apply _ _ _)
-
 @[spec_apply]
 theorem coin_apply {m : Mix.{0} Ω} (r : Rat) (post : Bool → Ω) :
     (coin r : WP m Bool) post = m.threshold r.den r.num (post true) (post false) :=
@@ -225,13 +214,6 @@ theorem pure_apply (a : α) (post : α → Nat → Ω) : (Pure.pure a : WPC m α
 @[spec_apply]
 theorem choose_apply {lo hi : Nat} {h : lo ≤ hi} (post : _ → Nat → Ω) :
     (choose lo hi h : WPC m _) post = m.range lo hi h fun a => post a 1 := rfl
-
-set_option linter.deprecated false in
-@[spec_apply, deprecated "use `index_apply`" (since := "2026-09-22")]
-theorem pick_apply (x y : Unit → WPC m α) (post : α → Nat → Ω) :
-    (pick x y) post
-      = m.binary (x () fun b n => post b (1 + n)) (y () fun b n => post b (1 + n)) :=
-  congrArg (m.mix 0 1) (funext fun _ => ite_apply _ _ _)
 
 @[spec_apply]
 theorem coin_apply {m : Mix.{0} Ω} (r : Rat) (post : Bool → Nat → Ω) :

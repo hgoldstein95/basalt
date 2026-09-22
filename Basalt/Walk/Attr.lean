@@ -9,23 +9,29 @@ import Lean.Meta.Tactic.Simp.Attr
 /-!
 # The Walker's Judgments and Registries
 
-The judgments the generator walker (`Basalt/Walk/Basic.lean`) proves and the leaves each observation
-closes them with; the registry of `@[gen_rule]` rules, keyed by judgment and by the head constant of
-what the rule is about; the registry of `@[gen_map]` lemmas, keyed by combinator; the `@[spec_apply]`
-simp set; and the `@[gen_branches]` relations a rule collects a list combinator's branches with. A
-rule must conclude a statement one of the `judgments` recognizes; that is what makes both keys
-readable off it.
+The judgments the generator walker (`Basalt/Walk/Basic.lean`) proves, and its registries: the
+`@[gen_rule]` rules, keyed by judgment and by the head constant of what the rule is about; the
+`@[gen_map]` lemmas, keyed by combinator; the `@[obs_leaf]` lemmas, keyed by observation; the
+`@[spec_apply]` simp set; and the `@[gen_branches]` relations. Each attribute reads its key off the
+statement it tags, and fails on one it cannot.
 -/
-
 open Lean Meta
 
 namespace Basalt.Walk
 
+/-- The naming convention for a generator's laws: `<gen>.<suffix>` states `<law> (gen …) …`, in the
+order a leaf tries them. `#genstats` reports on the laws under it, and the walker closes a leaf with
+a callee's law under it. The laws are named by quoted name, so that this module imports none of
+them; `BasaltTest/LawLine.lean` checks that each resolves. -/
+def lawConventions : Array (Name × Name) := #[
+  (`sound_complete, `IsSoundAndComplete), (`sound, `IsSound), (`complete, `IsCompleteFor),
+  (`terminates, `IsAlmostSurelyTerminating), (`cost_bounded, `IsCostBounded),
+  (`filter_free, `IsFilterFree), (`productive, `IsProductive)]
+
 /-- A statement about one generator that the walker proves by structural recursion on it.
 
 The table names its constants by quoted name rather than by resolved name so that this module
-imports nothing a judgment is defined in; a misspelled constant recognizes no rule, and tagging one
-then fails. -/
+imports nothing a judgment is defined in; `BasaltTest/Obs.lean` checks that each resolves. -/
 structure Judgment where
   /-- The registry key, conventionally the constant the judgment is stated with. -/
   key : Name
@@ -35,11 +41,8 @@ structure Judgment where
   /-- How a fact closes a leaf: `none` uses the fact itself, which must then close the goal; `some b`
   passes it as the first explicit argument of `b`, whose remaining premises are walked. -/
   bridges : Array (Option Name)
-  /-- A callee's law for this judgment is `<callee>.<suffix>`, for the first of these that exists
-  and closes the leaf. -/
-  laws : Array Name := #[]
   /-- For a judgment stated on an observation, which side of the `≤` the observation is on (the
-  argument index); its leaves are then the observation's (`Judgment.at`). -/
+  argument index); its leaves are then the observation's `@[obs_leaf]` lemmas (`Judgment.leaves`). -/
   specSide : Option Nat := none
   /-- The error for a leaf nothing closes. -/
   noLeaf : Expr → MessageData
@@ -49,18 +52,9 @@ structure Judgment where
   that turn a goal about a combinator into one about the right-hand side of the combinator's
   `@[gen_map]` lemma. The explicit premises of each are that equation, then the new goal. -/
   adapters : Array Name := #[]
-  /-- Bridges for a fact whose postcondition differs from the goal's by a constant: each takes the
-  fact, then equations `∀ a, p a = k + h a` that the walker solves for `k`. -/
-  affine : Array Name := #[]
   /-- A lemma that restates a goal of this judgment, about any generator, as goals of other
   judgments; tried before the rules when it is in scope. -/
   reduceTo : Option Name := none
-  /-- Bounds on the subject by itself, tried in order for a leaf nothing else closes, in place of
-  `noLeaf`. -/
-  selfLeaf : Array Name := #[]
-  /-- Whether `selfLeaf` stands in for a rule per combinator, and so applies only to a generator
-  the walker knows as one. A generator nothing is known about is then still `noLeaf`'s error. -/
-  selfLeafIsRule : Bool := false
   /-- The registry key of the rules about the subject `g`. Tagging a rule and looking one up both
   go through this. -/
   ruleHead? : Expr → MetaM (Option Name) := fun g => pure g.getAppFn.constName?
@@ -74,7 +68,6 @@ def isBoundedJudgment : Judgment where
     unless ty.isAppOfArity `IsBounded 3 do return none
     return some (ty.getArg! 1, fun g => mkApp3 ty.getAppFn (ty.getArg! 0) g (ty.getArg! 2))
   bridges := #[none, some `IsCostBounded.isBounded]
-  laws := #[`cost_bounded]
   noLeaf g := m!"cost_bound: no hypothesis or `.cost_bounded` law bounds the cost of the \
     combinator argument{indentExpr g}\nPass a cost bound for it to `cost_bound [_]`."
   leavesFirst := true
@@ -83,84 +76,23 @@ def isBoundedJudgment : Judgment where
 /-- `law g R` with `R` to be found, for `law` one half of the support law: a list combinator's
 generator argument, whose support the list's postcondition does not mention. Only a leaf closes
 it. -/
-private def supportJudgment (law : Name) (bridge tactic : Name) (laws : Array Name) : Judgment where
+private def supportJudgment (law : Name) (bridge tactic : Name) : Judgment where
   key := law
   subject? ty := do
     unless ty.isAppOfArity law 3 do return none
     return some (ty.getArg! 1, fun g => mkApp3 ty.getAppFn (ty.getArg! 0) g (ty.getArg! 2))
   bridges := #[none, some bridge]
-  laws := laws
   noLeaf g := m!"{tactic}: no hypothesis or law gives `{law} _ _` of the combinator argument\
     {indentExpr g}\nProve one and pass it to `{tactic} [_]`."
   leavesFirst := true
 
 @[inherit_doc supportJudgment]
 def isSoundJudgment : Judgment :=
-  supportJudgment `IsSound `IsSoundAndComplete.sound `sound_bound #[`sound_complete, `sound]
+  supportJudgment `IsSound `IsSoundAndComplete.sound `sound_bound
 
 @[inherit_doc supportJudgment]
 def isCompleteForJudgment : Judgment :=
   supportJudgment `IsCompleteFor `IsSoundAndComplete.complete `complete_bound
-    #[`sound_complete, `complete]
-
-/-- What a leaf of a judgment about one observation is closed with. The rules are shared by every
-observation of a direction; the laws and bridges are not. -/
-structure Observation where
-  /-- The `Obs` constant. -/
-  obs : Name
-  /-- The affine bridges for an upper bound, and the suffixes of a callee's laws for one. -/
-  upper : Array Name := #[]
-  upperLaw : Array Name := #[]
-  /-- The same for a lower bound. -/
-  lower : Array Name := #[]
-  lowerLaw : Array Name := #[]
-  /-- Lower bounds on the observation of any generator, tried in order: a recursive occurrence or
-  an unknown callee then stays in the bound, as an exact one, where another observation fails. -/
-  lowerSelf : Array Name := #[]
-  /-- The same for an upper bound, where what a generator gives is what the missing mass allows.
-  These stand in for a rule per combinator — a list combinator has no shape of choice for the walk
-  to enter — so they apply only to a combinator, and a generator nothing is known about is still an
-  error. -/
-  upperSelf : Array Name := #[]
-
-/-- The observations the walker has leaves for. -/
-def observations : Array Observation := #[
-  { obs := `SPMF.expectObs
-    upper := #[`SPMF.spec_le_add_of_expect_le]
-    upperSelf := #[`SPMF.spec_le_of_const, `SPMF.spec_le_iSup]
-    lower := #[`SPMF.le_spec_one_of_le_mass, `SPMF.le_spec_of_le_mass, `SPMF.le_spec_of_isPMF, `SPMF.le_spec_iInf_of_le_mass,
-      `SPMF.le_spec_iInf_of_isPMF]
-    lowerLaw := #[`terminates] },
-  { obs := `SPMF.Cost.expectObs
-    upper := #[`SPMF.Cost.spec_le_add_of_expect_le]
-    upperSelf := #[`SPMF.Cost.specC_le_of_const, `SPMF.Cost.specC_le_iSup] },
-  { obs := `SPMF.Cost.alwaysObs
-    lower := #[`SPMF.Cost.le_spec_of_always, `SPMF.Cost.le_spec_of_isBounded,
-      `SPMF.Cost.le_spec_of_isCostBounded]
-    lowerLaw := #[`cost_bounded] },
-  { obs := `SPMF.Cost.worstObs
-    upper := #[`SPMF.Cost.worst_le_add_of_le, `SPMF.Cost.worst_le_add_of_isBounded]
-    upperLaw := #[`cost_bounded] },
-  { obs := `SPMF.alwaysObs
-    lower := #[`SPMF.le_always_of_isSound, `SPMF.le_always_of_isSoundAndComplete]
-    lowerLaw := #[`sound_complete, `sound] },
-  { obs := `SPMF.mayObs
-    lower := #[`SPMF.le_may_of_isCompleteFor, `SPMF.le_may_of_isSoundAndComplete,
-      `SPMF.le_may_of_measure]
-    lowerLaw := #[`sound_complete, `complete]
-    lowerSelf := #[`SPMF.le_may_self] },
-  { obs := `SPMF.Cost.mayObs
-    lowerSelf := #[`SPMF.Cost.le_may_self] }]
-
-/-- `j` with the leaves of the observation that the goal `ty` is about. -/
-def Judgment.at (j : Judgment) (ty : Expr) : Judgment := Id.run do
-  let some side := j.specSide | return j
-  let spec := (ty.getArg! side).headBeta
-  let some o := observations.find? (spec.getArg! 6 |>.getAppFn.isConstOf ·.obs) | return j
-  return if side == 2 then
-      { j with laws := o.upperLaw, affine := o.upper, selfLeaf := o.upperSelf,
-               selfLeafIsRule := true }
-    else { j with laws := o.lowerLaw, affine := o.lower, selfLeaf := o.lowerSelf }
 
 /-- The generator of `O.spec g post`, and how to restate it about another. -/
 private def specSubject? (e : Expr) : Option (Expr × (Expr → Expr)) :=
@@ -169,36 +101,40 @@ private def specSubject? (e : Expr) : Option (Expr × (Expr → Expr)) :=
     some (e.getArg! 8, fun g => mkAppN e.getAppFn (e.getAppArgs.set! 8 g))
   else none
 
-/-- `O.spec g post ≤ b`: an upper bound on an observation into an ordered algebra, computed by the
-rules from the postcondition. The rules are stated once for every monotone observation. -/
-def specLEJudgment : Judgment where
-  key := `Obs.spec
-  subject? ty := do
-    unless ty.isAppOfArity ``LE.le 4 do return none
-    let some (g, restate) := specSubject? (ty.getArg! 2) | return none
-    return some (g, fun g => mkApp2 ty.appFn!.appFn! (restate g) (ty.getArg! 3))
-  bridges := #[none]
-  noLeaf g := m!"no rule, `@[gen_map]` lemma, hypothesis, or law bounds{indentExpr g}\n\
-    Pass a fact about it to the tactic."
-  adapters := #[`Obs.spec_le_of_map, `Obs.specC_le_of_map]
-  specSide := some 2
+/-- The observation a bound `O.spec g post ≤ b` (`upper`) or `b ≤ O.spec g post` is about. -/
+private def specObs? (ty : Expr) : Option (Name × Bool) := do
+  guard (ty.isAppOfArity ``LE.le 4)
+  let (spec, upper) ← if (specSubject? (ty.getArg! 2)).isSome then some (ty.getArg! 2, true)
+    else if (specSubject? (ty.getArg! 3)).isSome then some (ty.getArg! 3, false) else none
+  let obs ← (spec.headBeta.getArg! 6).getAppFn.constName?
+  return (obs, upper)
 
-/-- `b ≤ O.spec g post`: the lower bound, as `specLEJudgment`. -/
-def specGEJudgment : Judgment where
-  key := `Obs.spec ++ `ge
+/-- `O.spec g post ≤ b` (`side := 2`) or `b ≤ O.spec g post` (`side := 3`): a bound on an
+observation into an ordered algebra, computed by the rules from the postcondition. The rules are
+stated once for every monotone observation. -/
+private def specJudgment (side : Nat) (key : Name) (adapters : Array Name) : Judgment where
+  key := key
   subject? ty := do
     unless ty.isAppOfArity ``LE.le 4 do return none
-    let some (g, restate) := specSubject? (ty.getArg! 3) | return none
-    return some (g, fun g => mkApp2 ty.appFn!.appFn! (ty.getArg! 2) (restate g))
+    let some (g, restate) := specSubject? (ty.getArg! side) | return none
+    return some (g, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! side (restate g)))
   bridges := #[none]
   noLeaf g := m!"no rule, `@[gen_map]` lemma, hypothesis, or law bounds{indentExpr g}\n\
     Pass a fact about it to the tactic."
-  adapters := #[`Obs.le_spec_of_map, `Obs.le_specC_of_map]
-  specSide := some 3
+  adapters := adapters
+  specSide := some side
+
+@[inherit_doc specJudgment]
+def specLEJudgment : Judgment :=
+  specJudgment 2 `Obs.spec #[`Obs.spec_le_of_map, `Obs.specC_le_of_map]
+
+@[inherit_doc specJudgment]
+def specGEJudgment : Judgment :=
+  specJudgment 3 (`Obs.spec ++ `ge) #[`Obs.le_spec_of_map, `Obs.le_specC_of_map]
 
 /-- The shapes of choice an algebra has rules for. -/
 def mixShapes : Array Name :=
-  #[`Mix.range, `Mix.binary, `Mix.threshold, `Mix.index, `Mix.element, `Mix.select, `Mix.rangeInt]
+  #[`Mix.range, `Mix.threshold, `Mix.index, `Mix.element, `Mix.select, `Mix.rangeInt]
 
 private def firstExplicit : Expr → Nat → Option Nat
   | .forallE _ _ b bi, i => if bi.isExplicit then some i else firstExplicit b (i + 1)
@@ -213,35 +149,84 @@ def shapeRuleHead? (shape : Expr) : MetaM (Option Name) := do
   let some algebra := (shape.getAppArgs[i]?).bind (·.getAppFn.constName?) | return none
   return some (head ++ algebra)
 
-/-- `‹shape› ≤ b`: an upper bound on a choice in an ordered algebra, from bounds on what its
-outcomes mean. The "generator" is the shape, so a rule is keyed by it. -/
-def mixLEJudgment : Judgment where
-  key := `Mix.mix
+/-- `‹shape› ≤ b` (`side := 2`) or `b ≤ ‹shape›` (`side := 3`): a bound on a choice in an ordered
+algebra, from bounds on what its outcomes mean. The "generator" is the shape, so a rule is keyed by
+it. -/
+private def mixJudgment (side : Nat) (key : Name) : Judgment where
+  key := key
   subject? ty := do
     unless ty.isAppOfArity ``LE.le 4 do return none
-    let lhs := ty.getArg! 2
-    unless mixShapes.any lhs.isAppOf do return none
-    return some (lhs, fun g => mkApp2 ty.appFn!.appFn! g (ty.getArg! 3))
+    let shape := ty.getArg! side
+    unless mixShapes.any shape.isAppOf do return none
+    return some (shape, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! side g))
   bridges := #[]
   noLeaf g := m!"no rule bounds the choice{indentExpr g}"
   ruleHead? := shapeRuleHead?
 
-/-- `b ≤ ‹shape›`: the lower bound, as `mixLEJudgment`. -/
-def mixGEJudgment : Judgment where
-  key := `Mix.mix ++ `ge
-  subject? ty := do
-    unless ty.isAppOfArity ``LE.le 4 do return none
-    let rhs := ty.getArg! 3
-    unless mixShapes.any rhs.isAppOf do return none
-    return some (rhs, fun g => mkApp2 ty.appFn!.appFn! (ty.getArg! 2) g)
-  bridges := #[]
-  noLeaf g := m!"no rule bounds the choice{indentExpr g}"
-  ruleHead? := shapeRuleHead?
+@[inherit_doc mixJudgment]
+def mixLEJudgment : Judgment := mixJudgment 2 `Mix.mix
+
+@[inherit_doc mixJudgment]
+def mixGEJudgment : Judgment := mixJudgment 3 (`Mix.mix ++ `ge)
 
 /-- Every judgment the walker knows, tried in order. -/
 def judgments : Array Judgment :=
   #[isBoundedJudgment, isSoundJudgment, isCompleteForJudgment, specLEJudgment, mixLEJudgment,
     specGEJudgment, mixGEJudgment]
+
+/-! ## Leaves of a bound on an observation -/
+
+/-- Observation ↦ its `@[obs_leaf]` lemmas, in declaration order: whether each bounds it from above,
+whether it is a bound by itself (`self`), and its name. -/
+initialize obsLeafExt :
+    SimplePersistentEnvExtension (Name × Bool × Bool × Name) (NameMap (Array (Bool × Bool × Name))) ←
+  let add (m : NameMap (Array (Bool × Bool × Name))) : Name × Bool × Bool × Name → _
+    | (o, e) => m.insert o (((m.find? o).getD #[]).push e)
+  registerSimplePersistentEnvExtension {
+    addEntryFn := add
+    addImportedFn := fun ess => ess.foldl (fun m es => es.foldl add m) {}
+  }
+
+/-- What closes a leaf of a bound on one observation, besides a fact that is the bound itself. -/
+structure Leaves where
+  /-- Bridges from a fact whose postcondition differs from the goal's by a constant: each takes the
+  fact, then equations `∀ a, p a = k + h a` that the walker solves for `k`. -/
+  facts : Array Name := #[]
+  /-- Bounds on the subject by itself, tried in order for a leaf nothing else closes, in place of
+  the judgment's `noLeaf`. -/
+  self : Array Name := #[]
+  /-- Whether `self` stands in for a rule per combinator — an upper bound's does, since a list
+  combinator has no shape of choice for the walk to enter — and so applies only to a generator the
+  walker knows as one. A generator nothing is known about is then still an error. A lower bound's
+  keeps a recursive occurrence or an unknown callee in the bound as itself. -/
+  selfOnlyCombinators : Bool := false
+
+/-- The leaves of the goal `ty`, a statement of judgment `j`: its observation's, if it has one. -/
+def Judgment.leaves (j : Judgment) (ty : Expr) : CoreM Leaves := do
+  if j.specSide.isNone then return {}
+  let some (obs, upper) := specObs? ty | return {}
+  let all := ((obsLeafExt.getState (← getEnv)).find? obs).getD #[]
+  let of (self : Bool) := all.filterMap fun (u, s, n) => if u == upper && s == self then n else none
+  return { facts := of false, self := of true, selfOnlyCombinators := upper }
+
+/-- `@[obs_leaf]` — a bridge from a fact about a generator to a bound on an observation of it, which
+the walker tries at a leaf of that bound: its first explicit argument is the fact, and the rest are
+equations `∀ a, p a = k + h a` for the walker to solve. `@[obs_leaf self]` — a bound on an
+observation of any generator by itself, the walker's last resort. The observation and the direction
+are read off the conclusion; lemmas for one pair are tried in declaration order. -/
+syntax (name := obsLeafAttr) "obs_leaf" (&" self")? : attr
+
+initialize registerBuiltinAttribute {
+  name := `obsLeafAttr
+  descr := "a leaf of the generator walker's bound on an observation"
+  add := fun declName stx kind => do
+    unless kind == .global do throwError "obs_leaf: must be a global attribute"
+    let some (obs, upper) ← MetaM.run' <| forallTelescope (← getConstInfo declName).type
+        fun _ concl => return specObs? (← whnfR concl)
+      | throwError "obs_leaf: `{declName}` must conclude `O.spec g p ≤ b` or `b ≤ O.spec g p` for \
+          an observation `O` that is a constant"
+    modifyEnv (obsLeafExt.addEntry · (obs, upper, !stx[1].isNone, declName))
+}
 
 /-- `@[spec_apply]` — how a specification built from a shape of choice applies to a postcondition.
 The walker rewrites with these after a `@[gen_map]` lemma, to reach the algebra's own shapes. -/

@@ -70,18 +70,6 @@ theorem range_angelic (F : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → Prop
     Mix.angelic.mix lo hi F ↔ ∃ x, ∃ hx : lo ≤ x ∧ x ≤ hi, F ⟨⟨x, hx⟩⟩ :=
   ⟨fun ⟨a, h⟩ => ⟨a.down.val, a.down.property, h⟩, fun ⟨x, hx, h⟩ => ⟨⟨⟨x, hx⟩⟩, h⟩⟩
 
-@[deprecated "use `index_angelic`" (since := "2026-09-22")]
-theorem binary_angelic (F : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ 1} → Prop) :
-    Mix.angelic.mix 0 1 F ↔ F ⟨⟨0, by omega⟩⟩ ∨ F ⟨⟨1, by omega⟩⟩ := by
-  constructor
-  · rintro ⟨⟨⟨x, hx⟩⟩, h⟩
-    obtain rfl | rfl : x = 0 ∨ x = 1 := by omega
-    · exact Or.inl h
-    · exact Or.inr h
-  · rintro (h | h)
-    · exact ⟨_, h⟩
-    · exact ⟨_, h⟩
-
 theorem threshold_angelic {d : Nat} {k : Int} (hd : 0 < d) (t e : Prop) :
     Mix.angelic.mix 0 (d - 1)
         (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ d - 1} => if (a.down.val : Int) < k then t else e)
@@ -149,16 +137,6 @@ theorem le_demonic_range {lo hi : Nat} {h : lo ≤ hi}
     {d : (x : Nat) → lo ≤ x ∧ x ≤ hi → Prop} (hF : ∀ x hx, d x hx ≤ F ⟨⟨x, hx⟩⟩) :
     (∀ x hx, d x hx) ≤ Mix.demonic.range lo hi h F := fun hd _ => hF _ _ (hd _ _)
 
-set_option linter.deprecated false in
-@[gen_rule, deprecated "use `le_demonic_index`" (since := "2026-09-22")]
-theorem le_demonic_binary {t e c d : Prop} (ht : c ≤ t) (he : d ≤ e) :
-    (c ∧ d) ≤ (Mix.demonic.{u}).binary t e := by
-  rintro ⟨hc, hd⟩ a
-  show if _ then t else e
-  split
-  · exact ht hc
-  · exact he hd
-
 @[gen_rule]
 theorem le_demonic_threshold {n : Nat} {k : Int} {t e c d : Prop} (ht : c ≤ t) (he : d ≤ e) :
     (c ∧ d) ≤ (Mix.demonic.{u}).threshold n k t e := by
@@ -217,14 +195,6 @@ theorem le_angelic_range {lo hi : Nat} {h : lo ≤ hi}
     {d : (x : Nat) → lo ≤ x ∧ x ≤ hi → Prop} (hF : ∀ x hx, d x hx ≤ F ⟨⟨x, hx⟩⟩) :
     (∃ x hx, d x hx) ≤ Mix.angelic.range lo hi h F := fun ⟨x, hx, hd⟩ => ⟨_, hF x hx hd⟩
 
-set_option linter.deprecated false in
-@[gen_rule, deprecated "use `le_angelic_index`" (since := "2026-09-22")]
-theorem le_angelic_binary {t e c d : Prop} (ht : c ≤ t) (he : d ≤ e) :
-    (c ∨ d) ≤ (Mix.angelic.{u}).binary t e := by
-  intro h
-  refine (binary_angelic _).mpr ?_
-  exact h.imp ht he
-
 @[gen_rule]
 theorem le_angelic_threshold {n : Nat} {k : Int} {t e c d : Prop} (hn : 0 < n)
     (ht : c ≤ t) (he : d ≤ e) :
@@ -279,18 +249,3 @@ theorem le_angelic_rangeInt {lo hi : Int} {h : lo ≤ hi} {F : Int → Prop}
   exact hF x hx hd
 
 end Mix
-
-namespace Basalt.Walk
-
-/-! ## Introducing a conditional precondition -/
-
-theorem ite_intro {p : Prop} [Decidable p] {c d : Prop} (hc : ∀ _h : p, c) (hd : ∀ _h : ¬p, d) :
-    if p then c else d := by split <;> simp_all
-
-theorem dite_intro {p : Prop} [Decidable p] {c : p → Prop} {d : ¬p → Prop} (hc : ∀ h, c h)
-    (hd : ∀ h, d h) : if h : p then c h else d h := by split <;> simp_all
-
-theorem dite_const {p : Prop} [Decidable p] {c : Prop} : (if _h : p then c else c) = c := by
-  split <;> rfl
-
-end Basalt.Walk

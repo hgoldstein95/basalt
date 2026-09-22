@@ -272,15 +272,6 @@ theorem choose_apply (lo hi : Nat) (h : lo ≤ hi) (m : ULift {x : Nat // lo ≤
 
 theorem default_apply (a : α) : (default : SPMF α) a = 0 := rfl
 
-set_option linter.deprecated false in
-@[deprecated "use `oneOf`" (since := "2026-09-22")]
-theorem bind_pick {α β} (x y : SPMF α) (f : α → SPMF β) :
-    (pick (fun () => x) (fun () => y) >>= f) = pick (fun _ => x >>= f) (fun _ => y >>= f) := by
-  simp only [pick, LawfulMonad.bind_assoc]
-  congr 1
-  funext n
-  split <;> rfl
-
 @[simp]
 theorem bot_bind (f : α → SPMF β) : (Bot.bot (α := SPMF α) >>= f) = Bot.bot := by
   ext b

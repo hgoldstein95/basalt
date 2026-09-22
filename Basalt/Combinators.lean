@@ -289,6 +289,19 @@ theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
   apply hmono
   assumption
 
+/-- A uniform binary choice. -/
+@[deprecated "use `oneOf [x, y]`" (since := "2026-09-22")]
+def RandomChoice.pick [Gen G] (x y : Unit → G α) : G α := oneOf [x, y]
+
+set_option linter.deprecated false in
+@[partial_fixpoint_monotone, deprecated monotone_oneOf (since := "2026-09-22")]
+theorem RandomChoice.monotone_pick [Gen G] {γ : Sort w} [PartialOrder γ] {x y : γ → G α}
+    (hx : monotone x) (hy : monotone y) :
+    monotone fun a => RandomChoice.pick (fun () => x a) (fun () => y a) :=
+  monotone_oneOf (fun a => [fun () => x a, fun () => y a]) (fun _ => by simp)
+    (List.monotone_cons _ _ (monotone_of_monotone_apply _ fun _ => hx)
+      (List.monotone_cons _ _ (monotone_of_monotone_apply _ fun _ => hy) (monotone_const _)))
+
 @[partial_fixpoint_monotone]
 theorem monotone_pair_snd {α : Type u} {γ : Sort w} [PartialOrder α] [PartialOrder γ]
     (w : Nat) (g : γ → α) (hg : monotone g) :

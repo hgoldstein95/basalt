@@ -9,7 +9,8 @@ import Basalt
 # Facts about the combinators
 
 Concrete `frequency` branch probabilities, computed with `SPMF.frequency_apply` and friends and
-pinned here as regression tests, plus a check that `oneOf` works under `partial_fixpoint`.
+pinned here as regression tests, plus a check that `oneOf`, and the deprecated `pick` defined by
+it, work under `partial_fixpoint`.
 -/
 
 open NNReal ENNReal
@@ -79,3 +80,21 @@ partial_fixpoint
 #guard_msgs(drop info) in
 #eval (for _ in [0:10] do
   IO.println <| repr (← permutationOf [1, 2, 3, 4, 5]).val : IO Unit)
+
+/-! The deprecated `pick` is `oneOf` of two branches: a recursive generator using it still
+elaborates as a `partial_fixpoint`, and the walker proves its laws through `oneOf`. -/
+
+namespace DeprecatedPick
+
+set_option linter.deprecated false
+
+open RandomChoice in
+def natGen [Gen G] : G Nat :=
+  pick (fun _ => pure 0) (fun _ => do let n ← natGen; pure (n + 1))
+partial_fixpoint
+
+theorem natGen.cost_bounded : IsCostBounded natGen (fun n => n + 1) := by
+  cost_fixpoint
+  all_goals omega
+
+end DeprecatedPick
