@@ -4,8 +4,8 @@ Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks, Harrison Goldstein
 -/
 
-import Basalt.PBT.Property
 import Basalt.IO
+import Basalt.PBT.Property
 import Basalt.PlausibleGen
 
 /-!

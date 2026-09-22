@@ -3,8 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Expect.Obs
 import Basalt.Obs.Presentation
+import Basalt.SPMF.Expect.Obs
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 

@@ -3,8 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Obs.Combinators
 import Mathlib.Order.Basic
+import Basalt.Obs.Combinators
 
 /-!
 # Observations into an Ordered Algebra

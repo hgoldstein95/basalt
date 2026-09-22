@@ -3,10 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Gen
 import Mathlib.Algebra.Group.Defs
 import Mathlib.Algebra.Group.Nat.Defs
 import Mathlib.Data.Real.Basic
+import Basalt.Gen
 
 open RandomChoice
 

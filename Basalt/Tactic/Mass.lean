@@ -3,8 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Tactic.Average
 import Basalt.SPMF.Mass
+import Basalt.Tactic.Average
 import Basalt.Walk.Entry
 
 /-!

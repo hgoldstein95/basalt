@@ -3,19 +3,19 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Walk.Attr
-import Batteries.Data.List.Basic
-import Lean.Elab.Tactic.Basic
 import Lean.Elab.SyntheticMVars
-import Lean.Meta.RecExt
-import Lean.Meta.Transform
-import Lean.Meta.Tactic.Replace
-import Lean.Meta.Tactic.Assumption
-import Lean.Meta.Tactic.AC.Main
-import Lean.Meta.Tactic.NormCast
+import Lean.Elab.Tactic.Basic
+import Lean.Elab.Tactic.NormCast
 import Lean.Meta.CtorRecognizer
 import Lean.Meta.Match.MatcherApp.Basic
-import Lean.Elab.Tactic.NormCast
+import Lean.Meta.RecExt
+import Lean.Meta.Tactic.AC.Main
+import Lean.Meta.Tactic.Assumption
+import Lean.Meta.Tactic.NormCast
+import Lean.Meta.Tactic.Replace
+import Lean.Meta.Transform
+import Batteries.Data.List.Basic
+import Basalt.Walk.Attr
 
 /-!
 # The Generator Walker

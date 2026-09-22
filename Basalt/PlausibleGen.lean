@@ -4,8 +4,8 @@ Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
 
-import Basalt.Gen
 import Plausible.Gen
+import Basalt.Gen
 
 /-!
 # Plausible Gen as a Basalt Generator
