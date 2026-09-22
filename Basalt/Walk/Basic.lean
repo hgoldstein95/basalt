@@ -594,7 +594,7 @@ partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
     let (_, goal) ← goal.intro ((← getLCtx).getUnusedName n.eraseMacroScopes)
     return ← walk extras goal
   for j in judgments do
-    if let some (g, restate) ← j.subject? ty then
+    if let some (g, restate) := j.subject? ty then
       return ← bound j (← j.leaves ty) extras goal restate g
   -- The branch premises of a list combinator, built one branch at a time.
   if let some head := ty.getAppFn.constName? then
