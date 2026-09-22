@@ -43,53 +43,37 @@ theorem map_elements (xs : List α) (hne : xs ≠ []) :
   funext ⟨i, h1, h2⟩
   exact O.map_pure _
 
-theorem map_oneOfAux (l : List (Unit → G α)) (n : Nat) (hlt : ∀ i, i ≤ n → i < l.length) :
-    O.spec (Helpers.oneOfAux l n hlt)
-      = choose 0 n (Nat.zero_le _) >>= fun a =>
-          O.spec ((l[a.down.val]'(hlt _ a.down.property.2)) ()) := by
-  unfold Helpers.oneOfAux
-  rw [O.map_bind, O.map_map, O.map_choose, bind_map_left]
-  congr 1
-  funext ⟨i, h1, h2⟩
-  rfl
-
 @[gen_map]
 theorem map_oneOf (gs : List (Unit → G α)) (hne : gs ≠ []) :
-    O.spec (oneOf gs hne) = index gs hne fun g => O.spec (g ()) :=
-  O.map_oneOfAux gs _ _
+    O.spec (oneOf gs hne) = index gs hne fun g => O.spec (g ()) := by
+  unfold oneOf index
+  rw [O.map_bind, O.map_map, O.map_choose, bind_map_left]
 
 omit [LawfulMonad G] [LawfulMonad W] in
-theorem map_frequencySelect (gs : List (Nat × (Unit → G α))) (n : Nat)
+theorem map_frequencyAux (gs : List (Nat × (Unit → G α))) (n : Nat)
     (h : n < (gs.map Prod.fst).sum) (d : W α) :
-    O.spec (Helpers.frequencySelect gs n h)
+    O.spec (frequencyAux gs n h)
       = selectD (gs.map fun p => (p.1, O.spec (p.2 ()))) n d := by
   induction gs generalizing n with
   | nil => simp at h
   | cons hd tl ih =>
     obtain ⟨k, x⟩ := hd
-    simp only [Helpers.frequencySelect, selectD, List.map_cons]
+    simp only [frequencyAux, selectD, List.map_cons]
     split
     · rfl
     · exact ih _ _
 
-/-- The draw is below the total weight, so neither `frequencyAux`'s `default` branch nor `selectD`'s
+/-- The draw is below the total weight, so neither `frequency`'s `default` branch nor `selectD`'s
 `d` is reached, and no law about `default` is needed. -/
-theorem map_frequencyAux (gs : List (Nat × (Unit → G α))) (total : Nat)
-    (htotal : total = (gs.map Prod.fst).sum) (hpos : 0 < total) (d : W α) :
-    O.spec (Helpers.frequencyAux gs total htotal)
-      = choose 0 (total - 1) (Nat.zero_le _) >>= fun a =>
-          selectD (gs.map fun p => (p.1, O.spec (p.2 ()))) a.down.val d := by
-  unfold Helpers.frequencyAux
-  rw [O.map_bind, O.map_map, O.map_choose, bind_map_left]
-  congr 1
-  funext ⟨i, h1, h2⟩
-  have hi : i < total := by omega
-  simp only [dif_pos hi]
-  exact O.map_frequencySelect gs i (by omega) d
-
 @[gen_map]
 theorem map_frequency (gs : List (Nat × (Unit → G α))) (h : 0 < (gs.map Prod.fst).sum) :
-    O.spec (frequency gs h) = select gs h (fun g => O.spec (g ())) (O.spec default) :=
-  O.map_frequencyAux gs _ rfl h _
+    O.spec (frequency gs h) = select gs h (fun g => O.spec (g ())) (O.spec default) := by
+  unfold frequency select
+  rw [O.map_bind, O.map_chooseNat, bind_map_left]
+  congr 1
+  funext ⟨i, h1, h2⟩
+  have hi : i < (gs.map Prod.fst).sum := by omega
+  simp only [dif_pos hi]
+  exact O.map_frequencyAux gs i hi _
 
 end Obs
