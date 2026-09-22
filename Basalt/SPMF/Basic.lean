@@ -3,8 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Topology.Instances.ENNReal.Lemmas
 import Mathlib.MeasureTheory.Measure.Dirac
+import Mathlib.Topology.Instances.ENNReal.Lemmas
 import Basalt.RandomChoice
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory

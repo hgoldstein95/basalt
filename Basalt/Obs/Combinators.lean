@@ -3,9 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Basalt.Combinators
 import Basalt.Obs.Basic
 import Basalt.Obs.Spec
-import Basalt.Combinators
 
 /-!
 # Observations Commute with the Combinators

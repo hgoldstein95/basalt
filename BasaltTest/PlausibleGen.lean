@@ -3,10 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import BasaltExamples.ArbNat
+import BasaltExamples.ArbString
 import BasaltExamples.BST
 import BasaltExamples.Heap
-import BasaltExamples.ArbString
-import BasaltExamples.ArbNat
 
 /-!
 # Exercising the `Plausible.Gen` Interpretation

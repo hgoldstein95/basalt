@@ -3,9 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Mathlib.Data.ENat.Lattice
 import Basalt.Laws
 import Basalt.Walk.Entry
-import Mathlib.Data.ENat.Lattice
 
 /-!
 # Walking Cost Bounds

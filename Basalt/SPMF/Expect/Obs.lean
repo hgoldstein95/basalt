@@ -3,9 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Expect.Basic
-import Basalt.Obs.Spec
 import Basalt.Obs.Combinators
+import Basalt.Obs.Spec
+import Basalt.SPMF.Expect.Basic
 
 open RandomChoice NNReal ENNReal
 

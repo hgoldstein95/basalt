@@ -4,8 +4,8 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt
-import BasaltExamples.ArbNat
 import BasaltExamples.ArbChar
+import BasaltExamples.ArbNat
 
 open RandomChoice ArbNat ArbChar
 

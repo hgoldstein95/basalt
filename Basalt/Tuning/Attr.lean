@@ -3,8 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-
-import Lean
+import Lean.Elab.Command
+import Lean.Elab.Tactic.Monotonicity
 import Basalt.Combinators
 import Basalt.Tuning.Basic
 

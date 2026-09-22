@@ -5,7 +5,6 @@ Authors: Harrison Goldstein & Ernest Ng
 -/
 
 import Basalt.Gen
-import Basalt.IO
 import Basalt.RandomChoice
 
 open Lean.Order
