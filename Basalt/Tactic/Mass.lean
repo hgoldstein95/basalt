@@ -3,9 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.AverageBound
+import Basalt.Tactic.Average
 import Basalt.SPMF.Mass
-import Basalt.SPMF.Walk.Entry
+import Basalt.Walk.Entry
 
 /-!
 # Computing Mass Lower Bounds

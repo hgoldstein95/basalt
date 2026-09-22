@@ -4,7 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.RandomChoice
-import Basalt.SPMF.Walk.Attr
+import Basalt.Walk.Attr
 
 /-!
 # Specification Monads

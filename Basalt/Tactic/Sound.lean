@@ -4,7 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Laws
-import Basalt.SPMF.Walk.Entry
+import Basalt.Walk.Entry
 
 /-!
 # Walking Soundness
@@ -104,7 +104,7 @@ that path built. Recursive occurrences are closed from the local context, callee
 `.sound_complete` or `.sound` law; any other soundness fact can be passed as `sound_bound [h₁, h₂]`.
 
 In a residual goal, a value drawn by `let x ← …` is named `x` and what is known about it `h_x`, as
-the walker names them (`Basalt/SPMF/Walk.lean`). -/
+the walker names them (`Basalt/Walk/Basic.lean`). -/
 syntax (name := soundBoundTac) "sound_bound" (" [" term,* "]")? : tactic
 
 elab_rules : tactic

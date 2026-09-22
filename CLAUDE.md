@@ -40,19 +40,19 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean). A new combinator needs its `map_` lemma and
   nothing per judgment; [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour.
 - **Support** — a support law is two walks: soundness, a lower bound on `SPMF.alwaysObs` in the
-  demonic algebra (`sound_bound`, [Basalt/SPMF/SoundBound.lean](Basalt/SPMF/SoundBound.lean), and
-  `sound_fixpoint`, [Basalt/SPMF/SoundFixpoint.lean](Basalt/SPMF/SoundFixpoint.lean), pinned by
-  [BasaltTest/SoundBound.lean](BasaltTest/SoundBound.lean)); and completeness, a lower bound on
+  demonic algebra (`sound_bound`, [Basalt/Tactic/Sound.lean](Basalt/Tactic/Sound.lean), and
+  `sound_fixpoint`, [Basalt/Tactic/SoundFixpoint.lean](Basalt/Tactic/SoundFixpoint.lean), pinned by
+  [BasaltTest/Tactic/Sound.lean](BasaltTest/Tactic/Sound.lean)); and completeness, a lower bound on
   `SPMF.mayObs` in the angelic one, under an induction the user chooses (`complete_bound` and
-  `IsCompleteFor.of_measure`, [Basalt/SPMF/CompleteBound.lean](Basalt/SPMF/CompleteBound.lean),
-  pinned by [BasaltTest/CompleteBound.lean](BasaltTest/CompleteBound.lean)). The practical entry is
+  `IsCompleteFor.of_measure`, [Basalt/Tactic/Complete.lean](Basalt/Tactic/Complete.lean),
+  pinned by [BasaltTest/Tactic/Complete.lean](BasaltTest/Tactic/Complete.lean)). The practical entry is
   WORKFLOW.md's Recipe 1. Support inversion outside a law (`mem_support_*_iff`, for a probability
   goal or a support equation) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean); the
-  `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactics.lean](Basalt/Tactics.lean).
+  `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactic/Support.lean](Basalt/Tactic/Support.lean).
 - **Termination** — the criterion (`IsPMF_of_lfp_eq_one`) and its `LfpIsOne` certificates:
   [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); the `mass_fixpoint` tactic:
-  [Basalt/SPMF/MassFixpoint.lean](Basalt/SPMF/MassFixpoint.lean), contract
-  pinned by [BasaltTest/Termination.lean](BasaltTest/Termination.lean). Ranking functions and
+  [Basalt/Tactic/MassFixpoint.lean](Basalt/Tactic/MassFixpoint.lean), contract
+  pinned by [BasaltTest/Tactic/MassFixpoint.lean](BasaltTest/Tactic/MassFixpoint.lean). Ranking functions and
   expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). The equations of `mass`:
   [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
 - **The generator walker** — one walk proves every judgment, each stated on an observation as a
@@ -60,24 +60,24 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   combinator has no rule: its `@[gen_map]` lemma is applied and rewritten (`@[spec_apply]`) into a
   *shape of choice* in the algebra. The `@[gen_rule]` rules are for the host constructs, once for
   every monotone observation ([Basalt/Obs/Ordered.lean](Basalt/Obs/Ordered.lean)), for the shapes,
-  per algebra and direction ([Basalt/SPMF/AverageBound.lean](Basalt/SPMF/AverageBound.lean) for
+  per algebra and direction ([Basalt/Tactic/Average.lean](Basalt/Tactic/Average.lean) for
   expectations; the demonic and angelic ones beside the presentations they are derived from, in
   [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean); the `sup` ones in
-  [Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean)), and for bridging a recursive
+  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean)), and for bridging a recursive
   combinator's law. The judgments, the per-observation leaves, and the registries are
-  [Basalt/SPMF/Walk/Attr.lean](Basalt/SPMF/Walk/Attr.lean); the walk and its side-goal solvers are
-  [Basalt/SPMF/Walk.lean](Basalt/SPMF/Walk.lean). What an entry tactic is made of — `computeBound`,
+  [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean); the walk and its side-goal solvers are
+  [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean). What an entry tactic is made of — `computeBound`,
   `fixpointStep`, and the residual handlers — is
-  [Basalt/SPMF/Walk/Entry.lean](Basalt/SPMF/Walk/Entry.lean): a `_bound` tactic restates its goal
+  [Basalt/Walk/Entry.lean](Basalt/Walk/Entry.lean): a `_bound` tactic restates its goal
   and relates the computed bound to it, and a `_fixpoint` tactic is `fixpointStep` and its `_bound`
   (`mass_fixpoint` excepted, which goes through the `LfpIsOne` criterion). The entry tactics are
   `sound_bound` and `complete_bound` (above), `mass_bound`
-  ([Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean), pinned by
-  [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean)), `cost_bound`
-  ([Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean), pinned by
-  [BasaltTest/CostBound.lean](BasaltTest/CostBound.lean)), and `expect_bound`
-  ([Basalt/SPMF/ExpectBound.lean](Basalt/SPMF/ExpectBound.lean), pinned by
-  [BasaltTest/ExpectBound.lean](BasaltTest/ExpectBound.lean)), each but `complete_bound` with its
+  ([Basalt/Tactic/Mass.lean](Basalt/Tactic/Mass.lean), pinned by
+  [BasaltTest/Tactic/Mass.lean](BasaltTest/Tactic/Mass.lean)), `cost_bound`
+  ([Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean), pinned by
+  [BasaltTest/Tactic/Cost.lean](BasaltTest/Tactic/Cost.lean)), and `expect_bound`
+  ([Basalt/Tactic/Expect.lean](Basalt/Tactic/Expect.lean), pinned by
+  [BasaltTest/Tactic/Expect.lean](BasaltTest/Tactic/Expect.lean)), each but `complete_bound` with its
   `_fixpoint`.
   [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and fails the build when one of the
   combinators it names loses its `@[gen_map]` lemma or a list combinator loses a bridge — it checks
@@ -86,14 +86,14 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
-  [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean). The practical entry for a bound is
+  [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean). The practical entry for a bound is
   WORKFLOW.md's Recipe 4.
 - **Cost** — the interpretation (`SPMF.Cost`, `IsBounded`, its support inversion, expected cost):
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:
-  [Basalt/SPMF/CostFixpoint.lean](Basalt/SPMF/CostFixpoint.lean), contract pinned by
-  [BasaltTest/CostFixpoint.lean](BasaltTest/CostFixpoint.lean). The practical entry is
+  [Basalt/Tactic/CostFixpoint.lean](Basalt/Tactic/CostFixpoint.lean), contract pinned by
+  [BasaltTest/Tactic/CostFixpoint.lean](BasaltTest/Tactic/CostFixpoint.lean). The practical entry is
   WORKFLOW.md's Recipe 3.
-- **ENNReal arithmetic** — `ennreal_to_real` in [Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean).
+- **ENNReal arithmetic** — `ennreal_to_real` in [Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean).
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
   [Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)'s module docstring;
   [BasaltTest/Tuning.lean](BasaltTest/Tuning.lean) is the full tour.
@@ -147,10 +147,10 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   is in context, and the goal comes back stated through `vectorOf`'s own bridge) — for a generator
   headed by a combinator the walker tries the combinator's rule or `@[gen_map]` lemma before any
   fact. `generalize` the term to a variable first, as `isBounded_vectorOf` does in
-  [Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean).
+  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean).
 
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
-  `ennreal_to_real` ([Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean)) and finish over `ℝ`.
+  `ennreal_to_real` ([Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean)) and finish over `ℝ`.
 
 ## Documentation rules
 

@@ -4,7 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Support
-import Basalt.ENNRealAuto
+import Basalt.Tactic.ENNReal
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
