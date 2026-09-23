@@ -82,7 +82,7 @@ def campaign (label : String) (step : IO TestOutcome) (runs : Nat)
   r.report label
   r.exitOnFailure
 
-/-- Test `T` at the default `IO` interpretation, where choices come from `IO.rand`. -/
+/-- Test `T` at the default `IO` interpretation, where choices come from SplitMix via `ioGen`. -/
 def ioCampaign (T : Property) (runs : Nat) (maxDiscardRatio : Nat := 10) : IO Unit :=
   campaign "IO" (runProp (T IO)) runs maxDiscardRatio
 

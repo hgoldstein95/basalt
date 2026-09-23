@@ -20,7 +20,7 @@ ROOT=$(pwd)
 if [ -f fuzz-run/env.sh ]; then . fuzz-run/env.sh; fi
 
 IR="$ROOT/.lake/build/ir"
-DEP_IR="$ROOT/.lake/packages/plausible/.lake/build/ir"
+PKGS="$ROOT/.lake/packages"
 OUT="$ROOT/fuzz-run/obj"; mkdir -p "$OUT"
 
 # The exact (Mathlib-free) module closure the executable links. Instrumenting all of it realizes
@@ -37,11 +37,15 @@ MODULES=(
   BasaltFuzzMain
 )
 
-# Dependency modules the closure needs, compiled *without* SanitizerCoverage: they are the
-# `--backend=plausible` PRNG, not code under test, and coverage over a PRNG's mixing steps is pure
-# noise to libFuzzer's feedback. `Basalt/PlausibleGen` pulls these in for the `Gen Plausible.Gen`
-# instance; nothing here imports Mathlib (verified by the link succeeding).
-DEP_MODULES=(Plausible/Random Plausible/Gen)
+# Dependency modules the closure needs, as `<package>/<module>`, compiled *without*
+# SanitizerCoverage: they are the backends' PRNGs, not code under test, and coverage over a PRNG's
+# mixing steps is pure noise to libFuzzer's feedback. `Basalt/PlausibleGen` pulls in Plausible's for
+# the `Gen Plausible.Gen` instance and `Basalt/IO` SplitMix's; nothing here imports Mathlib
+# (verified by the link succeeding).
+DEP_MODULES=(plausible/Plausible/Random plausible/Plausible/Gen splitmix/SplitMix/Native splitmix/SplitMix/IO)
+
+# SplitMix's C implementation, which its `@[extern]` declarations call.
+DEP_LIBS=("$PKGS/splitmix/.lake/build/lib/libsplitmix.a")
 
 # ---------------------------------------------------------------------------------------------
 # Platform detection
@@ -183,7 +187,7 @@ echo "== platform: $UNAME; cc: $CC; runtime: $FUZZER_LIB_FLAGS ${DRIVER_DEFINE:+
 # ---------------------------------------------------------------------------------------------
 echo "== elaborate + emit C via Lake =="
 # shellcheck disable=SC2086   # a target list: the split into words is the point
-lake build Basalt.Fuzz.Runner Basalt.Combinators BasaltFuzzMain \
+lake build Basalt.Fuzz.Runner Basalt.Combinators BasaltFuzzMain splitmix/libsplitmix \
   ${EXTRA_LAKE_TARGETS:-} >/dev/null
 
 echo "== compile (SanitizerCoverage on all first-party modules) + bridge =="
@@ -199,9 +203,9 @@ for m in "${MODULES[@]}"; do
   OBJS+=("$o")
 done
 for m in "${DEP_MODULES[@]}"; do
-  c="$DEP_IR/$m.c"
+  c="$PKGS/${m%%/*}/.lake/build/ir/${m#*/}.c"
   [ -f "$c" ] || { echo "  (skip $m: no IR)"; continue; }
-  o="$OUT/$(echo "$m" | tr / _).o"
+  o="$OUT/$(echo "${m#*/}" | tr / _).o"
   $CC -O1 -c "$c" -o "$o"
   OBJS+=("$o")
 done
@@ -229,7 +233,7 @@ echo "== link =="
 # a nonzero status or a missing binary.
 rm -f fuzz-run/basalt-fuzz
 # shellcheck disable=SC2086   # flag strings: the split into words is the point
-if ! $CC "${OBJS[@]}" -o fuzz-run/basalt-fuzz $FUZZER_LIB_FLAGS $CXXLIB_FLAGS > "$OUT/link.log" 2>&1; then
+if ! $CC "${OBJS[@]}" "${DEP_LIBS[@]}" -o fuzz-run/basalt-fuzz $FUZZER_LIB_FLAGS $CXXLIB_FLAGS > "$OUT/link.log" 2>&1; then
   grep -viE 'unused|-Wl' "$OUT/link.log" >&2 || true
   echo "== link FAILED (runtime: $FUZZER_LIB_FLAGS; cxxlib: $CXXLIB_FLAGS) ==" >&2
   exit 1

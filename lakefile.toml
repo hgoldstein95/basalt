@@ -27,3 +27,8 @@ globs = ["BasaltFuzzMain"]
 name = "mathlib"
 scope = "leanprover-community"
 rev = "v4.33.0-rc2"
+
+[[require]]
+name = "splitmix"
+git = "https://github.com/hgoldstein95/splitmix"
+rev = "v4.33.0-rc2"

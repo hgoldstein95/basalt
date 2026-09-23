@@ -84,9 +84,9 @@ a compile-time flag on that C. `build.sh` compiles the modules whose branching t
 explore — the properties and the generator/combinator code, listed in its `MODULES` — with
 `-fsanitize=fuzzer-no-link`, and links them against the libFuzzer runtime with `leanc` as the C
 driver. The Lean runtime and the rest of stdlib stay uninstrumented; partial coverage still guides
-libFuzzer. Plausible's `Gen`/`Random` are linked but not instrumented: they are the
-`--backend=plausible` PRNG rather than code under test, and coverage over a PRNG's mixing steps is
-noise in the feedback.
+libFuzzer. The random backends' PRNGs — Plausible's `Gen`/`Random` and SplitMix, listed in
+`DEP_MODULES` — are linked but not instrumented: they are not code under test, and coverage over a
+PRNG's mixing steps is noise in the feedback.
 
 **The link closure must stay Mathlib-free.** A `#eval` runs generators in the interpreter, but a
 compiled executable links the native code of its entire import closure, and importing the `Basalt`
@@ -154,7 +154,7 @@ guided fuzzer or under a plain random sampler; `--backend=` picks the interpreta
 | backend | interpretation | choices come from |
 |---|---|---|
 | `fuzz` (default) | `Fuzz.FuzzGen` | libFuzzer's mutated byte buffer, guided by coverage |
-| `io` | `IO` | `IO.rand` |
+| `io` | `IO` | SplitMix (`ioGen`) |
 | `plausible` | `Plausible.Gen` | Plausible's `StdGen` |
 
 All three come from one registry of `Basalt.PBT.Property` and share `Basalt.PBT`'s failure contract,

@@ -56,8 +56,8 @@ def exercise (n : Nat) (gen : IO α) : IO Unit := do
 #guard_msgs in #eval exercise 10 (Heap.Tree.genHeap 0)
 
 /- Degenerate, rejection-heavy, and wide ranges all behave: `lo = hi` is forced, a range just past
-   half of one `StdGen` output rejects about half its draws, and a range far past `UInt64.MAX`
-   spans several outputs. -/
+   a power of two rejects about half its draws, and a range far past `UInt64.MAX` takes SplitMix's
+   slow path across several outputs. -/
 /-- info: true true true -/
 #guard_msgs in
 #eval (do
