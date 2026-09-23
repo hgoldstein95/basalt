@@ -24,7 +24,8 @@ globs = ["BasaltExperiments.+"]
 #
 # These modules must not be matched by any other library's globs. Lake resolves a module claimed by
 # two libraries to one of their configurations silently, and the uninstrumented one wins, leaving a
-# fuzzer that runs and finds only shallow bugs; `fuzz-run/build.sh` asserts the section is present.
+# fuzzer that runs and finds only shallow bugs; `fuzz-run/build.sh` asserts the instrumentation is
+# present.
 #
 # A default target, which costs `lake build` only elaboration: `moreLeancArgs` applies when something
 # asks for these modules' C objects, and only the executable does. Dropping it from `defaultTargets`
