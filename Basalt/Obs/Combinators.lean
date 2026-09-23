@@ -9,11 +9,6 @@ import Basalt.Obs.Spec
 
 /-!
 # Observations Commute with the Combinators
-
-One `map_X` lemma per non-recursive combinator: what an observation of `X` is, written with the
-specification monad's `Monad` and `RandomChoice` operations only, so that it need not be a `Gen`.
-Each right-hand side is one shape of choice (`Basalt/Obs/Spec.lean`), which is what a presentation
-lemma or a walker rule of an algebra reads.
 -/
 
 open RandomChoice

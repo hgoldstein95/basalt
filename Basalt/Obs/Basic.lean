@@ -10,8 +10,7 @@ import Basalt.Walk.Attr
 # Observations
 
 An `Obs G W` is a `choose`-preserving monad morphism from a generator monad `G` into a specification
-monad `W`. Every judgment about a generator is one, so a fact that holds of every observation is
-stated once for all of them.
+monad `W`.
 -/
 
 open RandomChoice
