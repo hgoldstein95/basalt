@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.RandomChoice
+import Basalt.Random
 import Basalt.Gen
 import Basalt.OptionT
 import Basalt.IO
@@ -13,6 +14,8 @@ import Basalt.SPMF.Cost
 import Basalt.SPMF.Failure
 import Basalt.Tactics
 import Basalt.Laws
+import Basalt.SPMF.CostBound
+import Basalt.SPMF.CostFixpoint
 import Basalt.Combinators
 import Basalt.PBT
 import Basalt.Tuning

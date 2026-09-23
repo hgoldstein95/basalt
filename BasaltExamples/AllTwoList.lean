@@ -47,24 +47,7 @@ theorem genAllTwos.terminates : IsAlmostSurelyTerminating genAllTwos := by
   simp
 
 theorem genAllTwos.cost_bounded : IsCostBounded genAllTwos AllTwos.cost := by
-  open Lean.Order in
-  delta genAllTwos
-  apply fix_induct (motive := fun (g : SPMF.Cost (List Nat)) =>
-    IsBounded g AllTwos.cost) _ ?admissible ?step
-  case admissible =>
-    apply admissible_IsBounded
-  case step =>
-    intro genAllTwos_rec ih
-    rw [IsBounded_iff]
-    rintro ⟨xs, c⟩ hmem
-    cost_support_simp at hmem
-    obtain ⟨m, rfl, h | h⟩ := hmem
-    · obtain ⟨rfl, rfl⟩ := h
-      simp [AllTwos.cost]
-    · obtain ⟨tl, n1, n2, htl, ⟨rfl, hn2⟩, hm⟩ := h
-      have h1 : n1 ≤ AllTwos.cost tl := ih (tl, n1) htl
-      show 1 + m ≤ AllTwos.cost (2 :: tl)
-      simp only [AllTwos.cost, List.length_cons] at *
-      omega
+  cost_fixpoint
+  all_goals simp only [AllTwos.cost, List.length_nil, List.length_cons] at *; omega
 
 end AllTwoList

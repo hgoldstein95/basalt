@@ -18,32 +18,7 @@ open ENNReal RandomChoice
 
 namespace Basalt.MassFixpoint
 
-open Lean Meta Elab Tactic Basalt.MassBound
-
-/-- The explicit-or-not argument positions of `gen` that some recursive call in one of its equations
-changes: those are the seed. -/
-private def seedPositions (gen : Name) : MetaM (Array Nat) := do
-  let some eqns ← getEqnsFor? gen
-    | throwError "mass_fixpoint: `{gen}` has no equation lemmas to unfold"
-  let varying ← IO.mkRef (∅ : Std.HashSet Nat)
-  for eqn in eqns do
-    forallTelescope (← getConstInfo eqn).type fun _ body => do
-      let some (_, lhs, rhs) := body.eq? | return
-      let params := lhs.getAppArgs
-      for h : k in [:params.size] do
-        unless params[k].isFVar do varying.modify (·.insert k)
-      forEachExpr rhs fun e => do
-        if e.isAppOf gen && e.getAppNumArgs == params.size then
-          for h : k in [:params.size] do
-            if e.getArg! k != params[k] then varying.modify (·.insert k)
-  let v ← varying.get
-  return (Array.range (← getConstInfo gen).type.getForallArity).filter v.contains
-
-/-- The user-facing name of `gen`'s `k`th binder. -/
-private def binderName (gen : Name) (k : Nat) : MetaM Name :=
-  do forallTelescope (← getConstInfo gen).type fun xs _ => do
-    let n ← xs[k]!.fvarId!.getUserName
-    return n.eraseMacroScopes
+open Lean Meta Elab Tactic Basalt.Walk
 
 /-- Right-nested tuple of `es` (`Unit` when empty), with its type. -/
 private def mkTuple (es : Array Expr) : MetaM Expr := do
@@ -76,18 +51,24 @@ elab_rules : tactic
   | `(tactic| mass_fixpoint $[per_seed%$perSeedTk]? $[[$extras,*]]? $[using $cert]?) =>
   withMainContext do
     let goal ← getMainGoal
-    let ty ← instantiateMVars (← goal.getType)
+    let ty := (← instantiateMVars (← goal.getType)).consumeMData
     let some x := (if ty.isAppOfArity `IsAlmostSurelyTerminating 2 then some ty.appArg!
         else if ty.isAppOfArity ``SPMF.IsPMF 2 then some ty.appArg! else none)
       | throwError "mass_fixpoint: expected a goal `IsAlmostSurelyTerminating (gen …)`, \
           got{indentExpr ty}"
     let some gen := x.getAppFn.constName?
       | throwError "mass_fixpoint: expected a generator applied to its arguments, got{indentExpr x}"
-    if (massBoundExt.getState (← getEnv)).contains gen then
+    if isCombinator (← getEnv) gen then
       throwError "mass_fixpoint: `{gen}` is a combinator, not a generator definition; prove \
         `SPMF.IsPMF` of a combinator term with `SPMF.IsPMF.of_one_le` and `mass_bound`"
     let args := x.getAppArgs
-    let seed ← seedPositions gen
+    let seed ← match ← fixpointSeed? gen with
+      | some (_, seed) => pure seed
+      | none => do
+        if ← isRecursiveDefinition gen then
+          throwError "mass_fixpoint: `{gen}` is recursive but not a `partial_fixpoint`; induct on \
+            its decreasing argument, unfold it, and apply `SPMF.IsPMF.of_one_le` and `mass_bound`"
+        pure #[]
     unless seed.all (· < args.size) do
       throwError "mass_fixpoint: `{gen}` is not fully applied in{indentExpr x}"
     -- The family over the seed.
@@ -218,14 +199,14 @@ theorem IsPMF_nonEmptyListOf {g : SPMF α} (hg : IsPMF g) : IsPMF (nonEmptyListO
 
 /-- An unbounded-length list only passes termination through: its bound is `1` exactly when its
 element generator's is, which is the shape that still chains when that generator is a bind. -/
-@[mass_bound]
+@[gen_rule]
 theorem le_mass_listOf {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ g.mass) :
     (if 1 ≤ c then 1 else 0 : ℝ≥0∞) ≤ (listOf g).mass := by
   split
   · exact (IsPMF_listOf (le_antisymm (mass_le_one g) (‹1 ≤ c›.trans hg))).ge
   · exact zero_le _
 
-@[mass_bound]
+@[gen_rule]
 theorem le_mass_nonEmptyListOf {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ g.mass) :
     (if 1 ≤ c then 1 else 0 : ℝ≥0∞) ≤ (nonEmptyListOf g).mass := by
   split

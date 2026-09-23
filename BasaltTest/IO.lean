@@ -55,32 +55,21 @@ def exercise (n : Nat) (gen : IO α) : IO Unit := do
 /-- info: drew 10 samples -/
 #guard_msgs in #eval exercise 10 (Heap.Tree.genHeap 0)
 
-/-! ## `UniformIO`
-
-The same generator terms run at the exactly-uniform interpretation. -/
-
-/-- `Gen` resolves for `UniformIO`, so any generator term can be interpreted there. -/
-example : Gen UniformIO := inferInstance
-
-/-- info: drew 10 samples -/
-#guard_msgs in #eval exercise 10 (ArbNat.Nat.arbitrary : UniformIO Nat).run
-
-/-- info: drew 10 samples -/
-#guard_msgs in #eval exercise 10 (BST.Tree.genBST 0 10 : UniformIO (BST.Tree Int)).run
-
-/-- info: drew 10 samples -/
-#guard_msgs in #eval exercise 10 (Heap.Tree.genHeap 0 : UniformIO Heap.Tree).run
-
-/- Degenerate and wide ranges both behave: `lo = hi` is forced, and a range far past
-   `UInt64.MAX` still lands in bounds. -/
-/-- info: true true -/
+/- Degenerate, rejection-heavy, and wide ranges all behave: `lo = hi` is forced, a range just past
+   half of one `StdGen` output rejects about half its draws, and a range far past `UInt64.MAX`
+   spans several outputs. -/
+/-- info: true true true -/
 #guard_msgs in
 #eval (do
-  let a := (← RandomChoice.choose (m := UniformIO) 7 7 (by omega)).down.val
+  let a := (← RandomChoice.choose (m := IO) 7 7 (by omega)).down.val
+  let mut b := true
+  for _ in [0:100] do
+    let v := (← RandomChoice.choose (m := IO) 0 (2 ^ 30) (by omega)).down.val
+    b := b && v ≤ 2 ^ 30
   let lo : Nat := 2 ^ 70
   let hi : Nat := 2 ^ 70 + 2 ^ 65
-  let b := (← RandomChoice.choose (m := UniformIO) lo hi (by omega)).down.val
-  IO.println s!"{a == 7} {lo ≤ b && b ≤ hi}" : UniformIO Unit).run
+  let c := (← RandomChoice.choose (m := IO) lo hi (by omega)).down.val
+  IO.println s!"{a == 7} {b} {lo ≤ c && c ≤ hi}" : IO Unit)
 
 /-! ## `OptionT` over `IO`
 

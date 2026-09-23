@@ -93,35 +93,8 @@ end termination
 pivot, and two recursive calls per node. -/
 theorem Tree.genBST.cost_bounded :
     IsCostBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
-  open Lean.Order in
-  delta genBST
-  apply (fix_induct (motive := fun (g : Int → Int → SPMF.Cost (Tree Int)) =>
-    ∀ lo hi, IsBounded (g lo hi) (fun t => 3 * t.size + 1)) _ ?admissible ?step)
-  case admissible =>
-    exact admissible_pi_apply _ fun _ => admissible_pi_apply _ fun _ => admissible_IsBounded _
-  case step =>
-    intro genBST_rec ih lo hi
-    rw [IsBounded_iff]
-    rintro ⟨t, n⟩ hmem
-    rw [SPMF.mem_support_dite_iff] at hmem
-    obtain ⟨_, hmem⟩ | ⟨_, hmem⟩ := hmem
-    · cost_support_simp at hmem
-      obtain ⟨rfl, rfl⟩ := hmem
-      simp [Tree.size]
-    · obtain ⟨w, g, m, hbr, hw, hmem, rfl⟩ := SPMF.Cost.mem_support_frequency hmem
-      simp only [List.mem_cons, List.not_mem_nil, or_false, Prod.mk.injEq] at hbr
-      obtain ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ := hbr
-      · cost_support_simp at hmem
-        obtain ⟨rfl, rfl⟩ := hmem
-        simp [Tree.size]
-      · cost_support_simp at hmem
-        obtain ⟨x, n1, n2, ⟨⟨hxlo, hxhi⟩, hn1⟩, hmem, hm⟩ := hmem
-        obtain ⟨l, n3, n4, hl, hmem, hn2⟩ := hmem
-        obtain ⟨r, n5, n6, hr, ⟨rfl, hn6⟩, hn4⟩ := hmem
-        have hL : n3 ≤ 3 * l.size + 1 := ih lo (x - 1) (l, n3) hl
-        have hR : n5 ≤ 3 * r.size + 1 := ih (x + 1) hi (r, n5) hr
-        simp only [Tree.size]
-        omega
+  cost_fixpoint
+  all_goals simp only [Tree.size]; omega
 
 /-! ## Distribution -/
 

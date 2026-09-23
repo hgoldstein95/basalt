@@ -87,26 +87,7 @@ theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) :=
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/
 theorem Tree.genHeap.cost_bounded :
     IsCostBounded (Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1) := by
-  open Lean.Order in
-  delta genHeap
-  apply (fix_induct (motive := fun (g : Nat → SPMF.Cost Tree) => ∀ lo, IsBounded (g lo) (fun t => 3 * t.size + t.sum + 1)) _ ?admissible ?step) lo
-  case admissible =>
-    exact admissible_pi_apply _ fun _ => admissible_IsBounded _
-  case step =>
-    intro genHeap_rec ih lo
-    rw [IsBounded_iff]
-    rintro ⟨t, n⟩ hmem
-    cost_support_simp at hmem
-    obtain ⟨m, rfl, h | h⟩ := hmem
-    · obtain ⟨rfl, rfl⟩ := h
-      simp [Tree.size, Tree.sum]
-    · obtain ⟨delta, n1, n2, hdelta,
-        ⟨l, n3, n4, hl, ⟨r, n5, n6, hr, ⟨rfl, hn6⟩, hn4⟩, hn2⟩, hm⟩ := h
-      have hd : n1 ≤ delta + 1 := IsBounded_iff.mp Nat.arbitrary.cost_bounded (delta, n1) hdelta
-      have hL : n3 ≤ 3 * l.size + l.sum + 1 := ih (lo + delta) (l, n3) hl
-      have hR : n5 ≤ 3 * r.size + r.sum + 1 := ih (lo + delta) (r, n5) hr
-      show 1 + m ≤ 3 * (Tree.node l (lo + delta) r).size + (Tree.node l (lo + delta) r).sum + 1
-      simp only [Tree.size, Tree.sum]
-      omega
+  cost_fixpoint
+  all_goals simp only [Tree.size, Tree.sum]; omega
 
 end Heap

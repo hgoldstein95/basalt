@@ -177,7 +177,7 @@ private theorem cost_mem_replicate {lo hi : Int} (h : lo ≤ hi) (k : Nat) :
 generator can spend any number of choices to produce `node leaf lo leaf` — drawing `lo` again is
 always possible and always absorbed. Bounding the *keys* with `chooseInt` does not help: what is
 unbounded is the number of insertions, not the size of each one. A bound does exist on the drawn
-list (`IsBounded_listOf`), and insertion discards exactly the information it is stated in. -/
+list (`SPMF.Cost.always_listOf`), and insertion discards exactly the information it is stated in. -/
 theorem Tree.genBSTByInsertion.not_cost_bounded {lo hi : Int} (h : lo ≤ hi) (c : Tree Int → Nat) :
     ¬ IsCostBounded (Tree.genBSTByInsertion lo hi h) c := by
   intro hb

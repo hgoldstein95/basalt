@@ -51,25 +51,7 @@ theorem List.arbitrary.terminates : IsAlmostSurelyTerminating List.arbitrary := 
 `Nat.arbitrary` (bounded by the element plus one) per cons cell, plus the final `pick`. -/
 theorem List.arbitrary.cost_bounded :
     IsCostBounded List.arbitrary (fun xs => 2 * xs.length + xs.sum + 1) := by
-  open Lean.Order in
-  delta arbitrary
-  apply fix_induct (motive := fun (g : SPMF.Cost (List Nat)) =>
-    IsBounded g (fun xs => 2 * xs.length + xs.sum + 1)) _ ?admissible ?step
-  case admissible =>
-    apply admissible_IsBounded
-  case step =>
-    intro arbitrary_rec ih
-    rw [IsBounded_iff]
-    rintro ⟨xs, c⟩ hmem
-    cost_support_simp at hmem
-    obtain ⟨m, rfl, h | h⟩ := hmem
-    · obtain ⟨rfl, rfl⟩ := h
-      simp
-    · obtain ⟨x, n1, n2, hx, ⟨tl, n3, n4, htl, ⟨rfl, hn4⟩, hn2⟩, hm⟩ := h
-      have hhead : n1 ≤ x + 1 := IsBounded_iff.mp Nat.arbitrary.cost_bounded (x, n1) hx
-      have htail : n3 ≤ 2 * tl.length + tl.sum + 1 := ih (tl, n3) htl
-      show 1 + m ≤ 2 * (x :: tl).length + (x :: tl).sum + 1
-      simp only [List.length_cons, List.sum_cons]
-      omega
+  cost_fixpoint
+  all_goals simp only [List.length_nil, List.sum_nil, List.length_cons, List.sum_cons]; omega
 
 end ArbList
