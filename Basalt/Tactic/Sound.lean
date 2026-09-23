@@ -77,6 +77,13 @@ theorem le_always_nonEmptyListOf (hg : IsSound g R) :
 
 end generatorArgument
 
+/-- `permutationOf` produces every permutation of its list, and its subtype says so: there is no
+support law to bridge. -/
+@[gen_rule]
+theorem le_always_permutationOf {α : Type} {xs : List α} {p : { ys // xs.Perm ys } → Prop} :
+    (∀ a, p a) ≤ alwaysObs.spec (permutationOf xs) p :=
+  fun h a _ => h a
+
 end SPMF
 
 namespace Basalt.SoundBound

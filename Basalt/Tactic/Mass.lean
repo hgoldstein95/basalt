@@ -149,4 +149,25 @@ theorem le_expect_listOfMaxLength_iInf {n : Nat} {g : SPMF α} {c : ℝ≥0∞} 
     min 1 c ^ n * ⨅ a, p a ≤ expectObs.spec (listOfMaxLength n g) p :=
   le_expect_iInf_of_le_mass (pow_le_mass_listOfMaxLength (hg.trans_eq (expect_one g)))
 
+private theorem one_le_mass_permutationOf {xs : List α} :
+    1 ≤ (permutationOf xs : SPMF { ys // xs.Perm ys }).mass := by
+  induction xs with
+  | nil => exact (mass_pure _).ge
+  | cons x xs ih =>
+    rw [permutationOf]
+    refine (one_mul (1 : ℝ≥0∞)).symm.le.trans (mass_bind_ge_mul ih fun _ => ?_)
+    refine (one_mul (1 : ℝ≥0∞)).symm.le.trans
+      (mass_bind_ge_mul (mass_map.trans (mass_choose _ _ _)).ge fun ⟨_, _, _⟩ => (mass_pure _).ge)
+
+/-- `permutationOf` takes no generator and always succeeds. -/
+@[gen_rule]
+theorem le_expect_permutationOf {xs : List α} {d : ℝ≥0∞} {p : { ys // xs.Perm ys } → ℝ≥0∞}
+    (hp : ∀ a, p a = d) : d ≤ expectObs.spec (permutationOf xs) p :=
+  (one_mul d).symm.le.trans (le_expect_of_le_mass one_le_mass_permutationOf hp)
+
+@[gen_rule, inherit_doc le_expect_vectorOf_iInf]
+theorem le_expect_permutationOf_iInf {xs : List α} {p : { ys // xs.Perm ys } → ℝ≥0∞} :
+    ⨅ a, p a ≤ expectObs.spec (permutationOf xs) p :=
+  (one_mul _).symm.le.trans (le_expect_iInf_of_le_mass one_le_mass_permutationOf)
+
 end SPMF

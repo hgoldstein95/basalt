@@ -70,13 +70,13 @@ run_cmd do
     ``elements, ``oneOf, ``frequency].filter (mapFor env · |>.isNone)
   unless noMap.isEmpty do throwError "combinators with no `@[gen_map]` lemma: {noMap}"
   for j in [Judgment.spec true, .spec false] do
-    for c in [``vectorOf, ``listOfMaxLength] ++ (if j.key == (Judgment.spec false).key
-        then [``listOf, ``nonEmptyListOf] else []) do
+    for c in [``vectorOf, ``listOfMaxLength, ``permutationOf] ++
+        (if j.key == (Judgment.spec false).key then [``listOf, ``nonEmptyListOf] else []) do
       if (rulesFor env j.key c).isNone then
         throwError "`{c}` has no bridge for the judgment `{j.key}`"
   -- The support observations share `.spec false`'s key with the others, so each is looked for.
   for obs in [``SPMF.alwaysObs, ``SPMF.mayObs] do
-    for c in [``vectorOf, ``listOfMaxLength, ``listOf, ``nonEmptyListOf] do
+    for c in [``vectorOf, ``listOfMaxLength, ``listOf, ``nonEmptyListOf, ``permutationOf] do
       let rules := (rulesFor env (Judgment.spec false).key c).getD #[]
       unless rules.any fun r => ((env.find? r).get!.type.find? (·.isConstOf obs)).isSome do
         throwError "`{c}` has no bridge for a lower bound on `{obs}`"

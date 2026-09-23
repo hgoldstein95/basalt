@@ -248,6 +248,21 @@ example {lo hi : Int} (h : lo ≤ hi) (k : Nat) :
     trace_state
     exact .inr ⟨lo, ⟨le_rfl, h⟩, _, _, ih, by simp [List.replicate_succ], by omega⟩
 
+/-! `permutationOf` produces every value of its subtype, so the witness is the permutation asked
+for. -/
+
+/--
+trace: xs a✝ : List ℕ
+h_a✝ : xs.Perm a✝
+⊢ ∃ x, ↑x = a✝
+-/
+#guard_msgs in
+example (xs : List Nat) :
+    IsCompleteFor ((·.1) <$> permutationOf xs : SPMF (List Nat)) xs.Perm := by
+  complete_bound
+  trace_state
+  next ys h => exact ⟨⟨ys, h⟩, rfl⟩
+
 /--
 error: complete_bound: expected a goal `a ∈ SPMF.support (gen …)` or `IsCompleteFor (gen …) P`, got
   IsSound (genHeap lo) (Heap.Tree.isHeap lo)

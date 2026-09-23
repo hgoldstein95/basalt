@@ -191,6 +191,19 @@ example : IsSound (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := by
   trace_state
   omega
 
+/-! `permutationOf` asks nothing of the postcondition: the value it draws carries its proof. -/
+
+/--
+trace: xs : List ℕ
+a✝ : { ys // xs.Perm ys }
+⊢ xs.Perm ↑a✝
+-/
+#guard_msgs in
+example (xs : List Nat) : IsSound ((·.1) <$> permutationOf xs : SPMF (List Nat)) xs.Perm := by
+  sound_bound
+  trace_state
+  next a => exact a.2
+
 /-! The combined law is split by hand; the tactics take a half. -/
 
 /--
