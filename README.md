@@ -128,7 +128,8 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
     `Laws.lean`, the properties a generator may be proved to have;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
     expectations, cost, almost-sure termination), `IO.lean`, `PlausibleGen.lean`, `OptionT.lean`,
-    `GenStats/`, and the opt-in `Fuzz/`;
+    `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean` holding the facts about core's `randNat`
+    that the PRNG-backed ones share;
   - *the proof machinery*: `Obs/`, the layer every per-combinator lemma is derived from — a
     judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
     `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
