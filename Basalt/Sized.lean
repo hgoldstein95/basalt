@@ -18,8 +18,9 @@ in the body of a `partial_fixpoint`.
 /-- A monad with an ambient size parameter. -/
 class Sized (g : Type u → Type v) where
   sized {α : Type u} : (Nat → g α) → g α
-  getSize : g (ULift.{u} Nat)
   resize {α : Type u} : Nat → g α → g α
+
+def getSize [Monad m] [Sized m] : m Nat := Sized.sized (fun n => pure n)
 
 /-- The monotonicity facts `sized` and `resize` must satisfy for a recursive generator that uses
 them to be definable by `partial_fixpoint`; the analogue of `MonoBind` for `Sized`. -/
@@ -68,7 +69,6 @@ instance instGenWithSize [Gen G] : Gen (WithSize G) where
 
 instance instSizedWithSize [Monad G] : Sized (WithSize G) where
   sized f := fun n => f n n
-  getSize := fun n => pure (ULift.up n)
   resize n g := fun _ => g n
 
 instance instMonoSizedWithSize [Gen G] : MonoSized (WithSize G) where
