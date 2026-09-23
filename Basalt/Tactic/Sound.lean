@@ -110,8 +110,8 @@ partial def walkSound (tac : String) (extras : Array Term) (goal : MVarId) :
 that path built. Recursive occurrences are closed from the local context, callees from their
 `.sound_complete` or `.sound` law; any other soundness fact can be passed as `sound_bound [h₁, h₂]`.
 
-In a residual goal, a value drawn by `let x ← …` is named `x` and what is known about it `h_x`, as
-the walker names them (`Basalt/Walk/Basic.lean`). -/
+In a residual goal, a value drawn by `let x ← …` is `x✝` and what is known about it `h_x✝`
+(`Basalt/Walk/Names.lean`); name them with `next x h_x =>`. -/
 syntax (name := soundBoundTac) "sound_bound" (walkFacts)? : tactic
 
 elab_rules : tactic

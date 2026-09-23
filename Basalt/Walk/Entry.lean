@@ -148,16 +148,20 @@ def splitMatch? (goal : MVarId) (g : Expr) : MetaM (Option (List MVarId)) := do
     pure c
   return some named
 
-/-- `goal` with its metavariables instantiated and `tidyExpr` applied, in the target and every
-hypothesis. -/
-def tidy (goal : MVarId) : MetaM MVarId := goal.withContext do
+/-- `goal`, a residual goal of a walk begun in `lctx`, with its metavariables instantiated and
+`tidyExpr` applied, in the target and every hypothesis, and each hypothesis the walk introduced made
+inaccessible under the name it was given. A fact passed to the walk can mention a drawn value by
+name; the residual goal cannot. -/
+def tidy (lctx : LocalContext) (goal : MVarId) : MetaM MVarId := goal.withContext do
   goal.setTag .anonymous
   let mut goal := goal
   for d in ← getLCtx do
     unless d.isImplementationDetail do
       let t ← tidyExpr d.type
       if t != d.type then goal ← goal.replaceLocalDeclDefEq d.fvarId t
-  goal.replaceTargetDefEq (← tidyExpr (← goal.getType))
+      unless lctx.contains d.fvarId do
+        goal ← goal.rename d.fvarId (← mkFreshUserName d.userName.eraseMacroScopes)
+  goal.withContext do goal.replaceTargetDefEq (← tidyExpr (← goal.getType))
 
 /-- One goal per path through a computed demonic precondition: its `∀` and `→` introduced, its `∧`
 and `if` split. Only a connective that is there syntactically is split, so that a postcondition
@@ -203,21 +207,23 @@ a lower bound: one goal per path through the precondition it computed (`splitPat
 else the walk left, tidied. -/
 def pathsBound (extras : Array Term) (obs : Name) (g post : Expr) (goal : MVarId) :
     TermElabM (List MVarId) := do
+  let lctx := (← goal.getDecl).lctx
   let (pre, structural, rest) ← computeBound extras obs true g post
   let paths ← mkFreshExprMVar pre
   goal.assign (mkApp structural paths)
-  ((← splitPaths paths.mvarId!) ++ rest).mapM fun g => tidy g
+  ((← splitPaths paths.mvarId!) ++ rest).mapM fun g => tidy lctx g
 
 /-- Prove `goal`, which is `other ≤ O.spec g post` when `lower` and `O.spec g post ≤ other`
 otherwise, for `O` the observation `obs`: the arithmetic goal relating `other` to the bound the walk
 computed, then whatever else the walk left, tidied. -/
 def arithBound (extras : Array Term) (obs : Name) (lower : Bool) (g post other : Expr)
     (goal : MVarId) : TermElabM (List MVarId) := do
+  let lctx := (← goal.getDecl).lctx
   let (b, structural, rest) ← computeBound extras obs lower g post
   let arith ← mkFreshExprMVar (← if lower then mkAppM ``LE.le #[other, b]
     else mkAppM ``LE.le #[b, other])
   goal.assign (← if lower then mkAppM ``le_trans #[arith, structural]
     else mkAppM ``le_trans #[structural, arith])
-  (arith.mvarId! :: rest).mapM fun g => tidy g
+  (arith.mvarId! :: rest).mapM fun g => tidy lctx g
 
 end Basalt.Walk

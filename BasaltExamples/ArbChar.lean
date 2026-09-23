@@ -27,7 +27,7 @@ theorem Char.arbitrary.sound_complete :
   refine .intro ?sound ?complete
   case sound =>
     sound_fixpoint
-    exact (alphanumChars_eq_filter c).mp h_c
+    next c h_c => exact (alphanumChars_eq_filter c).mp h_c
   case complete =>
     intro c hc
     rw [Char.arbitrary]; complete_bound

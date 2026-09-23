@@ -37,7 +37,7 @@ theorem genAllTwos.sound_complete : IsSoundAndComplete genAllTwos AllTwos := by
   case sound =>
     sound_fixpoint
     · simp [AllTwos]
-    · simpa [AllTwos] using h_xs
+    · next xs h_xs => simpa [AllTwos] using h_xs
   case complete =>
     intro xs
     induction xs with

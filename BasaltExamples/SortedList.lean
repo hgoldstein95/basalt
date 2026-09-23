@@ -61,8 +61,8 @@ theorem List.genSortedGt.sound_complete :
     sound_fixpoint
     · trivial
     · trivial
-    · cases xs <;> simp_all [List.sorted, List.Forall]
-    · exact (List.forall_cons ..).mpr ⟨by omega, h_xs.2.imp fun _ h => by omega⟩
+    · next xs _ => cases xs <;> simp_all [List.sorted, List.Forall]
+    · next h_xs => exact (List.forall_cons ..).mpr ⟨by omega, h_xs.2.imp fun _ h => by omega⟩
   case complete =>
     intro xs
     induction xs generalizing m with

@@ -48,7 +48,7 @@ theorem List.genSortedBySorting.sound_complete :
   refine .intro ?sound ?complete
   case sound =>
     sound_fixpoint
-    exact List.sorted_mergeSort xs
+    next xs _ => exact List.sorted_mergeSort xs
   case complete =>
     intro ys h
     rw [List.genSortedBySorting]; complete_bound
@@ -64,6 +64,7 @@ and being a permutation it changes neither the length nor the sum the bound is s
 theorem List.genSortedBySorting.cost_bounded :
     IsCostBounded List.genSortedBySorting (fun ys => 2 * ys.length + ys.sum + 1) := by
   cost_fixpoint
+  expose_names
   have hperm := List.mergeSort_perm xs (fun a b => a ≤ b)
   simp only [hperm.length_eq, hperm.sum_eq]
   omega
