@@ -62,6 +62,11 @@ placed there silently never appears — which is why `runOneIO` carries the run 
 prints its buffer statistics from an `atexit` handler. -/
 def go (T : PropM FuzzGen Unit) (argv : Array String := #[]) (grow : Bool := false) : IO Unit := do
   IO.println s!"[basalt] starting libFuzzer campaign (grow={grow}, {argv.toList})"
+  -- libFuzzer announces that the linked custom mutator disables `-len_control` on every campaign,
+  -- `--grow` or not; an explicit flag wins over that default (`splitFlags`), so say so.
+  if let some lc := argv.find? (·.startsWith "-len_control=") then
+    IO.println s!"[basalt] {lc} is explicit and overrides libFuzzer's \
+      \"Disabling -len_control by default\""
   let counters ← IO.mkRef (0, 0)
   goImpl (fun bytes => runOneIO counters T bytes) argv grow
 

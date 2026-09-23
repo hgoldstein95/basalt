@@ -110,8 +110,8 @@ thousands of edges the campaign never reaches. Measured on this repo: 4.5k count
 runtime, the compiled C bridge, and three post-link assertions. Each assertion guards a property
 whose violation leaves a *working* fuzzer that searches badly rather than a build error: no Mathlib in
 Lake's link response file, the instrumentation scope in both directions (every `BasaltFuzz` object and
-the root carry `__sancov_cntrs`; no `Basalt` object does), and `LLVMFuzzerCustomMutator` still
-exported past `-Wl,-dead_strip`.
+the root references `__sanitizer_cov_8bit_counters_init`; no `Basalt` object does), and
+`LLVMFuzzerCustomMutator` still exported past `-Wl,-dead_strip`.
 
 **The link closure must stay Mathlib-free.** A `#eval` runs generators in the interpreter, but a
 compiled executable links the native code of its entire import closure, and importing the `Basalt`
@@ -379,6 +379,7 @@ state, not a buffer.
 ```
 $ fuzz-run/basalt-fuzz bst-buggy-insert -runs=2000000 -artifact_prefix=./
 [basalt] starting libFuzzer campaign (grow=false, [-runs=2000000, …, -len_control=100])
+[basalt] -len_control=100 is explicit and overrides libFuzzer's "Disabling -len_control by default"
 ...
 *** BASALT PROPERTY FAILED ***
 counterexample : (BuggyBST.Tree.node (...leaf) 1 (...leaf), 1)
