@@ -30,6 +30,11 @@ def myGen [Gen G] : G α := ...
 `oneOf`, `frequency`, `listOf`, …) is built on it. Recursive generators are defined by
 `partial_fixpoint` over the `CCPO`.
 
+A generator that branches on a size adds a `[Sized G]` constraint and reads it with `getSize` or
+`Sized.sized`, shrinking it for recursive calls with `Sized.resize` (plus `[MonoSized G]` when the
+generator is a `partial_fixpoint`). `WithSize G` supplies the size to any interpretation `G`: run
+the generator at `WithSize G` and close it with `.run n`. See `Basalt/Sized.lean`.
+
 ## Correctness Properties
 
 `Basalt/Laws.lean` states the properties a generator may have as plain predicates; which apply

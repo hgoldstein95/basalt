@@ -22,6 +22,7 @@ import Basalt.Tuning
 import Basalt.Tuning.Attr
 import Basalt.GenStats
 import Basalt.GenStats.Command
+import Basalt.Sized
 
 /-!
 # Basalt

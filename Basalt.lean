@@ -23,5 +23,6 @@ proving generators correct, look at `Basalt.Laws` and the examples in `BasaltExa
 - `SPMF` — A type of sub-probability mass functions.
 - `RandomChoice` — A type class capturing random choices.
 - `Gen` — A type class capturing all of the operations necessary for PBT generators.
+- `Sized` / `WithSize` — An ambient size parameter for generators, and a monad that supplies one.
 - `Basalt.Laws` - Correctness properties that a `Gen` may be proved to have.
 -/
