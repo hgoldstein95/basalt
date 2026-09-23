@@ -237,7 +237,7 @@ fi
 # claimed by two libraries' globs, or a `moreLeancArgs` dropped from the executable, yields a fuzzer
 # whose coverage feedback is missing the code under test — it still runs, and still finds the shallow
 # `bst-buggy-*` bugs, so only a staged benchmark (`chain-4`) would ever reveal it.
-instrumented() { size -m "$1" 2>/dev/null | grep -q '__sancov_cntrs'; }
+instrumented() { [ "$(nm -u "$1" 2>/dev/null | grep -c __sanitizer_cov_8bit_counters_init || true)" -gt 0 ]; }
 for o in "$IR"/BasaltFuzz/*.c.o.export "$IR/BasaltFuzzMain.c.o.export"; do
   [ -f "$o" ] || die "no object for ${o#"$IR"/}: did a module leave the BasaltFuzz library?"
   instrumented "$o" || die "${o#"$IR"/} is not instrumented: check for overlapping library globs"
