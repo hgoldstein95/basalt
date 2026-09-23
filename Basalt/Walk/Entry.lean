@@ -12,10 +12,11 @@ import Basalt.Walk.Basic
 /-!
 # The Walker's Entry Points
 
-What a `_bound` or `_fixpoint` tactic is made of. A `_bound` tactic restates its goal, walks it, and
-hands what the walk computed to a residual handler: `pathsBound` splits a demonic precondition into
-paths, `prunePaths` prunes an angelic one, and `arithBound` leaves arithmetic. A `_fixpoint` tactic
-is `fixpointStep`, then its `_bound`. Nothing here dispatches on the judgment.
+Shared pieces of the `_bound` and `_fixpoint` tactics. A `_bound` tactic restates its goal as a
+bound on an observation, runs the walk with `computeBound`, and turns the result into goals for the
+user: `pathsBound` gives one goal per path of a demonic precondition, `prunePaths` simplifies an
+angelic precondition, and `arithBound` gives one inequality to close by arithmetic. A `_fixpoint`
+tactic takes one induction step with `fixpointStep` and then runs its `_bound` tactic.
 -/
 open Lean Meta Elab Tactic Lean.Order
 

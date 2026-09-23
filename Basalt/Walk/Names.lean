@@ -8,9 +8,7 @@ import Lean.Meta.Tactic.Replace
 /-!
 # The Walker's Names
 
-The names the generator walker (`Basalt/Walk/Basic.lean`) gives the binders of what it leaves: the
-generator's own. They are for reading only: an entry tactic introduces a residual goal's hypotheses
-inaccessible (`Basalt/Walk/Entry.lean`), for the user to name with `next` or `expose_names`.
+This machinery ensures that the walk does not mangle intermediate value names.
 -/
 
 open Lean Meta
@@ -72,16 +70,6 @@ partial def renameLambdas : Expr → Expr
   | .mdata m e => .mdata m (renameLambdas e)
   | .proj s i e => .proj s i (renameLambdas e)
   | e => e
-
-/-! ## Names
-
-What the walk leaves is stated over the values the generator drew, under the generator's names. A
-rule premise that binds a drawn value — a `∀` over data, or a postcondition it hands on — names it
-after the combinator's lambda argument (`let x ← …` binds `x`), or, when the combinator has none,
-after the goal's postcondition's own binders. At the cost family its cost, the next data binder, is
-`n_x`, and a
-hypothesis after the value is `h_x` (a callee's or recursive call's bound, a pivot's range). A
-hypothesis before any value takes the lambda argument's name instead (a `dite` branch's `h`). -/
 
 /-- The names of the lambda arguments of `g`'s head that bind something other than `Unit`: a
 continuation's `delta`, a `dite` branch's `h`. -/

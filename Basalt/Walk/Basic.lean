@@ -21,8 +21,7 @@ import Basalt.Walk.Names
 /-!
 # The Generator Walker
 
-Proves a judgment about a generator by structural recursion on its syntax, naming the binders of
-what it leaves with `Basalt/Walk/Names.lean`.
+Proves a judgment about a generator by structural recursion on its syntax.
 -/
 
 open Lean Meta Elab Tactic
@@ -35,7 +34,6 @@ The relations a rule collects a list combinator's branches with: `List.Forall₂
 list, `Mix.Weighted` (`Basalt/Obs/Ordered.lean`) for a weighted one. -/
 
 attribute [gen_branches] List.Forall₂
-
 
 /-- The proofs among the arguments of the applications in `e`, outside binders. -/
 private partial def proofArgs (e : Expr) (acc : Array Expr := #[]) : MetaM (Array Expr) := do
