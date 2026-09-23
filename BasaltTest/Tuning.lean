@@ -69,9 +69,9 @@ the head-constructor split). -/
 info: Tree.genWeightedBST.tuned ⟨#[(1, 0), (5, 0)]⟩ 0 10 — 200 draws (seed 0, fuel 10000)
 
   outcomes    ok 200 (100.0%)
-  size        mean 12.3   p50 13   p95 23   max 23
-  choices     mean 12.6   p50 14   p95 22   max 22
-  distinct    158 / 200
+  size        mean 12.6   p50 15   p95 23   max 23
+  choices     mean 12.8   p50 15   p95 22   max 22
+  distinct    160 / 200
 
   head constructor
     node    82.0%  (164)
@@ -79,10 +79,10 @@ info: Tree.genWeightedBST.tuned ⟨#[(1, 0), (5, 0)]⟩ 0 10 — 200 draws (seed
 
   most common
      18.0%  (36)  BST.Tree.leaf
-      1.5%   (3)  BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tree.leaf)
-      1.5%   (3)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tre…
       1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 3 (BST.Tree.leaf)
       1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 9 (BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf))
+      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tree.leaf)
+      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.node (BST.Tree.leaf) 1 (BST.Tree…
 
   samples
     BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 10 (BST.Tree.leaf)

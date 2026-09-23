@@ -68,9 +68,9 @@ instance : RandomChoice StatGen where
     if s.fuel == 0 then
       throw .outOfFuel
     else
-      let r := randNat s.rng lo hi
+      let r := stdChoose s.rng lo hi
       set { rng := r.2, fuel := s.fuel - 1, choices := s.choices + 1 : StatState }
-      pure (ULift.up ⟨r.1, randNat_mem s.rng h⟩)
+      pure (ULift.up ⟨r.1, stdChoose_mem s.rng h⟩)
 
 /-- `StatGen` has everything a generator needs. -/
 example : Gen StatGen := inferInstance

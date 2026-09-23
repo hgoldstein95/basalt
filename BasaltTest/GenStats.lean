@@ -17,9 +17,9 @@ namespace GenStatsExamples
 info: BST.Tree.genBST 0 10 — 200 draws (seed 0, fuel 10000)
 
   outcomes    ok 200 (100.0%)
-  size        mean 3.8   p50 1   p95 13   max 19
-  choices     mean 4.3   p50 1   p95 14   max 20
-  distinct    77 / 200
+  size        mean 3.9   p50 1   p95 13   max 21
+  choices     mean 4.4   p50 1   p95 15   max 21
+  distinct    78 / 200
 
   head constructor
     leaf    54.0%  (108)
@@ -48,9 +48,9 @@ info: BST.Tree.genBST 0 10 — 200 draws (seed 0, fuel 10000)
 info: BST.Tree.genWeightedBST 0 10 — 200 draws (seed 0, fuel 10000)
 
   outcomes    ok 200 (100.0%)
-  size        mean 5.7   p50 6   p95 11   max 11
-  choices     mean 12.6   p50 14   p95 22   max 22
-  distinct    158 / 200
+  size        mean 5.8   p50 7   p95 11   max 11
+  choices     mean 12.8   p50 15   p95 22   max 22
+  distinct    160 / 200
 
   head constructor
     node    82.0%  (164)
@@ -58,10 +58,10 @@ info: BST.Tree.genWeightedBST 0 10 — 200 draws (seed 0, fuel 10000)
 
   most common
      18.0%  (36)  BST.Tree.leaf
-      1.5%   (3)  BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tree.leaf)
-      1.5%   (3)  BST.Tree.node (BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tre…
       1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 3 (BST.Tree.leaf)
       1.0%   (2)  BST.Tree.node (BST.Tree.leaf) 9 (BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf))
+      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 1 (BST.Tree.leaf)
+      1.0%   (2)  BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.node (BST.Tree.leaf) 1 (BST.Tree…
 
   samples
     BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 10 (BST.Tree.leaf)
