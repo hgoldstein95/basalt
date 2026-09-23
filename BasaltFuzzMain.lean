@@ -5,8 +5,8 @@ Authors: Michael Hicks
 -/
 import Basalt.Fuzz.Runner
 import Basalt.Combinators
-import BasaltTest.Fuzz.BuggyBST
-import BasaltTest.Fuzz.Staged
+import BasaltFuzz.BuggyBST
+import BasaltFuzz.Staged
 
 /-!
 # `basalt-fuzz` executable entry point
@@ -25,9 +25,9 @@ def propThreshold [Gen G] : PropM G Unit :=
   forAll (chooseNat 0 255) (· < 200)
 
 /-- The property registry, selected by the first non-flag CLI argument. `bst-*` are the worked BST
-demo (`BasaltTest/Fuzz/BuggyBST.lean`): the `-buggy-*` ones have real bugs every backend can find,
+demo (`BasaltFuzz/BuggyBST.lean`): the `-buggy-*` ones have real bugs every backend can find,
 and the others must never fail. `chain-*` and `long-*` are the staged microbenchmarks
-(`BasaltTest/Fuzz/Staged.lean`), the one place the backends differ by orders of magnitude;
+(`BasaltFuzz/Staged.lean`), the one place the backends differ by orders of magnitude;
 `long-*` is the one whose difficulty is buffer length, so it is where `--grow` is measured.
 
 Each entry is a `Property`, so one registry serves every backend; `fun _ =>` is the explicit `G`

@@ -6,7 +6,7 @@ Authors: Michael Hicks
 import Basalt.Fuzz.Runner
 import Basalt.Combinators
 import BasaltExamples.BST
-import BasaltTest.Fuzz.BuggyBST
+import BasaltFuzz.BuggyBST
 
 /-!
 # `FuzzGen` regression tests

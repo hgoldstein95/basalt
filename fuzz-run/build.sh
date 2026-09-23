@@ -3,9 +3,12 @@
 # Released under MIT license as described in the file LICENSE.
 # Authors: Michael Hicks
 
-# Build the opt-in `basalt-fuzz` executable: elaborate the Mathlib-free property/generator closure
-# with Lake, SanitizerCoverage-instrument its C, and link it against libFuzzer with Lean owning
-# `main` (which calls Fuzz.go -> libFuzzer's driver). See fuzz-run/README.md.
+# Build the opt-in `basalt-fuzz` executable. Lake owns the module closure, the SanitizerCoverage
+# scope (the `BasaltFuzz` library and the executable root, per lakefile.toml), and the link; this
+# script owns what Lake's declarative config cannot express — detecting this platform's libFuzzer
+# runtime and C++ runtime, compiling the C bridge, and asserting the properties a wrong answer would
+# otherwise degrade silently. Lean owns `main`, which calls Fuzz.go -> libFuzzer's driver. See
+# fuzz-run/README.md.
 #
 # Portable across macOS (arm64) and Linux; everything platform-specific is detected below, and each
 # detection can be overridden by the environment variable named in its block. `fuzz-run/env.sh`, if
@@ -20,32 +23,10 @@ ROOT=$(pwd)
 if [ -f fuzz-run/env.sh ]; then . fuzz-run/env.sh; fi
 
 IR="$ROOT/.lake/build/ir"
-PKGS="$ROOT/.lake/packages"
 OUT="$ROOT/fuzz-run/obj"; mkdir -p "$OUT"
+EXE="$ROOT/.lake/build/bin/basalt-fuzz"
 
-# The exact (Mathlib-free) module closure the executable links. Instrumenting all of it realizes
-# the "property + generator modules" coverage scope (none of these import Mathlib).
-#
-# Keep this in step with the imports: a module added upstream but missing here fails at link with
-# `undefined symbol: initialize_basalt_<Module>`, which reads as a toolchain problem rather than a
-# stale list.
-MODULES=(
-  Basalt/RandomChoice Basalt/Gen Basalt/IO Basalt/Combinators Basalt/PlausibleGen
-  Basalt/PBT/Property Basalt/PBT/Campaign Basalt/PBT/Backend Basalt/PBT/Driver
-  Basalt/Fuzz/Core Basalt/Fuzz/Runner
-  BasaltTest/Fuzz/BuggyBST BasaltTest/Fuzz/Staged
-  BasaltFuzzMain
-)
-
-# Dependency modules the closure needs, as `<package>/<module>`, compiled *without*
-# SanitizerCoverage: they are the backends' PRNGs, not code under test, and coverage over a PRNG's
-# mixing steps is pure noise to libFuzzer's feedback. `Basalt/PlausibleGen` pulls in Plausible's for
-# the `Gen Plausible.Gen` instance and `Basalt/IO` SplitMix's; nothing here imports Mathlib
-# (verified by the link succeeding).
-DEP_MODULES=(plausible/Plausible/Random plausible/Plausible/Gen splitmix/SplitMix/Native splitmix/SplitMix/IO)
-
-# SplitMix's C implementation, which its `@[extern]` declarations call.
-DEP_LIBS=("$PKGS/splitmix/.lake/build/lib/libsplitmix.a")
+die() { echo "== $* ==" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------------------------
 # Platform detection
@@ -194,33 +175,10 @@ fi
 echo "== platform: $UNAME; cc: $CC; runtime: $FUZZER_LIB_FLAGS ${DRIVER_DEFINE:+(legacy driver)} =="
 
 # ---------------------------------------------------------------------------------------------
-echo "== elaborate + emit C via Lake =="
-# shellcheck disable=SC2086   # a target list: the split into words is the point
-lake build Basalt.Fuzz.Runner Basalt.Combinators BasaltFuzzMain splitmix/libsplitmix \
-  ${EXTRA_LAKE_TARGETS:-} >/dev/null
-
-echo "== compile (SanitizerCoverage on all first-party modules) + bridge =="
-OBJS=()
-for m in "${MODULES[@]}"; do
-  c="$IR/$m.c"
-  # Fatal, not skipped: a renamed or moved module would otherwise drop silently out of the
-  # instrumented set, and the symptom is not a build error but a fuzzer that never finds a staged
-  # bug (`chain-4`) because the coverage it needed was never compiled in.
-  [ -f "$c" ] || { echo "no IR for $m: is MODULES stale?" >&2; exit 1; }
-  o="$OUT/$(echo "$m" | tr / _).o"
-  $CC -O1 -fsanitize=fuzzer-no-link -c "$c" -o "$o"
-  OBJS+=("$o")
-done
-for m in "${DEP_MODULES[@]}"; do
-  c="$PKGS/${m%%/*}/.lake/build/ir/${m#*/}.c"
-  [ -f "$c" ] || { echo "  (skip $m: no IR)"; continue; }
-  o="$OUT/$(echo "${m#*/}" | tr / _).o"
-  $CC -O1 -c "$c" -o "$o"
-  OBJS+=("$o")
-done
+echo "== compile the C bridge =="
 # shellcheck disable=SC2086   # flag strings: the split into words is the point
 $CC -O1 $BRIDGE_INCLUDES $DRIVER_DEFINE -c Basalt/Fuzz/native.c -o "$OUT/native.o"
-OBJS+=("$OUT/native.o")
+EXTRA_OBJS=("$OUT/native.o")
 
 # On glibc >= 2.38 (Ubuntu 24.04, etc.) the runtime references `__isoc23_strtol`/`_strtoul` that
 # leanc's older-baseline libc does not export; this shim supplies them (fuzz-run/isoc23_compat.c).
@@ -228,36 +186,75 @@ OBJS+=("$OUT/native.o")
 # it targets. Inert where those symbols already resolve (its defs are weak).
 if [ "$UNAME" != "Darwin" ]; then
   $CC -O1 -c fuzz-run/isoc23_compat.c -o "$OUT/isoc23_compat.o"
-  OBJS+=("$OUT/isoc23_compat.o")
+  EXTRA_OBJS+=("$OUT/isoc23_compat.o")
 fi
 
-# `-fsanitize=fuzzer-no-link` is deliberately absent here: it is a *compile-time* instrumentation
-# flag, and at link time it also pulls in a ubsan dylib that Lean's vendored clang does not ship
-# (the link fails with "cannot open ... libclang_rt.ubsan_osx_dynamic.dylib"). The runtime archive
-# supplies every symbol the link actually needs.
-echo "== link =="
-# Capture rather than pipe: a previous `... | grep -v ... || true` swallowed the linker's exit code,
-# so a *failed* link still printed "built" and left no binary — the failure only surfaced later as
-# `fuzz-run/basalt-fuzz: No such file or directory`. Filter the noise for display, but fail loudly on
-# a nonzero status or a missing binary.
-rm -f fuzz-run/basalt-fuzz
+# Everything the link needs beyond the Lean closure, handed to Lake through the one static
+# `moreLinkArgs` entry in lakefile.toml. A clang response file is one argument per line; the quoting
+# is what survives a path containing a space.
+#
+# `-fsanitize=fuzzer-no-link` is deliberately absent: it is a *compile-time* instrumentation flag,
+# and at link time it also pulls in a ubsan dylib that Lean's vendored clang does not ship (the link
+# fails with "cannot open ... libclang_rt.ubsan_osx_dynamic.dylib"). The runtime archive supplies
+# every symbol the link actually needs.
+echo "== write link.rsp =="
+: > "$OUT/link.rsp"
 # shellcheck disable=SC2086   # flag strings: the split into words is the point
-if ! $CC "${OBJS[@]}" "${DEP_LIBS[@]}" -o fuzz-run/basalt-fuzz $FUZZER_LIB_FLAGS $CXXLIB_FLAGS $EXPORT_FLAGS \
-     > "$OUT/link.log" 2>&1; then
+for a in "${EXTRA_OBJS[@]}" $FUZZER_LIB_FLAGS $CXXLIB_FLAGS $EXPORT_FLAGS; do
+  printf '"%s"\n' "$a" >> "$OUT/link.rsp"
+done
+
+# Lake hashes `moreLinkArgs` as the literal string `@fuzz-run/obj/link.rsp`, not the file's contents,
+# so editing the response file alone leaves the previous binary reported as up to date. Deleting the
+# output is what forces the relink; a rebuild after switching `FUZZER_LIB_FLAGS` otherwise silently
+# keeps the old runtime.
+echo "== lake build basalt-fuzz =="
+rm -f "$EXE" fuzz-run/basalt-fuzz
+# shellcheck disable=SC2086   # a target list: the split into words is the point
+lake build basalt-fuzz ${EXTRA_LAKE_TARGETS:-} > "$OUT/link.log" 2>&1 || {
   grep -viE 'unused|-Wl' "$OUT/link.log" >&2 || true
-  echo "== link FAILED (runtime: $FUZZER_LIB_FLAGS; cxxlib: $CXXLIB_FLAGS) ==" >&2
-  exit 1
+  die "lake build FAILED (runtime: $FUZZER_LIB_FLAGS; cxxlib: $CXXLIB_FLAGS)"
+}
+grep -viE 'unused|-Wl|^✔|^info:' "$OUT/link.log" || true
+[ -x "$EXE" ] || die "lake reported success but produced no binary"
+
+# ---------------------------------------------------------------------------------------------
+# Post-conditions. Each of these three is a property whose violation leaves a *working* fuzzer that
+# searches badly, so none of them shows up as a build error on its own.
+# ---------------------------------------------------------------------------------------------
+
+# Mathlib in the link closure. Previously an accidental umbrella import failed the link and so
+# fenced itself; now that Lake derives the closure it would simply build Mathlib into the fuzzer.
+# The response file Lake writes for its own link names every object it linked, dependency packages
+# included, so it is the ground truth for what got in.
+LAKE_RSP="$ROOT/.lake/build/bin/basalt-fuzz.rsp"
+if [ -f "$LAKE_RSP" ] && grep -qi 'packages/mathlib' "$LAKE_RSP"; then
+  die "Mathlib entered the fuzz link closure: import the narrowest module, not an umbrella"
 fi
-grep -viE 'unused|-Wl' "$OUT/link.log" || true
-[ -x fuzz-run/basalt-fuzz ] || { echo "== link reported success but produced no binary ==" >&2; exit 1; }
+
+# The instrumentation scope, asserted in both directions: every object of the `BasaltFuzz` library
+# and the executable root carries SanitizerCoverage, and no `Basalt/` library object does. A module
+# claimed by two libraries' globs, or a `moreLeancArgs` dropped from the executable, yields a fuzzer
+# whose coverage feedback is missing the code under test — it still runs, and still finds the shallow
+# `bst-buggy-*` bugs, so only a staged benchmark (`chain-4`) would ever reveal it.
+instrumented() { size -m "$1" 2>/dev/null | grep -q '__sancov_cntrs'; }
+for o in "$IR"/BasaltFuzz/*.c.o.export "$IR/BasaltFuzzMain.c.o.export"; do
+  [ -f "$o" ] || die "no object for ${o#"$IR"/}: did a module leave the BasaltFuzz library?"
+  instrumented "$o" || die "${o#"$IR"/} is not instrumented: check for overlapping library globs"
+done
+while IFS= read -r o; do
+  ! instrumented "$o" || die "${o#"$IR"/} is instrumented: coverage must stay off Basalt's plumbing"
+done < <(find "$IR/Basalt" -name '*.c.o.export')
 
 # libFuzzer finds the custom mutator with `dlsym(RTLD_DEFAULT, ...)`, and a lookup that fails is
-# silent: the campaign runs the default mutators and `--grow` does nothing. So assert the linked
-# binary really exports it (`nm -g` lists dynamic externals; a hidden symbol shows as `private
-# external`, which `grep -v` drops).
-if ! nm -g fuzz-run/basalt-fuzz 2>/dev/null | grep -q 'T _\?LLVMFuzzerCustomMutator$'; then
-  echo "== LLVMFuzzerCustomMutator is not exported: --grow would silently do nothing ==" >&2
-  exit 1
-fi
+# silent: the campaign runs the default mutators and `--grow` does nothing. Lake's link adds
+# `-Wl,-dead_strip` on macOS, and nothing in the program references this symbol, so the export flag
+# in link.rsp is the only thing keeping it. (`nm -g` lists dynamic externals; a hidden symbol shows
+# as `private external`, which `grep` then misses.)
+nm -g "$EXE" 2>/dev/null | grep -q 'T _\?LLVMFuzzerCustomMutator$' \
+  || die "LLVMFuzzerCustomMutator is not exported: --grow would silently do nothing"
+
+# The committed entry point stays `fuzz-run/basalt-fuzz`, which every caller (CI, compare-*.sh) uses.
+cp "$EXE" fuzz-run/basalt-fuzz
 
 echo "== built: fuzz-run/basalt-fuzz =="
