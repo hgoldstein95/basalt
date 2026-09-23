@@ -44,14 +44,14 @@ def propChain [Gen G] (n : Nat) : PropM G Unit := do
     if (← generate (chooseNat 0 255)) == needle then ok := ok + 1 else break
   check (ok < n) s!"stages={ok} of {n}"
 
-/-- The second value that ends `propLong`'s run at position `i`, drawn from `[1, 3]` by the top of a
-golden-ratio multiplicative hash (`40503 ≈ 2¹⁶/φ`), which is aperiodic over the lengths we run.
+/-- The second value that ends `propLong`'s run at position `i`: a golden-ratio multiplicative hash
+(`40503 ≈ 2¹⁶/φ`) scaled from its 16 bits into `[1, 3]`, which is aperiodic over the lengths we run.
 
 It has to *vary* with the position, or one mutation ends the benchmark. A constant terminator leaves
 every other byte value acceptable everywhere, so a single `InsertRepeatedBytes` of any acceptable byte
 satisfies 128 positions at once — measured: `long-16` then failed in 4 runs. A terminator periodic in
 `i` falls the same way to `CopyPart` of an aligned block. -/
-def stopAt (i : Nat) : Nat := i * 40503 % 65536 / 21846 + 1
+def stopAt (i : Nat) : Nat := i * 40503 % 65536 * 3 / 65536 + 1
 
 /-- Build a run of elements, ending it at a terminator (`0` or `stopAt i`, so half the draws), and
 fail on reaching `n` of them. The benchmark for `--grow` (`fuzz-run/README.md`), and the mirror image

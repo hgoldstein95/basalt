@@ -76,12 +76,8 @@ instance : RandomChoice FuzzGen where
 /-- `FuzzGen` has everything a generator needs. -/
 example : Gen FuzzGen := inferInstance
 
-/-- What one input produced: its outcome, and how many bytes it wanted beyond the ones it was given.
-
-`deficit` is the whole feedback channel for buffer growth. Zero-extension is invisible to the fuzzer
-by construction — the zeros a starved run reads are not bytes it can mutate, because they are not in
-the input — so the count of them is the one thing worth reporting back: appending exactly that many
-zeros yields an input that behaves identically and *is* mutable there (`fuzz-run/README.md`). -/
+/-- What one input produced: its outcome, and how many bytes it wanted beyond the ones it was
+given (the `deficit`). -/
 structure FuzzResult where
   outcome : TestOutcome
   deficit : Nat
