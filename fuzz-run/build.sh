@@ -30,7 +30,7 @@ OUT="$ROOT/fuzz-run/obj"; mkdir -p "$OUT"
 # `undefined symbol: initialize_basalt_<Module>`, which reads as a toolchain problem rather than a
 # stale list.
 MODULES=(
-  Basalt/RandomChoice Basalt/Random Basalt/Gen Basalt/IO Basalt/Combinators Basalt/PlausibleGen
+  Basalt/RandomChoice Basalt/Gen Basalt/IO Basalt/Combinators Basalt/PlausibleGen
   Basalt/PBT/Property Basalt/PBT/Campaign Basalt/PBT/Backend Basalt/PBT/Driver
   Basalt/Fuzz/Core Basalt/Fuzz/Runner
   BasaltTest/Fuzz/BuggyBST BasaltTest/Fuzz/Staged
