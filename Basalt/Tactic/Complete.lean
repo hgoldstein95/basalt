@@ -120,7 +120,7 @@ partial def walkComplete (extras : Array Term) (goal : MVarId) : TermElabM (List
   if law.isAppOfArity ``IsCompleteFor 3 then
     -- The value is named after the predicate's binder, as the walk names a drawn value.
     let v := match law.getArg! 2 with | .lam v _ _ _ => v.eraseMacroScopes | _ => `a
-    let (_, g) ← goal.introN 2 [v, .mkSimple s!"h_{v}"]
+    let (_, g) ← goal.introN 2 [← mkFreshUserName v, ← mkFreshUserName (.mkSimple s!"h_{v}")]
     goal := g
   goal.withContext do
   let ty ← whnfR (← instantiateMVars (← goal.getType))
@@ -143,18 +143,19 @@ partial def walkComplete (extras : Array Term) (goal : MVarId) : TermElabM (List
       pure (``SPMF.Cost.mayObs, ← mkAppOptM ``SPMF.Cost.mem_support_iff_may #[none, g, v, n])
     else pure (``SPMF.mayObs, ← mkAppOptM ``SPMF.mem_support_iff_may #[none, g, a])
   let some (_, rhs) := (← inferType may).iff? | throwError bad
+  let lctx := (← goal.getDecl).lctx
   let (pre, structural, rest) ← computeBound extras obs true g rhs.appArg!
   let paths ← mkFreshExprMVar pre
   goal.assign (← mkAppM ``Iff.mpr #[may, mkApp structural paths])
-  return (← prunePaths paths.mvarId!) ++ (← rest.mapM fun g => tidy g)
+  return (← prunePaths paths.mvarId!) ++ (← rest.mapM fun g => tidy lctx g)
 
 /-- `complete_bound` replaces a goal `a ∈ SPMF.support (gen …)` by a precondition for `gen` to
 produce `a` (at `SPMF.Cost`, to produce the value `a.1` in `a.2` choices), computed by walking
 `gen`'s syntax: an `∃` over each value drawn, under the generator's own names, an `∨` over each
 choice, with the branches that cannot produce `a` pruned, and at the end the equation between `a`
-and the value built. On `IsCompleteFor (gen …) P` it introduces the value and `P` of it first. A
-callee is reached through its `.sound_complete` or `.complete` law, or a fact passed as
-`complete_bound [h₁, h₂]`; a recursive occurrence, or a callee nothing is known about, stays as
+and the value built. On `IsCompleteFor (gen …) P` it introduces the value and `P` of it first,
+inaccessible. A callee is reached through its `.sound_complete` or `.complete` law, or a fact passed
+as `complete_bound [h₁, h₂]`; a recursive occurrence, or a callee nothing is known about, stays as
 `∃ x ∈ SPMF.support (gen …), …`, to be discharged from the hypotheses of an induction.
 
 There is no `complete_fixpoint`: choose an induction on the value or on `P`, unfold `gen` with

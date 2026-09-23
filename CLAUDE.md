@@ -68,7 +68,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   law. What closes a leaf of a bound on one observation is tagged `@[obs_leaf]` beside the tactic
   that uses it. The judgments, the law naming convention, and the registries are
   [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean); the walk and its side-goal solvers are
-  [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean). What an entry tactic is made of —
+  [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean), and the names it gives what it leaves
+  [Basalt/Walk/Names.lean](Basalt/Walk/Names.lean). What an entry tactic is made of —
   `computeBound`, `fixpointStep`, and the residual handlers — is
   [Basalt/Walk/Entry.lean](Basalt/Walk/Entry.lean): a `_bound` tactic restates its goal and relates
   the computed bound to it, and a `_fixpoint` tactic is `fixpointStep` and its `_bound`

@@ -38,11 +38,11 @@ example (b : Bool) : IsCostBounded (gen b) (fun v => v + 6) := by
 -- A drawn value is named after its binder, its cost `n_<value>`, and what is known about it
 -- `h_<value>`: a pivot's range, a callee's cost law.
 /--
-trace: x : ℕ
-h_x : 0 ≤ x ∧ x ≤ 3
-y n_y : ℕ
-h_y : n_y ≤ y + 1
-⊢ 1 + n_y ≤ x + y + 2
+trace: x✝ : ℕ
+h_x✝ : 0 ≤ x✝ ∧ x✝ ≤ 3
+y✝ n_y✝ : ℕ
+h_y✝ : n_y✝ ≤ y✝ + 1
+⊢ 1 + n_y✝ ≤ x✝ + y✝ + 2
 -/
 #guard_msgs in
 example : IsCostBounded (do let x ← chooseNat 0 3; let y ← Nat.arbitrary; return x + y)
@@ -53,10 +53,10 @@ example : IsCostBounded (do let x ← chooseNat 0 3; let y ← Nat.arbitrary; re
 
 -- A combinator with a generator argument is bounded in terms of that generator's cost law.
 /--
-trace: xs : List ℕ
-n_xs : ℕ
-h_xs : n_xs ≤ xs.length + (List.map (fun n => n + 1) xs).sum + 1
-⊢ n_xs + 0 ≤ xs.length + (List.map (fun x => x + 1) xs).sum + 1
+trace: xs✝ : List ℕ
+n_xs✝ : ℕ
+h_xs✝ : n_xs✝ ≤ xs✝.length + (List.map (fun n => n + 1) xs✝).sum + 1
+⊢ n_xs✝ + 0 ≤ xs✝.length + (List.map (fun x => x + 1) xs✝).sum + 1
 -/
 #guard_msgs in
 example : IsCostBounded (listOf Nat.arbitrary >>= fun xs => pure xs)
@@ -84,9 +84,9 @@ example : IsCostBounded (permutationOf [1, 2, 3] : SPMF.Cost { ys // [1, 2, 3].P
 -- A definition with no rule is unfolded and walked through: one goal per path through its body, the
 -- draws it names under its names, and those it does not under the goal's.
 /--
-trace: x n_x : ℕ
-h_x : n_x ≤ x + 1
-⊢ 1 + n_x ≤ 1 + (some x).elim 0 fun x => x + 1
+trace: x✝ n_x✝ : ℕ
+h_x✝ : n_x✝ ≤ x✝ + 1
+⊢ 1 + n_x✝ ≤ 1 + (some x✝).elim 0 fun x => x + 1
 
 ⊢ 1 ≤ 1 + none.elim 0 fun x => x + 1
 -/
@@ -107,10 +107,10 @@ def twoDigits [Gen G] : G (Nat × Nat) := do
   return (d₁, d₂)
 
 /--
-trace: d₁ : ℕ
-h_d₁ : 0 ≤ d₁ ∧ d₁ ≤ 9
-d₂ : ℕ
-h_d₂ : 0 ≤ d₂ ∧ d₂ ≤ 9
+trace: d₁✝ : ℕ
+h_d₁✝ : 0 ≤ d₁✝ ∧ d₁✝ ≤ 9
+d₂✝ : ℕ
+h_d₂✝ : 0 ≤ d₂✝ ∧ d₂✝ ≤ 9
 ⊢ 1 + 1 ≤ 2
 -/
 #guard_msgs in
@@ -162,10 +162,10 @@ example : IsCostBounded (listOfMaxLength 3 (chooseNat 0 5 >>= fun x => pure (x +
 
 -- The worst case of a list combinator is the largest of its branches', a callee's included.
 /--
-trace: xs : List ℕ
-n_xs : ℕ
-h_xs : n_xs ≤ (List.map (fun x => max (1 + 1) (max (1 + 0) 0)) xs).sum
-⊢ n_xs ≤ 2 * xs.length
+trace: xs✝ : List ℕ
+n_xs✝ : ℕ
+h_xs✝ : n_xs✝ ≤ (List.map (fun x => max (1 + 1) (max (1 + 0) 0)) xs✝).sum
+⊢ n_xs✝ ≤ 2 * xs✝.length
 -/
 #guard_msgs in
 example : IsCostBounded

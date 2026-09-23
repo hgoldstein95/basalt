@@ -179,8 +179,9 @@ theorem <GEN>.sound_complete : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) :
 **`sound_fixpoint`** (`Basalt/Tactic/Sound.lean`) inducts over the arguments some recursive
 call of `<GEN>` changes, unfolds one step, and runs `sound_bound` (`Basalt/Tactic/Sound.lean`),
 which is `cost_bound` at the support interpretation: one goal per path, the drawn values and what is
-known of them in context under the generator's names. A recursive occurrence is closed by `ih`, a
-callee by its `.sound_complete` or `.sound` law, anything else by a fact: `sound_fixpoint [h]`.
+known of them in context under the generator's names, inaccessible (`x✝`, `h_x✝`: name them with
+`next x h_x =>`). A recursive occurrence is closed by `ih`, a callee by its `.sound_complete` or
+`.sound` law, anything else by a fact: `sound_fixpoint [h]`.
 `BasaltTest/Tactic/Sound.lean` shows the goals `genHeap`, `genBST`, and `genLeftist` leave.
 
 **`complete_bound`** (`Basalt/Tactic/Complete.lean`) turns `a ∈ SPMF.support (<GEN> …)`, after one
@@ -325,7 +326,7 @@ unfolded and walked.
 **`cost_bound` is the whole structural argument.** It pushes the postcondition "producing `v` took
 at most `<COST> v` choices" backward through the step, by the same walk as `mass_bound` — the tally
 of Step 2 is what it computes. It leaves one goal per path through the generator,
-stated over the values that path drew; the walker (`Basalt/Walk/Basic.lean`, "Names") says how
+stated over the values that path drew; `Basalt/Walk/Names.lean` says how
 they are named, and `BasaltTest/Tactic/CostFixpoint.lean` shows the goals `genHeap` and `genBST`
 leave. Nothing about the generator is yours to supply:
 

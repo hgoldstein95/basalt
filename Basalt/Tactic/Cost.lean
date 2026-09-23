@@ -100,8 +100,9 @@ arithmetic: it walks `gen`'s syntax, pushing the postcondition `n ≤ c v` into 
 and leaves one goal per path through `gen`. Recursive occurrences are closed from the local context,
 callees from their `.cost_bounded` law; any other cost bound can be passed as `cost_bound [h₁, h₂]`.
 
-In a residual goal, a value drawn by `let x ← …` is named `x`, the choices that draw took `n_x`,
-and what is known about it `h_x`, as the walker names them (`Basalt/Walk/Basic.lean`). -/
+In a residual goal, a value drawn by `let x ← …` is `x✝`, the choices that draw took `n_x✝`, and
+what is known about it `h_x✝` (`Basalt/Walk/Names.lean`); name them with `next x n_x h_x =>`, or
+all at once with `expose_names`. -/
 syntax (name := costBoundTac) "cost_bound" (walkFacts)? : tactic
 
 elab_rules : tactic

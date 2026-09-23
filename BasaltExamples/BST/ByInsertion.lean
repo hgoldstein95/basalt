@@ -126,11 +126,11 @@ theorem Tree.genBSTByInsertion.sound_complete {lo hi : Int} (h : lo ≤ hi) :
     all_goals omega
   have hc : IsCompleteFor (chooseInt lo hi h : SPMF Int) (fun x => lo ≤ x ∧ x ≤ hi) := by
     complete_bound
-    exact h_x
+    assumption
   refine .intro ?sound ?complete
   case sound =>
     sound_fixpoint [hs]
-    exact Tree.isBST_foldl_insert (t := .leaf) rfl xs h_xs
+    next xs h_xs => exact Tree.isBST_foldl_insert (t := .leaf) rfl xs h_xs
   case complete =>
     intro t ht
     rw [Tree.genBSTByInsertion]; complete_bound [hc]

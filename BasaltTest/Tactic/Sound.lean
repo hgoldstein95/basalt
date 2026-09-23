@@ -30,13 +30,13 @@ lo : ℕ
 
 genHeap : ℕ → SPMF Heap.Tree
 ih : ∀ (lo : ℕ), IsSound (genHeap lo) (Heap.Tree.isHeap lo)
-lo delta : ℕ
-h_delta : ⊤ delta
-l : Heap.Tree
-h_l : Heap.Tree.isHeap (lo + delta) l
-r : Heap.Tree
-h_r : Heap.Tree.isHeap (lo + delta) r
-⊢ Heap.Tree.isHeap lo (l.node (lo + delta) r)
+lo delta✝ : ℕ
+h_delta✝ : ⊤ delta✝
+l✝ : Heap.Tree
+h_l✝ : Heap.Tree.isHeap (lo + delta✝) l✝
+r✝ : Heap.Tree
+h_r✝ : Heap.Tree.isHeap (lo + delta✝) r✝
+⊢ Heap.Tree.isHeap lo (l✝.node (lo + delta✝) r✝)
 -/
 #guard_msgs in
 example : IsSound (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo) := by
@@ -50,26 +50,26 @@ example : IsSound (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo) := by
 trace: genBST : ℤ → ℤ → SPMF (BST.Tree ℤ)
 ih : ∀ (lo hi : ℤ), IsSound (genBST lo hi) (BST.Tree.isBST lo hi)
 lo hi : ℤ
-h : lo > hi
+h✝ : lo > hi
 ⊢ BST.Tree.isBST lo hi BST.Tree.leaf
 
 genBST : ℤ → ℤ → SPMF (BST.Tree ℤ)
 ih : ∀ (lo hi : ℤ), IsSound (genBST lo hi) (BST.Tree.isBST lo hi)
 lo hi : ℤ
-h : ¬lo > hi
+h✝ : ¬lo > hi
 ⊢ BST.Tree.isBST lo hi BST.Tree.leaf
 
 genBST : ℤ → ℤ → SPMF (BST.Tree ℤ)
 ih : ∀ (lo hi : ℤ), IsSound (genBST lo hi) (BST.Tree.isBST lo hi)
 lo hi : ℤ
-h : ¬lo > hi
-x : ℤ
-h_x : lo ≤ x ∧ x ≤ hi
-l : BST.Tree ℤ
-h_l : BST.Tree.isBST lo (x - 1) l
-r : BST.Tree ℤ
-h_r : BST.Tree.isBST (x + 1) hi r
-⊢ BST.Tree.isBST lo hi (l.node x r)
+h✝ : ¬lo > hi
+x✝ : ℤ
+h_x✝ : lo ≤ x✝ ∧ x✝ ≤ hi
+l✝ : BST.Tree ℤ
+h_l✝ : BST.Tree.isBST lo (x✝ - 1) l✝
+r✝ : BST.Tree ℤ
+h_r✝ : BST.Tree.isBST (x✝ + 1) hi r✝
+⊢ BST.Tree.isBST lo hi (l✝.node x✝ r✝)
 -/
 #guard_msgs in
 example : IsSound (BST.Tree.genBST lo hi) (BST.Tree.isBST lo hi) := by
@@ -87,25 +87,25 @@ lo : ℕ
 
 genLeftist : ℕ → SPMF LeftistHeap.Tree
 ih : ∀ (lo : ℕ), IsSound (genLeftist lo) (LeftistHeap.Tree.isLeftist lo)
-lo delta : ℕ
-h_delta : ⊤ delta
-a : LeftistHeap.Tree
-h_a : LeftistHeap.Tree.isLeftist (lo + delta) a
-b : LeftistHeap.Tree
-h_b : LeftistHeap.Tree.isLeftist (lo + delta) b
-_h : b.rank ≤ a.rank
-⊢ LeftistHeap.Tree.isLeftist lo (a.node (lo + delta) b)
+lo delta✝ : ℕ
+h_delta✝ : ⊤ delta✝
+a✝ : LeftistHeap.Tree
+h_a✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) a✝
+b✝ : LeftistHeap.Tree
+h_b✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) b✝
+_h✝ : b✝.rank ≤ a✝.rank
+⊢ LeftistHeap.Tree.isLeftist lo (a✝.node (lo + delta✝) b✝)
 
 genLeftist : ℕ → SPMF LeftistHeap.Tree
 ih : ∀ (lo : ℕ), IsSound (genLeftist lo) (LeftistHeap.Tree.isLeftist lo)
-lo delta : ℕ
-h_delta : ⊤ delta
-a : LeftistHeap.Tree
-h_a : LeftistHeap.Tree.isLeftist (lo + delta) a
-b : LeftistHeap.Tree
-h_b : LeftistHeap.Tree.isLeftist (lo + delta) b
-_h : ¬b.rank ≤ a.rank
-⊢ LeftistHeap.Tree.isLeftist lo (b.node (lo + delta) a)
+lo delta✝ : ℕ
+h_delta✝ : ⊤ delta✝
+a✝ : LeftistHeap.Tree
+h_a✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) a✝
+b✝ : LeftistHeap.Tree
+h_b✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) b✝
+_h✝ : ¬b✝.rank ≤ a✝.rank
+⊢ LeftistHeap.Tree.isLeftist lo (b✝.node (lo + delta✝) a✝)
 -/
 #guard_msgs in
 example : IsSound (LeftistHeap.Tree.genLeftist lo) (LeftistHeap.Tree.isLeftist lo) := by
@@ -129,27 +129,27 @@ lo x : ℕ
 
 genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
 ih : ∀ (lo a : ℕ), IsSound (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
-lo x k delta : ℕ
-h_delta : ⊤ delta
-r : LeftistHeap.Tree
-h_r : LeftistHeap.Tree.isLeftist (lo + delta) r ∧ r.rank = k
-gap : ℕ
-h_gap : ⊤ gap
-l : LeftistHeap.Tree
-h_l : LeftistHeap.Tree.isLeftist (lo + delta) l ∧ l.rank = k + gap
-⊢ LeftistHeap.Tree.isLeftist lo (l.node (lo + delta) r)
+lo x k delta✝ : ℕ
+h_delta✝ : ⊤ delta✝
+r✝ : LeftistHeap.Tree
+h_r✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) r✝ ∧ r✝.rank = k
+gap✝ : ℕ
+h_gap✝ : ⊤ gap✝
+l✝ : LeftistHeap.Tree
+h_l✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) l✝ ∧ l✝.rank = k + gap✝
+⊢ LeftistHeap.Tree.isLeftist lo (l✝.node (lo + delta✝) r✝)
 
 genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
 ih : ∀ (lo a : ℕ), IsSound (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
-lo x k delta : ℕ
-h_delta : ⊤ delta
-r : LeftistHeap.Tree
-h_r : LeftistHeap.Tree.isLeftist (lo + delta) r ∧ r.rank = k
-gap : ℕ
-h_gap : ⊤ gap
-l : LeftistHeap.Tree
-h_l : LeftistHeap.Tree.isLeftist (lo + delta) l ∧ l.rank = k + gap
-⊢ (l.node (lo + delta) r).rank = k.succ
+lo x k delta✝ : ℕ
+h_delta✝ : ⊤ delta✝
+r✝ : LeftistHeap.Tree
+h_r✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) r✝ ∧ r✝.rank = k
+gap✝ : ℕ
+h_gap✝ : ⊤ gap✝
+l✝ : LeftistHeap.Tree
+h_l✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) l✝ ∧ l✝.rank = k + gap✝
+⊢ (l✝.node (lo + delta✝) r✝).rank = k.succ
 -/
 #guard_msgs in
 example : IsSound (LeftistHeap.Tree.genLeftistOfRank lo k)
@@ -181,9 +181,9 @@ theorem genTwo.sound : IsSound (genTwo (G := SPMF)) (· = 2) := by
   rfl
 
 /--
-trace: n : ℕ
-h_n : n = 2
-⊢ n + 1 = 3
+trace: n✝ : ℕ
+h_n✝ : n✝ = 2
+⊢ n✝ + 1 = 3
 -/
 #guard_msgs in
 example : IsSound (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := by
