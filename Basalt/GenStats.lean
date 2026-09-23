@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Gen
+import Basalt.Random
 
 open Lean.Order
 
@@ -67,9 +68,9 @@ instance : RandomChoice StatGen where
     if s.fuel == 0 then
       throw .outOfFuel
     else
-      let (r, rng') := randNat s.rng lo hi
-      set { rng := rng', fuel := s.fuel - 1, choices := s.choices + 1 : StatState }
-      pure (ULift.up ⟨min hi (max lo r), by omega⟩)
+      let r := randNat s.rng lo hi
+      set { rng := r.2, fuel := s.fuel - 1, choices := s.choices + 1 : StatState }
+      pure (ULift.up ⟨r.1, randNat_mem s.rng h⟩)
 
 /-- `StatGen` has everything a generator needs. -/
 example : Gen StatGen := inferInstance

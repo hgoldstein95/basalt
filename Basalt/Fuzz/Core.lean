@@ -67,8 +67,8 @@ instance : RandomChoice FuzzGen where
     let range := hi - lo + 1
     let (raw, s') := readNat s (bytesFor range)
     set s'
-    let v := lo + raw % range
-    pure (ULift.up ⟨min hi (max lo v), by omega⟩)
+    have := Nat.mod_lt raw (show range > 0 by omega)
+    pure (ULift.up ⟨lo + raw % range, by omega⟩)
 
 /-- `FuzzGen` has everything a generator needs. -/
 example : Gen FuzzGen := inferInstance

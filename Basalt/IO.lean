@@ -3,6 +3,7 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Basalt.Random
 import Basalt.RandomChoice
 
 open RandomChoice
@@ -16,7 +17,7 @@ There are two `IO`-flavored interpretations:
 
 | monad       | `choose` via                    | uniform?               | draws per `choose`              |
 |-------------|---------------------------------|------------------------|---------------------------------|
-| `IO`        | `IO.rand`                       | to within `1 ± 1/1000` | 1 while `k ≲ 2^21`, more beyond |
+| `IO`        | `randNat` on `IO.stdGenRef`     | to within `1 ± 1/1000` | 1 while `k ≲ 2^21`, more beyond |
 | `UniformIO` | `IO.getRandomBytes` + rejection | exactly                | 1 per attempt, expected `< 2`   |
 
 `IO` remains the default because it is fast: a pure PRNG step, no syscall. `UniformIO` is the
@@ -25,16 +26,19 @@ interpretation says it does.
 
 ## Main Definitions
 
-- `RandomChoice IO` — the default, via `IO.rand`.
+- `RandomChoice IO` — the default, via `randNat` on `IO.stdGenRef`.
 - `UniformIO` — an `IO` synonym whose `RandomChoice` instance is exactly uniform.
 - `UniformIO.run` — recover the underlying `IO` action.
 -/
 
-/-- `IO` is an instance of `RandomChoice` via `IO.rand`. -/
+/-- `IO` is an instance of `RandomChoice` via `IO.rand`, inlined so that the draw's bound comes
+from `randNat_mem` instead of a clamp. -/
 instance : RandomChoice IO where
   choose lo hi h := do
-    let r ← IO.rand lo hi
-    pure (ULift.up ⟨min hi (max lo r), by omega⟩)
+    let gen ← IO.stdGenRef.get
+    let r := randNat gen lo hi
+    IO.stdGenRef.set r.2
+    pure (ULift.up ⟨r.1, randNat_mem gen h⟩)
 
 /-! ## The exactly-uniform interpretation -/
 
