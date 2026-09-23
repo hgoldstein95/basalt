@@ -77,6 +77,11 @@ theorem le_may_nonEmptyListOf (hg : IsCompleteFor g R) :
 
 end generatorArgument
 
+@[gen_rule]
+theorem le_may_permutationOf {α : Type} {xs : List α} {p : { ys // xs.Perm ys } → Prop} :
+    (∃ a, p a) ≤ mayObs.spec (permutationOf xs) p :=
+  fun ⟨a, hp⟩ => ⟨a, mem_support_permutationOf_iff.mpr trivial, hp⟩
+
 end SPMF
 
 namespace SPMF.Cost
