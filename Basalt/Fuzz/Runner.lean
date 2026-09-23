@@ -26,10 +26,10 @@ aborts the process). -/
 @[extern "basalt_fuzz_go"]
 opaque goImpl (run : ByteArray → IO UInt8) (argv : Array String) (grow : Bool) : IO Unit
 
-/-- Hand one run's unmet demand to the bridge, which both tallies it and — under `--grow` — treats it
-as the number of zero bytes `LLVMFuzzerCustomMutator` should append before the next run. -/
-@[extern "basalt_fuzz_note"]
-opaque noteImpl (deficit : UInt32) : BaseIO Unit
+/-- Called at the conclusion of a run to report to the C code the deficit in the buffer,
+i.e., the difference N - S between requested bytes N and available bytes S. -/
+@[extern "basalt_fuzz_note_deficit"]
+opaque noteDeficitImpl (deficit : UInt32) : BaseIO Unit
 
 /-- Run the property on one input, reporting the byte codes the C bridge expects: `0` = pass,
 `1` = failed (the bridge then aborts, so the report must already be flushed), `2` = discard.
@@ -39,8 +39,8 @@ other backends do — libFuzzer's own `#N` markers count only corpus-worthy inpu
 number of tests run. -/
 def runOneIO (counters : IO.Ref (Nat × Nat)) (T : PropM FuzzGen Unit)
     (bytes : ByteArray) : IO UInt8 := do
-  let r := runOne T bytes
-  noteImpl (UInt32.ofNat (min r.deficit 4294967295))
+  let r := runOne T bytes -- run the property test
+  noteDeficitImpl (UInt32.ofNatClamp r.deficit) -- note any bytes deficit
   match r.outcome with
   | Except.ok () => counters.modify (fun (runs, discards) => (runs + 1, discards)); pure 0
   | Except.error .discard => counters.modify (fun (r, d) => (r, d + 1)); pure 2

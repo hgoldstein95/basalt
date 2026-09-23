@@ -44,26 +44,26 @@ __attribute__((noreturn)) static void basalt_fuzz_die(const char *what) {
    A generator can outrun its buffer, and `Basalt.Fuzz.readByte` gives it `0` past the end. Those
    zeros are invisible to the fuzzer: not being in the input, no byte mutator can reach the positions
    that produced them. `--grow` materializes them — a run reports how far it overshot, and the next
-   mutation of *those same bytes* starts from the extended form, which decodes to the same value
-   because reading a stored `0` is reading past the end.
+   mutation starts from the extended form.
 
-   fuzz-run/README.md owns the design, the libFuzzer facts that bound it, and the measurement — which
-   does not support growth helping, hence the default.
+   fuzz-run/README.md gives the design and some preliminary experimental data.
    --------------------------------------------------------------------------------------------- */
 
 static int g_grow = 0;
 
-/* The one starved input growth may act on, held by value because identity is the whole question (see
-   `basalt_fuzz_slot_matches`). `deficit` is nonzero exactly while the slot holds a live request;
-   `pending` carries one from `basalt_fuzz_note` to the caller that has the bytes to go with it. */
+/* If the last run reported a deficit, it is stored in `g_last_run_deficit`. That run's buffer
+   is stored in `g_short`. The custom mutator checks if the last run had a deficit, and if
+   the to-be mutated buffer is the same as last one, in which case it will zero-extend that
+   buffer before mutating it. */
+static uint32_t g_last_run_deficit = 0;
+
 static struct {
   uint8_t *buf;
   size_t   cap;               /* allocated, never shrunk; see `basalt_fuzz_record_short`        */
   size_t   size;
-  uint32_t deficit;
-  uint32_t pending;
 } g_short;
 
+/* Stats about the fuzzing run. */
 static struct {
   uint64_t runs;
   uint64_t starved;           /* runs that read past the end of their buffer                    */
@@ -72,61 +72,49 @@ static struct {
   uint64_t cap_blocked;       /* wanted more but was already at `-max_len`                      */
 } g_stats;
 
-/* The deficit's only route from Lean to C: `FuzzGen`'s cursor computes it (`Basalt/Fuzz/Core.lean`),
-   nothing on this side can derive it, and the callback's return is already spoken for by the outcome
-   code. Called once per input while `LLVMFuzzerTestOneInput` is still on the stack, so `pending` is
-   the current run's when the caller pairs it with the bytes.
-
-   A `BaseIO` extern takes no world token and returns its value *unwrapped*: no
-   `lean_io_result_mk_ok`, unlike `basalt_fuzz_go`'s `IO`. Wrapping it hands Lean a constructor where
-   it expects the value; for a `String` return that meant reading an object header as a length and
-   allocating until libFuzzer reported an out-of-memory. */
-LEAN_EXPORT lean_object *basalt_fuzz_note(uint32_t deficit) {
+/* Called from Lean at the conclusion of a single property test run to note whether the run
+   demanded more bytes than were available (so deficit is non-zero). Called while
+   `LLVMFuzzerTestOneInput` is still on the stack, so `g_last_run_deficit` is the current run's. */
+LEAN_EXPORT lean_object *basalt_fuzz_note_deficit(uint32_t deficit) {
   g_stats.runs++;
   if (deficit) {
     g_stats.starved++;
     if (deficit > g_stats.max_deficit) g_stats.max_deficit = deficit;
-    g_short.pending = deficit;
+    if (g_grow) g_last_run_deficit = deficit;         /* no slot is maintained with `--grow` off      */
   }
   return lean_box(0);                               /* Unit */
 }
 
-/* Take a copy of an input that ran short. Failing to allocate forgoes a growth, not the campaign.
-
-   The capacity doubles rather than tracking `Size`, for a reason outside this file: this runs inside
-   `LLVMFuzzerTestOneInput`, and libFuzzer counts mallocs against frees across the callback
-   (`MallocFreeTracer`) to decide whether to run LeakSanitizer. Allocating on every growing input would
-   answer "more mallocs than frees" continually and spend real time in leak checks that can find
-   nothing, `buf` being a live global. */
-static void basalt_fuzz_record_short(const uint8_t *Data, size_t Size, uint32_t deficit) {
+/* Called from LLVMFuzzerTestOneInput at the conclusion of the Lean function's property test
+   run in the case that there was a deficit. This function makes a copy of the input, which
+   a subsequent custom mutator call will check, to make sure that it is zero-extending
+   the right buffer. `g_last_run_deficit` is already set; this pairs it with its bytes, or retires it
+   if that cannot be done. */
+static void basalt_fuzz_record_short(const uint8_t *Data, size_t Size) {
   if (Size > g_short.cap) {
     size_t cap = g_short.cap ? g_short.cap : 64;
     while (cap < Size) cap *= 2;
     uint8_t *p = (uint8_t *)realloc(g_short.buf, cap);
-    if (!p) return;
+    if (!p) {
+      g_last_run_deficit = 0;      /* no growth, so can't zero-extend the deficit buffer. */
+      return;
+    }
     g_short.buf = p;
     g_short.cap = cap;
   }
   if (Size) memcpy(g_short.buf, Data, Size);
   g_short.size = Size;
-  g_short.deficit = deficit;
 }
 
-/* Whether `Data` is the input the slot's deficit was measured on, which growth demands: extending a
-   *different* buffer is harmful rather than merely wasteful, since its tail is a region its own
-   generator never asked for and the mutation that follows can land there. `Fuzzer::MutateAndTestOne`
-   mutates one buffer in place for up to `-mutate_depth` iterations, so a mid-round call is on exactly
-   the bytes that just ran, while iteration 0 of a round is on a freshly copied corpus unit and fails
-   here as it must. The size test rejects those on one compare, so `memcmp` runs only on a tie. */
+/* Whether `Data` is the input the slot's deficit was measured on. */
 static int basalt_fuzz_slot_matches(const uint8_t *Data, size_t Size) {
-  return g_short.deficit && Size == g_short.size
-      && (Size == 0 || memcmp(Data, g_short.buf, Size) == 0);
+  return Size == g_short.size && (Size == 0 || memcmp(Data, g_short.buf, Size) == 0);
 }
 
 /* The campaign's buffer statistics, on stderr. Called from two disjoint exits — `atexit` for the
    `-runs`-exhausted path, and the failure path below, which `abort()`s past `atexit` handlers.
    Printed from C rather than returned to Lean because a `String`-returning extern is the one shape
-   of this bridge that gets the `BaseIO` ABI wrong silently (see `basalt_fuzz_note`). */
+   of this bridge that gets the `BaseIO` ABI wrong silently (see `basalt_fuzz_note_deficit`). */
 static void basalt_fuzz_report_stats(void) {
   if (!g_stats.runs) return;
   fprintf(stderr, "[basalt] runs %llu, starved %llu (max deficit %u B)",
@@ -139,16 +127,11 @@ static void basalt_fuzz_report_stats(void) {
     fprintf(stderr, " [--grow off]\n");
 }
 
-/* Defining this replaces libFuzzer's whole default suite for the campaign (`Mutators` holds only
-   `Mutate_Custom`), which is why every path ends in `LLVMFuzzerMutate` — the default suite,
-   dictionaries and TORC included. Growth is a prefix to it, not an alternative: the zeros are
-   materialized and then the extended buffer is mutated in the same call.
-
-   The append is end-anchored on purpose. libFuzzer's own `Mutate_CopyPart` also extends, but inserts
-   at a random offset, which re-aligns every subsequent `choose` and scrambles the whole generated
-   value; appending leaves every existing draw meaning what it meant. Nothing holds the extension
-   afterwards — `LLVMFuzzerMutate` may erase the tail it was just handed — and that is intended: one
-   growth makes the tail visible to the suite, it does not legislate the result.
+/* This replaces libFuzzer's mutator. If we are in --grow mode, and the prior run
+   experienced a deficit, and did so when using the provided `Data` buffer, then this code
+   will grow buffer (not exceeding its `MaxSize`) and zero-extend its contents up to the
+   deficit, prior to mutating. If there was no deficit or we were not in --grow
+   mode, we go straight to mutation, which is just the default behavior.
 
    `Seed` is libFuzzer's own PRNG output and is unused: the tail is determined, not chosen.
 
@@ -160,9 +143,9 @@ static void basalt_fuzz_report_stats(void) {
 __attribute__((visibility("default")))
 size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize, unsigned Seed) {
   (void)Seed;
-  if (g_grow && basalt_fuzz_slot_matches(Data, Size)) {
-    size_t want = g_short.deficit;
-    g_short.deficit = 0;                          /* one growth per observation                  */
+  size_t want = g_last_run_deficit;
+  if (g_grow && want && basalt_fuzz_slot_matches(Data, Size)) {
+    g_last_run_deficit = 0;                          /* one growth per observation                  */
     if (Size >= MaxSize) {
       g_stats.cap_blocked++;                      /* -max_len is the ceiling on structure size   */
     } else {
@@ -175,16 +158,18 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize, unsig
   return LLVMFuzzerMutate(Data, Size, MaxSize);
 }
 
-/* Failure model follows bolero (lib/bolero-libfuzzer): the Lean closure prints the counterexample,
+/* Libfuzzer harness -- called by libFuzzer loop during testing.
+   Failure model follows bolero (lib/bolero-libfuzzer): the Lean closure prints the counterexample,
    returns code 1, and we abort(). libFuzzer's signal handler then saves the crashing input as an
    artifact (reproduce with `basalt-fuzz replay`) and exits with its error code. */
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
-  g_short.pending = 0;                                /* `basalt_fuzz_note` sets it if this run runs short */
+  g_last_run_deficit = 0;                    /* `basalt_fuzz_note_deficit` sets it if this run runs short */
   lean_object *arr = lean_alloc_sarray(1, Size, Size);
   memcpy(lean_sarray_cptr(arr), Data, Size);
 
   lean_inc(g_run);                                    /* apply consumes the function object   */
-  /* : IO UInt8, applied to the world token; consumes arr. */
+  /* Run the target Lean function */
+  /* res : IO UInt8; Lean function applied to the world token; consumes arr. */
   lean_object *res = lean_apply_2(g_run, arr, lean_io_mk_world());
 
   uint8_t code;
@@ -192,16 +177,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     code = (uint8_t)lean_unbox(lean_io_result_get_value(res));
     lean_dec(res);
   } else {
-    /* The Lean side answers every outcome with a code, so an exception here is a broken harness
-       rather than a rejected input: end the campaign instead of reporting inputs no one ran. */
+    /* An exception -- this signals a broken harness, so end the campaign. */
     lean_io_result_show_error(res);
     lean_dec(res);
     basalt_fuzz_die("the property raised an exception");
   }
 
-  /* Only here are the bytes and their deficit both in hand. A discarded run (`code == 2`) is recorded
-     too: it is still the buffer the next mid-round mutation will be handed. */
-  if (g_grow && g_short.pending) basalt_fuzz_record_short(Data, Size, g_short.pending);
+  /* If there was a deficit, save the offending buffer. Will be checked by the custom mutator. */
+  if (g_last_run_deficit) basalt_fuzz_record_short(Data, Size);
 
   if (code == 1) {
     basalt_fuzz_report_stats();                       /* abort() skips the atexit handler      */

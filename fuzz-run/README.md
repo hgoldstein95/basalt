@@ -57,7 +57,7 @@ can be told about the zeros it did not supply; see [Extending the buffer](#exten
  │ FuzzGen α =                   │   arr := ByteArray copy of (Data,Size)  │ ││
  │  StateT FuzzState Option      │   code := run arr        (: IO UInt8)   │ ││
  │      │                        │   1 → (Lean printed it) abort()         │ ││
- │      └─ deficit ──────────────┼─▶ basalt_fuzz_note(deficit)             │ ││
+ │      └─ deficit ──────────────┼─▶ basalt_fuzz_note_deficit(deficit)     │ ││
  │                               │   2 → return -1 (discard) ; else 0      │ ││
  │                               │ LLVMFuzzerCustomMutator(Data,Size,Max): │ ││
  │                               │   if `grow` and Data ran short: append  │ ││
@@ -235,7 +235,7 @@ discontinuously.
 `--grow` attempts to close the gap by materializing the zeros *before* mutating. It is **off by
 default**, because measurement does not support it helping — read
 [How much growth helps](#how-much-growth-helps) before building on this. The run reports
-how far it overshot (`FuzzResult.deficit`), `basalt_fuzz_note` hands the count to the C side, and the
+how far it overshot (`FuzzResult.deficit`), `basalt_fuzz_note_deficit` hands the count to the C side, and the
 next time `LLVMFuzzerCustomMutator` is called on those same bytes it appends that many zeros and then
 mutates the extended buffer. Zeros are what make the extension free of meaning — reading past the end
 yields `0`, and reading a stored `0` yields `0` — so the buffer that gets mutated decodes to exactly
