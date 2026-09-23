@@ -9,10 +9,8 @@ import Basalt.Obs.Combinators
 /-!
 # Observations into an Ordered Algebra
 
-The walker's rules for a bound `O.spec g post ≤ b` or `b ≤ O.spec g post`, stated once for every
-observation that is monotone in its postcondition: the postcondition is given, and the bound is what
-the rule computes. A combinator with a `@[gen_map]` lemma needs no rule here; its bound is its
-shape's, in the algebra.
+Rules for a bound `O.spec g post ≤ b` or `b ≤ O.spec g post` A combinator with a `@[gen_map]` lemma
+needs no rule here; its bound is its shape's, in the algebra.
 -/
 
 /-- Branch-wise bounds for a weighted choice, each paired with its weight, so that the bound computed
