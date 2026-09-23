@@ -10,7 +10,7 @@
 # random backends. Only a property whose generator *outruns its buffer* can separate the two settings
 # — one that always fits reads no bytes past the end and reports no deficit, so growth never fires and
 # both columns are the same campaign. `long-*` is the case built for it
-# (BasaltTest/Fuzz/Staged.lean).
+# (BasaltFuzz/Staged.lean).
 #
 # Two modes, because the obvious metric is the bad one:
 #

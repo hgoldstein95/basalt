@@ -70,13 +70,13 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `@[basalt_backend]`.
 - **Coverage-guided fuzzing** (`FuzzGen`, the libFuzzer bridge, the opt-in `basalt-fuzz` executable)
   — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
-  the measured comparison between backends. This is the repo's only FFI and native-link config: the
-  executable's C emission and link live outside `lake build`, so a change to *them* is caught only by
-  `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow. The Lean side is not exempt — the fuzz
-  runner and `BasaltTest/Fuzz/BuggyBST.lean` are elaborated by the default build through
-  `BasaltTest/Fuzz.lean`, which is where a drift from the proved `genBST` becomes a build failure.
-  Anything added to the Mathlib-free link closure must stay Mathlib-free: import the narrowest
-  module, not an umbrella.
+  the measured comparison between backends. This is the repo's only FFI and native-link config. The
+  code under test lives in the `BasaltFuzz` library, which is the only instrumented one — a generator
+  or property that wants coverage feedback belongs there and nowhere else. The default build
+  type-checks it but emits no C, so a change to the *native* half (bridge, runtime detection, link) is
+  caught only by `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow; a drift from the proved
+  `genBST` is caught by `BasaltTest/Fuzz.lean`. Anything added to the Mathlib-free link closure must
+  stay Mathlib-free: import the narrowest module, not an umbrella.
 
 ## Gotchas (symptom → cause → pointer)
 

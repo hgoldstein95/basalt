@@ -70,7 +70,7 @@ can be told about the zeros it did not supply; see [Extending the buffer](#exten
                         mutation loop + corpus + coverage counters;
                         on abort() saves the crashing input as an artifact;
                         counters come from SanitizerCoverage-instrumented .o
-                        of the (Mathlib-free) property/generator closure.
+                        of `BasaltFuzz` + the executable root, nothing else.
 ```
 
 Lean owns `main`, so the Lean runtime is already initialized when libFuzzer calls back — no init
@@ -88,32 +88,52 @@ not re-entrant.
 ### Build and instrumentation (`fuzz-run/build.sh`)
 
 Lean's default backend emits one C file per module under `.lake/build/ir/`, and SanitizerCoverage is
-a compile-time flag on that C. `build.sh` compiles the modules whose branching the fuzzer should
-explore — the properties and the generator/combinator code, listed in its `MODULES` — with
-`-fsanitize=fuzzer-no-link`, and links them against the libFuzzer runtime with `leanc` as the C
-driver. The Lean runtime and the rest of stdlib stay uninstrumented; partial coverage still guides
-libFuzzer. The random backends' PRNGs — Plausible's `Gen`/`Random` and SplitMix, listed in
-`DEP_MODULES` — are linked but not instrumented: they are not code under test, and coverage over a
-PRNG's mixing steps is noise in the feedback.
+a compile-time flag on that C. **Lake owns the closure and the scope.** `basalt-fuzz` is an ordinary
+`lean_exe`, so Lake derives the link closure from imports; the instrumentation scope is
+`-fsanitize=fuzzer-no-link` in the `moreLeancArgs` of the `BasaltFuzz` library and of the executable
+root (`lakefile.toml`), and nowhere else. That confines coverage feedback to the code under test —
+the generators, the properties, and the buggy operations — leaving Basalt's plumbing, the Lean
+runtime, and stdlib linked but uninstrumented; partial coverage still guides libFuzzer. Plausible's
+`Gen`/`Random` are in the same position for a second reason: they are the `--backend=plausible` PRNG
+rather than code under test, and coverage over a PRNG's mixing steps is noise in the feedback.
+
+Two modules and one executable root are a narrow scope for something as central as generator
+branching, and it works because Lean *specializes*. A generator is polymorphic in its monad, so the
+copy that actually runs is a specialization emitted into the module that instantiates it — for every
+property here, the one holding the registry, `BasaltFuzzMain`. The generic copies left behind in
+`Basalt/Combinators.lean` are dead. Instrumenting `BasaltFuzz.+` and the root therefore captures the
+live generator code by construction, and extending the flag to the `Basalt` library would add tens of
+thousands of edges the campaign never reaches. Measured on this repo: 4.5k counters here against
+17.9k when the whole first-party closure carried the flag, with no loss in the properties found.
+
+`build.sh` supplies what Lake's declarative config cannot — this platform's libFuzzer runtime, its C++
+runtime, the compiled C bridge, and three post-link assertions. Each assertion guards a property
+whose violation leaves a *working* fuzzer that searches badly rather than a build error: no Mathlib in
+Lake's link response file, the instrumentation scope in both directions (every `BasaltFuzz` object and
+the root carry `__sancov_cntrs`; no `Basalt` object does), and `LLVMFuzzerCustomMutator` still
+exported past `-Wl,-dead_strip`.
 
 **The link closure must stay Mathlib-free.** A `#eval` runs generators in the interpreter, but a
 compiled executable links the native code of its entire import closure, and importing the `Basalt`
-umbrella reaches Mathlib through `Basalt.SPMF` — 1440 modules, against the handful of first-party
-ones `MODULES` compiles. Generator *definitions* need only `Gen`/`Combinators`; only their *proofs* need
+umbrella reaches Mathlib through `Basalt.SPMF` — 1440 modules, against the dozen-odd first-party ones
+the fuzzer needs. Generator *definitions* need only `Gen`/`Combinators`; only their *proofs* need
 Mathlib. So every module the executable imports imports the narrowest thing it can — which is also
 why `Basalt/PlausibleGen.lean` imports `Plausible.Gen` and not the `Plausible` umbrella, whose tactic
-frontend and deriving handlers would join the link.
+frontend and deriving handlers would join the link. This used to fence itself, since Mathlib's native
+code was not built; now that Lake derives the closure it would simply be built into the fuzzer, which
+is why `build.sh` greps for it instead.
 
-Elaboration is a separate matter from linking. The targets live under `BasaltTest/Fuzz/`, so the
-default `lake build` type-checks both, and `BasaltTest/Fuzz.lean` additionally pins `BuggyBST`'s
-`genBST` against the proved one, which is how a drift becomes a build failure. Only `BasaltFuzzMain`
-is left out, and only `build.sh` does the C emission, the sancov compile, and the native link, so the
-default `lake build` needs no C toolchain and no libFuzzer runtime.
+Elaboration is a separate matter from linking. `BasaltFuzz` is a default target, so `lake build`
+type-checks both fuzz targets, and `BasaltTest/Fuzz.lean` additionally pins `BuggyBST`'s `genBST`
+against the proved one, which is how a drift becomes a build failure. Only `BasaltFuzzMain` is left
+out. A `lean_lib` target stops at `.olean`s, so the default build emits no C for these modules at
+all: the sancov compile and the native link happen only when `basalt-fuzz` is requested, and
+`lake build` needs no C toolchain and no libFuzzer runtime.
 
 ## Build
 
 ```bash
-fuzz-run/build.sh          # elaborates the Mathlib-free closure, instruments it, links libFuzzer
+fuzz-run/build.sh          # lake build basalt-fuzz, plus the bridge, the runtime, and the assertions
 ```
 
 Runs with no arguments on the platforms in [Platforms](#platforms) below. The script detects the C
@@ -135,7 +155,7 @@ fuzz-run/basalt-fuzz <property> [--grow]           # fuzz backend only, see belo
 fuzz-run/basalt-fuzz replay <property> <file>      # reproduce a saved input, no fuzzer
 ```
 
-Properties (see `BasaltFuzzMain.lean` and `BasaltTest/Fuzz/`):
+Properties (see `BasaltFuzzMain.lean` and `BasaltFuzz/`):
 
 | property | expectation |
 |---|---|
@@ -341,7 +361,7 @@ way libFuzzer benefits from":
 
 `long-n` is built so that *length* is the binding constraint: each position accepts half the byte
 values, so the value of any single byte is cheap to find and what is expensive is having a byte there
-at all (`BasaltTest/Fuzz/Staged.lean`). That is the only shape this setting can separate — a property
+at all (`BasaltFuzz/Staged.lean`). That is the only shape this setting can separate — a property
 whose generator always fits inside its buffer reads nothing past the end, reports no deficit, and runs
 the identical campaign either way. `--grow` therefore costs nothing to leave on for a property that
 never runs short, and the `starved` count in the run report is how you tell which case you are in.
@@ -520,16 +540,17 @@ it.
   counterexamples, either in-process (`return -1` and accumulate) or libFuzzer-native
   (`-fork=N -ignore_crashes=1`).
 - **`Tree`/`genBST` is duplicated** between `BasaltExamples/BST.lean` and
-  `BasaltTest/Fuzz/BuggyBST.lean`, because the example imports the `Basalt` umbrella for its proofs and so cannot be linked. Moving
+  `BasaltFuzz/BuggyBST.lean`, because the example imports the `Basalt` umbrella for its proofs and so cannot be linked. Moving
   the Mathlib-free part (the datatype and the generator) into a module both import would make the
   fuzzed term the proved term by construction rather than by a pinned test. Two things to settle
   first: the shared `Tree` must be monomorphic or the fuzz side must instantiate it, and `isBST` has
   to exist in both a `Prop` form for the proofs and a `Bool` form for the property (a `decide`
   bridging lemma is the tidy version).
-- **Broader instrumentation, other engines.** More of Basalt can be instrumented when a target's
-  coverage of interest lives outside the current closure. The `RandomChoice FuzzGen` core is
-  engine-agnostic — crowbar shows the same cursor drives AFL — so an AFL or honggfuzz backend changes
-  only the C bridge.
+- **Broader instrumentation, other engines.** A target whose coverage of interest lies outside
+  `BasaltFuzz` needs the flag on another library — adding `moreLeancArgs` to that `lean_lib`, which
+  then also instruments it for every other executable. Per-target instrumentation scope would want a
+  Lean-side `lakefile.lean` and a facet override. The `RandomChoice FuzzGen` core is engine-agnostic —
+  crowbar shows the same cursor drives AFL — so an AFL or honggfuzz backend changes only the C bridge.
 
 ## Prior art
 

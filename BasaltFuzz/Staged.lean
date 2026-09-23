@@ -9,7 +9,7 @@ import Basalt.PBT.Property
 /-!
 # A microbenchmark that separates the backends
 
-`BasaltTest/Fuzz/BuggyBST.lean`'s bugs are all *shallow* — one unlucky draw exposes them, so every
+`BasaltFuzz/BuggyBST.lean`'s bugs are all *shallow* — one unlucky draw exposes them, so every
 backend finds them in tens of runs and a comparison measures nothing. This module is the opposite
 case and exists only to be measured: a bug behind a chain of guards, the shape a real bug takes
 behind a parser, a magic value, or a sequence of state transitions, but synthetic so the depth is a
