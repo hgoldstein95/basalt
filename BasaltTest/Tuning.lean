@@ -3,13 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-
 import Basalt
 import Basalt.Combinators
 import BasaltExamples.BST
 import BasaltExamples.BST.Weighted
-
-open RandomChoice
 
 /-!
 # `@[tunable]` Examples
@@ -28,6 +25,8 @@ alongside it. This file exercises the whole contract:
 4. `sites` reports each site's offset, arity, and per-branch recursive calls.
 5. A literal `0` weight is rejected at elaboration.
 -/
+
+open RandomChoice
 
 namespace TunableExamples
 open BST

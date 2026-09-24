@@ -26,9 +26,14 @@ def myGen [Gen G] : G α := ...
 | `GenStats.StatGen` | seeded, fuel-guarded execution that counts choices (drives `#genstats`) |
 | `Fuzz.FuzzGen` | choices read from a byte buffer, so a coverage-guided fuzzer drives generation |
 
-`RandomChoice.choose` is the only source of randomness; every combinator (`pick`, `elements`,
-`oneOf`, `frequency`, `listOf`, …) is built on it. Recursive generators are defined by
+`RandomChoice.choose` is the only source of randomness; every combinator (`elements`, `oneOf`,
+`frequency`, `listOf`, …) is built on it. Recursive generators are defined by
 `partial_fixpoint` over the `CCPO`.
+
+A generator that branches on a size adds a `[Sized G]` constraint and reads it with `getSize` or
+`Sized.sized`, shrinking it for recursive calls with `Sized.resize` (plus `[MonoSized G]` when the
+generator is a `partial_fixpoint`). `WithSize G` supplies the size to any interpretation `G`: run
+the generator at `WithSize G` and close it with `.run n`. See `Basalt/Sized.lean`.
 
 ## Correctness Properties
 
@@ -36,13 +41,16 @@ def myGen [Gen G] : G α := ...
 depends on the generator, and you prove the ones that do:
 
 - `IsSoundAndComplete g P` — the support of `g` is exactly `P` (nothing invalid, nothing missed).
+  Its halves are laws of their own: `IsSound g P` (nothing invalid) and `IsCompleteFor g P` (nothing
+  missed), for a generator that has only one.
 - `IsAlmostSurelyTerminating g` — `g` terminates with probability 1.
 - `IsCostBounded g c` — producing `v` takes at most `c v` random choices.
 - `IsFilterFree g` / `IsProductive g` — for filtering (`Option`-valued) generators.
 
 `BasaltExamples/` is a cookbook of worked generators, each carrying proofs of the properties that
 apply to it. `WORKFLOW.md` walks through writing a generator and proving it correct, with a recipe
-for each obligation.
+for each obligation, and one for bounding an expected value (`SPMF.expect`: the expected size of what
+is generated, the expected number of choices).
 
 ## Running Properties
 
@@ -115,15 +123,33 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
 
 ## Repository layout
 
-- `Basalt/` — the library.
+- `Basalt/` — the library, in four tiers:
+  - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean`, and
+    `Laws.lean`, the properties a generator may be proved to have;
+  - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
+    expectations, cost, almost-sure termination), `IO.lean`, `PlausibleGen.lean`, `OptionT.lean`,
+    `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean` holding the facts about core's `randNat`
+    that the PRNG-backed ones share;
+  - *the proof machinery*: `Obs/`, the layer every per-combinator lemma is derived from — a
+    judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
+    `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
+    saying that every observation commutes with it — and `Walk/`, the judgment-agnostic walk over
+    observations that every proof obligation is discharged by;
+  - *what a proof calls*: `Tactic/`, one entry tactic per judgment over that walk, plus the support
+    and `ℝ≥0∞` helpers; and `PBT/` and `Tuning/`, the front ends above.
+
+  `Basalt.lean` is the only module that imports the library wholesale; every other module, inside
+  the library and out, imports the narrowest thing it needs.
 - `BasaltExamples/` — worked generators with correctness proofs. Because each file proves its
   generator's laws, this directory is also most of the effective regression suite for the library's
   lemma sets and tactics.
 - `BasaltTest/` — regression tests, named for the library module they guard when one exists;
   `LawLine.lean` has no library counterpart (it pins the `#genstats` law-reporting contract).
-  `Fuzz/` holds the properties the `basalt-fuzz` executable links, so those modules — alone in this
-  directory — must stay Mathlib-free; `fuzz-run/README.md` says why.
-- `BasaltExperiments/` — spikes; the only place with `sorry`s, and not built by default.
+- `BasaltFuzz/` — the generators, properties, and buggy operations the `basalt-fuzz` executable
+  fuzzes. Two things set this directory apart, both explained in `fuzz-run/README.md`: it is linked
+  into a native executable, so it must stay Mathlib-free, and it is the only
+  SanitizerCoverage-instrumented library, which is what confines coverage feedback to the code under
+  test.
 - `BasaltFuzzMain.lean` — the root of the opt-in `basalt-fuzz` executable: the property registry.
   Not a default build target, since only `fuzz-run/build.sh` links it.
 - `fuzz-run/` — the `basalt-fuzz` build script, its backend benchmark, and `README.md`, which owns

@@ -4,8 +4,8 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import BasaltExamples.ArbChar
-import BasaltExamples.ArbNat
 import BasaltExamples.ArbList
+import BasaltExamples.ArbNat
 import BasaltExamples.ArbString
 import BasaltExamples.BST
 import BasaltExamples.BST.Weighted
@@ -56,8 +56,8 @@ def exercise (n : Nat) (gen : IO α) : IO Unit := do
 #guard_msgs in #eval exercise 10 (Heap.Tree.genHeap 0)
 
 /- Degenerate, rejection-heavy, and wide ranges all behave: `lo = hi` is forced, a range just past
-   half of one `StdGen` output rejects about half its draws, and a range far past `UInt64.MAX`
-   spans several outputs. -/
+   a power of two rejects about half its draws, and a range far past `UInt64.MAX` takes SplitMix's
+   slow path across several outputs. -/
 /-- info: true true true -/
 #guard_msgs in
 #eval (do

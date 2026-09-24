@@ -2,10 +2,10 @@
 # Released under MIT license as described in the file LICENSE.
 # Authors: Michael Hicks
 
-# Guards `basalt-fuzz` on macOS and Linux. `lake build` elaborates the fuzz *modules* but
-# never emits their C, instruments it, or links the fuzzer runtime (fuzz-run/README.md), so a
-# change to `Basalt/Gen.lean`, `fuzz-run/build.sh`, or the toolchain pin can break the executable
-# with every other CI job green. That is what this workflow is for. The two platforms take
+# Guards `basalt-fuzz` on macOS and Linux. `lake build` elaborates the `BasaltFuzz` library but never
+# emits its C, instruments it, or links the fuzzer runtime (fuzz-run/README.md), so a change to
+# `Basalt/Gen.lean`, `fuzz-run/build.sh`, `lakefile.toml`'s fuzz targets, or the toolchain pin can
+# break the executable with every other CI job green. That is what this workflow is for. The two platforms take
 # *different* branches through `fuzz-run/build.sh` (driver entry point, runtime source, C++
 # library), so only a matrix covers both.
 #
@@ -18,7 +18,8 @@ name: basalt-fuzz
 # Scoped to what can actually break the executable: the linked closure, the fuzz targets, the build
 # script, and the toolchain/dependency pins. A docs- or BasaltExamples-only change cannot, and the
 # `Lean Action CI` workflow already covers `BasaltTest/Fuzz.lean` (which is where the `genBST`
-# agreement pin lives). `push` is limited to `main` so a PR branch runs this once, not twice.
+# agreement pin lives) and the elaboration of `BasaltFuzz` itself. `push` is limited to `main` so a
+# PR branch runs this once, not twice.
 #
 # The two path lists are duplicated on purpose. A YAML anchor would express the intent, but GitHub's
 # workflow parser does not document anchor support and a parse failure here is silent in the worst
@@ -28,7 +29,7 @@ on:
     branches: [main]
     paths:
       - 'Basalt/**'
-      - 'BasaltTest/Fuzz/**'
+      - 'BasaltFuzz/**'
       - 'BasaltFuzzMain.lean'
       - 'fuzz-run/**'
       - 'lakefile.toml'
@@ -38,7 +39,7 @@ on:
   pull_request:
     paths:
       - 'Basalt/**'
-      - 'BasaltTest/Fuzz/**'
+      - 'BasaltFuzz/**'
       - 'BasaltFuzzMain.lean'
       - 'fuzz-run/**'
       - 'lakefile.toml'
@@ -97,9 +98,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: leanprover/lean-action@v1
         with:
-          # The executable's import closure is 11 modules and no Mathlib, so this job needs elan and
-          # a toolchain but none of Mathlib's build products. `build.sh` asks Lake for exactly the
-          # targets it needs.
+          # The executable's import closure is a handful of first-party modules and no Mathlib, so
+          # this job needs elan and a toolchain but none of Mathlib's build products. `build.sh` asks
+          # Lake for exactly the target it needs.
           build: false
           # Both of these matter, and the second is not implied by the first: lean-action's
           # `get mathlib cache` step is conditioned only on Mathlib being *detected* in the manifest,
@@ -166,6 +167,24 @@ jobs:
                 tail -20 "log-$b-$p.txt"; exit 1; }
             done
           done
+
+      # `--grow` (fuzz-run/README.md, "Extending the buffer") is deliberately unasserted here. It is
+      # off by default and measured not to help, so a campaign under it does not earn CI time; the
+      # cost of leaving it out is that two silent failures go uncaught — libFuzzer finding no
+      # `LLVMFuzzerCustomMutator` (only `build.sh`'s export check remains), and a growth path that
+      # never fires. `fuzz-run/compare-grow.sh` is where growth is exercised, by hand.
+
+      # A campaign reports its verdict *only* through the exit status, so a property name the registry
+      # does not know must not exit 0 (`usageError`, Basalt/PBT/Driver.lean): every "this must fail"
+      # step above would otherwise read a typo as the property having survived.
+      - name: A misspelled property must exit nonzero
+        run: |
+          if fuzz-run/basalt-fuzz long-6 -runs=1 > log-typo.txt 2>&1; then
+            echo "::error::an unknown property exited 0; a typo would read as a passing campaign"
+            cat log-typo.txt; exit 1
+          fi
+          grep -q "unknown property 'long-6'" log-typo.txt || {
+            echo "::error::an unknown property was not reported as such"; cat log-typo.txt; exit 1; }
 
       # The one property where the backends are supposed to *disagree*: `chain-4` hides its bug behind
       # 4 nested guards, so coverage guidance finds it in ~1e3 runs while uniform sampling needs

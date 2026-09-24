@@ -5,15 +5,13 @@ Authors: Harrison Goldstein
 -/
 import Basalt
 
-open RandomChoice
-
 /-!
 # Trees of All Twos
 
 Binary trees whose every node holds `2`. This example exists to contrast two termination regimes on
 the *same* shape:
 
-- `genTree` recurses on both children with a uniform `pick`, giving mean offspring exactly `1` — it
+- `genTree` recurses on both children with a uniform `oneOf`, giving mean offspring exactly `1` — it
   is **critical**. It still terminates almost surely, but with *infinite expected size*.
 - `genWeightedTree` uses `frequency` to make the leaf branch twice as likely (mean offspring `2/3`),
   making it **subcritical** and giving finite expected size.
@@ -21,6 +19,8 @@ the *same* shape:
 The `expectedSteps` theorems at the end make the contrast quantitative: `3` for the weighted
 generator versus `⊤` for the critical one.
 -/
+
+open RandomChoice
 
 namespace AllTwoTree
 
@@ -39,31 +39,39 @@ def Tree.isAllTwos : Tree → Prop
   | .leaf => True
   | .node l v r => v = 2 ∧ Tree.isAllTwos l ∧ Tree.isAllTwos r
 
-/-- The cost bound: three choices per node (one `pick` plus two recursive calls), plus one. -/
+/-- The cost bound: three choices per node (one `oneOf` plus two recursive calls), plus one. -/
 def Tree.cost : Tree → Nat := fun t => 3 * t.size + 1
 
-/-- Generates an all-`2`s tree with a uniform `pick`. Mean offspring `1`: critical, so almost surely
+/-- Generates an all-`2`s tree with a uniform `oneOf`. Mean offspring `1`: critical, so almost surely
 terminating but with infinite expected size. -/
 def genTree [Gen G] : G Tree :=
-  pick
-    (fun () => pure .leaf)
-    (fun () => do
+  oneOf [
+    fun _ => pure .leaf,
+    fun _ => do
       let l ← genTree
       let r ← genTree
-      return .node l 2 r)
+      return .node l 2 r]
 partial_fixpoint
 
 theorem genTree.sound_complete : IsSoundAndComplete genTree Tree.isAllTwos := by
-  intro t
-  fun_induction Tree.isAllTwos
-    <;> rw [genTree]
-    <;> simp
-  grind
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    all_goals simp_all [Tree.isAllTwos]
+  case complete =>
+    intro t
+    induction t with
+    | leaf => intro _; rw [genTree]; complete_bound
+    | node l v r ihl ihr =>
+      intro ⟨hv, hl, hr⟩
+      subst hv
+      rw [genTree]; complete_bound
+      exact ⟨l, ihl hl, r, ihr hr, rfl⟩
 
 theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
     (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
-  simp [sq]
+  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genTree.cost_bounded : IsCostBounded genTree Tree.cost := by
   cost_fixpoint

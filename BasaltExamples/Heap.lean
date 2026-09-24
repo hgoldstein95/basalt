@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.ArbNat
 
-open RandomChoice ArbNat
-
 /-!
 # Min-Heaps
 
@@ -17,6 +15,8 @@ value as the new lower bound. Like `SortedList`, the recursion re-indexes the se
 recursing on *two* children makes the mean offspring exactly `1`, so this is a **critical**
 generator (almost surely terminating, infinite expected size).
 -/
+
+open RandomChoice ArbNat
 
 namespace Heap
 
@@ -48,41 +48,36 @@ def Tree.isHeap (lo : Nat) : Tree → Prop
 
 /-- Generates an arbitrary min-heap whose values are all at least `lo`. -/
 def Tree.genHeap [Gen G] (lo : Nat) : G Tree :=
-  pick
-    (fun () => pure leaf)
-    (fun () => do
+  oneOf [
+    fun _ => pure leaf,
+    fun _ => do
       let delta ← Nat.arbitrary
       let x := lo + delta
       let l ← Tree.genHeap x
       let r ← Tree.genHeap x
-      return node l x r)
+      return node l x r]
 partial_fixpoint
 
 theorem Tree.genHeap.sound_complete :
     IsSoundAndComplete (Tree.genHeap lo) (Tree.isHeap lo) := by
-  intro t
-  induction t generalizing lo with
-  | leaf =>
-    rw [Tree.genHeap]
-    simp [Tree.isHeap]
-  | node l x r ihl ihr =>
-    rw [Tree.genHeap]
-    support_simp [Tree.isHeap, Tree.node.injEq, Nat.arbitrary_mem_support, true_and]
-    constructor
-    · rintro (h | ⟨d, l', hl', r', hr', hle, hld, hrd⟩)
-      · simp at h
-      · subst hld hle hrd
-        exact ⟨by omega, ihl.mp hl', ihr.mp hr'⟩
-    · rintro ⟨hle, hl, hr⟩
-      right
-      refine ⟨x - lo, l, ?_, r, ?_, rfl, by omega, rfl⟩
-      · rw [show lo + (x - lo) = x by omega]; exact ihl.mpr hl
-      · rw [show lo + (x - lo) = x by omega]; exact ihr.mpr hr
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    all_goals simp_all [Tree.isHeap]
+  case complete =>
+    intro t
+    induction t generalizing lo with
+    | leaf => intro _; rw [Tree.genHeap]; complete_bound
+    | node l x r ihl ihr =>
+      intro ⟨hle, hl, hr⟩
+      obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
+      rw [Tree.genHeap]; complete_bound
+      exact ⟨d, l, ihl hl, r, ihr hr, rfl⟩
 
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
     (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
-  simp [sq]
+  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/
 theorem Tree.genHeap.cost_bounded :

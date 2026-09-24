@@ -3,10 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Fuzz.Runner
 import Basalt.Combinators
-import BasaltTest.Fuzz.BuggyBST
-import BasaltTest.Fuzz.Staged
+import Basalt.Fuzz.Runner
+import BasaltFuzz.BuggyBST
+import BasaltFuzz.Staged
 
 /-!
 # `basalt-fuzz` executable entry point
@@ -25,9 +25,10 @@ def propThreshold [Gen G] : PropM G Unit :=
   forAll (chooseNat 0 255) (· < 200)
 
 /-- The property registry, selected by the first non-flag CLI argument. `bst-*` are the worked BST
-demo (`BasaltTest/Fuzz/BuggyBST.lean`): the `-buggy-*` ones have real bugs every backend can find,
-and the others must never fail. `chain-*` are the staged microbenchmark
-(`BasaltTest/Fuzz/Staged.lean`), the one place the backends differ by orders of magnitude.
+demo (`BasaltFuzz/BuggyBST.lean`): the `-buggy-*` ones have real bugs every backend can find,
+and the others must never fail. `chain-*` and `long-*` are the staged microbenchmarks
+(`BasaltFuzz/Staged.lean`), the one place the backends differ by orders of magnitude;
+`long-*` is the one whose difficulty is buffer length, so it is where `--grow` is measured.
 
 Each entry is a `Property`, so one registry serves every backend; `fun _ =>` is the explicit `G`
 binder it asks for. -/
@@ -42,7 +43,10 @@ def properties : List (String × Property) :=
     ("bst-buggy-delete",     fun _ => BuggyBST.prop_deleteBuggy_model),
     ("chain-2",              fun _ => Staged.propChain 2),
     ("chain-3",              fun _ => Staged.propChain 3),
-    ("chain-4",              fun _ => Staged.propChain 4) ]
+    ("chain-4",              fun _ => Staged.propChain 4),
+    ("long-16",              fun _ => Staged.propLong 16),
+    ("long-32",              fun _ => Staged.propLong 32),
+    ("long-64",              fun _ => Staged.propLong 64) ]
 
 /-- `dispatch`'s default backend is the first one registered, which is `io` — Basalt's own backends
 are registered by the import. This executable is a fuzzer, so it moves `fuzzBackend` to the front

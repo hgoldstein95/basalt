@@ -3,45 +3,32 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Core
-import Basalt.Combinators
-
-open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
+import Basalt.Obs.Presentation
+import Basalt.SPMF.Expect.Obs
 
 /-!
 # SPMF Support
 
-`SPMF.support` (the set of values with nonzero mass) and the support-inversion lemma family: for
-each combinator, a characterization of its support as an explicit set, packaged as the
-`mem_support_*_iff` `simp` lemmas that `support_simp` (`Basalt/Tactics.lean`) fires on real
-generator goals. Stated on monad notation (`>>=`/`Pure.pure`), which is what do-notation
-elaborates to.
+Support inversion for the host constructs (`bind`, `pure`, `map`, `ite`, `dite`, `choose`), stated
+on monad notation, which is what do-notation elaborates to; the may and always observations built
+from them; and the support laws of the list combinators, which the walker's rules bridge. A
+combinator's support is otherwise not a lemma: it is what `sound_bound` and `complete_bound` compute
+from its `Obs.map_*`.
 -/
+
+open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
 namespace SPMF
 
 section support
 
-/-- The support of an `SPMF` is the set of values that have nonzero mass. -/
-def support (p : SPMF α) : Set α := Function.support p
-
-theorem mem_support_iff (p : SPMF α) (a : α) : a ∈ p.support ↔ p a ≠ 0 := Iff.rfl
-
-/-- `SPMF.bind` is the monad's `>>=`. -/
-theorem bind_eq (x : SPMF α) (f : α → SPMF β) : x.bind f = x >>= f := rfl
-
-/-- `SPMF.pure` is the monad's `pure`. -/
-theorem pure_eq (a : α) : (SPMF.pure a : SPMF α) = Pure.pure a := rfl
-
 @[simp]
-theorem support_countable (p : SPMF α) : p.support.Countable :=
-  Summable.countable_support_ennreal (tsum_coe_ne_top p)
-
-theorem apply_eq_zero_iff (p : SPMF α) (a : α) : p a = 0 ↔ a ∉ p.support := by
-  rw [mem_support_iff, Classical.not_not]
-
-theorem apply_pos_iff (p : SPMF α) (a : α) : 0 < p a ↔ a ∈ p.support :=
-  pos_iff_ne_zero.trans (p.mem_support_iff a).symm
+theorem mem_support_bind_iff
+    {x : SPMF α}
+    {f : α → SPMF β} :
+    b ∈ (x >>= f).support ↔ ∃ a ∈ x.support, b ∈ (f a).support := by
+  rw [mem_support_iff_prob_pos, prob_bind, expect_pos_iff]
+  simp only [← mem_support_iff_prob_pos]
 
 @[simp]
 theorem support_bind
@@ -49,30 +36,7 @@ theorem support_bind
     {f : α → SPMF β} :
     (x >>= f).support = {b | ∃ a, a ∈ x.support ∧ b ∈ (f a).support} := by
   ext b
-  simp only [support, Function.mem_support, Set.mem_setOf_eq]
-  constructor
-  · intro h
-    by_contra hc
-    push Not at hc
-    have hzero : ∀ a, x a * f a b = 0 := fun a => by
-      by_cases ha : x a = 0
-      · simp [ha]
-      · simp [hc a ha]
-    apply h
-    change (∑' a, x a * f a b) = 0
-    simp only [hzero, tsum_zero]
-  · intro ⟨a, ha, hb⟩
-    apply ne_of_gt
-    change 0 < (∑' a', x a' * f a' b)
-    calc 0 < x a * f a b := ENNReal.mul_pos ha hb
-      _ ≤ ∑' a, x a * f a b := ENNReal.le_tsum a
-
-@[simp]
-theorem mem_support_bind_iff
-    {x : SPMF α}
-    {f : α → SPMF β} :
-    b ∈ (x >>= f).support ↔ ∃ a ∈ x.support, b ∈ (f a).support := by
-  simp [support_bind]
+  simp only [mem_support_bind_iff, Set.mem_setOf_eq]
 
 @[simp]
 theorem support_pure :
@@ -136,150 +100,64 @@ theorem mem_support_choose_iff :
     a ∈ (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi})).support ↔ True := by
   simp [support_choose]
 
+section observations
+
+/-- The may observation: some value the generator can produce satisfies the postcondition. -/
+def mayObs : Obs SPMF.{u} (WP Mix.angelic) where
+  spec g := fun Q => ∃ a ∈ g.support, Q a
+  map_pure a := by
+    funext Q; apply propext
+    exact ⟨fun ⟨b, hb, h⟩ => mem_support_pure_iff.mp hb ▸ h,
+      fun h => ⟨a, mem_support_pure_iff.mpr rfl, h⟩⟩
+  map_bind x k := by
+    funext Q; apply propext
+    show (∃ b ∈ (x >>= k).support, Q b) ↔ ∃ a ∈ x.support, ∃ b ∈ (k a).support, Q b
+    simp only [mem_support_bind_iff]
+    exact ⟨fun ⟨b, ⟨a, ha, hb⟩, h⟩ => ⟨a, ha, b, hb, h⟩, fun ⟨a, ha, b, hb, h⟩ => ⟨b, ⟨a, ha, hb⟩, h⟩⟩
+  map_choose lo hi h := by
+    funext Q; apply propext
+    exact ⟨fun ⟨a, _, h⟩ => ⟨a, h⟩, fun ⟨a, h⟩ => ⟨a, mem_support_choose_iff.mpr trivial, h⟩⟩
+
+/-- The always observation: every value the generator can produce satisfies the postcondition. -/
+def alwaysObs : Obs SPMF.{u} (WP Mix.demonic) where
+  spec g := fun Q => ∀ a ∈ g.support, Q a
+  map_pure a := by
+    funext Q; apply propext
+    exact ⟨fun h => h a (mem_support_pure_iff.mpr rfl), fun h b hb => mem_support_pure_iff.mp hb ▸ h⟩
+  map_bind x k := by
+    funext Q; apply propext
+    show (∀ b ∈ (x >>= k).support, Q b) ↔ ∀ a ∈ x.support, ∀ b ∈ (k a).support, Q b
+    simp only [mem_support_bind_iff]
+    exact ⟨fun h a ha b hb => h b ⟨a, ha, hb⟩, fun h b ⟨a, ha, hb⟩ => h a ha b hb⟩
+  map_choose lo hi h := by
+    funext Q; apply propext
+    exact ⟨fun hq x => hq x (mem_support_choose_iff.mpr trivial), fun hq a _ => hq a⟩
+
+instance : mayObs.Monotone := ⟨fun _ _ _ h ⟨a, ha, hp⟩ => ⟨a, ha, h a hp⟩⟩
+
+instance : alwaysObs.Monotone := ⟨fun _ _ _ h hp a ha => h a (hp a ha)⟩
+
+/-- Support membership is the may observation at the postcondition `(· = a)`. -/
+theorem mem_support_iff_may {g : SPMF α} {a : α} : a ∈ g.support ↔ mayObs.spec g (· = a) :=
+  ⟨fun h => ⟨a, h, rfl⟩, fun ⟨_, hb, e⟩ => e ▸ hb⟩
+
+/-- Support membership, read through a specification the may observation equals. -/
+theorem mem_support_of_may {g : SPMF α} {w : WP Mix.angelic α} (h : mayObs.spec g = w) {a : α} :
+    a ∈ g.support ↔ w (· = a) :=
+  mem_support_iff_may.trans (iff_of_eq (congrFun h _))
+
+end observations
+
+/-- The support of `oneOf gs` is exactly the union of all generators in `gs` -/
 @[simp]
-theorem support_pick
-    {x y : SPMF α} :
-    (pick (fun () => x) (fun () => y)).support = x.support ∪ y.support := by
-  simp only [pick, support_bind, support_choose]
+theorem support_oneOf
+    {gs : List (Unit → SPMF α)}
+    (hne : gs ≠ []) :
+    support (oneOf gs hne) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
   ext a
-  simp only [Set.mem_univ, true_and, Set.mem_setOf_eq, Set.mem_union]
-  constructor
-  · rintro ⟨n, ha⟩
-    rcases Nat.le_one_iff_eq_zero_or_eq_one.mp n.down.property.2 with h0 | h1
-    · left; simpa [h0] using ha
-    · right; simpa [h1] using ha
-  · intro h
-    cases h with
-    | inl hx => exact ⟨⟨⟨0, by omega⟩⟩, by simpa using hx⟩
-    | inr hy => exact ⟨⟨⟨1, by omega⟩⟩, by simpa using hy⟩
-
-@[simp]
-theorem mem_support_pick_iff
-    {x y : SPMF α} :
-    a ∈ (pick (fun () => x) (fun () => y)).support ↔ a ∈ x.support ∨ a ∈ y.support := by
-  simp
-
-/-- Note that the support of `RandomChoice.coin r` only includes both `true` and `false` when the
-bias is strictly in-between 0 and 1, otherwise it will only include one outcome. -/
-@[simp]
-theorem support_coin (h0 : 0 < r) (h1 : r < 1) :
-    SPMF.support (RandomChoice.coin r) = {true, false} := by
-  have hnum : (0 : ℤ) < r.num := Rat.num_pos.mpr h0
-  have hden : r.num < (r.den : ℤ) := Rat.num_lt_denom_iff.mpr h1
-  simp [coin, support_bind, support_choose, support_pure]
-  ext b
-  simp only [Set.mem_setOf_eq]
-  constructor
-  · rintro _
-    cases b <;> simp
-  · intro h
-    cases b
-    · exists r.den - 1
-      constructor
-      . apply le_refl
-      . right
-        constructor <;> try rfl
-        have hden_pos : 0 < r.den := r.den_pos
-        omega
-    · exists 0
-      constructor
-      . apply Nat.zero_le
-      . left
-        constructor <;> try rfl
-        omega
-
-@[simp]
-theorem mem_support_coin_iff (h0 : 0 < r) (h1 : r < 1) :
-    b ∈ SPMF.support (RandomChoice.coin r) ↔ b = true ∨ b = false := by
-  rw [support_coin h0 h1, Set.mem_insert_iff, Set.mem_singleton_iff]
-
-@[simp]
-theorem support_biasedOptionGen
-    {r : Rat}
-    {g : SPMF α}
-    (h0 : 0 < r) (h1 : r < 1) :
-    support (biasedOptionGen r g) = { none } ∪ { some x | x ∈ g.support } := by
-  have hnum : (0 : ℤ) < r.num := Rat.num_pos.mpr h0
-  have hden : r.num < (r.den : ℤ) := Rat.num_lt_denom_iff.mpr h1
-  have hden_pos : 0 < r.den := r.den_pos
-  simp [biasedOptionGen, coin, support_bind, support_choose]
-  ext a
-  simp [Set.mem_setOf_eq]
-  constructor <;> intros h
-  . obtain ⟨a, hge, h⟩ := h
-    rcases h with ⟨hle, rfl⟩ | ⟨hlt, ha⟩
-    . left; rfl
-    . obtain ⟨a', ⟨hmem, rfl⟩⟩ := ha
-      right; exists a'
-  . rcases h with rfl | ⟨x, ⟨hmem, rfl⟩⟩
-    . exists r.den - 1
-      constructor <;> try omega
-      left
-      constructor <;> try rfl
-      omega
-    . exists 0
-      constructor <;> try omega
-      right
-      constructor
-      . omega
-      . exists x
-
-@[simp]
-theorem mem_support_biasedOptionGen_iff {r : Rat} {g : SPMF α} (h0 : 0 < r) (h1 : r < 1) :
-    x ∈ (biasedOptionGen r g).support ↔ x = none ∨ (∃ a ∈ g.support, x = some a) := by
-  unfold biasedOptionGen
-  simp
-  constructor <;> intro h
-  . rcases h with ⟨hmem, rfl⟩ | ⟨hmem, a, ha, rfl⟩
-    . left; rfl
-    . right; exists a
-  . rcases h with rfl | ⟨a, hmem, rfl⟩
-    . left
-      constructor
-      . apply (mem_support_coin_iff h0 h1).mpr
-        right; rfl
-      . rfl
-    . right
-      constructor
-      . apply (mem_support_coin_iff h0 h1).mpr
-        left; rfl
-      . exists a
-
-@[simp]
-theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n : Nat} :
-    n ∈ (chooseNat lo hi h : SPMF Nat).support ↔ lo ≤ n ∧ n ≤ hi := by
-  unfold chooseNat
-  simp only [mem_support_map_iff, mem_support_choose_iff, true_and]
-  constructor
-  · rintro ⟨a, rfl⟩
-    exact a.down.property
-  · rintro ⟨h1, h2⟩
-    exact ⟨⟨⟨n, h1, h2⟩⟩, rfl⟩
-
-@[simp]
-theorem mem_support_chooseInt_iff {lo hi : Int} {h : lo ≤ hi} {n : Int} :
-    n ∈ (chooseInt lo hi h : SPMF Int).support ↔ lo ≤ n ∧ n ≤ hi := by
-  unfold chooseInt
-  simp only [mem_support_bind_iff, mem_support_pure_iff, mem_support_chooseNat_iff]
-  constructor
-  · rintro ⟨k, ⟨-, hk⟩, rfl⟩
-    omega
-  · rintro ⟨h1, h2⟩
-    exact ⟨(n - lo).toNat, ⟨Nat.zero_le _, by omega⟩, by omega⟩
-
-@[simp]
-theorem support_optionGen
-    {g : SPMF α} :
-    support (optionGen g) = {none} ∪ {some x | x ∈ g.support} := by
-  unfold optionGen
-  apply support_biasedOptionGen <;> norm_num
-
-@[simp]
-theorem mem_support_optionGen_iff
-    {g : SPMF α} :
-    x ∈ support (optionGen g) ↔ x = none ∨ (∃ a ∈ g.support, x = some a) := by
-  unfold optionGen
-  apply mem_support_biasedOptionGen_iff <;> norm_num
+  exact (mem_support_of_may (mayObs.map_oneOf gs hne)).trans
+    ((Mix.index_angelic gs hne fun g => mayObs.spec (g ()) (· = a)).trans
+      (exists_congr fun g => and_congr_right fun _ => mem_support_iff_may.symm))
 
 /-- The support of `vectorOf n g` is the set of all length-`n` list where each element is in `g`'s
 support. -/
@@ -379,7 +257,7 @@ theorem support_listOf
       contradiction
     . intro h
       unfold listOf
-      simp [support_pick]
+      simp [support_oneOf]
   | cons x xs' IH =>
     constructor
     . dsimp
@@ -387,13 +265,13 @@ theorem support_listOf
       cases hy with
       | head =>
         unfold listOf at h
-        simp [support_pick] at h
+        simp [support_oneOf] at h
         obtain ⟨h1, _⟩ := h
         assumption
       | tail =>
         rename_i hy
         unfold listOf at h
-        simp [support_pick] at h
+        simp [support_oneOf] at h
         obtain ⟨_, h2⟩ := h
         rw [IH] at h2
         apply h2
@@ -401,7 +279,7 @@ theorem support_listOf
     . intro h
       rw [Set.mem_setOf_eq] at h
       unfold listOf
-      simp [support_pick]
+      simp [support_oneOf]
       constructor
       . apply h
         apply List.mem_cons_self
@@ -424,7 +302,7 @@ theorem support_nonEmptyListOf
     constructor
     . intro h
       unfold nonEmptyListOf at h
-      simp [support_pick] at h
+      simp [support_oneOf] at h
     . intro ⟨hneq, hmem⟩
       contradiction
   | cons x xs' IH =>
@@ -437,12 +315,12 @@ theorem support_nonEmptyListOf
         cases hy with
         | head =>
           unfold nonEmptyListOf at hy
-          simp [support_pick] at hy
+          simp [support_oneOf] at hy
           rcases hy with ⟨h, _⟩ | ⟨h, _⟩ <;> assumption
         | tail =>
           rename_i hmem
           unfold nonEmptyListOf at hy
-          simp [support_pick] at hy
+          simp [support_oneOf] at hy
           rcases hy with ⟨_, hxs⟩ | ⟨_, hxs⟩
           · subst hxs
             contradiction
@@ -451,7 +329,7 @@ theorem support_nonEmptyListOf
     . intro h
       rw [Set.mem_setOf_eq] at h
       unfold nonEmptyListOf
-      simp [support_pick]
+      simp [support_oneOf]
       obtain ⟨h1, h2⟩ := h
       have hx : x ∈ g.support := by
         apply h2
@@ -486,215 +364,44 @@ theorem mem_support_nonEmptylistOf
     xs ∈ (nonEmptyListOf g).support ↔ xs ∈ {xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support} := by
   simp [support_nonEmptyListOf]
 
-/-- The support of `elements xs` is exactly the set of all elements in `xs` -/
-@[simp]
-theorem support_elements
-    {xs : List α}
-    (hne : xs ≠ []) :
-    support (elements xs hne) = { x | x ∈ xs } := by
-  simp only [elements, support_bind, support_map, support_choose]
-  ext a
-  dsimp only [Set.mem_setOf_eq]
-  constructor
-  . intro h
-    obtain ⟨ ⟨i, ⟨ hi_gt, hi_lt⟩⟩, h_idx, ha ⟩ := h
-    obtain ⟨ ⟨ n, ⟨ hgt, hlt ⟩⟩, ⟨ h_lowerbound, h_upperbound ⟩, hi ⟩ := h_idx
-    have h_pos : 0 < xs.length := by
-      rw [List.length_pos_iff]
-      assumption
-    have h_lt : i < xs.length := by omega
-    dsimp at ha
-    simp only [mem_support_pure_iff] at ha
-    apply List.mem_of_getElem (id (Eq.symm ha))
-  . intro hmem
-    obtain ⟨ i, hlt, heq ⟩ := List.mem_iff_getElem.mp hmem
-    have hle : i ≤ xs.length - 1 := by omega
-    exists ⟨ i, ⟨by omega, hle⟩⟩
-    constructor
-    . exists ⟨ i, ⟨by omega, hle⟩⟩
-    . have hidx : xs[i]? = some a := by
-        rw [← heq]
-        apply List.getElem?_eq_getElem hlt
-      dsimp
-      simp only [mem_support_pure_iff]
-      apply (Eq.symm heq)
-
-/-- Membership form of `support_elements`. -/
-@[simp]
-theorem mem_support_elements_iff
-    [Inhabited α]
-    {xs : List α}
-    (hne : xs ≠ []) :
-    a ∈ support (elements xs hne) ↔ a ∈ xs := by
-  simp [support_elements]
-
-/-- The support of `oneOf gs` is exactly the union of all generators in `gs` -/
-@[simp]
-theorem support_oneOf
-    {gs : List (Unit → SPMF α)}
-    (hne : gs ≠ []) :
-    support (oneOf gs hne) = {a | ∃ g ∈ gs, a ∈ (g ()).support} := by
-  simp only [oneOf, Helpers.oneOfAux, support_bind, support_map, support_choose]
-  ext a
-  dsimp only [Set.mem_setOf_eq]
-  constructor
-  . intro h
-    obtain ⟨ ⟨i, ⟨ hi_gt, hi_lt⟩⟩, h_idx, ha ⟩ := h
-    obtain ⟨ ⟨ n, ⟨ hgt, hlt ⟩⟩, ⟨ h_lowerbound, h_upperbound ⟩, hi ⟩ := h_idx
-    have h_pos : 0 < gs.length := by
-      rw [List.length_pos_iff]
-      assumption
-    have h_lt : i < gs.length := by omega
-    refine ⟨ gs[i], ?_, ?_ ⟩
-    . apply List.getElem_mem
-    . dsimp at ha
-      assumption
-  . intros h
-    obtain ⟨ g, hg, ha ⟩ := h
-    obtain ⟨ i, hi, heq ⟩ := List.mem_iff_getElem.mp hg
-    have hge : 0 ≤ i := by
-      apply Nat.zero_le
-    have hle : i ≤ gs.length - 1 := by
-      apply Nat.le_sub_one_of_lt
-      assumption
-    refine ⟨ ⟨i, hge, hle ⟩, ?_, ?_ ⟩
-    . exists ⟨ i, ⟨hge, hle⟩ ⟩
-    . dsimp
-      subst heq
-      assumption
-
-/-- Membership form of `support_oneOf`. -/
-@[simp]
-theorem mem_support_oneOf_iff
-    {gs : List (Unit → SPMF α)}
-    (hne : gs ≠ []) :
-    a ∈ support (oneOf gs hne) ↔ ∃ g ∈ gs, a ∈ (g ()).support := by
-  simp [support_oneOf]
-
-/-- Summing a list's entries by index over `range l.length` recovers `l.sum`. -/
-private theorem sum_range_getD (l : List ℝ≥0∞) :
-    ∑ n ∈ Finset.range l.length, l.getD n 0 = l.sum := by
-  induction l with
-  | nil => simp
-  | cons hd tl ih =>
-    rw [List.length_cons, Finset.sum_range_succ']
-    simp only [List.getD_cons_succ, List.getD_cons_zero, ih, List.sum_cons]
-    exact add_comm _ _
-
-/-- Branch `j` of `oneOf` fires with probability `1 / gs.length`. -/
-@[simp]
-theorem oneOf_apply
-    (gs : List (Unit → SPMF α)) (h : gs ≠ []) (a : α) :
-    oneOf gs h a
-      = (gs.map fun p => (p ()) a).sum / (gs.length : ℝ≥0∞) := by
-  have hlen : 0 < gs.length := List.length_pos_iff.mpr h
-  unfold oneOf Helpers.oneOfAux
-  rw [bind_map_left, bind_apply]
-  simp only [choose_apply]
-  trans (∑ n ∈ Finset.Icc 0 (gs.length - 1),
-      (fun n : Nat => 1 / ((gs.length - 1 - 0 + 1 : ℕ) : ℝ≥0∞) *
-        (gs.map fun p => (p ()) a).getD n 0) n)
-  · trans (∑' (m : ULift.{0} {x : Nat // 0 ≤ x ∧ x ≤ gs.length - 1}),
-        (fun n : Nat => 1 / ((gs.length - 1 - 0 + 1 : ℕ) : ℝ≥0∞) *
-          (gs.map fun p => (p ()) a).getD n 0) m.down.val)
-    · refine tsum_congr ?_
-      rintro ⟨⟨i, -, hi⟩⟩
-      dsimp only
-      have hi' : i < gs.length := by omega
-      simp only [List.getD_eq_getElem?_getD, List.getElem?_map,
-        List.getElem?_eq_getElem hi', Option.map_some, Option.getD_some]
-    · exact tsum_subtype_Icc 0 (gs.length - 1)
-        (fun n : Nat => 1 / ((gs.length - 1 - 0 + 1 : ℕ) : ℝ≥0∞) *
-          (gs.map fun p => (p ()) a).getD n 0)
-  · have hIcc : Finset.Icc 0 (gs.length - 1)
-        = Finset.range (gs.map fun p => (p ()) a).length := by
-      ext n
-      simp only [Finset.mem_Icc, Finset.mem_range, List.length_map]
-      omega
-    have hT : gs.length - 1 - 0 + 1 = gs.length := by omega
-    rw [hIcc, hT, ← Finset.mul_sum, sum_range_getD, one_div, div_eq_mul_inv, mul_comm]
-
-/-- Summing `frequencySelect` over all values of the uniform draw counts each branch `(w, g)`
-exactly `w` times. -/
-private theorem sum_frequencySelect_apply
-    (gs : List (Nat × (Unit → SPMF α))) (a : α) :
-    ∑ n ∈ Finset.range ((gs.map Prod.fst).sum),
-        (if h : n < (gs.map Prod.fst).sum then Helpers.frequencySelect gs n h a else 0)
-      = (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum := by
-  induction gs with
-  | nil => simp
-  | cons hd tl ih =>
-    obtain ⟨k, g⟩ := hd
-    have hS : ((((k, g) :: tl).map Prod.fst).sum) = k + (tl.map Prod.fst).sum := by simp
-    have hsummand : ∀ n ∈ Finset.range ((((k, g) :: tl).map Prod.fst).sum),
-        (if h : n < (((k, g) :: tl).map Prod.fst).sum
-          then Helpers.frequencySelect ((k, g) :: tl) n h a else 0)
-          = if n < k then g () a
-            else (if h : n - k < (tl.map Prod.fst).sum
-                  then Helpers.frequencySelect tl (n - k) h a else 0) := by
-      intro n hn
-      have hn' : n < (((k, g) :: tl).map Prod.fst).sum := Finset.mem_range.mp hn
-      rw [dif_pos hn']
-      simp only [Helpers.frequencySelect]
-      by_cases hlt : n < k
-      · rw [dif_pos hlt, if_pos hlt]
-      · rw [dif_neg hlt, if_neg hlt, dif_pos (by omega)]
-    rw [Finset.sum_congr rfl hsummand, hS]
-    rw [Finset.range_eq_Ico,
-      ← Finset.sum_Ico_consecutive _ (Nat.zero_le k) (Nat.le_add_right k _)]
-    have hfirst : ∑ n ∈ Finset.Ico 0 k,
-        (if n < k then g () a
-          else (if h : n - k < (tl.map Prod.fst).sum
-                then Helpers.frequencySelect tl (n - k) h a else 0))
-          = (k : ℝ≥0∞) * g () a := by
-      rw [Finset.sum_congr rfl (fun n hn => if_pos (Finset.mem_Ico.mp hn).2),
-        Finset.sum_const, Nat.card_Ico, Nat.sub_zero, nsmul_eq_mul]
-    have hsecond : ∑ n ∈ Finset.Ico k (k + (tl.map Prod.fst).sum),
-        (if n < k then g () a
-          else (if h : n - k < (tl.map Prod.fst).sum
-                then Helpers.frequencySelect tl (n - k) h a else 0))
-          = (tl.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum := by
-      rw [Finset.sum_Ico_eq_sum_range,
-        show k + (tl.map Prod.fst).sum - k = (tl.map Prod.fst).sum from by omega]
-      have h2 : ∀ n ∈ Finset.range ((tl.map Prod.fst).sum),
-          (if k + n < k then g () a
-            else (if h : k + n - k < (tl.map Prod.fst).sum
-                  then Helpers.frequencySelect tl (k + n - k) h a else 0))
-            = (if h : n < (tl.map Prod.fst).sum
-                then Helpers.frequencySelect tl n h a else 0) := by
-        intro n _
-        rw [if_neg (by omega)]
-        simp only [Nat.add_sub_cancel_left]
-      rw [Finset.sum_congr rfl h2]
-      exact ih
-    rw [hfirst, hsecond]
+/-- The support of `permutationOf xs` is the set of all values of the subtype `{ys // xs ~ ys}`,
+    i.e. all possible permutations of `xs`.  -/
+theorem support_permutationOf {α} {xs : List α} :
+    support (permutationOf xs) = Set.univ := by
+  ext z
+  simp only [Set.mem_univ, iff_true]
+  induction xs with
+  | nil =>
+    obtain ⟨zs, hz⟩ := z
+    have : zs = [] := List.Perm.eq_nil hz.symm
+    subst this
+    rw [permutationOf]
     simp
+  | cons x xs ih =>
+    obtain ⟨zs, hz⟩ := z
+    -- `x` occurs at some index `n` of `zs`.
+    obtain ⟨n, hn, hxn⟩ := List.mem_iff_getElem.mp (hz.mem_iff.mp List.mem_cons_self)
+    -- Erasing that index and reinserting `x` there recovers `zs` (the inverse of one step).
+    have hinv : (zs.eraseIdx n).insertIdx n x = zs := by
+      rw [← hxn]; exact List.insertIdx_eraseIdx_getElem hn
+    have hle : n ≤ (zs.eraseIdx n).length := by rw [List.length_eraseIdx_of_lt hn]; omega
+    -- Peel the head off both sides to get a permutation of the tail.
+    have hzperm : zs.Perm (x :: zs.eraseIdx n) := by
+      conv_lhs => rw [← hinv]
+      exact List.perm_insertIdx x (zs.eraseIdx n) hle
+    have htail : xs.Perm (zs.eraseIdx n) := List.Perm.cons_inv (hz.trans hzperm)
+    rw [permutationOf]
+    simp only [mem_support_bind_iff, mem_support_map_iff, mem_support_choose_iff, true_and]
+    -- Witnesses: the recursive result `⟨zs.eraseIdx n, htail⟩` and the insertion index `n`.
+    refine ⟨⟨zs.eraseIdx n, htail⟩, ih _, ⟨n, by omega, hle⟩,
+      ⟨ULift.up ⟨n, by omega, hle⟩, rfl⟩, ?_⟩
+    exact mem_support_pure_iff.mpr (Subtype.ext hinv.symm)
 
-/-- Branch `j` of `frequency` fires with probability `wⱼ / Σᵢ wᵢ`. -/
+/-- Membership form of `support_permutationOf` -/
 @[simp]
-theorem frequency_apply
-    (gs : List (Nat × (Unit → SPMF α))) (h : 0 < (gs.map Prod.fst).sum) (a : α) :
-    frequency gs h a
-      = (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()) a).sum / ((gs.map Prod.fst).sum : ℝ≥0∞) := by
-  unfold frequency Helpers.frequencyAux
-  rw [bind_map_left, bind_apply]
-  simp only [choose_apply, apply_dite (fun p : SPMF α => p a), default_apply]
-  trans (∑ n ∈ Finset.Icc 0 ((gs.map Prod.fst).sum - 1),
-      (fun n : Nat => (1 / (((gs.map Prod.fst).sum - 1 - 0 + 1 : ℕ) : ℝ≥0∞)) *
-        (if hn : n < (gs.map Prod.fst).sum
-          then Helpers.frequencySelect gs n hn a else 0)) n)
-  · exact tsum_subtype_Icc 0 ((gs.map Prod.fst).sum - 1)
-      (fun n : Nat => (1 / (((gs.map Prod.fst).sum - 1 - 0 + 1 : ℕ) : ℝ≥0∞)) *
-        (if hn : n < (gs.map Prod.fst).sum
-          then Helpers.frequencySelect gs n hn a else 0))
-  · have hIcc : Finset.Icc 0 ((gs.map Prod.fst).sum - 1)
-        = Finset.range ((gs.map Prod.fst).sum) := by
-      ext n
-      simp only [Finset.mem_Icc, Finset.mem_range]
-      omega
-    have hT : (gs.map Prod.fst).sum - 1 - 0 + 1 = (gs.map Prod.fst).sum := by omega
-    rw [hIcc, hT, ← Finset.mul_sum, sum_frequencySelect_apply, one_div,
-      div_eq_mul_inv, mul_comm]
+theorem mem_support_permutationOf_iff {α} {xs : List α} {z : { ys // xs.Perm ys }} :
+    z ∈ support (permutationOf xs : SPMF _) ↔ True := by
+  rw [support_permutationOf]; exact iff_of_true (Set.mem_univ z) trivial
 
 /-- If the sum of weights in `gs` is non-zero, then the support of `frequency gs` is exactly the
 union of the support of the generators in `gs` with non-zero weights. -/
@@ -704,20 +411,15 @@ theorem support_frequency
     (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
     support (frequency gs h_pos) = {a | ∃ w g, ⟨ w, g ⟩ ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support} := by
   ext a
-  rw [mem_support_iff, frequency_apply gs h_pos a, Set.mem_setOf_eq, ne_eq,
-    ENNReal.div_eq_zero_iff]
-  simp only [ENNReal.natCast_ne_top, or_false, List.sum_eq_zero_iff, List.forall_mem_map,
-    mul_eq_zero, Nat.cast_eq_zero, not_forall, Prod.exists, mem_support_iff,
-    Nat.pos_iff_ne_zero]
-  grind
-
-/-- Membership form of `support_frequency`. -/
-@[simp]
-theorem mem_support_frequency_iff
-    {gs : List (Nat × (Unit → SPMF α))}
-    (h_pos : 0 < List.sum (List.map Prod.fst gs)) :
-    a ∈ (frequency gs h_pos).support ↔ ∃ w g, (w, g) ∈ gs ∧ 0 < w ∧ a ∈ (g ()).support := by
-  simp [support_frequency]
+  refine (mem_support_of_may (mayObs.map_frequency gs h_pos)).trans ?_
+  simp only [Obs.select, WP.choose_bind_apply, Obs.selectD_map (fun w : WP Mix.angelic α => w (· = a)), List.map_map]
+  refine (Mix.select_angelic _ (by simp [Function.comp_def]) h_pos _).trans ?_
+  constructor
+  · rintro ⟨_, hp, hw, ha⟩
+    obtain ⟨⟨w, g⟩, hmem, rfl⟩ := List.mem_map.mp hp
+    exact ⟨w, g, hmem, hw, mem_support_iff_may.mpr ha⟩
+  · rintro ⟨w, g, hmem, hw, ha⟩
+    exact ⟨_, List.mem_map.mpr ⟨(w, g), hmem, rfl⟩, hw, mem_support_iff_may.mp ha⟩
 
 theorem bind_congr_support
     {x : SPMF α}
@@ -733,27 +435,9 @@ theorem bind_congr_support
   · simp only [support, Function.notMem_support] at hsupport
     simp_all [DFunLike.coe]
 
-theorem csup_apply {c : SPMF α → Prop} (hc : chain c) (a : α) :
-    (CCPO.csup hc) a = ⨆ f, ⨆ (_ : c f), f a := by
-  have hge : ∀ b, ⨆ f, ⨆ (_ : c f), f b ≤ (CCPO.csup hc) b :=
-    fun b => iSup₂_le (fun f hf => le_csup hc hf b)
-  have hsum : ∑' b, ⨆ f, ⨆ (_ : c f), f b ≤ 1 :=
-    (ENNReal.tsum_le_tsum hge).trans (tsum_coe _)
-  exact le_antisymm
-    ((csup_le hc (fun f hf b => le_iSup₂_of_le f hf le_rfl) :
-        CCPO.csup hc ⊑ ⟨fun b => ⨆ f, ⨆ (_ : c f), f b, hsum⟩) a)
-    (hge a)
-
 theorem mem_support_csup {c : SPMF α → Prop} (hc : chain c) {a : α} :
     a ∈ (CCPO.csup hc).support ↔ ∃ f, c f ∧ a ∈ f.support := by
-  simp only [mem_support_iff, csup_apply, ne_eq]
-  constructor
-  · intro h
-    by_contra h'
-    push Not at h'
-    simp_all
-  · rintro ⟨f, hcf, haf⟩ h
-    simp_all
+  simp only [mem_support_iff_prob_pos, prob, expect_csup, lt_iSup_iff, exists_prop]
 
 /-- Reweighting a uniform choice preserves its support. Replacing `oneOf gs` by a `frequency`
 over the same branches leaves the set of reachable values unchanged, provided every weight is

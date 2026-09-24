@@ -18,7 +18,7 @@ must not be laundered into a ✓.
 -/
 
 def genCoin [Gen G] : G Bool :=
-  RandomChoice.pick (fun () => pure true) (fun () => pure false)
+  oneOf [fun _ => pure true, fun _ => pure false]
 
 /-! ## No laws: the block is absent
 
@@ -69,11 +69,11 @@ open Lean Elab Meta in
 `terminates` names the divergence count it was *not* proved by. -/
 
 theorem genCoin.sound_complete : IsSoundAndComplete (genCoin (G := SPMF)) (fun _ => True) := by
-  intro a
   constructor
-  · intro _; trivial
-  · intro _
-    cases a <;> simp [genCoin, SPMF.support_pick]
+  · solve_by_elim
+  · unfold IsCompleteFor
+    intro a
+    cases a <;> simp [genCoin, SPMF.support_oneOf]
 
 /--
 info: genCoin — 5 draws (seed 0, fuel 10000)
@@ -105,16 +105,44 @@ info: genCoin — 5 draws (seed 0, fuel 10000)
 #guard_msgs in
 #genstats (draws := 5) genCoin
 
+/-! ## The halves, proved separately, are the same line
+
+`.sound` and `.complete` together are `.sound_complete`; one of them alone is not. -/
+
+def genHalves [Gen G] : G Bool := pure true
+
+theorem genHalves.sound : IsSound (genHalves (G := SPMF)) (· = true) := by
+  intro a ha
+  simpa [genHalves] using ha
+
+/-- info: false -/
+#guard_msgs in
+open Lean Elab Meta in
+#eval show CoreM Bool from do
+  let env ← getEnv
+  Prod.fst <$> (GenStats.Command.lawProvedFor env `genHalves `sound_complete).run {} {}
+
+theorem genHalves.complete : IsCompleteFor (genHalves (G := SPMF)) (· = true) := by
+  intro a ha
+  simp [genHalves, ha]
+
+/-- info: true -/
+#guard_msgs in
+open Lean Elab Meta in
+#eval show CoreM Bool from do
+  let env ← getEnv
+  Prod.fst <$> (GenStats.Command.lawProvedFor env `genHalves `sound_complete).run {} {}
+
 /-! ## The partial-generator laws: `productive` and `filter_free` -/
 
 open SPMF in
 
 def genMaybe [Gen G] : G (Option Nat) :=
-  RandomChoice.pick (fun () => pure none) (fun () => pure (some 0))
+  oneOf [fun _ => pure none, fun _ => pure (some 0)]
 
 theorem genMaybe.productive : IsProductive (genMaybe (G := SPMF)) :=
   IsProductive_of_mem_support (a := 0)
-    (by simp [genMaybe, SPMF.support_pick, SPMF.support_pure])
+    (by simp [genMaybe, SPMF.support_oneOf, SPMF.support_pure])
 
 /--
 info: genMaybe — 5 draws (seed 0, fuel 10000)
@@ -148,16 +176,16 @@ info: genMaybe — 5 draws (seed 0, fuel 10000)
 
 open SPMF in
 def genSurely [Gen G] : G (Option Nat) :=
-  RandomChoice.pick (fun () => pure (some 0)) (fun () => pure (some 1))
+  oneOf [fun _ => pure (some 0), fun _ => pure (some 1)]
 
 theorem genSurely.filter_free : IsFilterFree (genSurely (G := SPMF)) := by
   have hmass : SPMF.IsPMF (genSurely (G := SPMF)) := by
     mass_fixpoint using SPMF.LfpIsOne.one
-    simp [ENNReal.inv_two_add_inv_two]
+    norm_num [ENNReal.div_self]
   rw [IsFilterFree_iff_massNone_eq_zero hmass]
   show (genSurely (G := SPMF)) none = 0
   rw [SPMF.apply_eq_zero_iff]
-  simp [genSurely, SPMF.support_pick, SPMF.support_pure]
+  simp [genSurely, SPMF.support_oneOf, SPMF.support_pure]
 
 theorem genSurely.productive : IsProductive (genSurely (G := SPMF)) :=
   IsProductive_of_IsFilterFree genSurely.filter_free
@@ -189,3 +217,14 @@ info: genSurely — 5 draws (seed 0, fuel 10000)
 -/
 #guard_msgs in
 #genstats (draws := 5) genSurely
+
+/-! ## Every law the naming convention names exists
+
+`lawConventions` names each law by quoted name, so a renamed law would silently stop being found by
+`#genstats` and by the walker's leaves. -/
+
+open Lean Elab Command in
+run_cmd do
+  for (suffix, law) in Basalt.Walk.lawConventions do
+    unless (← getEnv).contains law do
+      throwError "the law `{law}` of the convention `.{suffix}` does not exist"

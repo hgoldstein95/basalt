@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Mass
+import Basalt.Tactic.ENNReal
 
 /-!
 # Almost-Sure Termination

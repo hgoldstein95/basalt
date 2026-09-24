@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt
 
-open RandomChoice
-
 /-!
 # Arbitrary Natural Numbers
 
@@ -15,26 +13,33 @@ whether to increment. It is the simplest recursive generator in the cookbook and
 for several others (`ArbList`, `SortedList`, `Heap`).
 -/
 
+open RandomChoice
+
 namespace ArbNat
 
 /-- Generates an arbitrary natural number: flip a coin to stop at `0` or recurse and add one. -/
 def Nat.arbitrary [Gen G] : G Nat := do
-  pick
-    (fun () => pure 0)
-    (fun () => do
+  oneOf [
+    fun _ => pure 0,
+    fun _ => do
       let n ← Nat.arbitrary
-      pure (n + 1))
+      pure (n + 1)
+  ]
 partial_fixpoint
 
-theorem Nat.arbitrary_mem_support : n ∈ SPMF.support Nat.arbitrary := by
-  induction n <;> rw [Nat.arbitrary] <;> simp [*]
-
-theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ :=
-  fun _ => iff_of_true Nat.arbitrary_mem_support trivial
+theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ := by
+  refine .intro (fun _ _ => trivial) ?complete
+  intro n
+  induction n with
+  | zero => intro _; rw [Nat.arbitrary]; complete_bound
+  | succ n ih =>
+    intro _
+    rw [Nat.arbitrary]; complete_bound
+    exact ⟨n, ih trivial, rfl⟩
 
 theorem Nat.arbitrary.terminates : IsAlmostSurelyTerminating Nat.arbitrary := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
-  simp
+  simp [ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Producing `n` costs `n + 1` random choices (one per increment, plus the final stop). -/
 theorem Nat.arbitrary.cost_bounded :
@@ -45,32 +50,13 @@ theorem Nat.arbitrary.cost_bounded :
 section expected_cost
 open scoped ENNReal
 
-/-- The cost recurrence `E = ½·1 + ½·(1 + E)` solves to 2; `fix_induct` gives the upper bound. -/
+/-- The cost recurrence `E = ½·1 + ½·(1 + E)` solves to 2, which the walk leaves as arithmetic. -/
 theorem Nat.arbitrary.expected_cost :
     SPMF.Cost.expectedCost (Nat.arbitrary : SPMF.Cost Nat) ≤ 2 := by
-  open Lean.Order in
-  delta arbitrary
-  apply fix_induct (motive := fun (g : SPMF.Cost Nat) =>
-    SPMF.expect g (fun p => (p.2 : ℝ≥0∞)) ≤ 2) _ ?admissible ?step
-  case admissible => exact SPMF.admissible_expect_le _ _
-  case step =>
-    intro arbitrary_rec ih
-    rw [SPMF.Cost.expect_pick, SPMF.Cost.expect_pure, SPMF.Cost.expect_bind]
-    simp only [SPMF.Cost.expect_pure]
-    push_cast
-    simp only [add_zero]
-    have hrec : SPMF.expect arbitrary_rec (fun p => (1 : ℝ≥0∞) + (p.2 : ℝ≥0∞)) ≤ 3 := by
-      calc SPMF.expect arbitrary_rec (fun p => (1 : ℝ≥0∞) + (p.2 : ℝ≥0∞))
-          = SPMF.expect arbitrary_rec (fun _ => 1)
-              + SPMF.expect arbitrary_rec (fun p => (p.2 : ℝ≥0∞)) := SPMF.expect_add _ _ _
-        _ ≤ 1 + 2 := add_le_add (by rw [SPMF.expect_one]; exact SPMF.mass_le_one _) ih
-        _ = 3 := by norm_num
-    calc (1/2 : ℝ≥0∞) * 1
-          + 1/2 * SPMF.expect arbitrary_rec (fun p => (1 : ℝ≥0∞) + (p.2 : ℝ≥0∞))
-        ≤ 1/2 * 1 + 1/2 * 3 := add_le_add le_rfl (mul_le_mul_right hrec _)
-      _ = 2 := by
-          ennreal_to_real
-          norm_num
+  expect_fixpoint
+  norm_num
+  ennreal_to_real
+  norm_num
 
 /-- Markov: generation costs at least `k` choices with probability at most `2 / k`. -/
 theorem Nat.arbitrary.cost_tail {k : Nat} (hk : k ≠ 0) :

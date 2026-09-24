@@ -1,6 +1,6 @@
 name = "basalt"
 version = "0.1.0"
-defaultTargets = ["Basalt", "BasaltExamples", "BasaltTest"]
+defaultTargets = ["Basalt", "BasaltExamples", "BasaltTest", "BasaltFuzz"]
 
 [[lean_lib]]
 name = "Basalt"
@@ -17,16 +17,42 @@ globs = ["BasaltTest.+"]
 # 4.29.1 interpreter's default C-stack is smaller than 4.31+, so raise it here.
 weakLeanArgs = ["--tstack=1000000"]
 
+# The code `basalt-fuzz` fuzzes: generators, properties, and the buggy operations under test. This
+# is the *only* SanitizerCoverage-instrumented library, which is what confines libFuzzer's coverage
+# feedback to the code under test instead of Basalt's plumbing (fuzz-run/README.md).
+#
+# These modules must not be matched by any other library's globs. Lake resolves a module claimed by
+# two libraries to one of their configurations silently, and the uninstrumented one wins, leaving a
+# fuzzer that runs and finds only shallow bugs; `fuzz-run/build.sh` asserts the instrumentation is
+# present.
+#
+# A default target, which costs `lake build` only elaboration: `moreLeancArgs` applies when something
+# asks for these modules' C objects, and only the executable does. Dropping it from `defaultTargets`
+# would stop type-checking `Staged`, which nothing else imports.
 [[lean_lib]]
-name = "BasaltExperiments"
-globs = ["BasaltExperiments.+"]
+name = "BasaltFuzz"
+globs = ["BasaltFuzz.+"]
+moreLeancArgs = ["-O1", "-fsanitize=fuzzer-no-link"]
 
-# Root of the opt-in `basalt-fuzz` executable. `fuzz-run/build.sh` elaborates it and links the fuzzer.
-[[lean_lib]]
-name = "BasaltFuzzMain"
-globs = ["BasaltFuzzMain"]
+# The opt-in fuzzing executable, never built by `lake build` and reached only through
+# `fuzz-run/build.sh`, which writes the `link.rsp` naming this platform's libFuzzer runtime. The root
+# is instrumented for the same reason the library is: Lean specializes each generator and property
+# into the module that registers them, so `BasaltFuzzMain` holds their live code. It shares the
+# library's `-O1` so both halves of the instrumented set are compiled alike — the edge granularity
+# libFuzzer sees is an artifact of inlining, so a split optimization level would make them
+# incomparable.
+[[lean_exe]]
+name = "basalt-fuzz"
+root = "BasaltFuzzMain"
+moreLeancArgs = ["-O1", "-fsanitize=fuzzer-no-link"]
+moreLinkArgs = ["@fuzz-run/obj/link.rsp"]
 
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
 rev = "v4.29.1"
+
+[[require]]
+name = "splitmix"
+git = "https://github.com/hgoldstein95/splitmix"
+rev = "v4.33.0-rc2"

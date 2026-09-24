@@ -3,8 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.PBT
 import Basalt.Combinators
+import Basalt.PBT.Driver
 import BasaltExamples.BST.ByInsertion
 
 /-!

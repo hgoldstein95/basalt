@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt.Combinators
 import BasaltExamples.ArbNat
 
-open RandomChoice ArbNat
-
 /-!
 # Leftist Heaps
 
@@ -17,6 +15,8 @@ generator builds both children independently and then puts the higher-rank one o
 `if` is the only difference from `genHeap` — including in the termination proof, which is
 **critical** in the same way and the same text.
 -/
+
+open RandomChoice ArbNat
 
 namespace LeftistHeap
 
@@ -69,44 +69,40 @@ partial_fixpoint
 
 theorem Tree.genLeftist.sound_complete :
     IsSoundAndComplete (Tree.genLeftist lo) (Tree.isLeftist lo) := by
-  intro t
-  fun_induction Tree.isLeftist with
-  | case1 lo =>
-    constructor
-    · solve_by_elim
-    · unfold genLeftist; simp
-  | case2 lo l x r ih_l ih_r =>
-    unfold genLeftist
-    simp
-    constructor
-    · grind
-    · intro h
-      exists (x - lo)
-      constructor <;> grind only [Nat.arbitrary_mem_support]
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    all_goals simp_all [Tree.isLeftist]
+    all_goals omega
+  case complete =>
+    intro t
+    induction t generalizing lo with
+    | leaf => intro _; rw [Tree.genLeftist]; complete_bound
+    | node l x r ihl ihr =>
+      intro ⟨hle, hrank, hl, hr⟩
+      obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
+      rw [Tree.genLeftist]; complete_bound
+      exact ⟨d, l, ihl hl, r, ihr hr, by rw [if_pos hrank]⟩
 
 theorem Tree.genLeftistOfRank.sound_complete :
     IsSoundAndComplete (Tree.genLeftistOfRank lo k) (fun t => Tree.isLeftist lo t ∧ t.rank = k) := by
-  intro t
-  induction t generalizing lo k with
-  | leaf =>
-    unfold genLeftistOfRank
-    split <;> simp <;> grind [SPMF.mem_support_pure_iff, isLeftist.eq_def, rank]
-  | node l x r ih_l ih_r =>
-    unfold genLeftistOfRank
-    split
-    case _ => simp; grind [= isLeftist, = rank]
-    case _ k =>
-      simp
-      constructor
-      · grind only [rank, isLeftist]
-      · intro h
-        exists (x - lo)
-        constructor
-        · grind only [Nat.arbitrary_mem_support]
-        · constructor
-          · grind only [rank, isLeftist]
-          · exists (l.rank - k)
-            grind only [Nat.arbitrary_mem_support, eq_def, rank.eq_def, isLeftist.eq_def]
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    all_goals simp_all [Tree.isLeftist, Tree.rank]
+  case complete =>
+    intro t
+    induction t generalizing lo k with
+    | leaf =>
+      intro ⟨_, hk⟩
+      obtain rfl : k = 0 := hk.symm
+      rw [Tree.genLeftistOfRank]; complete_bound
+    | node l x r ihl ihr =>
+      intro ⟨⟨hle, hrank, hl, hr⟩, hk⟩
+      obtain rfl : k = r.rank + 1 := hk.symm
+      obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
+      rw [Tree.genLeftistOfRank]; complete_bound
+      exact ⟨d, r, ihr ⟨hr, rfl⟩, l.rank - r.rank, l, ihl ⟨hl, by omega⟩, rfl⟩
 
 theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist lo) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)

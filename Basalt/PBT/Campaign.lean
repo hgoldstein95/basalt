@@ -3,9 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks, Harrison Goldstein
 -/
-
-import Basalt.PBT.Property
 import Basalt.IO
+import Basalt.PBT.Property
 import Basalt.PlausibleGen
 
 /-!
@@ -82,14 +81,14 @@ def campaign (label : String) (step : IO TestOutcome) (runs : Nat)
   r.report label
   r.exitOnFailure
 
-/-- Test `T` at the default `IO` interpretation, where choices come from `IO.rand`. -/
+/-- Test `T` at the default `IO` interpretation, where choices come from SplitMix via `ioGen`. -/
 def ioCampaign (T : Property) (runs : Nat) (maxDiscardRatio : Nat := 10) : IO Unit :=
   campaign "IO" (runProp (T IO)) runs maxDiscardRatio
 
 /-- Test `T` at `Plausible.Gen`, where choices come from Plausible's `StdGen`.
 
 The `size` handed to `Plausible.Gen.run` is inert: Basalt generators bound their own recursion (via
-`pick`/`partial_fixpoint`) and no combinator reads Plausible's size parameter. -/
+`partial_fixpoint`) and no combinator reads Plausible's size parameter. -/
 def plausibleCampaign (T : Property) (runs : Nat) (maxDiscardRatio : Nat := 10) : IO Unit :=
   campaign "Plausible.Gen" (Plausible.Gen.run (runProp (T Plausible.Gen)) 0) runs maxDiscardRatio
 

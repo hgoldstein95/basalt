@@ -12,14 +12,16 @@ import Basalt.PBT.Property
 coverage-guided fuzzer rather than by a PRNG: the fuzzer proposes a byte buffer, `choose` reads bytes
 from it to select each value, and coverage of the generator and the property guides its mutations
 ("parametric fuzzing"). Because `choose` is total, a whole fuzzer input is a pure function
-`ByteArray → TestOutcome` (`runOne`).
+`ByteArray → FuzzResult` (`runOne`).
 -/
 
 namespace Basalt.Fuzz
 
 open Basalt.PBT
 
-/-- State threaded through one fuzzer input: the fuzzer-controlled byte buffer and a read cursor. -/
+/-- State threaded through one fuzzer input: the fuzzer-controlled byte buffer and a read cursor.
+The cursor is *not* clamped to the buffer, so how far it overshoots is the input's unmet demand
+(`FuzzResult.deficit`). -/
 structure FuzzState where
   buffer : ByteArray
   cursor : Nat
@@ -44,8 +46,9 @@ def bitsFor (k : Nat) : Nat :=
 def bytesFor (k : Nat) : Nat := (bitsFor k + 7) / 8
 
 /-- Read one byte, advancing the cursor. Past the end of the buffer, read `0`: the buffer is
-zero-extended rather than exhausted, which is what keeps `choose` total (`fuzz-run/README.md` records
-what this costs and what a custom mutator would buy instead). -/
+zero-extended rather than exhausted, which is what keeps `choose` total. The cursor still advances, so
+the overshoot survives as the run's `deficit` — which is what lets the fuzzer be told to supply the
+missing bytes (`fuzz-run/README.md`). -/
 def readByte (s : FuzzState) : UInt8 × FuzzState :=
   let b := if s.cursor < s.buffer.size then s.buffer.get! s.cursor else 0
   (b, { s with cursor := s.cursor + 1 })
@@ -73,12 +76,19 @@ instance : RandomChoice FuzzGen where
 /-- `FuzzGen` has everything a generator needs. -/
 example : Gen FuzzGen := inferInstance
 
+/-- What one input produced: its outcome, and how many bytes it wanted beyond the ones it was
+given (the `deficit`). -/
+structure FuzzResult where
+  outcome : TestOutcome
+  deficit : Nat
+  deriving Inhabited
+
 /-- Run a property on one input buffer — the pure core the C bridge calls per input. The `none` case
 is the `partial_fixpoint` bottom, unreachable for a productive generator; we map it to `discard` for
-totality. -/
-def runOne (T : PropM FuzzGen Unit) (bytes : ByteArray) : TestOutcome :=
+totality, with no deficit to report. -/
+def runOne (T : PropM FuzzGen Unit) (bytes : ByteArray) : FuzzResult :=
   match (runProp T).run { buffer := bytes, cursor := 0 } with
-  | some (outcome, _) => outcome
-  | none              => Except.error .discard
+  | some (outcome, s) => { outcome, deficit := s.cursor - bytes.size }
+  | none              => { outcome := Except.error .discard, deficit := 0 }
 
 end Basalt.Fuzz

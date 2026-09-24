@@ -6,10 +6,6 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.BST
 
-open RandomChoice
-open SPMF
-open scoped NNReal ENNReal
-
 /-!
 # Weighted Binary Search Trees
 
@@ -23,6 +19,10 @@ applies. Termination instead goes through a ranking function on the seed `(lo, h
 fact that the interval genuinely shrinks. The machinery (`bstLevel`, `bstRank`) lives here since it
 is used nowhere else, instantiated at recursion weight `w = 5/6` and drift `ε = 1/6`.
 -/
+
+open RandomChoice
+open SPMF
+open scoped NNReal ENNReal
 
 namespace BST
 
@@ -155,27 +155,18 @@ theorem Tree.genWeightedBST.cost_bounded :
 
 theorem Tree.genWeightedBST.sound_complete :
     IsSoundAndComplete (Tree.genWeightedBST lo hi) (Tree.isBST lo hi) := by
-  intro t
-  fun_induction Tree.isBST
-    <;> rw [Tree.genWeightedBST]
-    <;> split
-    <;> simp
-  · -- leaf, `lo ≤ hi`: witness the (weight-1) leaf branch of the `frequency`.
-    exact ⟨1, fun _ => Pure.pure .leaf, Or.inl ⟨rfl, rfl⟩, one_pos, by simp⟩
-  · -- node, `lo > hi`: no pivot fits.
-    intros
-    omega
-  · -- node, `lo ≤ hi`: only the (weight-5) node branch can produce a `node`.
-    constructor
-    · rintro ⟨w, g, hbr, hw, hmem⟩
-      rcases hbr with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
-      · simp at hmem
-      · revert hmem
-        simp
-        grind
-    · rintro ⟨h1, h2, hl, hr⟩
-      refine ⟨5, _, Or.inr ⟨rfl, rfl⟩, by norm_num, ?_⟩
-      simp
-      grind
+  refine .intro ?sound ?complete
+  case sound =>
+    sound_fixpoint
+    all_goals simp_all [Tree.isBST]
+  case complete =>
+    intro t
+    induction t generalizing lo hi with
+    | leaf => intro _; rw [Tree.genWeightedBST]; complete_bound
+    | node l x r ihl ihr =>
+      intro ⟨h1, h2, hl, hr⟩
+      rw [Tree.genWeightedBST]; complete_bound
+      rw [dif_neg (by omega)]
+      exact ⟨x, ⟨h1, h2⟩, l, ihl hl, r, ihr hr, rfl⟩
 
 end BST

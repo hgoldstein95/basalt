@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Termination
 
-open ENNReal
-
 /-!
 # Ranking-Function Termination
 
@@ -15,6 +13,8 @@ whose expected value drops by `ε` under a level operator `SPMF.LevelOp` forces 
 bound's least fixed point to `1`, and bounds the expected number of unfolding steps by `φ / ε`. The
 union bounds that discharge its deficit condition live here too.
 -/
+
+open ENNReal
 
 namespace SPMF
 

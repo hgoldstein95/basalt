@@ -24,40 +24,80 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 ## Where things live
 
 - **Writing a generator and proving it correct** — `WORKFLOW.md`: a recipe for each of the three
-  obligations (support, termination, cost) as a skeleton with named holes, the unfolding-idiom
-  table, and a when-stuck table. [BasaltExamples/](BasaltExamples/) holds the worked instances
+  obligations (support, termination, cost) as a skeleton with named holes, the table of judgments
+  (observation, algebra, direction, who supplies the induction), the unfolding-idiom table, and a
+  when-stuck table. [BasaltExamples/](BasaltExamples/) holds the worked instances
   each recipe names. Start there for any per-generator work; do not improvise a proof shape.
-- **The laws** (`IsSoundAndComplete`, `IsAlmostSurelyTerminating`, `IsCostBounded`,
-  `IsFilterFree`, `IsProductive`) and their introduction lemmas — [Basalt/Laws.lean](Basalt/Laws.lean).
+- **The laws** (`IsSoundAndComplete` and its halves `IsSound` and `IsCompleteFor`,
+  `IsAlmostSurelyTerminating`, `IsCostBounded`, `IsFilterFree`, `IsProductive`) and their
+  introduction lemmas — [Basalt/Laws.lean](Basalt/Laws.lean).
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
-- **Support inversion** (`mem_support_*_iff`) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean);
-  the `support_simp` / `cost_support_simp` wrappers — [Basalt/Tactics.lean](Basalt/Tactics.lean).
+- **Observations** — the layer every per-combinator lemma is derived from. `Obs`, the one
+  `Obs.map_*` lemma per combinator, the specification monads and the presentation of each shape of
+  choice: [Basalt/Obs/](Basalt/Obs/). An observation lives with its interpretation — the
+  expectation one in [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean), may and always in
+  [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean), the cost ones and erasure in
+  [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean). A new combinator needs its `map_` lemma and
+  nothing per judgment; [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour.
+- **Support** — a support law is two walks: soundness, a lower bound on `SPMF.alwaysObs` in the
+  demonic algebra (`sound_bound` and `sound_fixpoint`,
+  [Basalt/Tactic/Sound.lean](Basalt/Tactic/Sound.lean), pinned by
+  [BasaltTest/Tactic/Sound.lean](BasaltTest/Tactic/Sound.lean)); and completeness, a lower bound on
+  `SPMF.mayObs` in the angelic one, under an induction the user chooses (`complete_bound` and
+  `IsCompleteFor.of_measure`, [Basalt/Tactic/Complete.lean](Basalt/Tactic/Complete.lean), pinned by
+  [BasaltTest/Tactic/Complete.lean](BasaltTest/Tactic/Complete.lean)). The practical entry is
+  WORKFLOW.md's Recipe 1. Support inversion outside a law (`mem_support_*_iff`, for a probability
+  goal or a support equation) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean); the
+  `support_simp` / `cost_support_simp` wrappers —
+  [Basalt/Tactic/Support.lean](Basalt/Tactic/Support.lean).
 - **Termination** — the criterion (`IsPMF_of_lfp_eq_one`) and its `LfpIsOne` certificates:
   [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); the `mass_fixpoint` tactic:
-  [Basalt/SPMF/MassFixpoint.lean](Basalt/SPMF/MassFixpoint.lean), contract
-  pinned by [BasaltTest/Termination.lean](BasaltTest/Termination.lean). Ranking functions and
-  expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). `mass` and its equations:
+  [Basalt/Tactic/MassFixpoint.lean](Basalt/Tactic/MassFixpoint.lean), contract pinned by
+  [BasaltTest/Tactic/MassFixpoint.lean](BasaltTest/Tactic/MassFixpoint.lean). Ranking functions and
+  expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). The equations of `mass`:
   [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
-- **The generator walker and its `@[gen_rule]` rules** — one rule per (judgment, combinator), later
-  ones fallbacks, and a non-recursive definition with none is unfolded; the judgments and the
-  registries (rules, and the `@[gen_branches]` relations that collect a list combinator's branches)
-  are
-  [Basalt/SPMF/Walk/Attr.lean](Basalt/SPMF/Walk/Attr.lean), the walk is
-  [Basalt/SPMF/Walk.lean](Basalt/SPMF/Walk.lean). The mass rules and the `mass_bound` tactic are
-  [Basalt/SPMF/MassBound.lean](Basalt/SPMF/MassBound.lean), contract pinned by
-  [BasaltTest/MassBound.lean](BasaltTest/MassBound.lean); the cost rules (`SPMF.Cost.Always`) and
-  the `cost_bound` tactic are [Basalt/SPMF/CostBound.lean](Basalt/SPMF/CostBound.lean), contract
-  pinned by [BasaltTest/CostBound.lean](BasaltTest/CostBound.lean), which also fails the build when
-  a combinator has a rule for one judgment and not the other. Nothing else in a termination or
-  cost proof mentions combinators.
+- **The generator walker** — one walk proves every judgment, each stated on an observation as a
+  bound `O.spec g post ≤ b` or `b ≤ O.spec g post` that the walk computes from the postcondition. A
+  combinator has no rule: its `@[gen_map]` lemma is applied and rewritten (`@[spec_apply]`) into a
+  *shape of choice* in the algebra. The `@[gen_rule]` rules are for the host constructs, once for
+  every monotone observation ([Basalt/Obs/Ordered.lean](Basalt/Obs/Ordered.lean)), for the shapes,
+  per algebra and direction ([Basalt/Tactic/Average.lean](Basalt/Tactic/Average.lean) for
+  expectations; the demonic and angelic ones beside the presentations they are derived from, in
+  [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean); the `sup` ones in
+  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean)), and for bridging a recursive combinator's
+  law. What closes a leaf of a bound on one observation is tagged `@[obs_leaf]` beside the tactic
+  that uses it. The judgments, the law naming convention, and the registries are
+  [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean); the walk and its side-goal solvers are
+  [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean), and the names it gives what it leaves
+  [Basalt/Walk/Names.lean](Basalt/Walk/Names.lean). What an entry tactic is made of —
+  `computeBound`, `fixpointStep`, and the residual handlers — is
+  [Basalt/Walk/Entry.lean](Basalt/Walk/Entry.lean): a `_bound` tactic restates its goal and relates
+  the computed bound to it, and a `_fixpoint` tactic is `fixpointStep` and its `_bound`
+  (`mass_fixpoint` excepted, which goes through the `LfpIsOne` criterion). The entry tactics are
+  `sound_bound` and `complete_bound` (above), `mass_bound`
+  ([Basalt/Tactic/Mass.lean](Basalt/Tactic/Mass.lean), pinned by
+  [BasaltTest/Tactic/Mass.lean](BasaltTest/Tactic/Mass.lean)), `cost_bound`
+  ([Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean), pinned by
+  [BasaltTest/Tactic/Cost.lean](BasaltTest/Tactic/Cost.lean)), and `expect_bound`
+  ([Basalt/Tactic/Expect.lean](Basalt/Tactic/Expect.lean), pinned by
+  [BasaltTest/Tactic/Expect.lean](BasaltTest/Tactic/Expect.lean)), each but `complete_bound` with
+  its `_fixpoint` in the same file. [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and
+  fails the build when one of the combinators it names loses its `@[gen_map]` lemma or a list
+  combinator loses a bridge — it checks that list, not the registry, so a *new* combinator with no
+  lemma is not caught. Nothing else in a termination, cost, or expectation proof mentions
+  combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
-  [Basalt/SPMF/Expect.lean](Basalt/SPMF/Expect.lean).
+  [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
+  [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
+  [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean). The practical entry
+  for a bound is WORKFLOW.md's Recipe 4.
 - **Cost** — the interpretation (`SPMF.Cost`, `IsBounded`, its support inversion, expected cost):
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:
-  [Basalt/SPMF/CostFixpoint.lean](Basalt/SPMF/CostFixpoint.lean), contract pinned by
-  [BasaltTest/CostFixpoint.lean](BasaltTest/CostFixpoint.lean). The practical entry is
+  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean), contract pinned by
+  [BasaltTest/Tactic/CostFixpoint.lean](BasaltTest/Tactic/CostFixpoint.lean). The practical entry is
   WORKFLOW.md's Recipe 3.
-- **ENNReal arithmetic** — `ennreal_to_real` in [Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean).
+- **ENNReal arithmetic** — `ennreal_to_real` in
+  [Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean).
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
   [Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)'s module docstring;
   [BasaltTest/Tuning.lean](BasaltTest/Tuning.lean) is the full tour.
@@ -70,33 +110,32 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `@[basalt_backend]`.
 - **Coverage-guided fuzzing** (`FuzzGen`, the libFuzzer bridge, the opt-in `basalt-fuzz` executable)
   — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
-  the measured comparison between backends. This is the repo's only FFI and native-link config: the
-  executable's C emission and link live outside `lake build`, so a change to *them* is caught only by
-  `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow. The Lean side is not exempt — the fuzz
-  runner and `BasaltTest/Fuzz/BuggyBST.lean` are elaborated by the default build through
-  `BasaltTest/Fuzz.lean`, which is where a drift from the proved `genBST` becomes a build failure.
-  Anything added to the Mathlib-free link closure must stay Mathlib-free: import the narrowest
-  module, not an umbrella.
+  the measured comparison between backends. This is the repo's only FFI and native-link config. The
+  code under test lives in the `BasaltFuzz` library, which is the only instrumented one — a generator
+  or property that wants coverage feedback belongs there and nowhere else. The default build
+  type-checks it but emits no C, so a change to the *native* half (bridge, runtime detection, link) is
+  caught only by `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow; a drift from the proved
+  `genBST` is caught by `BasaltTest/Fuzz.lean`. Anything added to the Mathlib-free link closure must
+  stay Mathlib-free: import the narrowest module, not an umbrella.
 
 ## Gotchas (symptom → cause → pointer)
 
 - **A `partial_fixpoint` definition fails to elaborate**, complaining about monotonicity rather
   than about any combinator — a combinator in the recursive body has no
-  `@[partial_fixpoint_monotone]` lemma. The tagged lemmas in
-  [Basalt/Combinators.lean](Basalt/Combinators.lean) (and
-  [RandomChoice.lean](Basalt/RandomChoice.lean)) are the models. The same applies inside a
-  `@[tunable]` body: the attribute rebuilds the fixpoint's monotonicity proof
+  `@[partial_fixpoint_monotone]` lemma *in scope where the definition is elaborated*: either none
+  is tagged, or the tagged one comes later in the same file. The tagged lemmas in
+  [Basalt/Combinators.lean](Basalt/Combinators.lean) are the models, and that file's own recursive
+  combinators sit after them for this reason. The same applies inside a `@[tunable]` body: the
+  attribute rebuilds the fixpoint's monotonicity proof
   ([Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)).
 - **`rw [gen]` (or another unfolding) fails or gives a confusing error in a correctness proof** —
-  wrong unfolding idiom for the context; the four-idiom table is in `WORKFLOW.md`
+  wrong unfolding idiom for the context; the unfolding-idiom table is in `WORKFLOW.md`
   ("Unfolding: one idiom per context").
-- **`simp`/`support_simp` refuses a callee's `.sound_complete` law** — the law is a semireducible
-  `def`, so `simp` cannot see the `↔` inside it; pass the raw `<callee>_mem_support` fact instead.
-  WORKFLOW.md's Recipe 1 notes own this, with the worked examples.
 - **`#genstats` reports `— (not proved)` for a law you proved** — the theorem is not under the
   `<gen>.sound_complete` / `.terminates` / … naming convention, or its statement is not the law
-  (both halves are checked). WORKFLOW.md Part 2 owns the convention;
-  [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean)'s `lawProved` implements the check.
+  (both halves are checked). `lawConventions` ([Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean)) owns
+  the convention; [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean)'s `lawProved`
+  implements the check.
 - **Drawing from a generator inside a property fails with `failed to synthesize instance Gen
   (PropM G)`** — `PropM G` is deliberately not a `Gen`, so a bare `←` on a generator elaborates it at
   the ambient `PropM G` instead of lifting it. Wrap the draw in `generate`
@@ -110,8 +149,14 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   defeq means a runner's `IO TestOutcome` argument does not determine `G`: ascribe the
   interpretation (`(prop : PropM IO Unit)`) at the call site.
 
+- **A walk ignores the hypothesis you have about a combinator term** (`ih : IsBounded (vectorOf n g) …`
+  is in context, and the goal comes back stated through `vectorOf`'s own bridge) — for a generator
+  headed by a combinator the walker tries the combinator's rule or `@[gen_map]` lemma before any
+  fact. `generalize` the term to a variable first, as `isBounded_vectorOf` does in
+  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean).
+
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
-  `ennreal_to_real` ([Basalt/ENNRealAuto.lean](Basalt/ENNRealAuto.lean)) and finish over `ℝ`.
+  `ennreal_to_real` ([Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean)) and finish over `ℝ`.
 
 ## Documentation rules
 
@@ -146,8 +191,13 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 
 - Every module opens with the MIT copyright header and a `/-! # … -/` module docstring, sized and
   scoped per the documentation rules above.
+- Imports: the narrowest module that supplies what the file names, never an umbrella — `Basalt.lean`
+  is the only wholesale import of the library and nothing inside the library may import it. Upstream
+  imports (`Lean`, `Batteries`, `Mathlib`, `Plausible`) come first, then Basalt's, each block
+  alphabetical. An import whose only use is inside a macro body or a `@[gen_rule]` registry is
+  load-bearing at the tactic's *use* sites, so it stays even though the module compiles without it.
 - Declaration docstrings explain design tension, not just signature — where rule 4 admits one.
 - `BasaltExamples/` files are cookbook entries: a generator plus proofs of the correctness
   properties that apply to it, nothing else — no `#eval`/`#guard_msgs`. Anything pinned or run
-  for effect belongs in `BasaltTest/`; anything with a `sorry` belongs in `BasaltExperiments/`.
+  for effect belongs in `BasaltTest/`; nothing built has a `sorry`.
 - Lean toolchain is pinned in `lean-toolchain`; deps in `lakefile.toml` / `lake-manifest.json`.

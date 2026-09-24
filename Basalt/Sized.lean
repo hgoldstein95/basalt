@@ -5,15 +5,15 @@ Authors: Harrison Goldstein
 -/
 import Basalt.Gen
 
-open Lean.Order
-
 /-!
 # Size-Parameterized Generators
 
 `Sized` gives a generator monad an ambient size parameter to branch on, and `WithSize G` adds a size
-to any generator monad `G`. `MonoSized` is the side condition that lets `sized` and `resize` appear
-in the body of a `partial_fixpoint`.
+to any generator monad `G`; `OptionT` preserves both. `MonoSized` is the side condition that lets
+`sized` and `resize` appear in the body of a `partial_fixpoint`.
 -/
+
+open Lean.Order
 
 /-- A monad with an ambient size parameter. -/
 class Sized (g : Type u → Type v) where
@@ -57,12 +57,16 @@ def WithSize.run (g : WithSize G α) (n : Nat) : G α := ReaderT.run g n
 /-- Run a size-agnostic generator at any size. -/
 def WithSize.lift (g : G α) : WithSize G α := fun _ => g
 
+instance instMonadWithSize [Monad G] : Monad (WithSize G) := inferInstanceAs (Monad (ReaderT Nat G))
+
+instance instMonadLiftWithSize : MonadLift G (WithSize G) := ⟨WithSize.lift⟩
+
 instance instRandomChoiceWithSize [RandomChoice G] : RandomChoice (WithSize G) where
   choose lo hi h := fun _ => RandomChoice.choose lo hi h
 
 instance instGenWithSize [Gen G] : Gen (WithSize G) where
   instInhabited := fun α => inferInstanceAs (Inhabited (Nat → G α))
-  instMonad := inferInstanceAs (Monad (ReaderT Nat G))
+  instMonad := instMonadWithSize
   instRandomChoice := instRandomChoiceWithSize
   instCCPO := fun α => inferInstanceAs (CCPO (Nat → G α))
   instMonoBind := inferInstanceAs (MonoBind (ReaderT Nat G))
@@ -74,3 +78,12 @@ instance instSizedWithSize [Monad G] : Sized (WithSize G) where
 instance instMonoSizedWithSize [Gen G] : MonoSized (WithSize G) where
   sized_mono h := fun n => h n n
   resize_mono h := fun _ => h _
+
+instance instSizedOptionT [Sized G] : Sized (OptionT G) where
+  sized f := OptionT.mk (Sized.sized fun n => (f n).run)
+  resize n g := OptionT.mk (Sized.resize n g.run)
+
+instance instMonoSizedOptionT [Sized G] [∀ α, PartialOrder (G α)] [MonoSized G] :
+    MonoSized (OptionT G) where
+  sized_mono h := MonoSized.sized_mono (g := G) h
+  resize_mono h := MonoSized.resize_mono (g := G) h

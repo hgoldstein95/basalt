@@ -3,10 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-
-import Lean
+import Lean.Elab.Command
+import Lean.Elab.Tactic.Monotonicity
 import Basalt.Combinators
-import Basalt.Tuning
+import Basalt.Tuning.Basic
 
 /-!
 # The `@[tunable]` attribute
@@ -39,7 +39,7 @@ the attribute emits:
 ## Conventions
 
 - **Weights must be positive `Nat` literals.**  A literal `0` is rejected: a zero weight removes its
-  branch from the generator's support, breaking `IsSoundAndComplete` (see `Basalt.Tuning`).  A zero
+  branch from the generator's support, breaking `IsSoundAndComplete` (see `Basalt.Tuning.Basic`).  A zero
   entry in a *runtime* `θ` cannot do the same damage — `Tuning.weight` clamps to `1`.
 - **Site names** are `<defName>.site<i>`, numbered outside-in in traversal order.
 - **Depth**: if a `Nat` binder named `depth` is in scope at a site, that site reads its weights at

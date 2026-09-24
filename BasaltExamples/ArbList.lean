@@ -6,8 +6,6 @@ Authors: Harrison Goldstein
 import Basalt
 import BasaltExamples.ArbNat
 
-open RandomChoice ArbNat
-
 /-!
 # Arbitrary Lists
 
@@ -18,16 +16,18 @@ then fill it); it is exercised in `BasaltTest/IO.lean`, but the laws below are a
 `List.arbitrary`.
 -/
 
+open RandomChoice ArbNat
+
 namespace ArbList
 
 /-- Generates an arbitrary `List Nat`: flip a coin to stop with `[]`, or draw a head and recurse. -/
 def List.arbitrary [Gen G] : G (List Nat) := do
-  pick
-    (fun () => pure [])
-    (fun () => do
+  oneOf [
+    fun _ => pure [],
+    fun _ => do
       let x ← Nat.arbitrary
       let xs ← List.arbitrary
-      return x :: xs)
+      return x :: xs]
 partial_fixpoint
 
 /-- A variant of `List.arbitrary` using the `vectorOf` combinator: choose a length `n` at random,
@@ -37,18 +37,21 @@ def List.arbitrary' [Gen G] : G (List Nat) := do
   vectorOf n Nat.arbitrary
 
 theorem List.arbitrary.sound_complete : IsSoundAndComplete List.arbitrary ⊤ := by
+  refine .intro (fun _ _ => trivial) ?complete
   intro xs
-  simp only [Pi.top_apply]
-  induction xs <;> rw [List.arbitrary]
-  case _ => simp
-  case _ x xs ih => simp [ih, Nat.arbitrary_mem_support]
+  induction xs with
+  | nil => intro _; rw [List.arbitrary]; complete_bound
+  | cons x xs ih =>
+    intro _
+    rw [List.arbitrary]; complete_bound
+    exact ⟨x, xs, ih trivial, rfl⟩
 
 theorem List.arbitrary.terminates : IsAlmostSurelyTerminating List.arbitrary := by
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
-  simp
+  simp [ENNReal.div_eq_inv_mul, mul_add]
 
-/-- Producing `xs` costs at most `2 * xs.length + xs.sum + 1` choices: one `pick` and one
-`Nat.arbitrary` (bounded by the element plus one) per cons cell, plus the final `pick`. -/
+/-- Producing `xs` costs at most `2 * xs.length + xs.sum + 1` choices: one `oneOf` and one
+`Nat.arbitrary` (bounded by the element plus one) per cons cell, plus the final `oneOf`. -/
 theorem List.arbitrary.cost_bounded :
     IsCostBounded List.arbitrary (fun xs => 2 * xs.length + xs.sum + 1) := by
   cost_fixpoint

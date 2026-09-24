@@ -3,17 +3,19 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Topology.Instances.ENNReal.Lemmas
 import Mathlib.MeasureTheory.Measure.Dirac
+import Mathlib.Topology.Instances.ENNReal.Lemmas
 import Basalt.RandomChoice
-
-open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
 /-!
 # Sub-Probability Mass Functions
 
-This file defines a type of sub-probability mass functions, similar to `PMF` from Mathlib.
+This file defines a type of sub-probability mass functions, similar to `PMF` from Mathlib, with its
+`support` (the values with nonzero mass) and its `mass` (the total probability of producing a value,
+as opposed to diverging — always ≤ 1).
 -/
+
+open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
 /-- A sub-probability mass function is similar to a PMF, but the total mass may be less than 1. -/
 def SPMF.{u} (α : Type u) : Type u := {μ : α → ℝ≥0∞ // (∑' a, μ a) ≤ 1}
@@ -195,32 +197,6 @@ end operations
 
 section operation_uses
 
-private lemma pick_apply {α : Type u} {x y : SPMF α} (a : α) :
-    (pick (fun () => x) (fun () => y)) a =
-    (1/2 : ℝ≥0∞) * x a + (1/2 : ℝ≥0∞) * y a := by
-  simp only [pick, Bind.bind, bind]
-  show ∑' (n : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1}),
-       (choose 0 1 (by simp) : SPMF (ULift {x : Nat // 0 ≤ x ∧ x ≤ 1})) n *
-       (if (n.down.val == 0) = true then x else y : SPMF α) a = _
-  let e0 : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1} := ⟨⟨0, by omega⟩⟩
-  let e1 : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1} := ⟨⟨1, by omega⟩⟩
-  have hne : e0 ≠ e1 := by
-    intro heq
-    have : (0 : Nat) = 1 := congrArg (fun z => z.down.val) heq
-    omega
-  have h_supp : ∀ n : ULift {x : Nat // 0 ≤ x ∧ x ≤ 1}, n ∉ ({e0, e1} : Finset _) →
-      (choose 0 1 (by simp) : SPMF (ULift {x : Nat // 0 ≤ x ∧ x ≤ 1})) n *
-      (if (n.down.val == 0) = true then x else y : SPMF α) a = 0 := by
-    intro n hn
-    exfalso
-    apply hn
-    simp only [Finset.mem_insert, Finset.mem_singleton]
-    rcases Nat.le_one_iff_eq_zero_or_eq_one.mp n.down.property.2 with h0 | h1
-    · exact Or.inl (ULift.down_injective (Subtype.ext h0))
-    · exact Or.inr (ULift.down_injective (Subtype.ext h1))
-  rw [tsum_eq_sum h_supp, Finset.sum_pair hne]
-  rfl
-
 private lemma bot_apply (a : α) : Bot.bot (α := SPMF α) a = 0 := rfl
 
 end operation_uses
@@ -296,20 +272,6 @@ theorem choose_apply (lo hi : Nat) (h : lo ≤ hi) (m : ULift {x : Nat // lo ≤
 
 theorem default_apply (a : α) : (default : SPMF α) a = 0 := rfl
 
-theorem bind_pick {α β} (x y : SPMF α) (f : α → SPMF β) :
-    (pick (fun () => x) (fun () => y) >>= f) = pick (fun _ => x >>= f) (fun _ => y >>= f) := by
-  apply SPMF.ext
-  intro b
-  rw [bind_apply, pick_apply, bind_apply, bind_apply]
-  simp_rw [pick_apply]
-  simp only [ENNReal.tsum_add, add_mul, ENNReal.tsum_mul_left, mul_assoc]
-
-theorem tsum_pick {x y : SPMF α} :
-    ∑' a, (pick (fun () => x) (fun () => y)) a = (1/2 : ℝ≥0∞) * (∑' a, x a) + (1/2 : ℝ≥0∞) * (∑' a, y a) := by
-  simp_rw [pick_apply]
-  rw [ENNReal.tsum_add]
-  congr 1 <;> rw [ENNReal.tsum_mul_left]
-
 @[simp]
 theorem bot_bind (f : α → SPMF β) : (Bot.bot (α := SPMF α) >>= f) = Bot.bot := by
   ext b
@@ -317,5 +279,50 @@ theorem bot_bind (f : α → SPMF β) : (Bot.bot (α := SPMF α) >>= f) = Bot.bo
   rfl
 
 end equations
+
+section support
+
+/-- The support of an `SPMF` is the set of values that have nonzero mass. -/
+def support (p : SPMF α) : Set α := Function.support p
+
+theorem mem_support_iff (p : SPMF α) (a : α) : a ∈ p.support ↔ p a ≠ 0 := Iff.rfl
+
+/-- `SPMF.bind` is the monad's `>>=`. -/
+theorem bind_eq (x : SPMF α) (f : α → SPMF β) : x.bind f = x >>= f := rfl
+
+/-- `SPMF.pure` is the monad's `pure`. -/
+theorem pure_eq (a : α) : (SPMF.pure a : SPMF α) = Pure.pure a := rfl
+
+@[simp]
+theorem support_countable (p : SPMF α) : p.support.Countable :=
+  Summable.countable_support_ennreal (tsum_coe_ne_top p)
+
+theorem apply_eq_zero_iff (p : SPMF α) (a : α) : p a = 0 ↔ a ∉ p.support := by
+  rw [mem_support_iff, Classical.not_not]
+
+theorem apply_pos_iff (p : SPMF α) (a : α) : 0 < p a ↔ a ∈ p.support :=
+  pos_iff_ne_zero.trans (p.mem_support_iff a).symm
+
+theorem csup_apply {c : SPMF α → Prop} (hc : chain c) (a : α) :
+    (CCPO.csup hc) a = ⨆ f, ⨆ (_ : c f), f a := by
+  have hge : ∀ b, ⨆ f, ⨆ (_ : c f), f b ≤ (CCPO.csup hc) b :=
+    fun b => iSup₂_le (fun f hf => le_csup hc hf b)
+  have hsum : ∑' b, ⨆ f, ⨆ (_ : c f), f b ≤ 1 :=
+    (ENNReal.tsum_le_tsum hge).trans (tsum_coe _)
+  exact le_antisymm
+    ((csup_le hc (fun f hf b => le_iSup₂_of_le f hf le_rfl) :
+        CCPO.csup hc ⊑ ⟨fun b => ⨆ f, ⨆ (_ : c f), f b, hsum⟩) a)
+    (hge a)
+
+end support
+
+section mass
+
+/-- The total mass of an SPMF. Always ≤ 1 by definition. -/
+noncomputable def mass (p : SPMF α) : ℝ≥0∞ := ∑' a, p a
+
+theorem mass_le_one (p : SPMF α) : p.mass ≤ 1 := p.tsum_coe
+
+end mass
 
 end SPMF

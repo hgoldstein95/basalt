@@ -3,18 +3,21 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF
+import Mathlib.Data.ENat.Lattice
 import Basalt.RandomChoice
-
-open RandomChoice
+import Basalt.SPMF.Support
 
 /-!
 # Cost-Tracking SPMF
 
 `SPMF.Cost` interprets a generator as a distribution over (value, number of random choices) pairs,
 and `IsBounded` says every value is produced within a given choice budget — enabling proofs like "a
-list generator makes `O(|xs|)` choices to generate `xs`."
+list generator makes `O(|xs|)` choices to generate `xs`." Its observations land in `WPC`, whose
+`bind` and `choose` do the cost accounting, so a combinator's lemma is its `Obs.map_*` read through
+one of them.
 -/
+
+open RandomChoice
 
 namespace SPMF
 
@@ -22,6 +25,17 @@ namespace SPMF
 abbrev Cost (α : Type u) : Type u := SPMF (α × Nat)
 
 end SPMF
+
+/-- A choice is as large as its largest outcome: the algebra the worst-case observation lands in.
+`ℕ∞` and not `ℕ`, because the supremum over an unbounded generator's support has to exist for
+`Obs.map_bind` to hold. -/
+noncomputable def Mix.sup : Mix.{u} ℕ∞ where mix _ _ F := ⨆ a, F a
+
+/-- Moves a cast out of a worst-case bound computed in `ℕ∞`, which the walker reads a cost bound off
+with `norm_cast`; Mathlib's `Nat.cast_max` needs a linear ordered ring. -/
+@[norm_cast]
+theorem ENat.coe_max' (a b : ℕ) : ((max a b : ℕ) : ℕ∞) = max (a : ℕ∞) (b : ℕ∞) :=
+  Nat.mono_cast.map_max
 
 namespace SPMF.Cost
 
@@ -81,6 +95,24 @@ noncomputable instance instRandomChoice : RandomChoice SPMF.Cost where
     exact SPMF.bind (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi}))
       fun n => SPMF.pure (n, 1)
 
+instance instLawfulMonad : LawfulMonad SPMF.Cost := LawfulMonad.mk' _
+  (id_map := fun x => by
+    show SPMF.bind x (fun p => SPMF.bind (SPMF.pure (p.1, 0)) fun q => SPMF.pure (q.1, p.2 + q.2)) = x
+    simp only [SPMF.pure_bind, Nat.add_zero]
+    exact SPMF.bind_pure x)
+  (pure_bind := fun a f => by
+    show SPMF.bind (SPMF.pure (a, 0)) (fun p => SPMF.bind (f p.1) fun q => SPMF.pure (q.1, p.2 + q.2))
+      = f a
+    simp only [SPMF.pure_bind, Nat.zero_add]
+    exact SPMF.bind_pure (f a))
+  (bind_assoc := fun x f g => by
+    show SPMF.bind (SPMF.bind x fun p => SPMF.bind (f p.1) fun q => SPMF.pure (q.1, p.2 + q.2))
+        (fun r => SPMF.bind (g r.1) fun s => SPMF.pure (s.1, r.2 + s.2))
+      = SPMF.bind x fun p =>
+          SPMF.bind (SPMF.bind (f p.1) fun q => SPMF.bind (g q.1) fun s => SPMF.pure (s.1, q.2 + s.2))
+            fun t => SPMF.pure (t.1, p.2 + t.2)
+    simp only [SPMF.bind_assoc, SPMF.pure_bind, Nat.add_assoc])
+
 section support
 
 @[simp]
@@ -135,49 +167,180 @@ theorem mem_support_map_iff {m : SPMF.Cost α} {f : α → β} {b : β} {n : Nat
   · rintro ⟨a, hmem, rfl⟩
     exact ⟨a, n, 0, hmem, ⟨rfl, rfl⟩, rfl⟩
 
-/-- Support inversion for `pick` at the cost interpretation: a branch draw plus one choice. -/
-@[simp]
-theorem mem_support_pick_iff {x y : Unit → SPMF.Cost α} {a : α} {n : Nat} :
-    (a, n) ∈ (pick x y).support ↔
-      ∃ m, n = 1 + m ∧ ((a, m) ∈ (x ()).support ∨ (a, m) ∈ (y ()).support) := by
-  unfold RandomChoice.pick
-  simp only [SPMF.Cost.mem_support_bind_iff, SPMF.Cost.mem_support_choose_iff]
-  constructor
-  · rintro ⟨k, n1, n2, h1, h2, rfl⟩
-    subst h1
-    refine ⟨n2, rfl, ?_⟩
-    rcases Nat.le_one_iff_eq_zero_or_eq_one.mp k.down.property.2 with h0 | h1
-    · left; simpa [h0] using h2
-    · right
-      have : (k.down.val == 0) = false := by simp [h1]
-      simpa [this] using h2
-  · rintro ⟨m, rfl, h | h⟩
-    · exact ⟨⟨⟨0, by omega⟩⟩, 1, m, rfl, by simpa using h, rfl⟩
-    · exact ⟨⟨⟨1, by omega⟩⟩, 1, m, rfl, by simpa using h, rfl⟩
-
-@[simp]
-theorem mem_support_chooseNat_iff {lo hi : Nat} {h : lo ≤ hi} {n c : Nat} :
-    (n, c) ∈ (chooseNat lo hi h : SPMF.Cost Nat).support ↔ (lo ≤ n ∧ n ≤ hi) ∧ c = 1 := by
-  unfold chooseNat
-  simp only [mem_support_map_iff, mem_support_choose_iff]
-  constructor
-  · rintro ⟨a, rfl, rfl⟩
-    exact ⟨a.down.property, rfl⟩
-  · rintro ⟨⟨h1, h2⟩, rfl⟩
-    exact ⟨⟨⟨n, h1, h2⟩⟩, rfl, rfl⟩
-
-@[simp]
-theorem mem_support_chooseInt_iff {lo hi : Int} {h : lo ≤ hi} {n : Int} {c : Nat} :
-    (n, c) ∈ (chooseInt lo hi h : SPMF.Cost Int).support ↔ (lo ≤ n ∧ n ≤ hi) ∧ c = 1 := by
-  unfold chooseInt
-  simp only [mem_support_bind_iff, mem_support_pure_iff, mem_support_chooseNat_iff]
-  constructor
-  · rintro ⟨k, n1, n2, ⟨⟨-, hk⟩, rfl⟩, ⟨rfl, rfl⟩, rfl⟩
-    exact ⟨by omega, rfl⟩
-  · rintro ⟨⟨h1, h2⟩, rfl⟩
-    exact ⟨(n - lo).toNat, 1, 0, ⟨⟨Nat.zero_le _, by omega⟩, rfl⟩, ⟨by omega, rfl⟩, rfl⟩
-
 end support
+
+section observations
+
+open scoped ENNReal
+
+theorem expect_pure (a : α) (φ : α × Nat → ℝ≥0∞) :
+    SPMF.expect (Pure.pure a : SPMF.Cost α) φ = φ (a, 0) := by
+  have h : (Pure.pure a : SPMF.Cost α) = (Pure.pure (a, 0) : SPMF (α × Nat)) := rfl
+  rw [h, SPMF.expect_pure]
+
+/-- The tower rule at the cost interpretation: the two stages' costs add. -/
+theorem expect_bind (m : SPMF.Cost α) (f : α → SPMF.Cost β) (φ : β × Nat → ℝ≥0∞) :
+    SPMF.expect (m >>= f : SPMF.Cost β) φ
+      = SPMF.expect m (fun p => SPMF.expect (f p.1) (fun q => φ (q.1, p.2 + q.2))) := by
+  have h : (m >>= f : SPMF.Cost β)
+      = SPMF.bind m fun p => SPMF.bind (f p.1) fun q => SPMF.pure (q.1, p.2 + q.2) := rfl
+  rw [h, SPMF.bind_eq, SPMF.expect_bind]
+  congr 1
+  funext p
+  rw [SPMF.bind_eq, SPMF.expect_bind]
+  congr 1
+  funext q
+  rw [SPMF.pure_eq, SPMF.expect_pure]
+
+/-- The expectation observation: the postcondition sees the value and the choices it took. -/
+noncomputable def expectObs : Obs SPMF.Cost.{u} (WPC Mix.average) where
+  spec g := fun post => SPMF.expect g fun p => post p.1 p.2
+  map_pure a := by funext post; exact expect_pure a _
+  map_bind x k := by funext post; exact expect_bind x k _
+  map_choose lo hi h := by
+    funext post
+    show SPMF.expect (SPMF.bind (choose lo hi h : SPMF _) fun n => SPMF.pure (n, 1)) _ = _
+    rw [SPMF.bind_eq, SPMF.expect_bind]
+    simp only [SPMF.pure_eq, SPMF.expect_pure]
+    rfl
+
+/-- The may observation. -/
+def mayObs : Obs SPMF.Cost.{u} (WPC Mix.angelic) where
+  spec g := fun Q => ∃ p ∈ SPMF.support g, Q p.1 p.2
+  map_pure a := by
+    funext Q; apply propext
+    constructor
+    · rintro ⟨⟨b, n⟩, hp, h⟩
+      obtain ⟨rfl, rfl⟩ := mem_support_pure_iff.mp hp
+      exact h
+    · exact fun h => ⟨(a, 0), mem_support_pure_iff.mpr ⟨rfl, rfl⟩, h⟩
+  map_bind x k := by
+    funext Q; apply propext
+    constructor
+    · rintro ⟨⟨b, n⟩, hp, h⟩
+      obtain ⟨a, n1, n2, h1, h2, rfl⟩ := mem_support_bind_iff.mp hp
+      exact ⟨(a, n1), h1, (b, n2), h2, h⟩
+    · rintro ⟨⟨a, n1⟩, h1, ⟨b, n2⟩, h2, h⟩
+      exact ⟨(b, n1 + n2), mem_support_bind_iff.mpr ⟨a, n1, n2, h1, h2, rfl⟩, h⟩
+  map_choose lo hi h := by
+    funext Q; apply propext
+    constructor
+    · rintro ⟨⟨a, c⟩, hp, h⟩
+      obtain rfl := mem_support_choose_iff.mp hp
+      exact ⟨a, h⟩
+    · exact fun ⟨a, h⟩ => ⟨(a, 1), mem_support_choose_iff.mpr rfl, h⟩
+
+/-- The always observation. -/
+def alwaysObs : Obs SPMF.Cost.{u} (WPC Mix.demonic) where
+  spec g := fun Q => ∀ p ∈ SPMF.support g, Q p.1 p.2
+  map_pure a := by
+    funext Q; apply propext
+    constructor
+    · exact fun h => h (a, 0) (mem_support_pure_iff.mpr ⟨rfl, rfl⟩)
+    · rintro h ⟨b, n⟩ hp
+      obtain ⟨rfl, rfl⟩ := mem_support_pure_iff.mp hp
+      exact h
+  map_bind x k := by
+    funext Q; apply propext
+    constructor
+    · rintro h ⟨a, n1⟩ h1 ⟨b, n2⟩ h2
+      exact h (b, n1 + n2) (mem_support_bind_iff.mpr ⟨a, n1, n2, h1, h2, rfl⟩)
+    · rintro h ⟨b, n⟩ hp
+      obtain ⟨a, n1, n2, h1, h2, rfl⟩ := mem_support_bind_iff.mp hp
+      exact h (a, n1) h1 (b, n2) h2
+  map_choose lo hi h := by
+    funext Q; apply propext
+    constructor
+    · exact fun hq a => hq (a, 1) (mem_support_choose_iff.mpr rfl)
+    · rintro hq ⟨a, c⟩ hp
+      obtain rfl := mem_support_choose_iff.mp hp
+      exact hq a
+
+/-- The worst-case observation: the most choices any run of the generator can make. -/
+noncomputable def worstObs : Obs SPMF.Cost.{u} (WPC Mix.sup) where
+  spec g := fun post => ⨆ p ∈ SPMF.support g, post p.1 p.2
+  map_pure a := by
+    funext post
+    refine le_antisymm (iSup₂_le ?_)
+      (le_iSup₂_of_le (a, 0) (mem_support_pure_iff.mpr ⟨rfl, rfl⟩) le_rfl)
+    rintro ⟨b, n⟩ hp
+    obtain ⟨rfl, rfl⟩ := mem_support_pure_iff.mp hp
+    exact le_rfl
+  map_bind x k := by
+    funext post
+    refine le_antisymm (iSup₂_le ?_) (iSup₂_le fun p hp => iSup₂_le fun q hq => ?_)
+    · rintro ⟨b, n⟩ hp
+      obtain ⟨a, n1, n2, h1, h2, rfl⟩ := mem_support_bind_iff.mp hp
+      exact le_iSup₂_of_le (a, n1) h1 (le_iSup₂_of_le (b, n2) h2 le_rfl)
+    · exact le_iSup₂_of_le (q.1, p.2 + q.2)
+        (mem_support_bind_iff.mpr ⟨p.1, p.2, q.2, hp, hq, rfl⟩) le_rfl
+  map_choose lo hi h := by
+    funext post
+    refine le_antisymm (iSup₂_le ?_) (iSup_le fun a => ?_)
+    · rintro ⟨a, c⟩ hp
+      obtain rfl := mem_support_choose_iff.mp hp
+      exact le_iSup (fun a => post a 1) a
+    · exact le_iSup₂_of_le (a, 1) (mem_support_choose_iff.mpr rfl) le_rfl
+
+instance : expectObs.MonotoneC := ⟨fun _ _ _ h => SPMF.expect_mono fun p => h p.1 p.2⟩
+
+instance : mayObs.MonotoneC := ⟨fun _ _ _ h ⟨q, hq, hp⟩ => ⟨q, hq, h _ _ hp⟩⟩
+
+instance : alwaysObs.MonotoneC := ⟨fun _ _ _ h hp _ ha => h _ _ (hp _ ha)⟩
+
+instance : worstObs.MonotoneC := ⟨fun _ _ _ h => iSup₂_mono fun p _ => h p.1 p.2⟩
+
+/-- Support membership, read through a specification the may observation equals. -/
+theorem mem_support_of_may {g : SPMF.Cost α} {w : WPC Mix.angelic α} (h : mayObs.spec g = w)
+    {a : α} {n : Nat} : (a, n) ∈ SPMF.support g ↔ w fun b m => b = a ∧ m = n := by
+  refine Iff.trans ⟨fun h => ⟨(a, n), h, rfl, rfl⟩, ?_⟩ (iff_of_eq (congrFun h _))
+  rintro ⟨⟨b, m⟩, hp, rfl, rfl⟩
+  exact hp
+
+/-- A run with its cost is the may observation at the postcondition `fun b m => b = a ∧ m = n`. -/
+theorem mem_support_iff_may {g : SPMF.Cost α} {a : α} {n : Nat} :
+    (a, n) ∈ SPMF.support g ↔ mayObs.spec g fun b m => b = a ∧ m = n :=
+  mem_support_of_may rfl
+
+/-- An expectation, read through a specification the expectation observation equals. -/
+theorem expect_of_obs {g : SPMF.Cost α} {w : WPC Mix.average α} (h : expectObs.spec g = w)
+    (φ : α × Nat → ℝ≥0∞) : SPMF.expect g φ = w fun a n => φ (a, n) :=
+  congrFun h fun a n => φ (a, n)
+
+end observations
+
+section erasure
+
+open scoped ENNReal
+
+/-- The value distribution of a cost-tracking generator: `Prod.fst <$> g` in `SPMF`. -/
+noncomputable def erase (g : SPMF.Cost α) : SPMF α := SPMF.bind g fun p => SPMF.pure p.1
+
+/-- The erasure observation. A generator's two interpretations agree on values wherever `erase`
+commutes with it, which for a combinator is its `Obs.map_*` lemma read at this observation. -/
+noncomputable def eraseObs : Obs SPMF.Cost.{u} SPMF where
+  spec := erase
+  map_pure a := SPMF.pure_bind (a, 0) _
+  map_bind x k := by
+    show SPMF.bind (SPMF.bind x fun p => SPMF.bind (k p.1) fun q => SPMF.pure (q.1, p.2 + q.2))
+        (fun r => SPMF.pure r.1)
+      = SPMF.bind (SPMF.bind x fun p => SPMF.pure p.1) fun a =>
+          SPMF.bind (k a) fun q => SPMF.pure q.1
+    simp only [SPMF.bind_assoc, SPMF.pure_bind]
+  map_choose lo hi h := by
+    show SPMF.bind (SPMF.bind (choose lo hi h : SPMF _) fun n => SPMF.pure (n, 1))
+        (fun r => SPMF.pure r.1) = _
+    simp only [SPMF.bind_assoc, SPMF.pure_bind]
+    exact SPMF.bind_pure _
+
+/-- An expectation over values may be taken at either interpretation. -/
+theorem expect_erase (g : SPMF.Cost α) (f : α → ℝ≥0∞) :
+    SPMF.expect (erase g) f = SPMF.expect g fun p => f p.1 := by
+  unfold erase
+  rw [SPMF.bind_eq, SPMF.expect_bind]
+  simp only [SPMF.pure_eq, SPMF.expect_pure]
+
+end erasure
 
 end SPMF.Cost
 
@@ -210,46 +373,45 @@ open scoped ENNReal
 noncomputable def expectedCost (g : SPMF.Cost α) : ℝ≥0∞ :=
   SPMF.expect g (fun p => (p.2 : ℝ≥0∞))
 
-theorem expect_pure (a : α) (φ : α × Nat → ℝ≥0∞) :
-    SPMF.expect (Pure.pure a : SPMF.Cost α) φ = φ (a, 0) := by
-  have h : (Pure.pure a : SPMF.Cost α) = (Pure.pure (a, 0) : SPMF (α × Nat)) := rfl
-  rw [h, SPMF.expect_pure]
+theorem expect_coin {r : Rat} (h0 : 0 ≤ r) (h1 : r ≤ 1) (φ : Bool × Nat → ℝ≥0∞) :
+    SPMF.expect (coin r : SPMF.Cost Bool) φ
+      = (r.num.toNat : ℝ≥0∞) / (r.den : ℝ≥0∞) * φ (true, 1)
+        + ((r.den - r.num.toNat : ℕ) : ℝ≥0∞) / (r.den : ℝ≥0∞) * φ (false, 1) := by
+  obtain ⟨hnum, hle⟩ := SPMF.coin_num_bounds h0 h1
+  refine (expect_of_obs (expectObs.map_coin r) φ).trans ?_
+  simp only [coin, WPC.choose_bind_apply, WPC.ite_apply]
+  exact Mix.threshold_average r.den_pos hnum hle _ _
 
-/-- The tower rule at the cost interpretation: the two stages' costs add. -/
-theorem expect_bind (m : SPMF.Cost α) (f : α → SPMF.Cost β) (φ : β × Nat → ℝ≥0∞) :
-    SPMF.expect (m >>= f : SPMF.Cost β) φ
-      = SPMF.expect m (fun p => SPMF.expect (f p.1) (fun q => φ (q.1, p.2 + q.2))) := by
-  have h : (m >>= f : SPMF.Cost β)
-      = SPMF.bind m fun p => SPMF.bind (f p.1) fun q => SPMF.pure (q.1, p.2 + q.2) := rfl
-  rw [h, SPMF.bind_eq, SPMF.expect_bind]
-  congr 1
-  funext p
-  rw [SPMF.bind_eq, SPMF.expect_bind]
-  congr 1
-  funext q
-  rw [SPMF.pure_eq, SPMF.expect_pure]
+theorem expect_chooseNat {lo hi : Nat} (h : lo ≤ hi) (φ : Nat × Nat → ℝ≥0∞) :
+    SPMF.expect (chooseNat lo hi h : SPMF.Cost Nat) φ
+      = (∑ x ∈ Finset.Icc lo hi, φ (x, 1)) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) :=
+  (expect_of_obs (expectObs.map_chooseNat lo hi h) φ).trans
+    (Mix.range_average lo hi fun x => φ (x, 1))
 
-theorem expect_pick (x y : Unit → SPMF.Cost α) (φ : α × Nat → ℝ≥0∞) :
-    SPMF.expect (pick x y : SPMF.Cost α) φ
-      = (1/2 : ℝ≥0∞) * SPMF.expect (x ()) (fun p => φ (p.1, 1 + p.2))
-        + (1/2 : ℝ≥0∞) * SPMF.expect (y ()) (fun p => φ (p.1, 1 + p.2)) := by
-  unfold RandomChoice.pick
-  rw [expect_bind]
-  have hch : (choose 0 1 (by simp) : SPMF.Cost (ULift {n : Nat // 0 ≤ n ∧ n ≤ 1}))
-      = SPMF.bind (choose 0 1 (by simp) : SPMF (ULift {n : Nat // 0 ≤ n ∧ n ≤ 1}))
-          (fun n => SPMF.pure (n, 1)) := rfl
-  rw [hch, SPMF.bind_eq, SPMF.expect_bind]
-  simp only [SPMF.pure_eq, SPMF.expect_pure]
-  rw [SPMF.expect_choose (Nat.zero_le 1) _
-    (fun k => if k == 0 then SPMF.expect (x ()) (fun p => φ (p.1, 1 + p.2))
-              else SPMF.expect (y ()) (fun p => φ (p.1, 1 + p.2)))
-    (fun a => by by_cases h : (a.down.val == 0) = true <;> simp [h])]
-  have hIcc : Finset.Icc 0 1 = ({0, 1} : Finset ℕ) := by decide
-  rw [hIcc, Finset.sum_insert (by decide), Finset.sum_singleton]
-  simp only [Nat.sub_zero, beq_self_eq_true, if_pos, Nat.one_ne_zero, beq_iff_eq]
-  norm_num
-  rw [ENNReal.add_div]
-  congr 1 <;> rw [ENNReal.div_eq_inv_mul]
+theorem expect_elements {xs : List α} (hne : xs ≠ []) (φ : α × Nat → ℝ≥0∞) :
+    SPMF.expect (elements xs hne : SPMF.Cost α) φ
+      = (xs.map fun a => φ (a, 1)).sum / (xs.length : ℝ≥0∞) :=
+  (expect_of_obs (expectObs.map_elements xs hne) φ).trans
+    (Mix.index_average xs hne fun a => φ (a, 1))
+
+theorem expect_oneOf {gs : List (Unit → SPMF.Cost α)} (hne : gs ≠ []) (φ : α × Nat → ℝ≥0∞) :
+    SPMF.expect (oneOf gs hne : SPMF.Cost α) φ
+      = (gs.map fun g => SPMF.expect (g ()) fun p => φ (p.1, 1 + p.2)).sum
+          / (gs.length : ℝ≥0∞) :=
+  (expect_of_obs (expectObs.map_oneOf gs hne) φ).trans
+    (Mix.index_average gs hne fun g => SPMF.expect (g ()) fun p => φ (p.1, 1 + p.2))
+
+theorem expect_frequency {gs : List (Nat × (Unit → SPMF.Cost α))}
+    (h : 0 < (gs.map Prod.fst).sum) (φ : α × Nat → ℝ≥0∞) :
+    SPMF.expect (frequency gs h : SPMF.Cost α) φ
+      = (gs.map fun p => (p.1 : ℝ≥0∞) * SPMF.expect (p.2 ()) fun q => φ (q.1, 1 + q.2)).sum
+          / (((gs.map Prod.fst).sum : ℕ) : ℝ≥0∞) := by
+  refine (expect_of_obs (expectObs.map_frequency gs h) φ).trans ?_
+  simp only [Obs.select, WPC.choose_bind_apply,
+    Obs.selectD_map (fun w : WPC Mix.average α => w fun b n => φ (b, 1 + n)), List.map_map]
+  refine (Mix.select_average _ ?_ h _).trans ?_
+  · simp [Function.comp_def]
+  · simp [Function.comp_def, expectObs]
 
 /-- A worst-case cost law bounds the average: `expectedCost` is at most the expected bound. -/
 theorem expectedCost_le_of_IsBounded {g : SPMF.Cost α} {c : α → Nat} (h : IsBounded g c) :

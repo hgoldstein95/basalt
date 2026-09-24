@@ -22,12 +22,11 @@ syntax "support_simp" (" [" simpArg,* "]")? (location)? : tactic
 macro_rules
   | `(tactic| support_simp $[$loc:location]?) => `(tactic| support_simp [] $[$loc]?)
   | `(tactic| support_simp [$args,*] $[$loc:location]?) =>
-    `(tactic| simp only [SPMF.mem_support_pick_iff, SPMF.mem_support_bind_iff,
+    `(tactic| simp only [SPMF.mem_support_bind_iff,
         SPMF.mem_support_pure_iff, SPMF.mem_support_map_iff, SPMF.mem_support_choose_iff,
-        SPMF.mem_support_chooseNat_iff, SPMF.mem_support_chooseInt_iff, SPMF.mem_support_ite_iff, SPMF.mem_support_dite_iff,
-        SPMF.mem_support_elements_iff, SPMF.mem_support_oneOf_iff,
-        SPMF.mem_support_frequency_iff, SPMF.mem_support_vectorOf_iff,
-        SPMF.mem_support_listOfMaxLength_iff, SPMF.mem_support_listOf, Set.mem_setOf_eq,
+        SPMF.mem_support_ite_iff, SPMF.mem_support_dite_iff, SPMF.mem_support_vectorOf_iff,
+        SPMF.mem_support_listOfMaxLength_iff, SPMF.mem_support_listOf,
+        SPMF.mem_support_permutationOf_iff, Set.mem_setOf_eq,
         $args,*] $[$loc]?)
 
 /-- `simp only` with the standard `SPMF.Cost` support-inversion set
@@ -37,9 +36,8 @@ syntax "cost_support_simp" (" [" simpArg,* "]")? (location)? : tactic
 macro_rules
   | `(tactic| cost_support_simp $[$loc:location]?) => `(tactic| cost_support_simp [] $[$loc]?)
   | `(tactic| cost_support_simp [$args,*] $[$loc:location]?) =>
-    `(tactic| simp only [SPMF.Cost.mem_support_pick_iff, SPMF.Cost.mem_support_bind_iff,
+    `(tactic| simp only [SPMF.Cost.mem_support_bind_iff,
         SPMF.Cost.mem_support_pure_iff, SPMF.Cost.mem_support_map_iff,
-        SPMF.Cost.mem_support_choose_iff, SPMF.Cost.mem_support_chooseNat_iff,
-        SPMF.Cost.mem_support_chooseInt_iff,
+        SPMF.Cost.mem_support_choose_iff,
         SPMF.mem_support_ite_iff, SPMF.mem_support_dite_iff,
         $args,*] $[$loc]?)
