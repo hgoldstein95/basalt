@@ -206,8 +206,8 @@ Notes:
   of it. A callee's law supplies it. A combinator term in that position has no law: prove its two
   halves, each one `sound_bound` or `complete_bound`, and pass them
   (`Tree.genBSTByInsertion.sound_complete`, `BST/ByInsertion.lean`).
-- **A generator defined by `match` on its arguments** is split into its cases before the walk, by
-  every tactic here.
+- **A `match` on the generator's arguments**, at its head or inside a branch, is split into its
+  cases before the walk, by every tactic here.
 - **Completeness by a measure**, when no structural induction fits or the script has to be fixed in
   advance: `apply IsCompleteFor.of_measure μ fun n ih s a hn hP => ?_` and then
   `rw [<GEN>]; complete_bound` leave a goal with no generator in it. `μ` is a measure of seed and
@@ -396,9 +396,9 @@ too coarse, prove the bound separately and pass it: `expect_bound [h]`.
 - **`sound_bound` / `complete_bound` says no hypothesis or law gives `IsSound _ _` /
   `IsCompleteFor _ _` of a combinator argument** → the argument of a list combinator has no law
   (it is a combinator term, or its law is under another name); prove the half and pass it.
-- **A walk says it does not enter a `match`** → the `match` is on a drawn value, or is not at the
-  head of the generator. Restate the generator with an `if`, or with the cases as separate
-  definitions that carry laws.
+- **A walk says it does not enter a `match`** → the `match` is on a drawn value, or inside a helper
+  the walk unfolds. Restate the generator with an `if`, move the `match` into the generator, or
+  make the cases separate definitions that carry laws.
 - **`omega` fails in a cost proof** → read the goal: it is the exact inequality your bound must
   satisfy, with every sub-cost's bound in context. Either the cost function is still folded in a
   hypothesis (`simp only [...] at *`), or the bound is too tight.

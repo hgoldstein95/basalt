@@ -131,14 +131,30 @@ def fixpointStep (tac boundTac : String) (x adm : Expr) (goal : MVarId) : TermEl
   let s ← s.tryClearMany (seedFVars.map (·.fvarId!))
   s.withContext do s.replaceTargetDefEq (← Core.betaReduce (← instantiateMVars (← s.getType)))
 
-/-- The cases of `goal`, a statement about the generator `g`, when `g` is a `match` on something in
-the context (a generator defined by cases on its seed): `split`'s, one per alternative. The walk
-itself does not enter a `match`, and this has to happen before a bound is a metavariable. -/
+/-- The sub-generators of `g` that are a `match` on something in the context, outermost first: a
+`match` with no loose bound variable, whose discriminants are therefore not drawn values. -/
+private partial def ctxMatches (env : Environment) (e : Expr) : Array Expr :=
+  let here := if !e.hasLooseBVars && isMatcherAppCore env e then #[e] else #[]
+  here ++ match e with
+  | .app f a => ctxMatches env f ++ ctxMatches env a
+  | .lam _ t b _ | .forallE _ t b _ => ctxMatches env t ++ ctxMatches env b
+  | .letE _ t v b _ => ctxMatches env t ++ ctxMatches env v ++ ctxMatches env b
+  | .mdata _ b | .proj _ _ b => ctxMatches env b
+  | _ => #[]
+
+/-- The cases of `goal`, a statement about the generator `g`, when `g` contains a sub-generator that
+is a `match` on something in the context (a generator defined by cases on its seed): `split`'s, one
+per alternative. The walk itself does not enter a `match`, and this has to happen before a bound is
+a metavariable. -/
 def splitMatch? (goal : MVarId) (g : Expr) : MetaM (Option (List MVarId)) := do
   let g ← instantiateMVars g
-  -- A `match` that reduces is the walk's: only a stuck one is split.
-  unless (← matchMatcherApp? g).isSome && (← whnfCore g) == g do return none
-  let some cases ← observing? (Split.splitMatch goal g) | return none
+  let gHead := (← inferType g).getAppFn
+  -- A `match` that reduces is the walk's: only a stuck one is split. One that is not a generator
+  -- (inside a proof or a value) is not the walk's concern.
+  let some m ← (ctxMatches (← getEnv) g).findM? fun m => do
+      pure ((← whnfCore m) == m) <&&> (return (← inferType m).getAppFn == gHead)
+    | return none
+  let some cases ← observing? (Split.splitMatch goal m) | return none
   let old := (← goal.getDecl).lctx
   -- A pattern's variables are the alternative's, under its names.
   let named ← cases.mapM fun (c : MVarId) => c.withContext do

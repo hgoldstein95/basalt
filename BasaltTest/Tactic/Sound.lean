@@ -165,11 +165,61 @@ error: the walk does not enter a `match`:
   match x with
   | 0 => pure 0
   | n.succ => pure n
-One on the generator's arguments is split before the walk when the generator is headed by it; one on a drawn value is not supported.
+One on the generator's arguments is split before the walk; one on a drawn value, or inside a helper the walk unfolds, is not supported.
 -/
 #guard_msgs in
 example : IsSound (ArbNat.Nat.arbitrary >>= fun x => match x with
     | 0 => Pure.pure 0 | n + 1 => Pure.pure n : SPMF Nat) (fun _ => True) := by
+  sound_bound
+
+/-! A `match` on an argument inside a branch is split before the walk, as one at the head is. -/
+
+def genBelow [Gen G] (n : Nat) : G Nat :=
+  oneOf [fun _ => pure 0, fun _ => match n with | 0 => pure 0 | k + 1 => genBelow k]
+partial_fixpoint
+
+/--
+trace: genBelow : ℕ → SPMF ℕ
+ih : ∀ (n : ℕ), IsSound (genBelow n) fun x => x ≤ n
+n : ℕ
+⊢ 0 ≤ 0
+
+genBelow : ℕ → SPMF ℕ
+ih : ∀ (n : ℕ), IsSound (genBelow n) fun x => x ≤ n
+n : ℕ
+⊢ 0 ≤ 0
+
+genBelow : ℕ → SPMF ℕ
+ih : ∀ (n : ℕ), IsSound (genBelow n) fun x => x ≤ n
+n k : ℕ
+⊢ 0 ≤ k.succ
+
+genBelow : ℕ → SPMF ℕ
+ih : ∀ (n : ℕ), IsSound (genBelow n) fun x => x ≤ n
+n k x✝ : ℕ
+h_x✝ : x✝ ≤ k
+⊢ x✝ ≤ k.succ
+-/
+#guard_msgs in
+example : IsSound (genBelow n) (· ≤ n) := by
+  sound_fixpoint
+  trace_state
+  all_goals omega
+
+/-! One inside a helper is met only once the walk has unfolded it, and is not split. -/
+
+def pickBelow [Gen G] (n : Nat) : G Nat := match n with | 0 => pure 0 | k + 1 => pure k
+
+/--
+error: the walk does not enter a `match`:
+  match n with
+  | 0 => pure 0
+  | k.succ => pure k
+One on the generator's arguments is split before the walk; one on a drawn value, or inside a helper the walk unfolds, is not supported.
+(in the unfolding of `SoundBoundTest.pickBelow`)
+-/
+#guard_msgs in
+example : IsSound (oneOf [fun _ => pure 0, fun _ => pickBelow n] (by simp) : SPMF Nat) (· ≤ n) := by
   sound_bound
 
 /-! A callee that has only a half of the law is closed by that half. -/

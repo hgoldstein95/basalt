@@ -581,8 +581,8 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
   for g' in forms do
     if (← matchMatcherApp? g').isSome then
       throwError "the walk does not enter a `match`:{indentExpr g'}\nOne on the generator's \
-        arguments is split before the walk when the generator is headed by it; one on a drawn \
-        value is not supported."
+        arguments is split before the walk; one on a drawn value, or inside a helper the walk \
+        unfolds, is not supported."
   -- A bound on the generator by itself, the tightest first: a later one is a fallback, as a later
   -- rule is.
   let applySelf (lem : Name) : TermElabM (List MVarId) := do
