@@ -9,8 +9,9 @@ import Basalt
 # Facts about the combinators
 
 Concrete `frequency` branch probabilities, computed with `SPMF.frequency_apply` and friends and
-pinned here as regression tests, plus a check that `oneOf`, and the deprecated `pick` defined by
-it, work under `partial_fixpoint`.
+pinned here as regression tests, a check that `oneOf`, and the deprecated `pick` defined by it, work
+under `partial_fixpoint`, and the contract of `oneOf!`/`frequency!`: no list in the compiled code,
+and nothing a proof can tell apart from `oneOf`/`frequency`.
 -/
 
 open NNReal ENNReal
@@ -98,3 +99,99 @@ theorem natGen.cost_bounded : IsCostBounded natGen (fun n => n + 1) := by
   all_goals omega
 
 end DeprecatedPick
+
+/-! ## Compiled choice -/
+
+namespace CompiledChoice
+
+open Lean Elab Command Term Meta in
+/-- `#same_walk tac on a and b` fails unless `tac` leaves the same goals on `a` as on `b`. -/
+elab "#same_walk " tac:tactic " on " a:term " and " b:term : command => liftTermElabM do
+  let run (stx : Term) : TermElabM String := do
+    let ty ← elabType stx
+    synthesizeSyntheticMVarsNoPostponing
+    let gs ← Tactic.run (← mkFreshExprMVar ty).mvarId! (Tactic.evalTactic tac)
+    return toString (← gs.mapM fun g => return (← Meta.ppGoal g).pretty)
+  let (ra, rb) := (← run a, ← run b)
+  unless ra == rb do throwError "the walks differ:{indentD ra}\nand{indentD rb}"
+
+#same_walk sound_bound
+  on IsSound (oneOf [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
+  and IsSound (oneOf! [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
+
+#same_walk (intro _ _; complete_bound)
+  on IsCompleteFor (oneOf [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
+  and IsCompleteFor (oneOf! [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
+
+#same_walk cost_bound
+  on IsCostBounded (oneOf [fun _ => pure 0, fun _ => chooseNat 1 3]) (fun _ => 2)
+  and IsCostBounded (oneOf! [fun _ => pure 0, fun _ => chooseNat 1 3]) (fun _ => 2)
+
+#same_walk expect_bound
+  on SPMF.expect (oneOf [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat)
+    (fun n => (n : ℝ≥0∞)) ≤ ⊤
+  and SPMF.expect (oneOf! [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat)
+    (fun n => (n : ℝ≥0∞)) ≤ ⊤
+
+#same_walk sound_bound
+  on IsSound (frequency [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat) (· ≤ 3)
+  and IsSound (frequency! [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat) (· ≤ 3)
+
+#same_walk (intro _ _; complete_bound)
+  on IsCompleteFor (frequency [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat)
+    (· ≤ 3)
+  and IsCompleteFor (frequency! [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat)
+    (· ≤ 3)
+
+#same_walk cost_bound
+  on IsCostBounded (frequency [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)]) (fun _ => 2)
+  and IsCostBounded (frequency! [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)]) (fun _ => 2)
+
+#same_walk expect_bound
+  on SPMF.expect (frequency [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat)
+    (fun n => (n : ℝ≥0∞)) ≤ ⊤
+  and SPMF.expect (frequency! [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat)
+    (fun n => (n : ℝ≥0∞)) ≤ ⊤
+
+/-- `simp` sees the model. -/
+example : (frequency! [(1, fun _ => Pure.pure 0), (3, fun _ => Pure.pure 1)] : SPMF Nat) 1
+    = 3 / 4 := by
+  simp
+
+-- Goals show the source form.
+/-- info: oneOf! [fun x => pure 0, fun x => pure 1] : SPMF ℕ -/
+#guard_msgs in
+#check (oneOf! [fun _ => pure 0, fun _ => pure 1] : SPMF Nat)
+
+/-- Weights that are not literals are summed as `frequencyChain` unfolds them. -/
+def weighted [Gen G] (b : Nat) : G Nat :=
+  frequency! [(1, fun _ => pure 0), (b, fun _ => pure 1), (b + 2, fun _ => pure 2)]
+    (by simp)
+
+def plain [Gen G] : G Nat := oneOf [fun _ => pure 0, fun _ => pure 1, fun _ => pure 2]
+
+def compiled [Gen G] : G Nat := oneOf! [fun _ => pure 0, fun _ => pure 1, fun _ => pure 2]
+
+def compiledWeighted [Gen G] : G Nat :=
+  frequency! [(1, fun _ => pure 0), (2, fun _ => oneOf! [fun _ => pure 1, fun _ => pure 2])]
+
+/-- A recursive body under `oneOf!` is monotone through `monotone_oneOfWith`. -/
+def compiledRec [Gen G] : G Nat :=
+  oneOf! [fun _ => pure 0, fun _ => do let n ← compiledRec; pure (n + 1)]
+partial_fixpoint
+
+-- The compiled code of a compiled choice builds no list and calls no combinator; `plain` is the
+-- control that the check can see one.
+open Lean in
+run_cmd do
+  let env ← getEnv
+  let code (n : Name) : String :=
+    (IR.getDecls env).filter (n.isPrefixOf ·.name) |>.foldl (fun acc d => acc ++ toString (format d)) ""
+  unless ((code ``plain).splitOn "List.cons").length > 1 do
+    throwError "the check cannot see `plain`'s list"
+  for n in [``compiled, ``compiledWeighted, ``weighted, ``compiledRec] do
+    for c in ["List.cons", "oneOf", "frequency"] do
+      unless ((code n).splitOn c).length == 1 do
+        throwError "`{n}`'s compiled code mentions `{c}`"
+
+end CompiledChoice

@@ -63,7 +63,7 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
     prob (listOf g) {xs | xs.length = k} = (1/2 : ℝ≥0∞) ^ (k + 1) := by
   induction k with
   | zero =>
-    rw [listOf, prob_oneOf]
+    rw [listOf, oneOfWith_eq, prob_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, prob_pure, Set.mem_ofPred_eq]
     have hz : prob (g >>= fun x => listOf g >>= fun xs => Pure.pure (x :: xs))
@@ -76,7 +76,7 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
     rw [hz]
     norm_num
   | succ k ih =>
-    rw [listOf, prob_oneOf]
+    rw [listOf, oneOfWith_eq, prob_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, prob_pure, Set.mem_ofPred_eq]
     rw [ite_eq_right (by omega)]
@@ -122,7 +122,7 @@ theorem expect_listOf_length_le (g : SPMF α) :
   case admissible => exact admissible_expect_le _ _
   case step =>
     intro listOf_rec ih
-    rw [expect_oneOf]
+    rw [oneOfWith_eq, expect_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, expect_pure, Nat.cast_zero, add_zero, zero_add]
     rw [ENNReal.div_eq_inv_mul, ← one_div]

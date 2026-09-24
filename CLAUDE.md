@@ -32,6 +32,10 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `IsAlmostSurelyTerminating`, `IsCostBounded`, `IsFilterFree`, `IsProductive`) and their
   introduction lemmas — [Basalt/Laws.lean](Basalt/Laws.lean).
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
+- **Compiled choice** (`oneOf!`, `frequency!`) — the `compiled_choice` section of
+  [Basalt/Combinators.lean](Basalt/Combinators.lean). Its contract (no list in the compiled code, the
+  walk its model gets) is pinned by [BasaltTest/Combinators.lean](BasaltTest/Combinators.lean), and
+  `@[tunable]`'s handling of it by [BasaltTest/Tuning.lean](BasaltTest/Tuning.lean).
 - **Observations** — the layer every per-combinator lemma is derived from. `Obs`, the one
   `Obs.map_*` lemma per combinator, the specification monads and the presentation of each shape of
   choice: [Basalt/Obs/](Basalt/Obs/). An observation lives with its interpretation — the
@@ -154,6 +158,11 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   headed by a combinator the walker tries the combinator's rule or `@[gen_map]` lemma before any
   fact. `generalize` the term to a variable first, as `isBounded_vectorOf` does in
   [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean).
+
+- **`rw [support_oneOf]` (or `prob_frequency`, …) finds no occurrence in a goal that shows
+  `oneOf! [...]`** — `oneOf!`/`frequency!` elaborate to `oneOfWith`/`frequencyWith`, which only
+  display as the source form. Rewrite with `oneOfWith_eq`/`frequencyWith_eq` first, or use `simp`,
+  which applies them ([Basalt/Combinators.lean](Basalt/Combinators.lean)).
 
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
   `ennreal_to_real` ([Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean)) and finish over `ℝ`.

@@ -22,7 +22,7 @@ namespace ArbList
 
 /-- Generates an arbitrary `List Nat`: flip a coin to stop with `[]`, or draw a head and recurse. -/
 def List.arbitrary [Gen G] : G (List Nat) := do
-  oneOf [
+  oneOf! [
     fun _ => pure [],
     fun _ => do
       let x ← Nat.arbitrary

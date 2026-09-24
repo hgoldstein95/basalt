@@ -134,7 +134,7 @@ def genBST [Gen G] (lo hi : Int) : G Tree := do
   if h : lo > hi then
     return .leaf
   else
-    frequency [
+    frequency! [
       (1, fun () => pure .leaf),
       (1, fun () => do
         let x ← chooseInt lo hi (by omega)

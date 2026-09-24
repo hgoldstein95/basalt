@@ -28,7 +28,9 @@ def myGen [Gen G] : G α := ...
 
 `RandomChoice.choose` is the only source of randomness; every combinator (`elements`, `oneOf`,
 `frequency`, `listOf`, …) is built on it. Recursive generators are defined by
-`partial_fixpoint` over the `CCPO`.
+`partial_fixpoint` over the `CCPO`. A choice between literal branches is written `oneOf! [g₀, g₁, …]`
+or `frequency! [(w₀, g₀), …]`: it runs as a chain of tests on the drawn index, allocating no list of
+branches, while every proof sees the plain `oneOf` / `frequency` (`Basalt/Combinators.lean`).
 
 A generator that branches on a size adds a `[Sized G]` constraint and reads it with `getSize` or
 `Sized.sized`, shrinking it for recursive calls with `Sized.resize` (plus `[MonoSized G]` when the
@@ -117,7 +119,7 @@ properties, the failure model, and the supported platforms.
 Because a property is polymorphic in its monad, the same executable also runs it under the random
 interpretations — `--backend=io` or `--backend=plausible` instead of the default coverage-guided
 `fuzz` — from one shared property registry. Which backend finds a bug faster is a property of the
-bug: blind random sampling wins on shallow bugs (fewer runs, ~3–5× the throughput), while a bug
+bug: blind random sampling wins on shallow bugs (fewer runs, ~2–5× the throughput), while a bug
 behind several nested guards is reachable only by coverage guidance. `fuzz-run/compare-backends.sh` measures it and
 `fuzz-run/README.md` records the numbers.
 

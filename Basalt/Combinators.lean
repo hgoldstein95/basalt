@@ -3,6 +3,7 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
+import Lean.Elab.ElabRules
 import Basalt.Gen
 import Basalt.RandomChoice
 
@@ -10,7 +11,8 @@ import Basalt.RandomChoice
 # Generator Combinators
 
 Derived combinators (`chooseNat`, `elements`, `oneOf`, `frequency`, `listOf`, …) built on
-`RandomChoice.choose`.
+`RandomChoice.choose`, and `oneOf!`/`frequency!`, which run a literal choice as a chain of tests
+while every proof sees the combinator.
 -/
 
 open Lean.Order
@@ -118,6 +120,229 @@ def permutationOf [Gen G] : (xs : List α) → G { ys // xs ~ ys }
     return ⟨ys.insertIdx n x, (Perm.cons x h1).trans (List.perm_insertIdx x ys h3).symm⟩
 
 end combinators
+
+/-! ## Compiled Choice
+
+`oneOf! [g₀, g₁, …]` is `oneOfWith [g₀, g₁, …] hne impl h`: the model `oneOf [g₀, g₁, …]`, which
+proofs see, and `impl`, which runs — the same draw followed by a chain of tests on it, with no list
+of branches to build. `h : impl = oneOf …` is an instance of `oneOf_eq_chain`, checked by unfolding
+`oneOfChain` over the literal list, so `impl` must be exactly what that unfolds to. `frequency!` is the
+same over `frequencyChain`. -/
+
+section compiled_choice
+
+/-- The branches of `oneOf gs`, tested one index at a time: `oneOfChain gs k i` runs entry `i - k`.
+The last entry is not tested, so a chain of `n` branches makes `n - 1` comparisons. -/
+def oneOfChain {G : Type u → Type v} {α : Type u} [Gen G] :
+    List (Unit → G α) → Nat → Nat → G α
+  | [], _, _ => default
+  | [g], _, _ => g ()
+  | g :: gs, k, i => if i = k then g () else oneOfChain gs (k + 1) i
+
+theorem oneOfChain_eq {G : Type u → Type v} {α : Type u} [Gen G] (gs : List (Unit → G α))
+    (k j : Nat) (hj : j < gs.length) : oneOfChain gs k (k + j) = (gs[j]'hj) () := by
+  induction gs generalizing k j with
+  | nil => simp at hj
+  | cons g gs ih =>
+    cases gs with
+    | nil =>
+      obtain rfl : j = 0 := by simp at hj; omega
+      rfl
+    | cons g' gs' =>
+      rw [oneOfChain.eq_3 _ _ _ _ (List.cons_ne_nil _ _)]
+      cases j with
+      | zero => simp
+      | succ j =>
+        rw [ite_eq_right (by omega), show k + (j + 1) = k + 1 + j by omega, ih]
+        rfl
+
+/-- The chain begins with `oneOf`'s own draw: `Gen` has no monad laws, so the two can differ only
+after it. The bound is `n` and not `gs.length - 1`, which would put `gs` into the type of the drawn
+value, where `partial_fixpoint`'s `monotone_bind` cannot have it. -/
+theorem oneOf_eq_chain {G : Type u → Type v} {α : Type u} [Gen G] (gs : List (Unit → G α))
+    (hne : gs ≠ []) (n : Nat) (hn : gs.length - 1 = n) :
+    oneOf gs hne = RandomChoice.choose 0 n (Nat.zero_le _) >>= fun i =>
+      oneOfChain gs 0 i.down.val := by
+  subst hn
+  unfold oneOf
+  congr 1
+  funext i
+  have := i.down.property.2
+  have : 0 < gs.length := List.length_pos_iff.mpr hne
+  rw [← oneOfChain_eq gs 0 _ (by omega), Nat.zero_add]
+
+/-- `oneOf gs hne`, run as `impl`. Write it as `oneOf! [g₀, g₁, …]`. -/
+@[inline] def oneOfWith {G : Type u → Type v} {α : Type u} [Gen G] (gs : List (Unit → G α))
+    (hne : gs ≠ []) (impl : G α) (_h : impl = oneOf gs hne) : G α := impl
+
+@[simp] theorem oneOfWith_eq {G : Type u → Type v} {α : Type u} [Gen G] {gs : List (Unit → G α)}
+    {hne : gs ≠ []} {impl : G α} {h : impl = oneOf gs hne} :
+    oneOfWith gs hne impl h = oneOf gs hne :=
+  h
+
+/-- The weighted branches of `frequency gs`, tested against running totals: `frequencyChain gs acc n`
+runs the first entry whose total, counted from `acc`, exceeds `n`. Past the last it is `default`, as
+`frequency` is past the total weight, so the two agree for every draw and not only the ones in
+range. -/
+def frequencyChain {G : Type → Type v} {α : Type} [Gen G] :
+    List (Nat × (Unit → G α)) → Nat → Nat → G α
+  | [], _, _ => default
+  | (w, g) :: gs, acc, n => if n < acc + w then g () else frequencyChain gs (acc + w) n
+
+theorem frequencyChain_eq {G : Type → Type v} {α : Type} [Gen G]
+    (gs : List (Nat × (Unit → G α))) (acc m : Nat) :
+    frequencyChain gs acc (acc + m)
+      = if h : m < (gs.map Prod.fst).sum then frequencyAux gs m h else default := by
+  induction gs generalizing acc m with
+  | nil => simp [frequencyChain]
+  | cons p gs ih =>
+    obtain ⟨w, g⟩ := p
+    simp only [frequencyChain, List.map_cons, List.sum_cons]
+    by_cases hm : m < w
+    · rw [ite_eq_left (by omega), dite_eq_left (by omega)]
+      simp [frequencyAux, hm]
+    · rw [ite_eq_right (by omega), show acc + m = acc + w + (m - w) by omega, ih]
+      by_cases hs : m - w < (gs.map Prod.fst).sum
+      · rw [dite_eq_left hs, dite_eq_left (by omega)]
+        simp [frequencyAux, hm]
+      · rw [dite_eq_right hs, dite_eq_right (by omega)]
+
+/-- As `oneOf_eq_chain`, with the bound `W - 1` for the total weight `W`. -/
+theorem frequency_eq_chain {G : Type → Type v} {α : Type} [Gen G]
+    (gs : List (Nat × (Unit → G α))) (h : 0 < (gs.map Prod.fst).sum) (m : Nat)
+    (hm : (gs.map Prod.fst).sum - 1 = m) :
+    frequency gs h = chooseNat 0 m (Nat.zero_le _) >>= fun n => frequencyChain gs 0 n := by
+  subst hm
+  unfold frequency
+  congr 1
+  funext n
+  simpa using (frequencyChain_eq gs 0 n).symm
+
+/-- `frequency gs h`, run as `impl`. Write it as `frequency! [(w₀, g₀), …]`. -/
+@[inline] def frequencyWith {G : Type → Type v} {α : Type} [Gen G]
+    (gs : List (Nat × (Unit → G α))) (h : 0 < (gs.map Prod.fst).sum) (impl : G α)
+    (_h : impl = frequency gs h) : G α := impl
+
+@[simp] theorem frequencyWith_eq {G : Type → Type v} {α : Type} [Gen G]
+    {gs : List (Nat × (Unit → G α))} {h : 0 < (gs.map Prod.fst).sum} {impl : G α}
+    {he : impl = frequency gs h} : frequencyWith gs h impl he = frequency gs h :=
+  he
+
+open Lean Meta in
+/-- `impl` and `impl = model` for `model` (a `oneOf` or `frequency`), from `eqChain`
+(`oneOf_eq_chain` or `frequency_eq_chain`) at the draw's bound `hi`, with the continuation's body
+replaced by `chain` of the drawn `Nat`. The draw is the model's own term, so the chain starts with the
+model's bind. -/
+private def mkChainImpl (eqChain : Name) (model hi : Expr) (chain : Expr → MetaM Expr) :
+    MetaM (Expr × Expr) := do
+  let hEq := mkAppN (mkConst eqChain model.getAppFn.constLevels!)
+    (model.getAppArgs.extract 0 5 ++ #[hi, ← mkEqRefl hi])
+  let some (_, _, rhs) := (← inferType hEq).eq? | throwError "{eqChain} is not an equation"
+  -- `rhs` is `draw >>= fun x => oneOfChain gs 0 x'`, `x'` the drawn `Nat`
+  let bindArgs := rhs.getAppArgs
+  let k ← lambdaTelescope bindArgs[5]! fun xs body => do
+    mkLambdaFVars xs (← chain body.appArg!)
+  let impl := mkAppN rhs.getAppFn (bindArgs.set! 5 k)
+  -- stated at `impl`, not at the chain `rhs` names, for the `@[partial_fixpoint_monotone]` lemmas
+  -- to unify with; the kernel checks the two agree
+  return (impl, ← mkExpectedTypeHint (← mkEqSymm hEq) (← mkEq impl model))
+
+open Lean in
+/-- `e` with the `let`s along its list spine substituted: a list literal of eight or more entries
+elaborates to one, its tails `let`-bound. -/
+private partial def zetaSpine : Expr → Expr
+  | .letE _ _ v b _ => zetaSpine (b.instantiate1 v)
+  | e => if e.isAppOfArity ``List.cons 3 then mkApp e.appFn! (zetaSpine e.appArg!) else e
+
+open Lean Meta in
+/-- `e`, a `c` of five arguments, with its list argument's spine free of `let`s. -/
+private def literalModel? (c : Name) (e : Expr) : MetaM (Option Expr) := do
+  let e ← instantiateMVars e
+  unless e.isAppOfArity c 5 do return none
+  return some (mkAppN e.getAppFn (e.getAppArgs.modify 3 zetaSpine))
+
+open Lean Meta in
+/-- `oneOf gs hne` for a literal `gs`, as `oneOfWith gs hne impl h`; `none` for any other term. -/
+def mkOneOfWith? (e : Expr) : MetaM (Option Expr) := do
+  let some e ← literalModel? ``oneOf e | return none
+  let some (_, gs) := e.appFn!.appArg!.listLit? | return none
+  let some last := gs.getLast? | return none
+  let (impl, h) ← mkChainImpl ``oneOf_eq_chain e (mkNatLit (gs.length - 1)) fun i => do
+    let mut chain := (mkApp last (mkConst ``Unit.unit)).headBeta
+    for (g, k) in gs.dropLast.zipIdx.reverse do
+      chain ← mkAppM ``ite
+        #[← mkEq i (mkNatLit k), (mkApp g (mkConst ``Unit.unit)).headBeta, chain]
+    return chain
+  let args := e.getAppArgs
+  return mkAppN (mkConst ``oneOfWith e.getAppFn.constLevels!) (args.push impl |>.push h)
+
+open Lean Meta in
+/-- `frequency gs h` for a literal `gs`, as `frequencyWith gs h impl h'`; `none` for any other term.
+Literal weights give literal running totals; any other weight is summed as `frequencyChain`
+unfolds it, `0 + w₀ + w₁ + …`, which is all that makes the chain an instance of
+`frequency_eq_chain` when the weights are not closed. -/
+def mkFrequencyWith? (e : Expr) : MetaM (Option Expr) := do
+  let some e ← literalModel? ``frequency e | return none
+  let some (_, ps) := e.appFn!.appArg!.listLit? | return none
+  let mut branches : Array (Expr × Expr) := #[]
+  for p in ps do
+    unless p.isAppOfArity ``Prod.mk 4 do return none
+    branches := branches.push (p.appFn!.appArg!, p.appArg!)
+  let lits := branches.filterMap (·.1.nat?)
+  let closed := lits.size == branches.size
+  let mut totals : Array Expr := #[]
+  let mut acc := mkNatLit 0
+  for ((w, _), k) in branches.zipIdx do
+    acc ← if closed then pure (mkNatLit (lits.extract 0 (k + 1)).sum) else mkAdd acc w
+    totals := totals.push acc
+  let hi ← if closed then pure (mkNatLit (lits.sum - 1)) else
+    mkSub (← branches.foldrM (fun (w, _) s => mkAdd w s) (mkNatLit 0)) (mkNatLit 1)
+  let (impl, h) ← mkChainImpl ``frequency_eq_chain e hi fun n => do
+    let mut chain ← mkAppOptM ``Inhabited.default #[← inferType e, none]
+    for ((_, g), t) in (branches.zip totals).reverse do
+      chain ← mkAppM ``ite #[← mkLt n t, (mkApp g (mkConst ``Unit.unit)).headBeta, chain]
+    return chain
+  let args := e.getAppArgs
+  return mkAppN (mkConst ``frequencyWith e.getAppFn.constLevels!) (args.push impl |>.push h)
+
+/-- `oneOf [g₀, g₁, …]`, compiled to a chain of tests on the drawn index. -/
+syntax (name := oneOfBang) "oneOf! " "[" term,+ "]" : term
+
+/-- `frequency [(w₀, g₀), (w₁, g₁), …]`, compiled to a chain of tests on the drawn weight. Like
+`frequency`, it takes the positivity of the total weight as an optional argument. -/
+syntax (name := frequencyBang) "frequency! " "[" term,+ "]" (ppSpace colGt term:max)? : term
+
+open Lean Elab Term in
+@[term_elab oneOfBang]
+def elabOneOfBang : TermElab := fun stx ty? => do
+  let `(oneOf! [$gs,*]) := stx | throwUnsupportedSyntax
+  let e ← elabTermEnsuringType (← `(oneOf [$gs,*] (List.cons_ne_nil _ _))) ty?
+  let some e' ← mkOneOfWith? e | throwError "oneOf!: expected a `oneOf` of a literal list"
+  return e'
+
+open Lean Elab Term in
+@[term_elab frequencyBang]
+def elabFrequencyBang : TermElab := fun stx ty? => do
+  let `(frequency! [$ps,*] $[$h]?) := stx | throwUnsupportedSyntax
+  let model ← match h with
+    | some h => `(frequency [$ps,*] $h)
+    | none => `(frequency [$ps,*])
+  let e ← elabTermEnsuringType model ty?
+  let some e' ← mkFrequencyWith? e
+    | throwError "frequency!: expected a `frequency` of a literal list of pairs"
+  return e'
+
+@[app_unexpander oneOfWith]
+def unexpandOneOfWith : Lean.PrettyPrinter.Unexpander
+  | `($_ [$gs,*] $_ $_ $_) => `(oneOf! [$gs,*])
+  | _ => throw ()
+
+@[app_unexpander frequencyWith]
+def unexpandFrequencyWith : Lean.PrettyPrinter.Unexpander
+  | `($_ [$ps,*] $_ $_ $_) => `(frequency! [$ps,*])
+  | _ => throw ()
+
+end compiled_choice
 
 section monotonicity
 
@@ -289,6 +514,13 @@ theorem monotone_oneOf [Gen G] {γ : Sort w} [PartialOrder γ]
   apply hmono
   assumption
 
+@[partial_fixpoint_monotone]
+theorem monotone_oneOfWith {G : Type u → Type v} {α : Type u} [Gen G] {γ : Sort w} [PartialOrder γ]
+    (gs : γ → List (Unit → G α)) (hne : ∀ x, gs x ≠ []) (impl : γ → G α)
+    (h : ∀ x, impl x = oneOf (gs x) (hne x)) (himpl : monotone impl) :
+    monotone (fun x => oneOfWith (gs x) (hne x) (impl x) (h x)) :=
+  himpl
+
 /-- A uniform binary choice. -/
 @[deprecated "use `oneOf [x, y]`" (since := "2026-09-22")]
 def RandomChoice.pick [Gen G] (x y : Unit → G α) : G α := oneOf [x, y]
@@ -344,6 +576,14 @@ theorem monotone_frequency [Gen G] {γ : Sort w} [PartialOrder γ]
   assumption
 
 @[partial_fixpoint_monotone]
+theorem monotone_frequencyWith {G : Type → Type v} {α : Type} [Gen G] {γ : Sort w}
+    [PartialOrder γ] (gs : γ → List (Nat × (Unit → G α)))
+    (h : ∀ x, 0 < List.sum (List.map Prod.fst (gs x))) (impl : γ → G α)
+    (he : ∀ x, impl x = frequency (gs x) (h x)) (himpl : monotone impl) :
+    monotone (fun x => frequencyWith (gs x) (h x) (impl x) (he x)) :=
+  himpl
+
+@[partial_fixpoint_monotone]
 theorem monotone_vectorOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (n : Nat) (g : γ → G α) (hg : monotone g) :
     monotone (fun x => vectorOf n (g x)) := by
@@ -384,8 +624,8 @@ end monotonicity
 /-! ## Recursive combinators
 
 `partial_fixpoint` rebuilds each body's monotonicity proof from the `@[partial_fixpoint_monotone]`
-lemmas in scope at the definition, so a combinator whose body recurses under `oneOf` has to come
-after `monotone_oneOf`. -/
+lemmas in scope at the definition, so a combinator whose body recurses under `oneOf!` has to come
+after `monotone_oneOfWith`. -/
 
 section recursive_combinators
 
@@ -393,7 +633,7 @@ section recursive_combinators
 `g`.  Note: this produces the empty list 50% of the time, so for production generators, you should
 consider using other combinators, e.g. `listOfMaxLength`. -/
 def listOf [Gen G] (g : G α) : G (List α) := do
-  oneOf [
+  oneOf! [
     fun _ => pure [],
     fun _ => do
       let x ← g
@@ -403,7 +643,7 @@ partial_fixpoint
 
 /-- Generates a *non-empty* list with unbounded length, where each element is produced using `g`. -/
 def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
-  oneOf [
+  oneOf! [
     fun _ => do let x ← g; pure [x],
     fun _ => do
       let x ← g
@@ -426,6 +666,7 @@ theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
   · intro z hz
     subst hw
     unfold listOf
+    rw [oneOfWith_eq, oneOfWith_eq]
     apply oneOf_le
     refine ⟨rfl, ?_⟩
     rintro (_ | _ | i) h1 h2 <;> intro _
@@ -453,6 +694,7 @@ theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
   · intro z hz
     subst hw
     unfold nonEmptyListOf
+    rw [oneOfWith_eq, oneOfWith_eq]
     apply oneOf_le
     refine ⟨rfl, ?_⟩
     rintro (_ | _ | i) h1 h2 <;> intro _

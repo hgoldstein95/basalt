@@ -19,7 +19,7 @@ namespace ArbNat
 
 /-- Generates an arbitrary natural number: flip a coin to stop at `0` or recurse and add one. -/
 def Nat.arbitrary [Gen G] : G Nat := do
-  oneOf [
+  oneOf! [
     fun _ => pure 0,
     fun _ => do
       let n ← Nat.arbitrary

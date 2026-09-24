@@ -45,7 +45,7 @@ def Tree.cost : Tree → Nat := fun t => 3 * t.size + 1
 /-- Generates an all-`2`s tree with a uniform `oneOf`. Mean offspring `1`: critical, so almost surely
 terminating but with infinite expected size. -/
 def genTree [Gen G] : G Tree :=
-  oneOf [
+  oneOf! [
     fun _ => pure .leaf,
     fun _ => do
       let l ← genTree
@@ -83,7 +83,7 @@ open scoped NNReal ENNReal
 
 /-- Generates an all-`2`s tree, but weights the leaf branch twice as heavily as the node branch. -/
 def genWeightedTree [Gen G] : G Tree :=
-  frequency [
+  frequency! [
     (2, fun _ => pure .leaf),
     (1, fun _ => do
       let l ← genWeightedTree

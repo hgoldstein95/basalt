@@ -25,7 +25,7 @@ def AllTwos.cost (l : List Nat) : Nat := l.length + 1
 
 /-- Generates a list of all `2`s: flip a coin to stop with `[]`, or prepend a `2` and recurse. -/
 def genAllTwos [Gen G] : G (List Nat) :=
-  oneOf [
+  oneOf! [
     fun _ => pure [],
     fun _ => do
       let xs ← genAllTwos

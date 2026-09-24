@@ -67,7 +67,7 @@ open Lean Elab Command Basalt.Walk in
 run_cmd do
   let env ← getEnv
   let noMap := [``RandomChoice.choose, ``RandomChoice.coin, ``chooseInt,
-    ``elements, ``oneOf, ``frequency].filter (mapFor env · |>.isNone)
+    ``elements, ``oneOf, ``frequency, ``oneOfWith, ``frequencyWith].filter (mapFor env · |>.isNone)
   unless noMap.isEmpty do throwError "combinators with no `@[gen_map]` lemma: {noMap}"
   for j in [Judgment.spec true, .spec false] do
     for c in [``vectorOf, ``listOfMaxLength, ``permutationOf] ++

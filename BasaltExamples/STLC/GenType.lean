@@ -17,7 +17,7 @@ open RandomChoice
 
 /-- Generates an arbitrary type. -/
 def genType [Gen G] : G Ty :=
-  oneOf [
+  oneOf! [
     fun _ => pure .Bool,
     fun _ => do
       let τ1 ← genType

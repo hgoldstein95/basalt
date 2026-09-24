@@ -33,7 +33,7 @@ def Tree.genWeightedBST [Gen G] (lo hi : Int) : G (Tree Int) := do
   if h : lo > hi then
     return leaf
   else
-    frequency [
+    frequency! [
       (1, fun _ => pure leaf),
       (5, fun _ => do
         let x ← chooseInt lo hi (by omega)

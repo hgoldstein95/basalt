@@ -42,7 +42,7 @@ def Tree.isLeftist (lo : Nat) : Tree → Prop
     isLeftist x r
 
 def Tree.genLeftist [Gen G] (lo : Nat) : G Tree :=
-  oneOf [
+  oneOf! [
     fun () => pure leaf,
     fun () => do
       let delta ← Nat.arbitrary

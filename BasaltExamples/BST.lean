@@ -39,7 +39,7 @@ def Tree.genBST [Gen G] (lo hi : Int) : G (Tree Int) := do
   if h : lo > hi then
     return leaf
   else
-    frequency [
+    frequency! [
       (1, fun () => pure leaf),
       (1, fun () => do
         let x ← chooseInt lo hi (by omega)
@@ -99,7 +99,7 @@ open scoped ENNReal
 theorem Tree.genBST.prob_leaf {lo hi : Int} (h : lo ≤ hi) :
     SPMF.prob (Tree.genBST lo hi) {Tree.leaf} = 1/2 := by
   conv_lhs => rw [Tree.genBST]
-  rw [dite_eq_right (by omega), SPMF.prob_frequency]
+  rw [dite_eq_right (by omega), frequencyWith_eq, SPMF.prob_frequency]
   have hleaf : SPMF.prob (Pure.pure Tree.leaf : SPMF (Tree Int)) {Tree.leaf} = 1 := by
     rw [SPMF.prob_singleton]
     simp

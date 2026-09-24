@@ -48,7 +48,7 @@ def Tree.isHeap (lo : Nat) : Tree → Prop
 
 /-- Generates an arbitrary min-heap whose values are all at least `lo`. -/
 def Tree.genHeap [Gen G] (lo : Nat) : G Tree :=
-  oneOf [
+  oneOf! [
     fun _ => pure leaf,
     fun _ => do
       let delta ← Nat.arbitrary
