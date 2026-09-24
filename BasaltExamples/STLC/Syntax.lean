@@ -3,10 +3,6 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import Basalt
-
-open List
-
 /-!
 # STLC Syntax and Typing
 

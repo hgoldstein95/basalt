@@ -1,12 +1,15 @@
-import Basalt
-import Basalt.PlausibleGen
+/-
+Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein & Ernest Ng
+-/
 import BasaltExamples.STLC.Syntax
-import BasaltExamples.STLC.GenType
-
-open RandomChoice SPMF List
 
 /-!
-# Shrinker for well-typed STLC terms
+# Shrinking STLC Terms
+
+`shrinkTerm` proposes structurally smaller terms, each well-typed in the context of the term it
+shrinks.
 -/
 
 /-- Produces structurally smaller terms. Each candidate stays well-typed in the
@@ -17,7 +20,7 @@ def shrinkTerm (e : Term) : List Term :=
   | .Var _      => []
   | .App e1 e2  => [e1, e2]
   -- Shrink only the body but keep the binder
-  | .Abs τ e    => (Term.Abs τ ·) <$> shrinkTerm e
+  | .Abs τ e    => (shrinkTerm e).map (Term.Abs τ ·)
 
 /-- Every term produced by `shrinkTerm` is well-typed in the same context,
     though not necessarily at the same type. -/
@@ -44,7 +47,7 @@ theorem shrinkTerm_sound :
     intro hty hmem
     cases hty with
     | TAbs Γ e τ1 τ2 hbody =>
-      simp [shrinkTerm] at hmem
+      simp only [shrinkTerm, List.mem_map] at hmem
       obtain ⟨body', hb', rfl⟩ := hmem
       obtain ⟨τ2', hτ2'⟩ := IH hbody hb'
       exists .Fun τ τ2'
