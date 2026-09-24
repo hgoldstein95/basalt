@@ -89,7 +89,7 @@ theorem Tree.foldl_insert_of_lt {l r : Tree Int} {x : Int} (ys : List Int)
   induction ys generalizing l with
   | nil => rfl
   | cons y ys ih =>
-    simp only [List.foldl_cons, Tree.insert, if_pos (h y (by simp))]
+    simp only [List.foldl_cons, Tree.insert, ite_eq_left (h y (by simp))]
     exact ih (fun z hz => h z (by simp [hz]))
 
 theorem Tree.foldl_insert_of_gt {l r : Tree Int} {x : Int} (ys : List Int)
@@ -99,7 +99,7 @@ theorem Tree.foldl_insert_of_gt {l r : Tree Int} {x : Int} (ys : List Int)
   | nil => rfl
   | cons y ys ih =>
     have hy := h y (by simp)
-    simp only [List.foldl_cons, Tree.insert, if_neg (show ¬ y < x by omega), if_pos hy]
+    simp only [List.foldl_cons, Tree.insert, ite_eq_right (show ¬ y < x by omega), ite_eq_left hy]
     exact ih (fun z hz => h z (by simp [hz]))
 
 /-- Completeness in one lemma: inserting a tree's own keys in preorder rebuilds that tree, so every

@@ -25,7 +25,7 @@ theorem prob_vectorOf_all {g : SPMF α} (E : Set α) (n : Nat) :
   induction n with
   | zero =>
     rw [show vectorOf 0 g = (Pure.pure [] : SPMF (List α)) from rfl, prob_pure,
-      if_pos (by intro y hy; simp at hy), pow_zero]
+      ite_eq_left (by intro y hy; simp at hy), pow_zero]
   | succ n ih =>
     rw [vectorOf_succ, prob_bind]
     have hpt : ∀ (x : α) (xs : List α),
@@ -79,7 +79,7 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
     rw [listOf, prob_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, prob_pure, Set.mem_ofPred_eq]
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
     have hstep : prob (g >>= fun x => listOf g >>= fun xs => Pure.pure (x :: xs))
         {xs | xs.length = k + 1} = (1/2 : ℝ≥0∞) ^ (k + 1) := by
       rw [prob_bind]
@@ -95,7 +95,7 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
           rw [prob_pure]
           by_cases h : xs.length = k
           · simp [Set.indicator, h]
-          · rw [if_neg (by simp; omega)]
+          · rw [ite_eq_right (by simp; omega)]
             simp [Set.indicator, h]
         calc expect (listOf g)
               (fun xs => prob (Pure.pure (x :: xs) : SPMF (List α)) {xs | xs.length = k + 1})

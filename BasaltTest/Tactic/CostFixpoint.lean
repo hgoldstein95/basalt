@@ -183,7 +183,7 @@ example (fuel : Nat) : IsCostBounded (fuelled fuel) (fun t => 3 * t.size + 1) :=
 -- bounds both branches, and nothing bounds `fuelled (0 - 1)`.
 example (fuel : Nat) : IsCostBounded (fuelled fuel) (fun t => 3 * t.size + 1) := by
   induction fuel with
-  | zero => rw [fuelled, dif_pos rfl]; cost_bound; simp
+  | zero => rw [fuelled, dite_eq_left rfl]; cost_bound; simp
   | succ n ih =>
     rw [fuelled]
     cost_bound

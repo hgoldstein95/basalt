@@ -325,10 +325,10 @@ private theorem frequency_le [Gen G] {l1 l2 : List (Nat × (Unit → G α))} (h 
   apply MonoBind.bind_mono_right
   intro i
   by_cases hi : i < (map Prod.fst l1).sum
-  . rw [dif_pos hi, dif_pos (hsum ▸ hi)]
+  . rw [dite_eq_left hi, dite_eq_left (hsum ▸ hi)]
     apply frequencyAux_le
     assumption
-  . rw [dif_neg hi, dif_neg (hsum ▸ hi)]
+  . rw [dite_eq_right hi, dite_eq_right (hsum ▸ hi)]
     apply PartialOrder.rel_refl
 
 @[partial_fixpoint_monotone]

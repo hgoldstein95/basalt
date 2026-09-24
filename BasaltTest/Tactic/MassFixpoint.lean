@@ -165,7 +165,7 @@ example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
 -- bounds both branches, and nothing bounds `fuelled (0 - 1)`.
 example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
   induction fuel with
-  | zero => apply SPMF.IsPMF.of_one_le; rw [fuelled, dif_pos rfl]; mass_bound; rfl
+  | zero => apply SPMF.IsPMF.of_one_le; rw [fuelled, dite_eq_left rfl]; mass_bound; rfl
   | succ n ih =>
     apply SPMF.IsPMF.of_one_le
     rw [fuelled]

@@ -5,7 +5,7 @@ Authors: Harrison Goldstein
 -/
 import Mathlib.Algebra.Group.Defs
 import Mathlib.Algebra.Group.Nat.Defs
-import Mathlib.Data.Real.Basic
+import Mathlib.Basic.Real.Basic
 import Basalt.Combinators
 
 /-!

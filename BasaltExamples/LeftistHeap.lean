@@ -82,7 +82,7 @@ theorem Tree.genLeftist.sound_complete :
       intro ⟨hle, hrank, hl, hr⟩
       obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
       rw [Tree.genLeftist]; complete_bound
-      exact ⟨d, l, ihl hl, r, ihr hr, by rw [if_pos hrank]⟩
+      exact ⟨d, l, ihl hl, r, ihr hr, by rw [ite_eq_left hrank]⟩
 
 theorem Tree.genLeftistOfRank.sound_complete :
     IsSoundAndComplete (Tree.genLeftistOfRank lo k) (fun t => Tree.isLeftist lo t ∧ t.rank = k) := by

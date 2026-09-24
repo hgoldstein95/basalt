@@ -50,7 +50,7 @@ private theorem selectD_forall (l : List (Nat × Prop)) (d : Prop) :
     · intro h
       refine ⟨fun hk => by simpa [hk] using h 0 (by omega), fun n hn => ?_⟩
       have := h (k + n) (by omega)
-      rwa [if_neg (by omega), Nat.add_sub_cancel_left] at this
+      rwa [ite_eq_right (by omega), Nat.add_sub_cancel_left] at this
     · rintro ⟨hx, htl⟩ n hn
       split
       · exact hx (by omega)
@@ -83,10 +83,10 @@ theorem threshold_angelic {d : Nat} {k : Int} (hd : 0 < d) (t e : Prop) :
   · rintro (⟨hk, h⟩ | ⟨hk, h⟩)
     · refine ⟨⟨⟨0, by omega⟩⟩, ?_⟩
       show if ((0 : Nat) : Int) < k then t else e
-      rwa [if_pos (by omega)]
+      rwa [ite_eq_left (by omega)]
     · refine ⟨⟨⟨d - 1, by omega⟩⟩, ?_⟩
       show if ((d - 1 : Nat) : Int) < k then t else e
-      rwa [if_neg (by omega)]
+      rwa [ite_eq_right (by omega)]
 
 theorem index_angelic {γ : Type v} (l : List γ) (hne : l ≠ []) (F : γ → Prop) :
     Mix.angelic.mix 0 (l.length - 1)
@@ -116,9 +116,9 @@ private theorem selectD_exists (l : List (Nat × Prop)) (d : Prop) :
         exact ⟨p, List.mem_cons_of_mem _ hp, hw, hp2⟩
     · rintro ⟨p, hp, hw, hp2⟩
       rcases List.mem_cons.mp hp with rfl | hp
-      · exact ⟨0, by omega, by rwa [if_pos hw]⟩
+      · exact ⟨0, by omega, by rwa [ite_eq_left hw]⟩
       · obtain ⟨n, hn, h⟩ := ih.mpr ⟨p, hp, hw, hp2⟩
-        exact ⟨k + n, by omega, by rwa [if_neg (by omega), Nat.add_sub_cancel_left]⟩
+        exact ⟨k + n, by omega, by rwa [ite_eq_right (by omega), Nat.add_sub_cancel_left]⟩
 
 theorem select_angelic (l : List (Nat × Prop)) {T : Nat} (hT : T = (l.map Prod.fst).sum)
     (hpos : 0 < T) (d : Prop) :

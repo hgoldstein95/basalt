@@ -3,8 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Data.ENNReal.Inv
-import Mathlib.Data.ENNReal.Real
+import Mathlib.Basic.ENNReal.Inv
+import Mathlib.Basic.ENNReal.Real
 import Mathlib.Tactic.Bound
 import Mathlib.Tactic.Finiteness
 import Mathlib.Tactic.Positivity

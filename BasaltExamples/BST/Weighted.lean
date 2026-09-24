@@ -100,10 +100,10 @@ private theorem genWeightedBST_drift (p : Int × Int) :
     exact_mod_cast (show 1 ≤ bstRank (lo, hi) by simp only [bstRank]; omega)
   unfold bstLevel
   by_cases hgt : lo > hi
-  · rw [if_pos hgt, zero_add]
+  · rw [ite_eq_left hgt, zero_add]
     exact (ENNReal.div_le_of_le_mul (by norm_num)).trans hrank1
   · push Not at hgt
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
     simp only
     have hcast : (∑ x ∈ Finset.Icc lo hi,
           ((bstRank (lo, x - 1) : ℝ≥0∞) + (bstRank (x + 1, hi) : ℝ≥0∞)))
@@ -166,7 +166,7 @@ theorem Tree.genWeightedBST.sound_complete :
     | node l x r ihl ihr =>
       intro ⟨h1, h2, hl, hr⟩
       rw [Tree.genWeightedBST]; complete_bound
-      rw [dif_neg (by omega)]
+      rw [dite_eq_right (by omega)]
       exact ⟨x, ⟨h1, h2⟩, l, ihl hl, r, ihr hr, rfl⟩
 
 end BST

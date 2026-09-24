@@ -49,14 +49,14 @@ private theorem sum_ite_lt {d : Nat} {k : ℤ} (hd : 0 < d) (h0 : 0 ≤ k) (hk :
     have hall : ∀ n ∈ Finset.Ico 0 k.toNat, (if (n : ℤ) < k then t else e) = t := by
       intro n hn
       have := (Finset.mem_Ico.mp hn).2
-      rw [if_pos (by omega)]
+      rw [ite_eq_left (by omega)]
     rw [Finset.sum_congr rfl hall, Finset.sum_const, Nat.card_Ico, Nat.sub_zero, nsmul_eq_mul]
   have hsecond : ∑ n ∈ Finset.Ico k.toNat d, (if (n : ℤ) < k then t else e)
       = ((d - k.toNat : ℕ) : ℝ≥0∞) * e := by
     have hall : ∀ n ∈ Finset.Ico k.toNat d, (if (n : ℤ) < k then t else e) = e := by
       intro n hn
       have := (Finset.mem_Ico.mp hn).1
-      rw [if_neg (by omega)]
+      rw [ite_eq_right (by omega)]
     rw [Finset.sum_congr rfl hall, Finset.sum_const, Nat.card_Ico, nsmul_eq_mul]
   rw [hfirst, hsecond]
 
@@ -111,11 +111,11 @@ private theorem sum_selectD (l : List (Nat × ℝ≥0∞)) (d : ℝ≥0∞) :
     rw [Finset.range_eq_Ico,
       ← Finset.sum_Ico_consecutive _ (Nat.zero_le k) (Nat.le_add_right k _)]
     congr 1
-    · rw [Finset.sum_congr rfl (fun n hn => if_pos (Finset.mem_Ico.mp hn).2),
+    · rw [Finset.sum_congr rfl (fun n hn => ite_eq_left (Finset.mem_Ico.mp hn).2),
         Finset.sum_const, Nat.card_Ico, Nat.sub_zero, nsmul_eq_mul]
     · rw [Finset.sum_Ico_eq_sum_range, Nat.add_sub_cancel_left, ← ih]
       refine Finset.sum_congr rfl fun n _ => ?_
-      rw [if_neg (by omega), Nat.add_sub_cancel_left]
+      rw [ite_eq_right (by omega), Nat.add_sub_cancel_left]
 
 theorem select_average (l : List (Nat × ℝ≥0∞)) {T : Nat} (hT : T = (l.map Prod.fst).sum)
     (hpos : 0 < T) (d : ℝ≥0∞) :

@@ -62,7 +62,7 @@ theorem map_frequency (gs : List (Nat × (Unit → G α))) (h : 0 < (gs.map Prod
   congr 1
   funext ⟨i, h1, h2⟩
   have hi : i < (gs.map Prod.fst).sum := by omega
-  simp only [dif_pos hi]
+  simp only [dite_eq_left hi]
   exact O.map_frequencyAux gs i hi _
 
 /-- `oneOf` is `Obs.index` at every universe: unlike the other combinators it draws no `Nat`, so

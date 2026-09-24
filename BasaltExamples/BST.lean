@@ -62,7 +62,7 @@ theorem Tree.genBST.sound_complete :
     | node l x r ihl ihr =>
       intro ⟨h1, h2, hl, hr⟩
       rw [Tree.genBST]; complete_bound
-      rw [dif_neg (by omega)]
+      rw [dite_eq_right (by omega)]
       exact ⟨x, ⟨h1, h2⟩, l, ihl hl, r, ihr hr, rfl⟩
 
 /-! ## Termination -/
@@ -99,7 +99,7 @@ open scoped ENNReal
 theorem Tree.genBST.prob_leaf {lo hi : Int} (h : lo ≤ hi) :
     SPMF.prob (Tree.genBST lo hi) {Tree.leaf} = 1/2 := by
   conv_lhs => rw [Tree.genBST]
-  rw [dif_neg (by omega), SPMF.prob_frequency]
+  rw [dite_eq_right (by omega), SPMF.prob_frequency]
   have hleaf : SPMF.prob (Pure.pure Tree.leaf : SPMF (Tree Int)) {Tree.leaf} = 1 := by
     rw [SPMF.prob_singleton]
     simp

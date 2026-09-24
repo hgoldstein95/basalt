@@ -85,7 +85,7 @@ theorem massSome_biasedOptionGen {r : Rat} {g : SPMF α} (h0 : 0 ≤ r) (h1 : r 
   have hfalse : prob (Pure.pure none : SPMF (Option α)) {o | o.isSome = true} = 0 := by
     rw [prob_pure]
     simp
-  rw [if_pos (by trivial), if_neg (by simp), htrue, hfalse, mul_zero, add_zero]
+  rw [ite_eq_left (by trivial), ite_eq_right (by simp), htrue, hfalse, mul_zero, add_zero]
 
 theorem massSome_optionGen {g : SPMF α} : massSome (optionGen g) = g.mass / 2 := by
   unfold optionGen

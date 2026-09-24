@@ -111,7 +111,7 @@ example : IsCompleteFor (genBST lo hi) (BST.Tree.isBST lo hi) := by
     obtain ⟨h1, h2, hl, hr⟩ := ht
     rw [genBST]; complete_bound
     trace_state
-    rw [dif_neg (by omega)]
+    rw [dite_eq_right (by omega)]
     exact ⟨x, ⟨h1, h2⟩, l, ihl hl, r, ihr hr, rfl⟩
 
 /-! ## By a measure

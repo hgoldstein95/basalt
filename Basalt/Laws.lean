@@ -74,7 +74,7 @@ def IsProductive (g : SPMF (Option α)) : Prop :=
   productivity is a much weaker ask than filter-freedom. -/
 theorem IsProductive_of_apply_pos {g : SPMF (Option α)} {a : α} (h : 0 < g (some a)) :
     IsProductive g :=
-  lt_of_lt_of_le h (ENNReal.le_tsum a)
+  lt_of_lt_of_le h (ENNReal.le_tsum (f := fun a => g (some a)) a)
 
 /-- `IsProductive` from support membership — the form a `support` characterization hands you
   directly, so exhibiting one value the generator can produce discharges it. -/

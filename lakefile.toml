@@ -47,9 +47,9 @@ moreLinkArgs = ["@fuzz-run/obj/link.rsp"]
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-rev = "v4.33.0-rc2"
+rev = "v4.34.0"
 
 [[require]]
 name = "splitmix"
 git = "https://github.com/hgoldstein95/splitmix"
-rev = "v4.33.0-rc2"
+rev = "v4.34.0"

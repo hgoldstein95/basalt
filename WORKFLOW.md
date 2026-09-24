@@ -196,7 +196,7 @@ choice, and last the equation between `a` and the value built. On `IsCompleteFor
   That induction is ordinary Lean — on the value, or on `<PRED>` with `fun_induction`.
 - a **branch that cannot produce `a`** is pruned — a constructor clash, a weight that is `0` — and a
   base case usually closes outright. It never chooses between branches that survive: that is
-  `Or.inl` / `Or.inr`, and a conditional your facts decide is `rw [dif_neg (by omega)]`
+  `Or.inl` / `Or.inr`, and a conditional your facts decide is `rw [dite_eq_right (by omega)]`
   (`Tree.genBST`).
 
 Notes:

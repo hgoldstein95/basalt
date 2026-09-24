@@ -177,7 +177,7 @@ theorem retry_some (p : SPMF (Option α)) (a : α) :
     · intro a' ha'
       have h0 : (Pure.pure (some a') : SPMF (Option α)) (some a) = 0 := by
         simp only [Pure.pure, SPMF.pure, DFunLike.coe]
-        rw [if_neg]; intro h; exact ha' (Option.some_injective _ h).symm
+        rw [ite_eq_right]; intro h; exact ha' (Option.some_injective _ h).symm
       rw [h0, mul_zero]
   rw [hsum, add_comm]
   rfl
