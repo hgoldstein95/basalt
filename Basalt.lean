@@ -5,9 +5,17 @@ Authors: Harrison Goldstein
 -/
 import Basalt.Combinators
 import Basalt.Gen
+import Basalt.GenRel
 import Basalt.GenStats.Basic
 import Basalt.GenStats.Command
 import Basalt.IO
+import Basalt.IO.Approx
+import Basalt.IO.Choose
+import Basalt.IO.Faithful
+import Basalt.IO.Ideal
+import Basalt.IO.Laws
+import Basalt.IO.SplitMix
+import Basalt.IO.Stream
 import Basalt.Laws
 import Basalt.Obs.Basic
 import Basalt.Obs.Combinators
@@ -38,6 +46,9 @@ import Basalt.Tactic.Complete
 import Basalt.Tactic.Cost
 import Basalt.Tactic.ENNReal
 import Basalt.Tactic.Expect
+import Basalt.Tactic.Faithful
+import Basalt.Tactic.IO
+import Basalt.Tactic.Ideal
 import Basalt.Tactic.Mass
 import Basalt.Tactic.MassFixpoint
 import Basalt.Tactic.Sound

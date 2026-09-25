@@ -166,7 +166,8 @@ private def lawSlots : Array LawSlot := #[
   { label := `terminates,     proofs := #[#[`terminates]] },
   { label := `cost_bounded,   proofs := #[#[`cost_bounded]] },
   { label := `filter_free,    proofs := #[#[`filter_free]] },
-  { label := `productive,     proofs := #[#[`productive]] }]
+  { label := `productive,     proofs := #[#[`productive]] },
+  { label := `faithful,       proofs := #[#[`faithful]] }]
 
 /-- Does `declName.suffix` exist *and* actually state the law the convention names?
 

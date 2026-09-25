@@ -101,6 +101,7 @@ info: genCoin — 5 draws (seed 0, fuel 10000)
         cost_bounded    — (not proved)
         filter_free     — (not proved)
         productive      — (not proved)
+        faithful        — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 5) genCoin
@@ -170,6 +171,7 @@ info: genMaybe — 5 draws (seed 0, fuel 10000)
         terminates      — (not proved; measured 0/5 divergences)
         cost_bounded    — (not proved)
         filter_free     — (not proved)
+        faithful        — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 5) genMaybe
@@ -214,6 +216,7 @@ info: genSurely — 5 draws (seed 0, fuel 10000)
         sound_complete  — (not proved)
         terminates      — (not proved; measured 0/5 divergences)
         cost_bounded    — (not proved)
+        faithful        — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 5) genSurely

@@ -85,4 +85,7 @@ theorem Tree.genHeap.cost_bounded :
   cost_fixpoint
   all_goals simp only [Tree.size, Tree.sum]; omega
 
+theorem Tree.genHeap.faithful : IsFaithful (Tree.genHeap lo) := by
+  faithful_fixpoint
+
 end Heap

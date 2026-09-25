@@ -31,7 +31,8 @@ def List.arbitrary [Gen G] : G (List Nat) := do
 partial_fixpoint
 
 /-- A variant of `List.arbitrary` using the `vectorOf` combinator: choose a length `n` at random,
-then generate a length-`n` list of `Nat`s. Same distribution; the proofs target `List.arbitrary`. -/
+then generate a length-`n` list of `Nat`s. Same distribution; the support and cost proofs target
+`List.arbitrary`. -/
 def List.arbitrary' [Gen G] : G (List Nat) := do
   let n ← Nat.arbitrary
   vectorOf n Nat.arbitrary
@@ -56,5 +57,15 @@ theorem List.arbitrary.cost_bounded :
     IsCostBounded List.arbitrary (fun xs => 2 * xs.length + xs.sum + 1) := by
   cost_fixpoint
   all_goals simp only [List.length_nil, List.sum_nil, List.length_cons, List.sum_cons]; omega
+
+theorem List.arbitrary.faithful : IsFaithful List.arbitrary := by
+  faithful_fixpoint
+
+theorem List.arbitrary'.terminates : IsAlmostSurelyTerminating List.arbitrary' := by
+  mass_fixpoint using SPMF.LfpIsOne.one
+  simp
+
+theorem List.arbitrary'.faithful : IsFaithful List.arbitrary' := by
+  faithful_fixpoint
 
 end ArbList

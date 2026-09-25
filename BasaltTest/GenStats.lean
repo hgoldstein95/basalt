@@ -42,7 +42,7 @@ info: BST.Tree.genBST 0 10 — 200 draws (seed 0, fuel 10000)
     BST.Tree.leaf
     BST.Tree.leaf
 
-  laws: sound_complete ✓  terminates ✓  cost_bounded ✓
+  laws: sound_complete ✓  terminates ✓  cost_bounded ✓  faithful ✓
         filter_free     — (not proved)
         productive      — (not proved)
 -/
@@ -73,7 +73,7 @@ info: BST.Tree.genWeightedBST 0 10 — 200 draws (seed 0, fuel 10000)
     BST.Tree.leaf
     BST.Tree.leaf
 
-  laws: sound_complete ✓  terminates ✓  cost_bounded ✓
+  laws: sound_complete ✓  terminates ✓  cost_bounded ✓  faithful ✓
         filter_free     — (not proved)
         productive      — (not proved)
 -/
@@ -91,7 +91,7 @@ info: AllTwoTree.genTree — 1000 draws (seed 0, fuel 10000)
     leaf    50.6%  (503)
     node    49.4%  (492)
 
-  laws: sound_complete ✓  terminates ✓  cost_bounded ✓
+  laws: sound_complete ✓  terminates ✓  cost_bounded ✓  faithful ✓
         filter_free     — (not proved)
         productive      — (not proved)
 -/
@@ -116,7 +116,7 @@ info: AllTwoTree.genWeightedTree — 200 draws (seed 0, fuel 10000)
     leaf    65.5%  (131)
     node    34.5%   (69)
 
-  laws: terminates ✓
+  laws: terminates ✓  faithful ✓
         sound_complete  — (not proved)
         cost_bounded    — (not proved)
         filter_free     — (not proved)

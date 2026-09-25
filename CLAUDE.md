@@ -30,7 +30,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   each recipe names. Start there for any per-generator work; do not improvise a proof shape.
 - **The laws** (`IsSoundAndComplete` and its halves `IsSound` and `IsCompleteFor`,
   `IsAlmostSurelyTerminating`, `IsCostBounded`, `IsFilterFree`, `IsProductive`) and their
-  introduction lemmas — [Basalt/Laws.lean](Basalt/Laws.lean).
+  introduction lemmas — [Basalt/Laws.lean](Basalt/Laws.lean); `IsFaithful`, which relates `IO` to
+  `SPMF` — [Basalt/IO/Laws.lean](Basalt/IO/Laws.lean).
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
 - **Compiled choice** (`oneOf!`, `frequency!`) — the `compiled_choice` section of
   [Basalt/Combinators.lean](Basalt/Combinators.lean). Its contract (no list in the compiled code, the
@@ -85,7 +86,12 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [BasaltTest/Tactic/Cost.lean](BasaltTest/Tactic/Cost.lean)), and `expect_bound`
   ([Basalt/Tactic/Expect.lean](Basalt/Tactic/Expect.lean), pinned by
   [BasaltTest/Tactic/Expect.lean](BasaltTest/Tactic/Expect.lean)), each but `complete_bound` with
-  its `_fixpoint` in the same file. [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and
+  its `_fixpoint` in the same file. Two judgments relate a generator at two monads instead of
+  bounding it: `ideal_fixpoint` ([Basalt/Tactic/Ideal.lean](Basalt/Tactic/Ideal.lean)) and
+  `io_fixpoint` ([Basalt/Tactic/IO.lean](Basalt/Tactic/IO.lean)), which unfold any combinator with
+  no rule; `faithful_fixpoint` ([Basalt/Tactic/Faithful.lean](Basalt/Tactic/Faithful.lean)) runs
+  both. Their combinator rules are instances of [Basalt/GenRel.lean](Basalt/GenRel.lean).
+  [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and
   fails the build when one of the combinators it names loses its `@[gen_map]` lemma or a list
   combinator loses a bridge — it checks that list, not the registry, so a *new* combinator with no
   lemma is not caught. Nothing else in a termination, cost, or expectation proof mentions
@@ -108,6 +114,17 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **`#genstats`** — options on the command's declarations in
   [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean); the law-discovery contract is on
   `lawProved` there, guarded by [BasaltTest/LawLine.lean](BasaltTest/LawLine.lean).
+- **What an `IO` run means** — `idealized_faithful`
+  ([Basalt/IO/Faithful.lean](Basalt/IO/Faithful.lean)) states the chain from `IO` to `SPMF` and owns
+  what the library assumes of it. Its links: `IOModel` and `toIO` —
+  [Basalt/IO.lean](Basalt/IO.lean); `WordModel σ`, SplitMix's range reduction over any source of
+  words — [Basalt/IO/SplitMix.lean](Basalt/IO/SplitMix.lean); that `IO` runs `IOModel`
+  (`IOModel.Approx`, `IOModel.IOGenLaws`) — [Basalt/IO/Approx.lean](Basalt/IO/Approx.lean), with
+  the compiled C checked against the model by [BasaltTest/IO.lean](BasaltTest/IO.lean); that
+  `WordModel σ` on an `IdealSource` has the `SPMF` distribution —
+  [Basalt/IO/Ideal.lean](Basalt/IO/Ideal.lean), with a draw's case in
+  [Basalt/IO/Choose.lean](Basalt/IO/Choose.lean) and an ideal source in
+  [Basalt/IO/Stream.lean](Basalt/IO/Stream.lean). WORKFLOW.md's Recipe 5 is the practical entry.
 - **Stating and running a property** — [Basalt/PBT/](Basalt/PBT/), guarded by
   [BasaltTest/PBT.lean](BasaltTest/PBT.lean), which is the tour. Nothing there may name an
   interpretation: a runner that needs one belongs with that interpretation and tags itself

@@ -25,7 +25,7 @@ order a leaf tries them. Used to help `#genstats` report law, and to help the wa
 def lawConventions : Array (Name × Name) := #[
   (`sound_complete, `IsSoundAndComplete), (`sound, `IsSound), (`complete, `IsCompleteFor),
   (`terminates, `IsAlmostSurelyTerminating), (`cost_bounded, `IsCostBounded),
-  (`filter_free, `IsFilterFree), (`productive, `IsProductive)]
+  (`filter_free, `IsFilterFree), (`productive, `IsProductive), (`faithful, `IsFaithful)]
 
 /-- The generator of `O.spec g post`, and how to restate it about another. -/
 private def specSubject? (e : Expr) : Option (Expr × (Expr → Expr)) :=
@@ -73,6 +73,11 @@ inductive Judgment where
   /-- `‹shape› ≤ b` (`upper`) or `b ≤ ‹shape›`: a bound on a choice in an ordered algebra, from
   bounds on what its outcomes mean. The "generator" is the shape, so a rule is keyed by it. -/
   | mix (upper : Bool)
+  /-- `rel … y x`: one generator at two monads, related construct by construct, `y` the side the
+  induction is on and the one a rule is keyed by. A combinator with no rule is unfolded on both
+  sides, which stay in step because they are one term; a leaf is a hypothesis, the fact
+  `<gen>.<law>`, or the stronger law `<gen>.<stronger.1>` through the bridge `stronger.2`. -/
+  | rel (rel law : Name) (stronger : Name × Name) (tactic : String)
 
 namespace Judgment
 
@@ -84,6 +89,7 @@ def key : Judgment → Name
   | argument law .. => law
   | spec upper => if upper then `Obs.spec else `Obs.spec ++ `ge
   | mix upper => if upper then `Mix.mix else `Mix.mix ++ `ge
+  | rel r .. => r
 
 /-- On a statement already in `whnfR`: the subject it is about, and how to restate it about a
 subject that is definitionally equal. -/
@@ -101,6 +107,10 @@ def subject? (j : Judgment) (ty : Expr) : Option (Expr × (Expr → Expr)) :=
     let shape := ty.getArg! (side upper)
     guard (mixShapes.any shape.isAppOf)
     return (shape, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! (side upper) g))
+  | rel r .. => do
+    guard (ty.isAppOf r && 2 ≤ ty.getAppNumArgs)
+    let i := ty.getAppNumArgs - 2
+    return (ty.getArg! i, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! i g))
 
 /-- The registry key of the rules about the subject `g`. Tagging a rule and looking one up both go
 through this. -/
@@ -114,6 +124,7 @@ never a leaf. -/
 def bridges : Judgment → Array (Option Name)
   | argument _ bridge .. => #[none, some bridge]
   | spec _ => #[none]
+  | rel _ _ stronger _ => #[none, some stronger.2]
   | mix _ => #[]
 
 /-- The lemmas, one per family of specification monad, that turn a goal about a combinator into one
@@ -144,6 +155,14 @@ def noLeaf (j : Judgment) (g : Expr) : MessageData :=
   | spec _ => m!"no rule, `@[gen_map]` lemma, hypothesis, or law bounds{indentExpr g}\n\
       Pass a fact about it to the tactic."
   | mix _ => m!"no rule bounds the choice{indentExpr g}"
+  | rel r law stronger tactic => m!"{tactic}: no rule, hypothesis, `.{law}` fact, or \
+      `.{stronger.1}` law relates{indentExpr g}\nto its counterpart. A recursive combinator needs \
+      a `{r}` rule of its own."
+
+/-- Whether a combinator with no rule is unfolded rather than being an error. -/
+def unfoldsCombinators : Judgment → Bool
+  | rel .. => true
+  | _ => false
 
 end Judgment
 
@@ -153,7 +172,18 @@ def judgments : Array Judgment := #[
   .argument `IsBounded `IsCostBounded.isBounded (some `SPMF.Cost.isBounded_of_worst) "cost_bound",
   .argument `IsSound `IsSoundAndComplete.sound none "sound_bound",
   .argument `IsCompleteFor `IsSoundAndComplete.complete none "complete_bound",
-  .spec true, .mix true, .spec false, .mix false]
+  .spec true, .mix true, .spec false, .mix false,
+  .rel `IdealSource.Below `ideal (`faithful, `IsFaithful.below) "ideal_fixpoint",
+  .rel `IOModel.Approx `io (`faithful, `IsFaithful.approx) "io_fixpoint"]
+
+/-- The laws a leaf of this judgment is closed by, by their suffix on the generator's name: a
+relational judgment's own; for a bound, every convention but a relational judgment's law, which no
+bridge turns into a bound. -/
+def Judgment.lawSuffixes : Judgment → Array Name
+  | .rel _ law stronger _ => #[stronger.1, law]
+  | _ => (lawConventions.filter fun (suffix, _) => !judgments.any fun
+      | .rel _ _ stronger _ => stronger.1 == suffix
+      | _ => false).map (·.1)
 
 /-! ## Leaves of a bound on an observation -/
 

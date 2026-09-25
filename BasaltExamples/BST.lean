@@ -81,6 +81,11 @@ theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) :
 
 end termination
 
+/-! ## Faithfulness -/
+
+theorem Tree.genBST.faithful : IsFaithful (Tree.genBST lo hi) := by
+  faithful_fixpoint
+
 /-! ## Cost -/
 
 /-- Producing a tree of `n` nodes costs at most `3 * n + 1` choices: one `frequency` choice, one

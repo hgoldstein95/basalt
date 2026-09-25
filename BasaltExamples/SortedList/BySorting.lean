@@ -59,6 +59,9 @@ theorem List.genSortedBySorting.terminates :
   mass_fixpoint using SPMF.LfpIsOne.one
   simp
 
+theorem List.genSortedBySorting.faithful : IsFaithful List.genSortedBySorting := by
+  faithful_fixpoint
+
 /-- `List.arbitrary`'s own bound, read on the sorted output: `mergeSort` makes no random choices,
 and being a permutation it changes neither the length nor the sum the bound is stated in. -/
 theorem List.genSortedBySorting.cost_bounded :

@@ -143,6 +143,12 @@ theorem Tree.genBSTByInsertion.terminates {lo hi : Int} (h : lo ≤ hi) :
   mass_fixpoint using SPMF.LfpIsOne.one
   simp
 
+/-! ## Faithfulness -/
+
+theorem Tree.genBSTByInsertion.faithful (h : lo ≤ hi) :
+    IsFaithful (Tree.genBSTByInsertion lo hi h) := by
+  faithful_fixpoint
+
 /-! ## Cost -/
 
 /-- Every `lo` after the first is absorbed, so any number of them produces the same one-node tree.

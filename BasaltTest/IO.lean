@@ -3,6 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Basalt.IO
+import Basalt.PBT.Property
 import BasaltExamples.ArbChar
 import BasaltExamples.ArbList
 import BasaltExamples.ArbNat
@@ -70,6 +72,54 @@ def exercise (n : Nat) (gen : IO α) : IO Unit := do
   let hi : Nat := 2 ^ 70 + 2 ^ 65
   let c := (← RandomChoice.choose (m := IO) lo hi (by omega)).down.val
   IO.println s!"{a == 7} {b} {lo ≤ c && c ≤ hi}" : IO Unit)
+
+/-! ## `IO` executes `IOModel`
+
+`IsFaithful.approx` proves this given `IOModel.IOGenLaws`; here the compiled C is run against the
+model. From one seed, `n` runs at `IO` must produce the same values and leave `ioGen` in the same
+state as threading that state through `IOModel` by hand. -/
+
+open Basalt.PBT in
+private def renderOutcome : TestOutcome → String
+  | .ok () => "pass"
+  | .error (.fail r) => s!"fail: {r}"
+  | .error .discard => "discard"
+
+/-- Whether `n` runs of `x` at `IO` from `seed` agree with `n` steps of `IOModel` from it. -/
+def executesModel (x : {G : Type → Type} → [Gen G] → G α) (render : α → String) (n : Nat)
+    (seed : UInt64) : IO Bool := do
+  ioGen.set (SplitMix.ofSeed seed)
+  let executed ← (List.range n).mapM fun _ => x (G := IO)
+  let final ← ioGen.get
+  let mut s := SplitMix.ofSeed seed
+  let mut modeled := #[]
+  for _ in [0:n] do
+    let some (a, s') := (x (G := IOModel)).run s | return false
+    modeled := modeled.push a
+    s := s'
+  return executed.map render == modeled.toList.map render && final == s
+
+open Basalt.PBT in
+/-- info: true -/
+#guard_msgs in
+#eval do
+  let mut ok := true
+  for seed in [0, 1, 2026] do
+    ok := ok && (← executesModel ArbNat.Nat.arbitrary reprStr 200 seed)
+    ok := ok && (← executesModel ArbList.List.arbitrary reprStr 200 seed)
+    ok := ok && (← executesModel ArbString.String.arbitrary reprStr 200 seed)
+    ok := ok && (← executesModel (BST.Tree.genBST 0 100) reprStr 200 seed)
+    ok := ok && (← executesModel (BST.Tree.genWeightedBST 0 100) reprStr 200 seed)
+    -- A tuned generator executes code `@[tunable]` builds, with its weights read at runtime.
+    ok := ok && (← executesModel (BST.Tree.genWeightedBST.tuned ⟨#[(5, 0), (1, 0)]⟩ 0 100)
+      reprStr 200 seed)
+    -- Wide and bignum ranges take SplitMix's slow path.
+    ok := ok && (← executesModel (chooseNat (2 ^ 70) (2 ^ 70 + 2 ^ 65)) reprStr 200 seed)
+    -- A property that fails, discards, and passes: the outcome and its counterexample agree too.
+    ok := ok && (← executesModel (runProp (forAll (chooseNat 0 99) fun x => do
+      assume (x % 3 != 0)
+      check (x < 90) s!"x={x}")) renderOutcome 200 seed)
+  IO.println ok
 
 /-! ## `OptionT` over `IO`
 

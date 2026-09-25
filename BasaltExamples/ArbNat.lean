@@ -47,6 +47,9 @@ theorem Nat.arbitrary.cost_bounded :
   cost_fixpoint
   all_goals omega
 
+theorem Nat.arbitrary.faithful : IsFaithful Nat.arbitrary := by
+  faithful_fixpoint
+
 section expected_cost
 open scoped ENNReal
 

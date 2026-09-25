@@ -52,9 +52,16 @@ theorem String.arbitrary.terminates : IsAlmostSurelyTerminating String.arbitrary
   simp
 
 /-- `NonEmptyString.arbitrary` almost surely terminates -/
-theorem NonEmptyString.arbitrary_terminates : IsAlmostSurelyTerminating NonEmptyString.arbitrary := by
+theorem NonEmptyString.arbitrary.terminates :
+    IsAlmostSurelyTerminating NonEmptyString.arbitrary := by
   mass_fixpoint using SPMF.LfpIsOne.one
   simp
+
+theorem String.arbitrary.faithful : IsFaithful String.arbitrary := by
+  faithful_fixpoint
+
+theorem NonEmptyString.arbitrary.faithful : IsFaithful NonEmptyString.arbitrary := by
+  faithful_fixpoint
 
 /-- `listOf`'s bound with `Char.arbitrary`'s per-element cost of `1`: one `oneOf` and one character
 per element, plus the `oneOf` that ends the list. -/

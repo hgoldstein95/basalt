@@ -109,4 +109,15 @@ theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist 
     (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
+theorem Tree.genLeftist.faithful : IsFaithful (Tree.genLeftist lo) := by
+  faithful_fixpoint
+
+theorem Tree.genLeftistOfRank.ideal [WordSource σ] (src : IdealSource σ) :
+    src.Below (Tree.genLeftistOfRank lo k) (Tree.genLeftistOfRank lo k) := by
+  ideal_fixpoint
+
+theorem Tree.genLeftistOfRank.io :
+    IOModel.Approx (Tree.genLeftistOfRank lo k) (Tree.genLeftistOfRank lo k) := by
+  io_fixpoint
+
 end LeftistHeap

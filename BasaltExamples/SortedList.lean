@@ -89,6 +89,12 @@ theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.
 theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=
   List.genSortedGt.terminates 0
 
+theorem List.genSortedGt.faithful : IsFaithful (List.genSortedGt m) := by
+  faithful_fixpoint
+
+theorem List.genSorted.faithful : IsFaithful List.genSorted := by
+  faithful_fixpoint
+
 /-- Producing `xs` from `genSortedGt m` costs at most `xs.length + xs.sum + xs.length + 1` choices:
 one per cons cell and the final nil, plus each element `n`'s `Nat.arbitrary` cost of `n + 1`. -/
 theorem List.genSortedGt.cost_bounded :

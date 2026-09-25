@@ -150,6 +150,12 @@ theorem expect_chooseNat {lo hi : Nat} (h : lo ≤ hi) (f : Nat → ℝ≥0∞) 
       = (∑ x ∈ Finset.Icc lo hi, f x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) :=
   (congrFun (expectObs.map_chooseNat lo hi h) f).trans (Mix.range_average lo hi f)
 
+theorem expect_chooseNat_zero {N : Nat} (hN : 0 < N) (f : Nat → ℝ≥0∞) :
+    expect (chooseNat 0 (N - 1)) f = (∑ x ∈ Finset.range N, f x) / N := by
+  rw [expect_chooseNat]
+  have : Finset.Icc 0 (N - 1) = Finset.range N := by ext; simp; omega
+  rw [this, show N - 1 - 0 + 1 = N by omega]
+
 theorem expect_chooseInt {lo hi : Int} (h : lo ≤ hi) (f : Int → ℝ≥0∞) :
     expect (chooseInt lo hi h) f
       = (∑ x ∈ Finset.Icc lo hi, f x) / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞) := by

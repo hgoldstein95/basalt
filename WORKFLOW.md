@@ -381,6 +381,35 @@ from a fact you pass. Everywhere else only the mass is used: a constant postexpe
 otherwise its worst case over every value (`⨆`), which for an unbounded quantity is `⊤`. When that is
 too coarse, prove the bound separately and pass it: `expect_bound [h]`.
 
+### Recipe 5: Running at `IO`
+
+Not one of the three obligations either: that what `IO` runs has the distribution the other recipes
+reason about, up to what `idealized_faithful` (`Basalt/IO/Faithful.lean`) states. Worked instances:
+every example with a `.terminates` law.
+
+```lean
+theorem <GEN>.faithful : IsFaithful (<GEN> <ARGS>) := by
+  faithful_fixpoint
+```
+
+`IsFaithful` (`Basalt/IO/Laws.lean`) has three fields. `terminates` is taken from
+`<GEN>.terminates`. `below`, a relation on ideal words, is what the walk proves and composes; it
+bounds the distribution from one side only, and `terminates` gives the other. `approx` is that `IO`
+runs `IOModel` wherever that terminates. A generator with no `.terminates` law states the two
+relations alone, as `<GEN>.ideal` and `<GEN>.io` (`Tree.genLeftistOfRank`,
+`BasaltExamples/LeftistHeap.lean`), which a caller's walk uses in place of `.faithful`.
+
+**`ideal_fixpoint`** (`Basalt/Tactic/Ideal.lean`) and **`io_fixpoint`** (`Basalt/Tactic/IO.lean`)
+each induct on one side (`SPMF`, `IOModel`), unfold the other side one step, and walk the two
+together; `faithful_fixpoint` (`Basalt/Tactic/Faithful.lean`) runs both. There is nothing to supply:
+a recursive occurrence is closed by `ih`, a callee by its `.faithful` law, and a combinator with no
+rule is unfolded on both sides. A generator defined by structural recursion is induction on the
+argument it recurses on, `unfold`, and `ideal_bound` or `io_bound` in each case (`genZero`,
+`BasaltExamples/STLC/Faithful.lean`). A recursive combinator of your own needs a `@[gen_rule]`
+relating it at each pair of monads: prove it once for any relation that is a `GenRel`
+(`GenRel.listOf`, `Basalt/GenRel.lean`) and instantiate it (`IdealSource.below_listOf`,
+`IOModel.approx_listOf`).
+
 ## When Stuck
 
 - **`rw [gen]` fails** → wrong unfolding idiom for the context; see the table above.

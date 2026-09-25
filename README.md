@@ -21,6 +21,7 @@ def myGen [Gen G] : G α := ...
 | Interpretation | What it gives you |
 |---|---|
 | `Plausible.Gen` / `IO` | run it and get values |
+| `WordModel σ` / `IOModel` | `IO`'s draws with the PRNG state threaded purely — what `IsFaithful` (below) relates `IO` and `SPMF` through |
 | `SPMF` | a sub-probability mass function — reason about the distribution and its `support` |
 | `SPMF.Cost` | the same, plus a count of random choices |
 | `GenStats.StatGen` | seeded, fuel-guarded execution that counts choices (drives `#genstats`) |
@@ -48,6 +49,13 @@ depends on the generator, and you prove the ones that do:
 - `IsAlmostSurelyTerminating g` — `g` terminates with probability 1.
 - `IsCostBounded g c` — producing `v` takes at most `c v` random choices.
 - `IsFilterFree g` / `IsProductive g` — for filtering (`Option`-valued) generators.
+
+One more, in `Basalt/IO/Laws.lean`, relates two interpretations rather than constraining one, so it
+takes the polymorphic generator:
+
+- `IsFaithful gen` — on any ideal source of words, `gen` has its `SPMF` distribution, and at `IO`
+  it runs as `IOModel` does wherever that terminates. This connects the proofs about `SPMF` to what
+  `IO` runs; what it leaves out is `idealized_faithful`'s (`Basalt/IO/Faithful.lean`).
 
 `BasaltExamples/` is a cookbook of worked generators, each carrying proofs of the properties that
 apply to it. `WORKFLOW.md` walks through writing a generator and proving it correct, with a recipe
@@ -129,14 +137,15 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
   - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean`, and
     `Laws.lean`, the properties a generator may be proved to have;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
-    expectations, cost, almost-sure termination), `IO.lean`, `PlausibleGen.lean`, `OptionT.lean`,
-    `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean` holding the facts about core's `randNat`
-    that the PRNG-backed ones share;
+    expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
+    `PlausibleGen.lean`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean`
+    holding the facts about core's `randNat` that the PRNG-backed ones share;
   - *the proof machinery*: `Obs/`, the layer every per-combinator lemma is derived from — a
     judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
     `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
-    saying that every observation commutes with it — and `Walk/`, the judgment-agnostic walk over
-    observations that every proof obligation is discharged by;
+    saying that every observation commutes with it — `Walk/`, the judgment-agnostic walk over
+    observations that every proof obligation is discharged by, and `GenRel.lean`, each combinator
+    related to itself at two monads, for the judgments that relate interpretations;
   - *what a proof calls*: `Tactic/`, one entry tactic per judgment over that walk, plus the support
     and `ℝ≥0∞` helpers; and `PBT/` and `Tuning/`, the front ends above.
 

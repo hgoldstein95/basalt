@@ -272,8 +272,11 @@ private def tryFact (j : Judgment) (leaves : Leaves) (goal : MVarId) (e : Expr) 
     -- A bridge stated for the fact's own head is tried before one that must unfold the fact, which
     -- can succeed too, by unification against the unfolded judgment, but with a mangled result.
     let goalHead := (← whnfR (← goal.getType)).getAppFn.constName?
-    let exact ← j.bridges.filterM fun b => return head == (← b.elim (pure goalHead) bridgeArgHead)
-    for bridge in exact ++ j.bridges.filter (!exact.contains ·) do
+    -- A bridge not in scope cannot apply: a stronger law is stated after the rules that use it.
+    let env ← getEnv
+    let bridges := j.bridges.filter fun b => b.all env.contains
+    let exact ← bridges.filterM fun b => return head == (← b.elim (pure goalHead) bridgeArgHead)
+    for bridge in exact ++ bridges.filter (!exact.contains ·) do
       let r ← observing? do
         let cand ← match bridge with
           | none => pure e
@@ -301,11 +304,11 @@ private def tryFact (j : Judgment) (leaves : Leaves) (goal : MVarId) (e : Expr) 
         if leaves.facts.back? == some bridge && inst == some false then throw ex
   return none
 
-/-- `g`'s head's laws, under the naming convention (`lawConventions`). -/
-def law? (g : Expr) : MetaM (Array Expr) := do
+/-- `g`'s head's laws for judgment `j`, under the naming convention (`Judgment.lawSuffixes`). -/
+def law? (j : Judgment) (g : Expr) : MetaM (Array Expr) := do
   let some head := g.getAppFn.constName? | return #[]
   let env ← getEnv
-  (lawConventions.filterMap fun (suffix, _) =>
+  (j.lawSuffixes.filterMap fun suffix =>
     if env.contains (head ++ suffix) then some (head ++ suffix) else none).mapM
     mkConstWithFreshMVarLevels
 
@@ -331,12 +334,13 @@ def fixpointSeed? (gen : Name) : MetaM (Option (Name × Array Nat)) := do
 
 /-- `g` with its head unfolded one step, when the head is a non-recursive definition with no rule:
 a derived combinator or a helper, which is walked through rather than taught to the walker. A
-combinator with a rule, a recursive definition, a matcher, a projection, and an instance are not
-unfolded. Returns the head's name with the body. -/
-def unfold? (g : Expr) : MetaM (Option (Name × Expr)) := do
+combinator with a rule (unless `combinators`), a recursive definition, a matcher, a projection, and
+an instance are not unfolded. Returns the head's name with the body. -/
+def unfold? (g : Expr) (combinators := false) : MetaM (Option (Name × Expr)) := do
   let .const c us := g.getAppFn | return none
   let env ← getEnv
-  if isCombinator env c || isMatcherCore env c || env.isProjectionFn c then return none
+  if (!combinators && isCombinator env c) || isMatcherCore env c || env.isProjectionFn c then
+    return none
   if ← isInstance c then return none
   let some (.defnInfo info) := env.find? c | return none
   if ← isRecursiveDefinition c then return none
@@ -542,7 +546,7 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
         if let some gs ← tryFact j leaves goal decl.toExpr then
           return some (← walkAll extras (← namePremises none (← goal.getType) gs))
     for g in forms do
-      for law in ← law? g do
+      for law in ← law? j g do
         if let some gs ← tryFact j leaves goal law then
           return some (← walkAll extras (← namePremises none (← goal.getType) gs))
     return none
@@ -574,7 +578,7 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
     if self.isEmpty || (← ruleApplied.get) then throw ex
   -- Unfolding comes last, so that a law or a caller's fact stays an abstraction boundary.
   for g' in forms do
-    if let some (c, body) ← unfold? g' then
+    if let some (c, body) ← unfold? g' j.unfoldsCombinators then
       let goal ← goal.change (restate body)
       try return ← walk extras goal
       catch ex => throwError "{ex.toMessageData}\n(in the unfolding of `{c}`)"

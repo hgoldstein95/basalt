@@ -16,7 +16,8 @@ Shared pieces of the `_bound` and `_fixpoint` tactics. A `_bound` tactic restate
 bound on an observation, runs the walk with `computeBound`, and turns the result into goals for the
 user: `pathsBound` gives one goal per path of a demonic precondition, `prunePaths` simplifies an
 angelic precondition, and `arithBound` gives one inequality to close by arithmetic. A `_fixpoint`
-tactic takes one induction step with `fixpointStep` and then runs its `_bound` tactic.
+tactic takes one induction step with `fixpointStep` and then runs its `_bound` tactic. A relational
+judgment, one generator at two monads, walks with `walkRel`, and takes its step with `relFixpoint`.
 -/
 open Lean Meta Elab Tactic Lean.Order
 
@@ -62,7 +63,9 @@ def computeBound (extras : Array Term) (obs : Name) (lower : Bool) (g post : Exp
 unification cannot find it. -/
 private partial def mkAdmissible (gTy : Expr) (leaf : Array Expr → MetaM Expr)
     (ys : Array Expr := #[]) : MetaM Expr := do
-  match ← whnf gTy with
+  -- `whnfR`, here and for `fTy` in `fixpointStep`: `whnf` unfolds `IOModel α` to a function type.
+  -- A generator with no arguments then fails `io_fixpoint` on an `admissible_pi_apply` mismatch.
+  match ← whnfR gTy with
   | .forallE n d b _ =>
     withLocalDeclD n d fun y => do
       let inner ← mkAdmissible (b.instantiate1 y) leaf (ys.push y)
@@ -97,7 +100,7 @@ def fixpointStep (tac boundTac : String) (x adm : Expr) (goal : MVarId) : TermEl
   let some step := xs.back? | throwError "{tac}: internal error"
   let admGoal := xs[xs.size - 2]!
   let F := concl.appArg!
-  let fTy ← whnf (← inferType F)
+  let fTy ← whnfR (← inferType F)
   -- Matching `F`'s body against the goal fixes the arguments outside the seed.
   let args := x.getAppArgs
   forallTelescope fTy fun ys _ => do
@@ -179,6 +182,44 @@ def tidy (lctx : LocalContext) (goal : MVarId) : MetaM MVarId := goal.withContex
       unless lctx.contains d.fvarId do
         goal ← goal.rename d.fvarId (← mkFreshUserName d.userName.eraseMacroScopes)
   goal.withContext do goal.replaceTargetDefEq (← tidyExpr (← goal.getType))
+
+/-! ## Relating one generator at two monads -/
+
+/-- The arguments of `goal`, which must be `rel … y x`: the relation's own first, then `y` and `x`,
+the last two. `tac` is the caller, for the error. -/
+def parseRel (tac : String) (rel : Name) (goal : MVarId) : MetaM (Array Expr) := do
+  let ty ← whnfR (← instantiateMVars (← goal.getType))
+  unless ty.isAppOf rel && 2 ≤ ty.getAppNumArgs do
+    throwError "{tac}: expected a goal `{.ofConstName rel} … (gen …) (gen …)`, got{indentExpr ty}"
+  return ty.getAppArgs
+
+/-- Walk `goal`, a `rel … y x`, splitting a `match` on the generator's arguments first. -/
+partial def walkRel (tac : String) (rel : Name) (extras : Array Term) (goal : MVarId) :
+    TermElabM (List MVarId) := goal.withContext do
+  let args ← parseRel tac rel goal
+  if let some cases ← splitMatch? goal args[args.size - 2]! then
+    return ← cases.flatMapM (walkRel tac rel extras)
+  let lctx := (← goal.getDecl).lctx
+  (← walk extras goal).mapM fun g => tidy lctx g
+
+/-- `rel … (gen a₁ … aₙ) (gen a₁ … aₙ)`: one step of `gen.fixpoint_induct` on `y`'s side, admissible
+by `adm` of the goal's arguments, `x`'s side unfolded one step, and the two walked together
+(`walkRel`). A `gen` that is not recursive is unfolded on both sides and walked. -/
+def relFixpoint (tac boundTac : String) (rel : Name) (adm : Array Expr → MetaM Expr)
+    (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) := goal.withContext do
+  let args ← parseRel tac rel goal
+  let y := args[args.size - 2]!
+  let some gen := y.getAppFn.constName?
+    | throwError "{tac}: expected a generator applied to its arguments, got{indentExpr y}"
+  let step ← fixpointStep tac boundTac y (← adm args) goal
+  -- `eq_def`, not the equation lemmas: a generator defined by cases has one per case.
+  let step ← if (← fixpointSeed? gen).isSome then
+      match ← Lean.Elab.Tactic.run step
+          (evalTactic (← `(tactic| rw [$(mkCIdent (gen ++ `eq_def)):ident]))) with
+      | [g] => pure g
+      | _ => throwError "{tac}: could not unfold `{gen}`"
+    else pure step
+  walkRel tac rel extras step
 
 /-- One goal per path through a computed demonic precondition: its `∀` and `→` introduced, its `∧`
 and `if` split. Only a connective that is there syntactically is split, so that a postcondition
