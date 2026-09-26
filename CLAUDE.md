@@ -74,8 +74,10 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   per algebra and direction ([Basalt/Walk/Average.lean](Basalt/Walk/Average.lean) for expectations;
   the demonic and angelic ones beside the presentations they are derived from, in
   [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean); the `sup` ones in
-  [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean)), and for bridging a recursive combinator's law.
-  What closes a leaf of a bound on one observation is tagged `@[obs_leaf]`. The registries are
+  [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean)), and for bridging a recursive combinator's law. A
+  `match` has no rule: the walk generates a congruence lemma for its matcher on first use
+  ([Basalt/Walk/Match.lean](Basalt/Walk/Match.lean), pinned by
+  [BasaltTest/Walk/Match.lean](BasaltTest/Walk/Match.lean)). What closes a leaf of a bound on one observation is tagged `@[obs_leaf]`. The registries are
   [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean); the walk and its side-goal solvers are
   [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean), and the names it gives what it leaves
   [Basalt/Walk/Names.lean](Basalt/Walk/Names.lean). The one entry tactic, `walk`, is

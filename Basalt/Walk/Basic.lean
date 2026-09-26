@@ -20,6 +20,7 @@ import Mathlib.Data.Nat.Cast.Defs
 import Mathlib.Order.Defs.PartialOrder
 import Basalt.Obs.Ordered
 import Basalt.Walk.Attr
+import Basalt.Walk.Match
 import Basalt.Walk.Names
 
 /-!
@@ -599,10 +600,11 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
     let goal ← goal.change (restate body)
     try return ← walk extras goal
     catch ex => throwError "{ex.toMessageData}\n(in the unfolding of `{c}`)"
+  if let some gs ← matchCongr? j goal restate g then return ← rest gs
   if (← matchMatcherApp? g).isSome then
-    throwError "the walk does not enter a `match`:{indentExpr g}\nOne on the generator's \
-      arguments is split before the walk; one on a drawn value, or inside a helper the walk \
-      unfolds, is not supported."
+    throwError "the walk does not enter this `match`:{indentExpr g}\nIt enters one whose type does \
+      not depend on its discriminants, that is applied to nothing further, and, on a relation, \
+      whose counterpart is the same `match`."
   if let some gs ← trySelf leaves goal g rest then return gs
   throwError j.noLeaf g
 

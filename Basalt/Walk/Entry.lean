@@ -135,44 +135,10 @@ def fixpointStep (tac boundTac : String) (x adm : Expr) (goal : MVarId) : TermEl
   let s ← s.tryClearMany (seedFVars.map (·.fvarId!))
   s.withContext do s.replaceTargetDefEq (← Core.betaReduce (← instantiateMVars (← s.getType)))
 
-/-- The sub-generators of `g` that are a `match` on something in the context, outermost first: a
-`match` with no loose bound variable, whose discriminants are therefore not drawn values. -/
-private partial def ctxMatches (env : Environment) (e : Expr) : Array Expr :=
-  let here := if !e.hasLooseBVars && isMatcherAppCore env e then #[e] else #[]
-  here ++ match e with
-  | .app f a => ctxMatches env f ++ ctxMatches env a
-  | .lam _ t b _ | .forallE _ t b _ => ctxMatches env t ++ ctxMatches env b
-  | .letE _ t v b _ => ctxMatches env t ++ ctxMatches env v ++ ctxMatches env b
-  | .mdata _ b | .proj _ _ b => ctxMatches env b
-  | _ => #[]
-
-/-- The cases of `goal`, a statement about the generator `g`, when `g` contains a sub-generator that
-is a `match` on something in the context (a generator defined by cases on its seed): `split`'s, one
-per alternative. The walk itself does not enter a `match`, and this has to happen before a bound is
-a metavariable. -/
-def splitMatch? (goal : MVarId) (g : Expr) : MetaM (Option (List MVarId)) := do
-  let g ← instantiateMVars g
-  let gHead := (← inferType g).getAppFn
-  -- A `match` that reduces is the walk's: only a stuck one is split. One that is not a generator
-  -- (inside a proof or a value) is not the walk's concern.
-  let some m ← (ctxMatches (← getEnv) g).findM? fun m => do
-      pure ((← whnfCore m) == m) <&&> (return (← inferType m).getAppFn == gHead)
-    | return none
-  let some cases ← observing? (Split.splitMatch goal m) | return none
-  let old := (← goal.getDecl).lctx
-  -- A pattern's variables are the alternative's, under its names.
-  let named ← cases.mapM fun (c : MVarId) => c.withContext do
-    let mut c := c
-    for d in ← getLCtx do
-      if !old.contains d.fvarId && d.userName.hasMacroScopes then
-        c ← c.rename d.fvarId ((← c.getDecl).lctx.getUnusedName d.userName.eraseMacroScopes)
-    pure c
-  return some named
-
 /-- `goal`, a residual goal of a walk begun in `lctx`, with its metavariables instantiated and
-`tidyExpr` applied, in the target and every hypothesis, and each hypothesis the walk introduced made
-inaccessible under the name it was given. A fact passed to the walk can mention a drawn value by
-name; the residual goal cannot. -/
+`tidyExpr` applied, in the target and every hypothesis, a `match` of one value in the target
+collapsed, and each hypothesis the walk introduced made inaccessible under the name it was given. A
+fact passed to the walk can mention a drawn value by name; the residual goal cannot. -/
 def tidy (lctx : LocalContext) (goal : MVarId) : MetaM MVarId := goal.withContext do
   goal.setTag .anonymous
   let mut goal := goal
@@ -182,7 +148,10 @@ def tidy (lctx : LocalContext) (goal : MVarId) : MetaM MVarId := goal.withContex
       if t != d.type then goal ← goal.replaceLocalDeclDefEq d.fvarId t
       unless lctx.contains d.fvarId do
         goal ← goal.rename d.fvarId (← mkFreshUserName d.userName.eraseMacroScopes)
-  goal.withContext do goal.replaceTargetDefEq (← tidyExpr (← goal.getType))
+  goal ← goal.withContext do goal.replaceTargetDefEq (← tidyExpr (← goal.getType))
+  goal.withContext do
+    let ty ← goal.getType
+    applySimpResultToTarget goal ty (← collapseMatches ty)
 
 /-! ## Relating one generator at two monads -/
 
@@ -194,12 +163,10 @@ def parseRel (tac : String) (rel : Name) (goal : MVarId) : MetaM (Array Expr) :=
     throwError "{tac}: expected a goal `{.ofConstName rel} … (gen …) (gen …)`, got{indentExpr ty}"
   return ty.getAppArgs
 
-/-- Walk `goal`, a `rel … y x`, splitting a `match` on the generator's arguments first. -/
-partial def walkRel (tac : String) (rel : Name) (extras : Array Term) (goal : MVarId) :
+/-- Walk `goal`, a `rel … y x`. -/
+def walkRel (tac : String) (rel : Name) (extras : Array Term) (goal : MVarId) :
     TermElabM (List MVarId) := goal.withContext do
-  let args ← parseRel tac rel goal
-  if let some cases ← splitMatch? goal args[args.size - 2]! then
-    return ← cases.flatMapM (walkRel tac rel extras)
+  discard <| parseRel tac rel goal
   let lctx := (← goal.getDecl).lctx
   (← walk extras goal).mapM fun g => tidy lctx g
 
@@ -222,9 +189,45 @@ def relFixpoint (tac boundTac : String) (rel : Name) (adm : Array Expr → MetaM
     else pure step
   walkRel tac rel extras step
 
-/-- One goal per path through a computed demonic precondition: its `∀` and `→` introduced, its `∧`
-and `if` split. Only a connective that is there syntactically is split, so that a postcondition
-defined as a conjunction stays folded. -/
+/-- `g`, one case of a `split` begun in `old`, with the equations `split` introduced solved: each
+that is between constructors by `injection`, which closes a case that is a clash, each with a
+variable side by `subst`. Then the variables it introduced that nothing mentions are cleared; a
+hypothesis it introduced (an earlier pattern that did not match) stays. -/
+private partial def solveSplitEqs (old : LocalContext) (g : MVarId) : MetaM (Option MVarId) :=
+  g.withContext do
+  for d in ← getLCtx do
+    if old.contains d.fvarId || !d.userName.hasMacroScopes || !d.type.isEq then continue
+    if let some g' ← subst? g d.fvarId then return ← solveSplitEqs old g'
+    if let some r ← observing? (injection g d.fvarId) then
+      match r with
+      | .solved => return none
+      | .subgoal g' .. => return ← solveSplitEqs old g'
+  let fresh ← (← getLCtx).foldlM (init := #[]) fun acc d => do
+    if old.contains d.fvarId || !d.userName.hasMacroScopes || (← isProp d.type) then return acc
+    return acc.push d.fvarId
+  some <$> g.tryClearMany fresh
+
+/-- The cases of `g` by the first `match` in `part` of its target on something in the context, each
+with its equations solved (`solveSplitEqs`); `none` when there is no such `match`. -/
+private def splitCtxMatch? (part : Expr → Expr) (g : MVarId) : MetaM (Option (List MVarId)) :=
+  g.withContext do
+  let ty ← instantiateMVars (← g.getType)
+  let some m ← findSplit? (part ty) .match | return none
+  let old ← getLCtx
+  let some gs ← observing? (Split.splitMatch g m) | return none
+  some <$> gs.filterMapM fun g => do
+    g.setTag .anonymous
+    solveSplitEqs old g
+
+/-- `g`, an inequality whose `i`-th argument is a computed bound, one goal per case of each `match`
+in the bound on something in the context. -/
+partial def splitBoundMatches (i : Nat) (g : MVarId) : MetaM (List MVarId) := do
+  let some gs ← splitCtxMatch? (·.getArg! i) g | return [g]
+  gs.flatMapM (splitBoundMatches i)
+
+/-- One goal per path through a computed demonic precondition: its `∀` and `→` introduced, its `∧`,
+`if` and `match` split. Only a connective that is there syntactically is split, so that a
+postcondition defined as a conjunction stays folded. -/
 partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
   let ty := (← reduceCtorProjs (← g.getType)).consumeMData
   if ty.isConstOf ``True then
@@ -235,6 +238,16 @@ partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
     return ← splitPaths g
   if ty.isAppOf ``List.foldr then
     return ← splitPaths (← g.replaceTargetDefEq (← whnf ty))
+  if (← matchMatcherApp? ty).isSome then
+    if let some ty' ← reduceRecMatcher? ty then
+      return ← splitPaths (← g.replaceTargetDefEq ty'.headBeta)
+    let r ← collapseMatches ty
+    if r.expr != ty then return ← splitPaths (← applySimpResultToTarget g ty r)
+    let old ← getLCtx
+    if let some gs ← observing? (Split.splitMatch g ty) then
+      return ← gs.flatMapM fun g => do
+        let some g ← solveSplitEqs old g | return []
+        splitPaths g
   for (head, arity, lem) in [(``And, 2, ``And.intro), (``dite, 5, ``dite_intro),
       (``ite, 5, ``ite_intro)] do
     if ty.isAppOfArity head arity then
@@ -243,11 +256,11 @@ partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
   return [g]
 
 /-- The computed angelic precondition `g`, pruned: its `List.foldr Or False` and `List.map` over a
-literal list of branches reduced to a disjunction, then the disjuncts that are refuted outright
-removed (a constructor clash, a closed weight that is `0`), the trivial conjuncts dropped, and a
-draw that is the value itself eliminated. It
-never picks between disjuncts that survive, and closes the goal when nothing is left to choose. -/
-def prunePaths (g : MVarId) : TermElabM (List MVarId) := g.withContext do
+literal list of branches reduced to a disjunction, a `match` of one value collapsed, then the
+disjuncts that are refuted outright removed (a constructor clash, a closed weight that is `0`), the
+trivial conjuncts dropped, and a draw that is the value itself eliminated. It never picks between
+disjuncts that survive, and closes the goal when nothing is left to choose. -/
+private def prune (g : MVarId) : TermElabM (List MVarId) := g.withContext do
   let ty ← Meta.transform (← instantiateMVars (← g.getType)) (pre := fun e => do
     unless e.isAppOf ``List.foldr do return .continue
     let e' ← whnf e
@@ -257,8 +270,16 @@ def prunePaths (g : MVarId) : TermElabM (List MVarId) := g.withContext do
     simp only [reduceCtorEq, Nat.lt_irrefl, Nat.reduceLT, Int.reduceLT, Nat.cast_ofNat,
       Pi.top_apply, Prop.top_eq_true, false_or, or_false, true_or, or_true, true_and, and_true,
       false_and, and_false, exists_false, exists_prop, exists_eq_right, ite_self,
-      Basalt.Walk.dite_const]))
+      Basalt.Walk.dite_const, Basalt.Walk.matchConst]))
   return pruned.getD [g]
+
+/-- The computed angelic precondition `g`, pruned (`prune`), then one goal per case of each `match`
+in it on something in the context, each pruned again. A case split on the context picks no
+disjunct. -/
+partial def prunePaths (g : MVarId) : TermElabM (List MVarId) := do
+  (← prune g).flatMapM fun g => do
+    let some gs ← splitCtxMatch? id g | return [g]
+    gs.flatMapM prunePaths
 
 
 /-- Prove `goal`, which is `O.spec g post` for `O` the observation `obs` into `Prop`, by the walk of
@@ -283,7 +304,8 @@ def arithBound (extras : Array Term) (obs : Name) (lower : Bool) (g post other :
     else mkAppM ``LE.le #[b, other])
   goal.assign (← if lower then mkAppM ``le_trans #[arith, structural]
     else mkAppM ``le_trans #[structural, arith])
-  (arith.mvarId! :: rest).mapM fun g => tidy lctx g
+  let ariths ← splitBoundMatches (if lower then 3 else 2) (← tidy lctx arith.mvarId!)
+  return ariths ++ (← rest.mapM fun g => tidy lctx g)
 
 /-- Prove `goal`, which is `O.spec g post` for `O` the observation `obs` into `Prop`, by the walk of
 a lower bound in an angelic algebra: the precondition it computed, pruned (`prunePaths`), then
@@ -377,7 +399,6 @@ partial def walkGoal (extras : Array Term) (goal : MVarId) : TermElabM (List MVa
     if isWalkRel (← getEnv) rel then return ← walkRel "walk" rel extras goal
   let some sg := specGoal? ty | throwError (← notASpec ty)
   let goal ← goal.replaceTargetDefEq ty
-  if let some cases ← splitMatch? goal sg.g then return ← cases.flatMapM (walkGoal extras)
   match sg.bound with
   | some (b, lower) => arithBound extras sg.obs lower sg.g sg.post b goal
   | none =>

@@ -215,8 +215,9 @@ Notes:
   of it. A callee's law supplies it. A combinator term in that position has no law: prove its two
   halves, each by `walk`, and pass them (`Tree.genBSTByInsertion.sound_complete`,
   `BST/ByInsertion.lean`).
-- **A `match` on the generator's arguments**, at its head or inside a branch, is split into its
-  cases before the walk.
+- **A `match`**, on the generator's arguments or on a drawn value, is entered: the bound becomes the
+  same `match`, split into one goal per case where the algebra allows (`BasaltTest/Walk/Match.lean`
+  shows each).
 - **Completeness by a measure**, when no structural induction fits or the script has to be fixed in
   advance: `apply IsCompleteFor.of_measure μ fun n ih s a hn hP => ?_` and then
   `rw [<GEN>, SPMF.mem_support_iff_may]; walk` leave a goal with no generator in it. `μ` is a
@@ -443,9 +444,9 @@ once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`)
 - **A walk says no hypothesis or fact gives `….spec g …` of a combinator's generator argument** →
   the argument of a list combinator has no law passed: pass the callee's, or, for a combinator term,
   prove the half and pass it.
-- **A walk says it does not enter a `match`** → the `match` is on a drawn value, or inside a helper
-  the walk unfolds. Restate the generator with an `if`, move the `match` into the generator, or
-  make the cases separate definitions that carry laws.
+- **A walk says it does not enter this `match`** → the message says which `match`es it enters.
+  Restate this one as one of them (move what it is applied to into its alternatives), or make the
+  cases separate definitions that carry laws.
 - **`omega` fails in a cost proof** → read the goal: it is the exact inequality your bound must
   satisfy, with every sub-cost's bound in context. Either the cost function is still folded in a
   hypothesis (`simp only [...] at *`), or the bound is too tight.

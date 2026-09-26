@@ -118,42 +118,42 @@ example : IsSoundFor (LeftistHeap.Tree.genLeftist lo) (LeftistHeap.Tree.isLeftis
   all_goals simp_all [LeftistHeap.Tree.isLeftist]
   all_goals omega
 
-/-! A generator defined by `match` on its seed is split into its cases before the walk. -/
+/-! A generator defined by `match` on its seed: one goal per case, the seed replaced by its pattern. -/
 
 /--
 trace: genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
 ih : ∀ (lo a : ℕ), SPMF.alwaysObs.spec (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
-lo x : ℕ
+lo : ℕ
 ⊢ LeftistHeap.Tree.isLeftist lo LeftistHeap.Tree.leaf
 
 genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
 ih : ∀ (lo a : ℕ), SPMF.alwaysObs.spec (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
-lo x : ℕ
+lo : ℕ
 ⊢ LeftistHeap.Tree.leaf.rank = 0
 
 genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
 ih : ∀ (lo a : ℕ), SPMF.alwaysObs.spec (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
-lo x k delta✝ : ℕ
+lo k✝ delta✝ : ℕ
 h_delta✝ : ⊤ delta✝
 r✝ : LeftistHeap.Tree
-h_r✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) r✝ ∧ r✝.rank = k
+h_r✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) r✝ ∧ r✝.rank = k✝
 gap✝ : ℕ
 h_gap✝ : ⊤ gap✝
 l✝ : LeftistHeap.Tree
-h_l✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) l✝ ∧ l✝.rank = k + gap✝
+h_l✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) l✝ ∧ l✝.rank = k✝ + gap✝
 ⊢ LeftistHeap.Tree.isLeftist lo (l✝.node (lo + delta✝) r✝)
 
 genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
 ih : ∀ (lo a : ℕ), SPMF.alwaysObs.spec (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
-lo x k delta✝ : ℕ
+lo k✝ delta✝ : ℕ
 h_delta✝ : ⊤ delta✝
 r✝ : LeftistHeap.Tree
-h_r✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) r✝ ∧ r✝.rank = k
+h_r✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) r✝ ∧ r✝.rank = k✝
 gap✝ : ℕ
 h_gap✝ : ⊤ gap✝
 l✝ : LeftistHeap.Tree
-h_l✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) l✝ ∧ l✝.rank = k + gap✝
-⊢ (l✝.node (lo + delta✝) r✝).rank = k.succ
+h_l✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) l✝ ∧ l✝.rank = k✝ + gap✝
+⊢ (l✝.node (lo + delta✝) r✝).rank = k✝.succ
 -/
 #guard_msgs in
 example : IsSoundFor (LeftistHeap.Tree.genLeftistOfRank lo k)
@@ -163,22 +163,8 @@ example : IsSoundFor (LeftistHeap.Tree.genLeftistOfRank lo k)
   trace_state
   all_goals simp_all [LeftistHeap.Tree.isLeftist, LeftistHeap.Tree.rank]
 
-/-! A `match` on a drawn value is not entered. -/
-
-/--
-error: the walk does not enter a `match`:
-  match x with
-  | 0 => pure 0
-  | n.succ => pure n
-One on the generator's arguments is split before the walk; one on a drawn value, or inside a helper the walk unfolds, is not supported.
--/
-#guard_msgs in
-example : IsSoundFor (ArbNat.Nat.arbitrary >>= fun x => match x with
-    | 0 => Pure.pure 0 | n + 1 => Pure.pure n : SPMF Nat) (fun _ => True) := by
-  rw [IsSoundFor.iff_obs]
-  walk
-
-/-! A `match` on an argument inside a branch is split before the walk, as one at the head is. -/
+/-! A `match` on an argument inside a branch is entered where it is: the other branch is walked
+once. -/
 
 def genBelow [Gen G] (n : Nat) : G Nat :=
   oneOf [fun _ => pure 0, fun _ => match n with | 0 => pure 0 | k + 1 => genBelow k]
@@ -188,23 +174,17 @@ partial_fixpoint
 trace: genBelow : ℕ → SPMF ℕ
 ih : ∀ (n : ℕ), SPMF.alwaysObs.spec (genBelow n) fun x => x ≤ n
 n : ℕ
+⊢ 0 ≤ n
+
+genBelow : ℕ → SPMF ℕ
+ih : ∀ (n : ℕ), SPMF.alwaysObs.spec (genBelow n) fun x => x ≤ n
 ⊢ 0 ≤ 0
 
 genBelow : ℕ → SPMF ℕ
 ih : ∀ (n : ℕ), SPMF.alwaysObs.spec (genBelow n) fun x => x ≤ n
-n : ℕ
-⊢ 0 ≤ 0
-
-genBelow : ℕ → SPMF ℕ
-ih : ∀ (n : ℕ), SPMF.alwaysObs.spec (genBelow n) fun x => x ≤ n
-n k : ℕ
-⊢ 0 ≤ k.succ
-
-genBelow : ℕ → SPMF ℕ
-ih : ∀ (n : ℕ), SPMF.alwaysObs.spec (genBelow n) fun x => x ≤ n
-n k x✝ : ℕ
-h_x✝ : x✝ ≤ k
-⊢ x✝ ≤ k.succ
+k✝ x✝ : ℕ
+h_x✝ : x✝ ≤ k✝
+⊢ x✝ ≤ k✝.succ
 -/
 #guard_msgs in
 example : IsSoundFor (genBelow n) (· ≤ n) := by
@@ -213,23 +193,15 @@ example : IsSoundFor (genBelow n) (· ≤ n) := by
   trace_state
   all_goals omega
 
-/-! One inside a helper is met only once the walk has unfolded it, and is not split. -/
+/-! One inside a helper is entered once the walk has unfolded the helper. -/
 
 def pickBelow [Gen G] (n : Nat) : G Nat := match n with | 0 => pure 0 | k + 1 => pure k
 
-/--
-error: the walk does not enter a `match`:
-  match n with
-  | 0 => pure 0
-  | k.succ => pure k
-One on the generator's arguments is split before the walk; one on a drawn value, or inside a helper the walk unfolds, is not supported.
-(in the unfolding of `SoundBoundTest.pickBelow`)
--/
-#guard_msgs in
 example :
     IsSoundFor (oneOf [fun _ => pure 0, fun _ => pickBelow n] (by simp) : SPMF Nat) (· ≤ n) := by
   rw [IsSoundFor.iff_obs]
   walk
+  all_goals omega
 
 /-! A callee that has only a half of the law is closed by that half, passed as a fact. -/
 

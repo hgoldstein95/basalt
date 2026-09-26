@@ -219,12 +219,9 @@ def byCases [Gen G] (n : Nat) : G Nat :=
   | 0 => pure 0
   | _ + 1 => chooseNat 0 1
 
--- A `match` on the seed that is stuck is split into its cases before the walk.
+-- A `match` on the seed is entered, and one whose alternatives have one bound is that bound.
 /--
 trace: n : ℕ
-⊢ 1 ≤ 1
-
-n n_1 : ℕ
 ⊢ 1 ≤ 1
 -/
 #guard_msgs in

@@ -154,12 +154,11 @@ example (n : Nat) : IsCostBounded (byCases n) (fun _ => 1) := by
   | _ + 1 => rw [IsCostBounded.iff_obs]; walk fixpoint; omega
 
 
--- A `match` on the seed that is stuck is split into its cases before the walk.
+-- A `match` on the seed is entered: one goal per case, the seed replaced by its pattern.
 /--
-trace: n : ℕ
-⊢ 0 ≤ 1
+trace: ⊢ 0 ≤ 1
 
-n n_1 v✝ : ℕ
+v✝ : ℕ
 h_v✝ : 0 ≤ v✝ ∧ v✝ ≤ 1
 ⊢ 1 ≤ 1
 -/

@@ -308,29 +308,14 @@ theorem worst_listOfMaxLength_le {n : Nat} (hg : worstObs.spec g (fun _ m => (m 
     push_cast
     exact le_rfl
 
-/-! `permutationOf` takes no generator: it draws one insertion index per element of its list. Its
-body destructures each draw with a `match`, which the walk does not enter, so its bound is proved
-by support inversion. -/
+/-! `permutationOf` takes no generator: it draws one insertion index per element of its list. -/
 
 private theorem always_permutationOf {xs : List α} :
     alwaysObs.spec (permutationOf xs : SPMF.Cost { ys // xs.Perm ys }) fun _ n =>
       n ≤ xs.length := by
   induction xs with
-  | nil =>
-    rintro ⟨a, n⟩ h
-    rw [permutationOf, mem_support_pure_iff] at h
-    exact h.2.le
-  | cons x xs ih =>
-    rintro ⟨a, n⟩ h
-    rw [permutationOf] at h
-    obtain ⟨_, n1, n2, h1, h2, rfl⟩ := mem_support_bind_iff.mp h
-    obtain ⟨⟨k, _, _⟩, n3, n4, h3, h4, rfl⟩ := mem_support_bind_iff.mp h2
-    obtain ⟨_, h3, -⟩ := mem_support_map_iff.mp h3
-    obtain ⟨-, rfl⟩ := mem_support_pure_iff.mp h4
-    have : n1 ≤ xs.length := ih _ h1
-    rw [mem_support_choose_iff.mp h3]
-    show _ ≤ xs.length + 1
-    omega
+  | nil => rw [permutationOf]; walk; simp
+  | cons x xs ih => rw [permutationOf]; walk [ih]; simp; omega
 
 @[gen_rule]
 theorem le_always_permutationOf {xs : List α} {p : { ys // xs.Perm ys } → Nat → Prop} :
