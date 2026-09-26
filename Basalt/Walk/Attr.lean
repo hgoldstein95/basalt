@@ -140,12 +140,6 @@ def reduceTo : Judgment → Option Name
   | argument _ r _ => r
   | _ => none
 
-/-- Whether a fact about a generator is tried before its combinator's rules: the caller of a rule
-that asks about an argument usually has one. -/
-def leavesFirst : Judgment → Bool
-  | argument .. => true
-  | _ => false
-
 /-- The error for a leaf nothing closes. -/
 def noLeaf (j : Judgment) (g : Expr) : MessageData :=
   match j with
@@ -224,13 +218,9 @@ structure Leaves where
   fact, then equations `∀ a, p a = k + h a` that the walker solves for `k`. -/
   facts : Array Name := #[]
   /-- Bounds on the subject by itself, tried in order for a leaf nothing else closes, in place of
-  the judgment's `noLeaf`. -/
+  the judgment's `noLeaf`: a lower bound's keeps a recursive occurrence or an unknown callee in the
+  bound as itself. -/
   self : Array Name := #[]
-  /-- Whether `self` stands in for a rule per combinator — an upper bound's does, since a list
-  combinator has no shape of choice for the walk to enter — and so applies only to a generator the
-  walker knows as one. A generator nothing is known about is then still an error. A lower bound's
-  keeps a recursive occurrence or an unknown callee in the bound as itself. -/
-  selfOnlyCombinators : Bool := false
 
 /-- The leaves of the goal `ty`, a statement of judgment `j`: its observation's, if it has one. -/
 def Judgment.leaves (j : Judgment) (ty : Expr) : CoreM Leaves := do
@@ -238,7 +228,7 @@ def Judgment.leaves (j : Judgment) (ty : Expr) : CoreM Leaves := do
   let some (obs, _) := specObs? ty | return {}
   let all := ((obsLeafExt.getState (← getEnv)).find? obs).getD #[]
   let of (self : Bool) := all.filterMap fun (u, s, n) => if u == upper && s == self then n else none
-  return { facts := of false, self := of true, selfOnlyCombinators := upper }
+  return { facts := of false, self := of true }
 
 /-- `@[obs_leaf]` — a bridge from a fact about a generator to a bound on an observation of it, which
 the walker tries at a leaf of that bound: its first explicit argument is the fact, and the rest are

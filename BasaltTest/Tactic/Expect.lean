@@ -107,6 +107,17 @@ example : SPMF.expect (listOf Nat.arbitrary >>= fun _ => Pure.pure 0)
   trace_state
   exact le_rfl
 
+-- A generator nothing is known about is an error, not a bound by its mass alone: that bound is a
+-- list combinator's rule, and a callee whose law was not passed is no list combinator.
+/--
+error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
+  g
+Pass a fact about it to the tactic.
+-/
+#guard_msgs in
+example (g : SPMF Nat) : SPMF.expect (g >>= fun n => Pure.pure n) (fun n => (n : ℝ≥0∞)) ≤ ⊤ := by
+  expect_bound
+
 -- The cookbook's expectation bounds are this walk followed by arithmetic:
 -- `Nat.arbitrary.expected_cost` (`ArbNat.lean`) and `Tree.genBST.expect_size_le` (`BST.lean`).
 
