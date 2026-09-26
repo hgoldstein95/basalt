@@ -18,6 +18,8 @@ the precondition as itself.
 
 open RandomChoice Lean Meta Elab Tactic Basalt.Walk
 
+attribute [walk_argument "complete_bound"] IsCompleteFor
+
 namespace SPMF
 
 /-! ## Leaves -/
@@ -25,11 +27,6 @@ namespace SPMF
 @[obs_leaf]
 theorem le_may_of_isCompleteFor {x : SPMF α} {R p : α → Prop} (hx : IsCompleteFor x R) :
     (∃ a, R a ∧ p a) ≤ mayObs.spec x p := fun ⟨a, hR, hp⟩ => ⟨a, hx a hR, hp⟩
-
-@[obs_leaf]
-theorem le_may_of_isSoundAndComplete {x : SPMF α} {R p : α → Prop}
-    (hx : IsSoundAndComplete x R) : (∃ a, R a ∧ p a) ≤ mayObs.spec x p :=
-  le_may_of_isCompleteFor hx.complete
 
 /-- The reflexive leaf: a generator nothing is known about is reached through its own support. -/
 @[obs_leaf self]
@@ -159,8 +156,8 @@ produce `a` (at `SPMF.Cost`, to produce the value `a.1` in `a.2` choices), compu
 `gen`'s syntax: an `∃` over each value drawn, under the generator's own names, an `∨` over each
 choice, with the branches that cannot produce `a` pruned, and at the end the equation between `a`
 and the value built. On `IsCompleteFor (gen …) P` it introduces the value and `P` of it first,
-inaccessible. A callee is reached through its `.sound_complete` or `.complete` law, or a fact passed
-as `complete_bound [h₁, h₂]`; a recursive occurrence, or a callee nothing is known about, stays as
+inaccessible. A callee is reached through a fact passed as `complete_bound [h₁, h₂]`, such as its
+`.sound_complete` law; a recursive occurrence, or a callee nothing is known about, stays as
 `∃ x ∈ SPMF.support (gen …), …`, to be discharged from the hypotheses of an induction.
 
 There is no `complete_fixpoint`: choose an induction on the value or on `P`, unfold `gen` with

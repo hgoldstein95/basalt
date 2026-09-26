@@ -149,7 +149,7 @@ theorem Tree.genWeightedBST.terminates : IsAlmostSurelyTerminating (Tree.genWeig
         exact ENNReal.one_sub_mul_le_add (hc _) (hc _)
 
 theorem Tree.genWeightedBST.faithful : IsFaithful (Tree.genWeightedBST lo hi) := by
-  faithful_fixpoint
+  faithful_fixpoint [Tree.genWeightedBST.terminates]
 
 theorem Tree.genWeightedBST.cost_bounded :
     IsCostBounded (Tree.genWeightedBST lo hi) (fun t => 3 * t.size + 1) := by

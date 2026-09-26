@@ -26,11 +26,11 @@ theorem String.arbitrary_support :
     IsSoundAndComplete String.arbitrary (fun s => ∀ c ∈ s.toList, c.isAlphanum = true) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    sound_fixpoint [Char.arbitrary.sound_complete]
     simp_all
   case complete =>
     intro s hs
-    rw [String.arbitrary]; complete_bound
+    rw [String.arbitrary]; complete_bound [Char.arbitrary.sound_complete]
     exact ⟨s.toList, hs, String.ofList_toList⟩
 
 /-- `NonEmptyString.arbitrary`'s support is exactly the set of
@@ -39,11 +39,11 @@ theorem NonEmptyString.arbitrary_support :
     IsSoundAndComplete NonEmptyString.arbitrary (fun s => !s.isEmpty ∧ ∀ c ∈ s.toList, c.isAlphanum = true) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    sound_fixpoint [Char.arbitrary.sound_complete]
     all_goals simp_all [String.isEmpty]
   case complete =>
     intro s ⟨hne, hs⟩
-    rw [NonEmptyString.arbitrary]; complete_bound
+    rw [NonEmptyString.arbitrary]; complete_bound [Char.arbitrary.sound_complete]
     refine ⟨s.toList, ⟨?_, hs⟩, String.ofList_toList⟩
     simpa [String.isEmpty, String.toList_eq_nil_iff] using hne
 
@@ -58,10 +58,10 @@ theorem NonEmptyString.arbitrary.terminates :
   simp
 
 theorem String.arbitrary.faithful : IsFaithful String.arbitrary := by
-  faithful_fixpoint
+  faithful_fixpoint [String.arbitrary.terminates]
 
 theorem NonEmptyString.arbitrary.faithful : IsFaithful NonEmptyString.arbitrary := by
-  faithful_fixpoint
+  faithful_fixpoint [NonEmptyString.arbitrary.terminates]
 
 /-- `listOf`'s bound with `Char.arbitrary`'s per-element cost of `1`: one `oneOf` and one character
 per element, plus the `oneOf` that ends the list. -/

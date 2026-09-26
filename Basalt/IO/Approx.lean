@@ -182,6 +182,7 @@ theorem toIO_bind (hc : IOGenLaws) (m : IOModel α) (k : α → IOModel β) :
 
 /-- `x` runs `m` wherever `m` terminates, if `ioGen` is lawful: `m.toIO ⊑ x` in `IO`'s order, which
 is flat at each world, with divergence at the bottom. -/
+@[walk_rel "io_fixpoint"]
 def Approx (m : IOModel α) (x : IO α) : Prop := IOGenLaws → m.toIO ⊑ x
 
 /-- Fixpoint induction on the `IOModel` side needs nothing of `ioGen`: `toIO` is continuous. -/

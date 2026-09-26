@@ -21,7 +21,7 @@ open RandomChoice ArbNat ENNReal
 namespace MassBoundTest
 
 /-- One branch per combinator that takes no generator argument. `Nat.arbitrary` is a callee, not a
-combinator: the tactic finds its `.terminates` law by name. -/
+combinator: its `.terminates` law is passed to the tactic. -/
 def gen [Gen G] (b : Bool) : G Nat := do
   let x ← oneOf [
     fun () => pure 0,
@@ -49,12 +49,12 @@ trace: b : Bool
 #guard_msgs in
 example (b : Bool) : (0 : ℝ≥0∞) ≤ (gen b : SPMF Nat).mass := by
   unfold gen
-  mass_bound
+  mass_bound [Nat.arbitrary.terminates]
   trace_state
   exact zero_le
 
 /--
-error: no rule, `@[gen_map]` lemma, hypothesis, or law bounds
+error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
   g
 Pass a fact about it to the tactic.
 -/
@@ -62,14 +62,13 @@ Pass a fact about it to the tactic.
 example (g : SPMF Nat) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
   mass_bound
 
--- A definition with no rule and no law is unfolded: `optionGen`'s body draws a coin and branches on
--- it.
+-- A definition with no rule is unfolded: `optionGen`'s body draws a coin and branches on it.
 /--
 trace: ⊢ 1 ≤ ↑1 / ↑2 * 1 + ↑1 / ↑2 * 1
 -/
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤ (optionGen Nat.arbitrary : SPMF (Option Nat)).mass := by
-  mass_bound
+  mass_bound [Nat.arbitrary.terminates]
   trace_state
   simp [ENNReal.inv_two_add_inv_two]
 
@@ -85,7 +84,7 @@ trace: ⊢ 1 ≤ (if 1 ≤ 1 then 1 else 0) * 1
 -/
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤ (listOf Nat.arbitrary : SPMF (List Nat)).mass := by
-  mass_bound
+  mass_bound [Nat.arbitrary.terminates]
   trace_state
   simp
 
@@ -109,10 +108,10 @@ example (g : SPMF Nat) (c : ℝ≥0∞) (hrec : ∀ _ : Unit, c ≤ g.mass) :
   mass_bound
   simp
 
-/-- A callee whose `.terminates` law takes an argument is found by name too. -/
+/-- A callee's `.terminates` law that takes an argument is instantiated at the call. -/
 example : (1 : ℝ≥0∞) ≤
     ((Nat.arbitrary >>= SortedList.List.genSortedGt : SPMF (List Nat))).mass := by
-  mass_bound
+  mass_bound [Nat.arbitrary.terminates, SortedList.List.genSortedGt.terminates]
   simp
 
 -- A conditional on a drawn value belongs to that draw's postexpectation, so both branches are

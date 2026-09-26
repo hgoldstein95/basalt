@@ -20,7 +20,8 @@ theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by
   | Fun τ1 τ2 _ ih2 => apply SPMF.IsPMF.of_one_le; rw [genZero]; mass_bound [ih2]; rfl
 
 theorem genTerm.terminates : IsAlmostSurelyTerminating (genTerm Γ τ) := by
-  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 3) (b := 1 / 3) (d := 1 / 3)
+  mass_fixpoint [genZero.terminates, genType.terminates]
+    using SPMF.LfpIsOne.quadratic (a := 1 / 3) (b := 1 / 3) (d := 1 / 3)
     (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   all_goals
     split

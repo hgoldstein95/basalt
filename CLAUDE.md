@@ -13,7 +13,7 @@ reasoned about at `SPMF`. Research code; APIs are unstable.
 repository layout, the interpretation table, and the correctness-law vocabulary. Read it before
 changing public behavior, and update it when you do.
 [Palamedes](https://github.com/hgoldstein95/palamedes-lean), the flagship client, synthesizes
-Basalt generators and emits laws under Basalt's naming convention.
+Basalt generators and proves their laws with Basalt's tactics.
 
 ## Commands
 
@@ -71,8 +71,9 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean); the `sup` ones in
   [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean)), and for bridging a recursive combinator's
   law. What closes a leaf of a bound on one observation is tagged `@[obs_leaf]` beside the tactic
-  that uses it. The judgments, the law naming convention, and the registries are
-  [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean); the walk and its side-goal solvers are
+  that uses it. The judgments and the registries are
+  [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean), each judgment registered by the file that owns
+  it; the walk and its side-goal solvers are
   [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean), and the names it gives what it leaves
   [Basalt/Walk/Names.lean](Basalt/Walk/Names.lean). What an entry tactic is made of —
   `computeBound`, `fixpointStep`, and the residual handlers — is
@@ -101,7 +102,7 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
   [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean). The practical entry
   for a bound is WORKFLOW.md's Recipe 4.
-- **Cost** — the interpretation (`SPMF.Cost`, `IsBounded`, its support inversion, expected cost):
+- **Cost** — the interpretation (`SPMF.Cost`, its support inversion, expected cost):
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:
   [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean), contract pinned by
   [BasaltTest/Tactic/CostFixpoint.lean](BasaltTest/Tactic/CostFixpoint.lean). The practical entry is
@@ -112,8 +113,7 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)'s module docstring;
   [BasaltTest/Tuning.lean](BasaltTest/Tuning.lean) is the full tour.
 - **`#genstats`** — options on the command's declarations in
-  [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean); the law-discovery contract is on
-  `lawProved` there, guarded by [BasaltTest/LawLine.lean](BasaltTest/LawLine.lean).
+  [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean).
 - **What an `IO` run means** — `idealized_faithful`
   ([Basalt/IO/Faithful.lean](Basalt/IO/Faithful.lean)) states the chain from `IO` to `SPMF` and owns
   what the library assumes of it. Its links: `IOModel` and `toIO` —
@@ -152,11 +152,6 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **`rw [gen]` (or another unfolding) fails or gives a confusing error in a correctness proof** —
   wrong unfolding idiom for the context; the unfolding-idiom table is in `WORKFLOW.md`
   ("Unfolding: one idiom per context").
-- **`#genstats` reports `— (not proved)` for a law you proved** — the theorem is not under the
-  `<gen>.sound_complete` / `.terminates` / … naming convention, or its statement is not the law
-  (both halves are checked). `lawConventions` ([Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean)) owns
-  the convention; [Basalt/GenStats/Command.lean](Basalt/GenStats/Command.lean)'s `lawProved`
-  implements the check.
 - **Drawing from a generator inside a property fails with `failed to synthesize instance Gen
   (PropM G)`** — `PropM G` is deliberately not a `Gen`, so a bare `←` on a generator elaborates it at
   the ambient `PropM G` instead of lifting it. Wrap the draw in `generate`
@@ -170,10 +165,10 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   defeq means a runner's `IO TestOutcome` argument does not determine `G`: ascribe the
   interpretation (`(prop : PropM IO Unit)`) at the call site.
 
-- **A walk ignores the hypothesis you have about a combinator term** (`ih : IsBounded (vectorOf n g) …`
+- **A walk ignores the hypothesis you have about a combinator term** (`ih : IsCostBounded (vectorOf n g) …`
   is in context, and the goal comes back stated through `vectorOf`'s own bridge) — for a generator
   headed by a combinator the walker tries the combinator's rule or `@[gen_map]` lemma before any
-  fact. `generalize` the term to a variable first, as `isBounded_vectorOf` does in
+  fact. `generalize` the term to a variable first, as `isCostBounded_vectorOf` does in
   [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean).
 
 - **`rw [support_oneOf]` (or `prob_frequency`, …) finds no occurrence in a goal that shows

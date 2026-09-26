@@ -22,8 +22,8 @@ namespace Basalt.IOBound
 
 /-- `io_bound` proves `IOModel.Approx m x`, for `m` and `x` one generator term at `IOModel` and at
 `IO`, by walking the two together: a bind, a map, a conditional, and a choice on each side are
-related by their rules, a combinator with none is unfolded on both, and a leaf is a hypothesis, a
-fact passed as `io_bound [h]`, or a callee's `.faithful` law or `.io` fact. -/
+related by their rules, a combinator with none is unfolded on both, and a leaf is a hypothesis or a
+fact passed as `io_bound [h]`, such as a callee's `.faithful` law. -/
 syntax (name := ioBoundTac) "io_bound" (walkFacts)? : tactic
 
 elab_rules : tactic

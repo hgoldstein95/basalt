@@ -83,8 +83,8 @@ partial def walkMass (extras : Array Term) (goal : MVarId) : TermElabM (List MVa
 
 /-- `mass_bound` replaces a goal `c ≤ (gen …).mass` by the `ℝ≥0∞` inequality `c ≤ b`, where `b` is
 the bound it computes by walking `gen`'s syntax: a draw's postexpectation is the bound its
-continuation computed. Recursive occurrences are closed from the local context, callees from their
-`.terminates` law; any other fact can be passed as `mass_bound [h₁, h₂]`. -/
+continuation computed. Recursive occurrences are closed from the local context, and a callee by a
+fact passed as `mass_bound [h₁, h₂]`, such as its `.terminates` law. -/
 syntax (name := massBoundTac) "mass_bound" (walkFacts)? : tactic
 
 elab_rules : tactic

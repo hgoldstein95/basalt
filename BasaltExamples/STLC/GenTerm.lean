@@ -100,13 +100,13 @@ theorem Bool.arbitrary.sound_complete : IsSoundAndComplete Bool.arbitrary ⊤ :=
 
 theorem genZero.sound : IsSound (genZero Γ τ) (Typing Γ · τ) := by
   induction τ generalizing Γ with
-  | Bool => unfold genZero; sound_bound; constructor
+  | Bool => unfold genZero; sound_bound [Bool.arbitrary.sound_complete]; constructor
   | Fun τ1 τ2 _ ih2 => unfold genZero; sound_bound [ih2]; constructor; assumption
 
 theorem genTerm.sound_complete : IsSoundAndComplete (genTerm Γ τ) (Typing Γ · τ) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [genZero.sound]
+    sound_fixpoint [genZero.sound, genType.sound_complete, Bool.arbitrary.sound_complete]
     all_goals first
       | assumption
       | exact varsWithType_sound ‹_›
@@ -115,16 +115,20 @@ theorem genTerm.sound_complete : IsSoundAndComplete (genTerm Γ τ) (Typing Γ �
     intro e h
     induction h with
     | TBool Γ b =>
-      rw [genTerm]; complete_bound
+      rw [genTerm]; complete_bound [genType.sound_complete, Bool.arbitrary.sound_complete]
       split <;> simp
     | TVar Γ x τ hx =>
       have hmem := varsWithType_complete hx
-      rw [genTerm.eq_def]; complete_bound <;> simp [List.ne_nil_of_mem hmem, hmem]
+      rw [genTerm.eq_def]
+      complete_bound [genType.sound_complete, Bool.arbitrary.sound_complete]
+      all_goals simp [List.ne_nil_of_mem hmem, hmem]
     | TAbs Γ body τ1 τ2 _ ih =>
-      rw [genTerm]; complete_bound
+      rw [genTerm]; complete_bound [genType.sound_complete, Bool.arbitrary.sound_complete]
       split <;> simp [ih]
     | TApp Γ e1 e2 τ1 τ2 _ _ ih2 ih1 =>
       have happ : ∃ argTy, ∃ e1' ∈ SPMF.support (genTerm Γ (.Fun argTy τ2)),
           ∃ e2' ∈ SPMF.support (genTerm Γ argTy), Term.App e1' e2' = .App e1 e2 :=
         ⟨τ1, e1, ih1, e2, ih2, rfl⟩
-      rw [genTerm.eq_def]; complete_bound <;> split <;> simp only [happ, or_true]
+      rw [genTerm.eq_def]
+      complete_bound [genType.sound_complete, Bool.arbitrary.sound_complete]
+      all_goals split <;> simp only [happ, or_true]

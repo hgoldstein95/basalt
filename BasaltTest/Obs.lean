@@ -80,13 +80,3 @@ run_cmd do
       let rules := (rulesFor env (Judgment.spec false).key c).getD #[]
       unless rules.any fun r => ((env.find? r).get!.type.find? (·.isConstOf obs)).isSome do
         throwError "`{c}` has no bridge for a lower bound on `{obs}`"
-
--- The judgments name their bridges and adapters by quoted name, and the walker skips one that is
--- not in scope, so a misspelled one would silently close no leaf.
-open Lean Elab Command Basalt.Walk in
-run_cmd do
-  let env ← getEnv
-  for j in judgments do
-    let names := j.bridges.filterMap id ++ j.adapters ++ j.reduceTo.toArray
-    for n in names do
-      unless env.contains n do throwError "judgment `{j.key}` names `{n}`, which does not exist"

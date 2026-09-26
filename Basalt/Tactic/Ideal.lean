@@ -23,7 +23,7 @@ namespace Basalt.IdealBound
 /-- `ideal_bound` proves `src.Below y x`, for `y` and `x` one generator term at `SPMF` and at
 `WordModel σ`, by walking the two together: a bind, a map, a conditional, and a choice on each side
 are related by their rules, a combinator with none is unfolded on both, and a leaf is a hypothesis,
-a fact passed as `ideal_bound [h]`, or a callee's `.faithful` law or `.ideal` fact. -/
+a fact passed as `ideal_bound [h]`, such as a callee's `.faithful` law. -/
 syntax (name := idealBoundTac) "ideal_bound" (walkFacts)? : tactic
 
 elab_rules : tactic

@@ -84,7 +84,7 @@ end termination
 /-! ## Faithfulness -/
 
 theorem Tree.genBST.faithful : IsFaithful (Tree.genBST lo hi) := by
-  faithful_fixpoint
+  faithful_fixpoint [Tree.genBST.terminates]
 
 /-! ## Cost -/
 

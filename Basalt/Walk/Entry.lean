@@ -23,7 +23,9 @@ open Lean Meta Elab Tactic Lean.Order
 
 namespace Basalt.Walk
 
-/-- The facts a caller passes a walk, `[h₁, h₂]`: each is tried at every leaf. -/
+/-- The facts a caller passes a walk, `[h₁, h₂]`: each is tried at every leaf, and so is each field
+of one that bundles laws (`IsSoundAndComplete`, `IsFaithful`). A callee's law reaches the walk only
+this way. -/
 syntax walkFacts := " [" term,* "]"
 
 /-- The terms of `walkFacts`, none when they are absent. -/

@@ -17,6 +17,8 @@ and splits it into one goal per path, as `cost_bound` does at the cost interpret
 
 open RandomChoice Lean Meta Elab Tactic Basalt.Walk
 
+attribute [walk_argument "sound_bound"] IsSound
+
 namespace SPMF
 
 open Lean.Order in
@@ -34,11 +36,6 @@ imply is the bound. -/
 @[obs_leaf]
 theorem le_always_of_isSound {x : SPMF α} {R p : α → Prop} (hx : IsSound x R) :
     (∀ a, R a → p a) ≤ alwaysObs.spec x p := fun h a ha => h a (hx a ha)
-
-@[obs_leaf]
-theorem le_always_of_isSoundAndComplete {x : SPMF α} {R p : α → Prop}
-    (hx : IsSoundAndComplete x R) : (∀ a, R a → p a) ≤ alwaysObs.spec x p :=
-  le_always_of_isSound hx.sound
 
 /-! ## The combinators that take a generator
 
@@ -114,8 +111,8 @@ partial def walkSound (tac : String) (extras : Array Term) (goal : MVarId) :
 
 /-- `sound_bound` proves `IsSound (gen …) P` up to what `P` says: it walks `gen`'s syntax, pushing
 `P` into each sub-generator, and leaves one goal per path through `gen`, which is `P` of the value
-that path built. Recursive occurrences are closed from the local context, callees from their
-`.sound_complete` or `.sound` law; any other soundness fact can be passed as `sound_bound [h₁, h₂]`.
+that path built. Recursive occurrences are closed from the local context, and a callee by a fact
+passed as `sound_bound [h₁, h₂]`, such as its `.sound_complete` law.
 
 In a residual goal, a value drawn by `let x ← …` is `x✝` and what is known about it `h_x✝`
 (`Basalt/Walk/Names.lean`); name them with `next x h_x =>`. -/

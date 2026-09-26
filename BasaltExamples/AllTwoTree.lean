@@ -78,7 +78,7 @@ theorem genTree.cost_bounded : IsCostBounded genTree Tree.cost := by
   all_goals simp only [Tree.cost, Tree.size] at *; omega
 
 theorem genTree.faithful : IsFaithful genTree := by
-  faithful_fixpoint
+  faithful_fixpoint [genTree.terminates]
 
 section weighted
 
@@ -101,7 +101,7 @@ theorem genWeightedTree.terminates : IsAlmostSurelyTerminating genWeightedTree :
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genWeightedTree.faithful : IsFaithful genWeightedTree := by
-  faithful_fixpoint
+  faithful_fixpoint [genWeightedTree.terminates]
 
 /-- Expected size of the subcritical `genWeightedTree`: `1 / (1 - 2/3) = 3`. -/
 theorem genWeightedTree_expectedSteps :

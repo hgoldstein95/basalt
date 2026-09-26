@@ -51,7 +51,7 @@ theorem genZero.cost_typed :
 argument's type, which only the argument's typing fixes, so the induction must carry it. -/
 theorem genTerm.cost_typed :
     SPMF.Cost.Always (genTerm Γ τ) (fun e n => Typing Γ e τ ∧ n ≤ Term.costInCtx Γ e) := by
-  cost_fixpoint [genZero.cost_typed]
+  cost_fixpoint [genZero.cost_typed, genType.cost_bounded]
   all_goals grind [Term.costInCtx, typeCheck_getD_of_typing, Term.two_le_costInCtx,
     varsWithType_sound, Typing]
 

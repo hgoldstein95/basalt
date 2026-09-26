@@ -10,18 +10,18 @@ import Basalt.Tactic.Ideal
 /-!
 # Proving a Generator Faithful
 
-`faithful_fixpoint` proves `IsFaithful (gen …)` field by field: termination by the generator's
-`.terminates` law, and the two relations by `ideal_fixpoint` and `io_fixpoint`.
+`faithful_fixpoint` proves `IsFaithful (gen …)` field by field: termination by a fact passed to it,
+and the two relations by `ideal_fixpoint` and `io_fixpoint`.
 -/
 
 open Lean Meta Elab Tactic Basalt.Walk
 
 namespace Basalt.FaithfulFixpoint
 
-/-- `faithful_fixpoint` proves `IsFaithful (gen a₁ … aₙ)`: `terminates` by `gen.terminates`, whose
-explicit premises are hypotheses, and `below` and `approx` by `ideal_fixpoint` and `io_fixpoint`,
-each passed the facts in `faithful_fixpoint [h]`. A generator with no `.terminates` law, or one that
-does not apply, is left its termination goal. -/
+/-- `faithful_fixpoint [h₁, h₂]` proves `IsFaithful (gen a₁ … aₙ)`: `terminates` by the first of the
+facts that applies, its explicit premises closed by hypotheses, and `below` and `approx` by
+`ideal_fixpoint [h₁, h₂]` and `io_fixpoint [h₁, h₂]`. With no fact that applies, the termination
+goal is left. -/
 syntax (name := faithfulFixpointTac) "faithful_fixpoint" (walkFacts)? : tactic
 
 elab_rules : tactic
@@ -30,19 +30,19 @@ elab_rules : tactic
     let ty ← whnfR (← instantiateMVars (← goal.getType))
     unless ty.isAppOfArity ``IsFaithful 2 do
       throwError "faithful_fixpoint: expected a goal `IsFaithful (gen …)`, got{indentExpr ty}"
-    let head ← lambdaTelescope ty.appArg! fun _ body => pure body.getAppFn.constName?
     let [t, b, a] ← goal.apply (← mkConstWithFreshMVarLevels ``IsFaithful.mk)
       | throwError "faithful_fixpoint: could not split{indentExpr ty}"
-    let law := head.map (· ++ `terminates)
-    let closed ← match law with
-      | some law =>
-        if (← getEnv).contains law then
-          observing? do
-            let gs ← t.apply (← mkConstWithFreshMVarLevels law)
-            gs.forM fun g => g.assumption
-        else pure none
-      | none => pure none
-    let ts := if closed.isSome then [] else [t]
+    let mut ts := [t]
+    for stx in walkFacts.terms fs do
+      let closed ← t.withContext <| observing? do
+        let e ← Term.withoutErrToSorry do
+          let e ← Term.elabTerm stx none
+          Term.synthesizeSyntheticMVarsNoPostponing
+          instantiateMVars e
+        (← t.apply e).forM fun g => g.assumption
+      if closed.isSome then
+        ts := []
+        break
     let (_, b) ← b.introN 3
     let bs ← Lean.Elab.Tactic.run b (evalTactic (← `(tactic| ideal_fixpoint $[$fs]?)))
     let as ← Lean.Elab.Tactic.run a (evalTactic (← `(tactic| io_fixpoint $[$fs]?)))

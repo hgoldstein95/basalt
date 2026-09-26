@@ -13,8 +13,7 @@ import BasaltExamples.SortedList
 
 Pins the precondition `complete_bound` leaves: an `∃` per draw under the generator's names, the
 refuted branches pruned and the surviving ones not chosen between, and a recursive occurrence left as
-itself. The recursive generators are copies of the cookbook's that carry no law, which the walk would
-otherwise close a recursive occurrence with.
+itself.
 -/
 
 open RandomChoice ArbNat
@@ -53,7 +52,7 @@ hr : Heap.Tree.isHeap (lo + d) r
 example : IsSoundAndComplete (genHeap lo) (Heap.Tree.isHeap lo) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    sound_fixpoint [Nat.arbitrary.sound_complete]
     all_goals simp_all [Heap.Tree.isHeap]
   case complete =>
     intro t
@@ -63,7 +62,7 @@ example : IsSoundAndComplete (genHeap lo) (Heap.Tree.isHeap lo) := by
       intro ht
       obtain ⟨hle, hl, hr⟩ := ht
       obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
-      rw [genHeap]; complete_bound
+      rw [genHeap]; complete_bound [Nat.arbitrary.sound_complete]
       trace_state
       exact ⟨d, l, ihl hl, r, ihr hr, rfl⟩
 
@@ -144,7 +143,7 @@ hP : List.sorted xs ∧ List.Forall (fun x => m ≤ x) xs
 #guard_msgs in
 example : IsCompleteFor (genSortedGt m) (fun xs => List.sorted xs ∧ List.Forall (m ≤ ·) xs) := by
   apply IsCompleteFor.of_measure (fun _ xs => xs.length) fun n ih m xs hn hP => ?_
-  rw [genSortedGt]; complete_bound
+  rw [genSortedGt]; complete_bound [Nat.arbitrary.sound_complete]
   trace_state
   match xs, hP with
   | [], _ => exact .inl rfl
@@ -159,7 +158,7 @@ example : IsCompleteFor (genSortedGt m) (fun xs => List.sorted xs ∧ List.Foral
 /-! ## Every combinator -/
 
 /-- One branch per combinator that takes no generator argument, a `frequency` branch of weight `0`,
-and a `coin`. `Nat.arbitrary` is a callee: the tactic finds its `.sound_complete` law by name. -/
+and a `coin`. `Nat.arbitrary` is a callee, reached through its `.sound_complete` law. -/
 def gen [Gen G] (b : Bool) : G Nat := do
   let x ← oneOf [
     fun () => pure 0,
@@ -183,7 +182,7 @@ hn : n ≤ 1
 #guard_msgs in
 example (b : Bool) (n : Nat) (hn : n ≤ 1) : n ∈ (gen b : SPMF Nat).support := by
   unfold gen
-  complete_bound
+  complete_bound [Nat.arbitrary.sound_complete]
   trace_state
   exact .inl (.inl (by omega))
 
@@ -202,7 +201,8 @@ example (g : SPMF Nat) (hg : 3 ∈ g.support) : 0 ∈ (g >>= fun _ => pure 0).su
   trace_state
   exact ⟨3, hg⟩
 
-/-! A callee that has only the `.complete` half of the law is reached through it. -/
+/-! A callee that has only the `.complete` half of the law is reached through it, passed as a
+fact. -/
 
 def genTwo [Gen G] : G Nat := pure 2
 
@@ -216,7 +216,7 @@ trace: ⊢ ∃ n, n = 2 ∧ n + 1 = 3
 -/
 #guard_msgs in
 example : 3 ∈ (genTwo >>= fun n => pure (n + 1) : SPMF Nat).support := by
-  complete_bound
+  complete_bound [genTwo.complete]
   trace_state
   exact ⟨2, rfl, rfl⟩
 

@@ -20,7 +20,8 @@ open RandomChoice
 
 namespace SoundBoundTest
 
-/-! A callee (`Nat.arbitrary`) is closed by its `.sound_complete` law. -/
+/-! A callee (`Nat.arbitrary`) is closed by the `sound` field of its `.sound_complete` law,
+passed as a fact. -/
 
 /--
 trace: genHeap : ℕ → SPMF Heap.Tree
@@ -40,7 +41,7 @@ h_r✝ : Heap.Tree.isHeap (lo + delta✝) r✝
 -/
 #guard_msgs in
 example : IsSound (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo) := by
-  sound_fixpoint
+  sound_fixpoint [ArbNat.Nat.arbitrary.sound_complete]
   trace_state
   all_goals simp_all [Heap.Tree.isHeap]
 
@@ -109,7 +110,7 @@ _h✝ : ¬b✝.rank ≤ a✝.rank
 -/
 #guard_msgs in
 example : IsSound (LeftistHeap.Tree.genLeftist lo) (LeftistHeap.Tree.isLeftist lo) := by
-  sound_fixpoint
+  sound_fixpoint [ArbNat.Nat.arbitrary.sound_complete]
   trace_state
   all_goals simp_all [LeftistHeap.Tree.isLeftist]
   all_goals omega
@@ -154,7 +155,7 @@ h_l✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) l✝ ∧ l✝.rank = k + gap
 #guard_msgs in
 example : IsSound (LeftistHeap.Tree.genLeftistOfRank lo k)
     (fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = k) := by
-  sound_fixpoint
+  sound_fixpoint [ArbNat.Nat.arbitrary.sound_complete]
   trace_state
   all_goals simp_all [LeftistHeap.Tree.isLeftist, LeftistHeap.Tree.rank]
 
@@ -222,7 +223,7 @@ One on the generator's arguments is split before the walk; one on a drawn value,
 example : IsSound (oneOf [fun _ => pure 0, fun _ => pickBelow n] (by simp) : SPMF Nat) (· ≤ n) := by
   sound_bound
 
-/-! A callee that has only a half of the law is closed by that half. -/
+/-! A callee that has only a half of the law is closed by that half, passed as a fact. -/
 
 def genTwo [Gen G] : G Nat := pure 2
 
@@ -237,7 +238,7 @@ h_n✝ : n✝ = 2
 -/
 #guard_msgs in
 example : IsSound (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := by
-  sound_bound
+  sound_bound [genTwo.sound]
   trace_state
   omega
 

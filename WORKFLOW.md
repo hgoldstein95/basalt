@@ -100,12 +100,12 @@ interpretation.
 |---|---|---|
 | Support | `IsSoundAndComplete g P`, i.e. `∀ a, a ∈ SPMF.support g ↔ P a` | Soundness and completeness: nothing invalid is produced, nothing valid is missed. |
 | Termination | `IsAlmostSurelyTerminating g`, i.e. `SPMF.IsPMF g` (`mass g = 1`) | The generator terminates with probability 1. |
-| Cost | `IsCostBounded g c`, i.e. `IsBounded g c` | Producing `v` takes at most `c v` random choices. |
+| Cost | `IsCostBounded g c` | Producing `v` takes at most `c v` random choices. |
 
 Each has a fixed recipe, and every recipe is the same walk over one step of the recursion: a tactic
 pushes the judgment's postcondition backward through the generator's syntax, closes recursive
-occurrences and callees itself, and leaves what only you can supply — logic about `P`, or
-arithmetic. Support is two judgments, one per direction of its `↔`. What differs between judgments
+occurrences itself and callees with the laws you pass it, and leaves what only you can supply —
+logic about `P`, or arithmetic. Support is two judgments, one per direction of its `↔`. What differs between judgments
 is the algebra the walk computes in, the direction of the bound, and who supplies the induction:
 
 | Judgment | Observation | Algebra | Bound | Induction | What is left |
@@ -126,21 +126,19 @@ completeness. That is why there is no `complete_fixpoint`.
 and every obligation reduces to composition instead: the recipes unchanged, with
 `mass_fixpoint using SPMF.LfpIsOne.one` for termination. `List.genSortedBySorting`
 (`SortedList/BySorting.lean`) is the worked instance — it sorts a `List.arbitrary` draw, and each
-law follows from the corresponding law of `List.arbitrary`, which the walk finds, plus one fact
+law follows from the corresponding law of `List.arbitrary`, passed to the tactic, plus one fact
 about `f`: that sorting sorts, that it fixes a sorted list, that it is a permutation. Cost is the
 obligation that can fail outright for this shape (Step 2).
 
-**Name the laws `<GEN>.sound_complete`, `<GEN>.terminates`, `<GEN>.cost_bounded`.** The dot is not
-cosmetic: `#genstats` discovers laws by exactly this naming convention and reports which ones a
-generator carries beside the statistics it merely *measured*, and the walk closes a callee by the
-same convention (`lawConventions`, `Basalt/Walk/Attr.lean`). A law under any other name is invisible to the report — the generator will show
-`— (not proved)` for something you proved. The statement is checked too, not just the name, so a
-conventionally-named theorem that says something else cannot be laundered into a ✓. Automated
-synthesis that emits the same convention reports identically to hand-written generators.
-(`IsFilterFree`/`IsProductive`, for filtering generators, are `.filter_free` and `.productive`.)
-A generator that has only one half of the support law — a size-bounded generator is sound and
-deliberately incomplete — names it `<GEN>.sound` or `<GEN>.complete`; the two together count as
-`.sound_complete`, to `#genstats` and to the walk.
+**A callee's law is passed, never found.** A walk uses a law of a sub-generator only when it is
+given one — `sound_fixpoint [Nat.arbitrary.sound_complete]` — so the facts a proof passes are
+exactly the laws it depends on, and a missing one is an error at the proof that needs it. Wherever
+`[<CALLEES>]` appears below it stands for the callees' laws for that judgment, and is dropped when
+there are none. A law that bundles others (`IsSoundAndComplete`, `IsFaithful`) is used through its
+fields, so pass the whole law. By convention the laws are named `<GEN>.sound_complete`,
+`<GEN>.terminates`, `<GEN>.cost_bounded`, `<GEN>.faithful` (`.filter_free` and `.productive` for
+filtering generators; `<GEN>.sound` or `<GEN>.complete` for a generator that has only one half of
+the support law, as a size-bounded generator is sound and deliberately incomplete).
 
 ### Unfolding: one idiom per context
 
@@ -164,19 +162,19 @@ combinator.
 theorem <GEN>.sound_complete : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint                      -- one goal per path: `<PRED>` of the value that path built
+    sound_fixpoint [<CALLEES>]          -- one goal per path: `<PRED>` of the value that path built
     all_goals simp_all [<PRED>]
   case complete =>
     intro x
     -- 1. Induct on the generated value, generalizing any index the recursion changes.
     induction x generalizing <IDX> with
-    | <base case> => intro _; rw [<GEN>]; complete_bound
+    | <base case> => intro _; rw [<GEN>]; complete_bound [<CALLEES>]
     | <recursive case> ... ih₁ ih₂ =>
       intro ⟨...facts...⟩
       -- 2. The only creative step in the whole proof: inverting the index arithmetic — if the
       --    recursion ran at `lo + d` and you know `lo ≤ x`, then `x` is `lo + d` for `d := x - lo`.
       obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
-      rw [<GEN>]; complete_bound        -- 3. unfold one step and walk it
+      rw [<GEN>]; complete_bound [<CALLEES>]  -- 3. unfold one step and walk it
       exact ⟨d, l, ih₁ ‹_›, r, ih₂ ‹_›, rfl⟩   -- 4. a witness per draw; the IHs for recursive ones
 ```
 
@@ -184,8 +182,8 @@ theorem <GEN>.sound_complete : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) :
 call of `<GEN>` changes, unfolds one step, and runs `sound_bound` (`Basalt/Tactic/Sound.lean`),
 which is `cost_bound` at the support interpretation: one goal per path, the drawn values and what is
 known of them in context under the generator's names, inaccessible (`x✝`, `h_x✝`: name them with
-`next x h_x =>`). A recursive occurrence is closed by `ih`, a callee by its `.sound_complete` or
-`.sound` law, anything else by a fact: `sound_fixpoint [h]`.
+`next x h_x =>`). A recursive occurrence is closed by `ih`, and a callee, or anything else, by a
+fact: `sound_fixpoint [h]`, usually the callee's `.sound_complete` law.
 `BasaltTest/Tactic/Sound.lean` shows the goals `genHeap`, `genBST`, and `genLeftist` leave.
 
 **`complete_bound`** (`Basalt/Tactic/Complete.lean`) turns `a ∈ SPMF.support (<GEN> …)`, after one
@@ -193,8 +191,8 @@ unfolding, into a precondition for the step to produce `a`: an `∃` for each dr
 choice, and last the equation between `a` and the value built. On `IsCompleteFor g P` it introduces
 `a` and `P a` first. `BasaltTest/Tactic/Complete.lean` shows the goals. What to expect of it:
 
-- a **callee** contributes its predicate, from its `.sound_complete` or `.complete` law; a fact is
-  passed as `complete_bound [h]`.
+- a **callee** contributes its predicate, from the `.sound_complete` or `.complete` law passed as
+  `complete_bound [h]`; without one it stays as itself, like a recursive occurrence.
 - a **recursive occurrence** stays as itself, `∃ l ∈ SPMF.support (<GEN> (lo + d)), …`. No tactic can
   close it: the hypothesis that does is about one value, and comes from the induction *you* chose.
   That induction is ordinary Lean — on the value, or on `<PRED>` with `fun_induction`.
@@ -228,7 +226,7 @@ the proof is the tactic and the arithmetic:
 
 ```lean
 theorem <GEN>.terminates : IsAlmostSurelyTerminating (<GEN> <ARGS>) := by
-  mass_fixpoint using <CERTIFICATE>
+  mass_fixpoint [<CALLEES>] using <CERTIFICATE>
   simp                      -- the goal left is `F c ≤ <computed bound>`, pure ℝ≥0∞
 ```
 
@@ -263,12 +261,11 @@ backward: a draw is bounded at the bound its continuation computed, so the bound
 shape of the do-block and is exact wherever the generator's callees are
 (`Basalt/Tactic/Mass.lean` owns how a fact is used, `Basalt/Tactic/Average.lean` the bound of
 each shape of choice, `Basalt/Walk/Basic.lean` the walk; `BasaltTest/Tactic/Mass.lean` shows a generator
-that uses every combinator). Nothing about the generator is yours to supply:
+that uses every combinator). Of the generator, only its callees' laws are yours to supply:
 
 - a **recursive occurrence** is discharged by `hrec`, whatever the shape of the seed.
-- a **callee** is discharged by its own `<callee>.terminates` law, found by the naming convention
-  (Part 2 above) — `Nat.arbitrary` inside a body needs no mention. Any other fact is passed
-  explicitly: `mass_fixpoint [h₁, h₂] using …`.
+- a **callee** is discharged by its `<callee>.terminates` law, passed with any other fact:
+  `mass_fixpoint [Nat.arbitrary.terminates] using …`.
 - a **helper with no law**, or a derived combinator (`optionGen`, `BasaltTest/OptionGen.lean`), is
   unfolded and walked through when it is not recursive.
 - an **`if`/`dite`** is no different from any other combinator: the bound is the same conditional
@@ -319,7 +316,7 @@ Worked instances: `Nat.arbitrary.cost_bounded` (`ArbNat.lean`) is the minimal ca
 
 ```lean
 theorem <GEN>.cost_bounded : IsCostBounded (<GEN> <ARGS>) <COST> := by
-  cost_fixpoint
+  cost_fixpoint [<CALLEES>]
   all_goals simp only [<COST>'s equations]; omega   -- one goal per path through <GEN>
 ```
 
@@ -332,12 +329,12 @@ at most `<COST> v` choices" backward through the step, by the same walk as `mass
 of Step 2 is what it computes. It leaves one goal per path through the generator,
 stated over the values that path drew; `Basalt/Walk/Names.lean` says how
 they are named, and `BasaltTest/Tactic/CostFixpoint.lean` shows the goals `genHeap` and `genBST`
-leave. Nothing about the generator is yours to supply:
+leave. Of the generator, only its callees' laws are yours to supply:
 
 - a **recursive occurrence** is bounded by `ih`, at whatever arguments it is called with.
-- a **callee** is bounded by its own `<callee>.cost_bounded` law, found by the naming convention
-  (Part 2 above). Any other cost bound is passed explicitly: `cost_fixpoint [h₁, h₂]`. A
-  non-recursive helper with no law is unfolded and walked through instead.
+- a **callee** is bounded by its `<callee>.cost_bounded` law, passed with any other cost bound:
+  `cost_fixpoint [h₁, h₂]`. A non-recursive helper with no law is unfolded and walked through
+  instead.
 - a **combinator that takes a generator** (`listOf`, `vectorOf`, …) asks for that generator's cost
   law the same way, and the goal states the combinator's bound in terms of it —
   `String.arbitrary_cost` (`ArbString.lean`). A combinator term in that position, which has no law,
@@ -389,21 +386,21 @@ every example with a `.terminates` law.
 
 ```lean
 theorem <GEN>.faithful : IsFaithful (<GEN> <ARGS>) := by
-  faithful_fixpoint
+  faithful_fixpoint [<GEN>.terminates, <CALLEES>]
 ```
 
-`IsFaithful` (`Basalt/IO/Laws.lean`) has three fields. `terminates` is taken from
-`<GEN>.terminates`. `below`, a relation on ideal words, is what the walk proves and composes; it
+`IsFaithful` (`Basalt/IO/Laws.lean`) has three fields. `terminates` is the `<GEN>.terminates` law
+you pass. `below`, a relation on ideal words, is what the walk proves and composes; it
 bounds the distribution from one side only, and `terminates` gives the other. `approx` is that `IO`
 runs `IOModel` wherever that terminates. A generator with no `.terminates` law states the two
 relations alone, as `<GEN>.ideal` and `<GEN>.io` (`Tree.genLeftistOfRank`,
-`BasaltExamples/LeftistHeap.lean`), which a caller's walk uses in place of `.faithful`.
+`BasaltExamples/LeftistHeap.lean`), which a caller passes in place of `.faithful`.
 
 **`ideal_fixpoint`** (`Basalt/Tactic/Ideal.lean`) and **`io_fixpoint`** (`Basalt/Tactic/IO.lean`)
 each induct on one side (`SPMF`, `IOModel`), unfold the other side one step, and walk the two
-together; `faithful_fixpoint` (`Basalt/Tactic/Faithful.lean`) runs both. There is nothing to supply:
-a recursive occurrence is closed by `ih`, a callee by its `.faithful` law, and a combinator with no
-rule is unfolded on both sides. A generator defined by structural recursion is induction on the
+together; `faithful_fixpoint` (`Basalt/Tactic/Faithful.lean`) runs both. A recursive occurrence is
+closed by `ih`, a callee by the `.faithful` law you pass, and a combinator with no rule is unfolded
+on both sides, as is a helper that is not recursive. A generator defined by structural recursion is induction on the
 argument it recurses on, `unfold`, and `ideal_bound` or `io_bound` in each case (`genZero`,
 `BasaltExamples/STLC/Faithful.lean`). A recursive combinator of your own needs a `@[gen_rule]`
 relating it at each pair of monads: prove it once for any relation that is a `GenRel`
@@ -421,28 +418,28 @@ relating it at each pair of monads: prove it once for any relation that is a `Ge
   (`x - lo` when the recursion ran at `lo + d`). Substitute it *before* unfolding
   (`obtain ⟨d, rfl⟩ : ∃ d, x = lo + d`), so that the equation at the end of the goal is `rfl`.
 - **`complete_bound` leaves `∃ a ∈ SPMF.support <callee>, …` for a callee** → no law of the callee
-  was found: it is under another name, or not proved. The walk does not fail there, unlike the
-  others; the missing law shows up as this residual.
+  was passed. The walk does not fail there, unlike the others; the missing law shows up as this
+  residual.
 - **`complete_bound` leaves `False`** → every branch that could build the value was refuted, or the
   one conditional on the way is decided the other way by your hypotheses. Check the case split:
   the predicate may admit a value the generator cannot produce.
-- **`sound_bound` / `complete_bound` says no hypothesis or law gives `IsSound _ _` /
+- **`sound_bound` / `complete_bound` says no hypothesis or fact gives `IsSound _ _` /
   `IsCompleteFor _ _` of a combinator argument** → the argument of a list combinator has no law
-  (it is a combinator term, or its law is under another name); prove the half and pass it.
+  passed: pass the callee's, or, for a combinator term, prove the half and pass it.
 - **A walk says it does not enter a `match`** → the `match` is on a drawn value, or inside a helper
   the walk unfolds. Restate the generator with an `if`, move the `match` into the generator, or
   make the cases separate definitions that carry laws.
 - **`omega` fails in a cost proof** → read the goal: it is the exact inequality your bound must
   satisfy, with every sub-cost's bound in context. Either the cost function is still folded in a
   hypothesis (`simp only [...] at *`), or the bound is too tight.
-- **`cost_bound` says nothing bounds a sub-generator** → it is a callee whose cost law is under
-  another name, or the generator argument of a combinator that has no law of its own and no worst
+- **`cost_bound` says nothing bounds a sub-generator** → it is a callee whose cost law was not
+  passed, or the generator argument of a combinator that has no law of its own and no worst
   case (it recurses, or draws from something that does); pass a bound for it: `cost_fixpoint [h]`. A
   recursive combinator of your own gets the same message: it needs a law and a bridge from it
   (`SPMF.Cost.le_always_listOf`, `Basalt/Tactic/Cost.lean`).
 - **`mass_bound` says nothing bounds a sub-generator** → it is a recursive combinator of your own
   (bridge its law, as `SPMF.le_expect_listOf` does in `Basalt/Tactic/MassFixpoint.lean`), a callee
-  whose termination law is under another name (pass it: `mass_bound [h]`), or a recursive occurrence whose
+  whose termination law was not passed (`mass_bound [h]`), or a recursive occurrence whose
   fact needs a premise that neither unification nor a hypothesis supplies (`m < n` for a size
   computed from a draw). Pass that fact instantiated; the drawn values are in scope under the
   generator's names (`mass_bound [ih _ (… k₁ …)]`).

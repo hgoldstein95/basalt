@@ -11,7 +11,8 @@ import Basalt
 `biasedOptionGen` and `optionGen` are fixtures, not library combinators: they have no `@[gen_map]`
 lemma and no law, so a walk has to unfold and traverse their bodies. `BasaltTest/Tactic/Mass.lean`
 and `BasaltTest/Tactic/Cost.lean` pin that path; `SPMF.massSome_biasedOptionGen` below is the worked
-acceptance rate that `SPMF.retry_attempts` turns into a retry count.
+acceptance rate that `SPMF.retry_attempts` turns into a retry count. The partial-generator laws,
+`IsProductive` and `IsFilterFree`, are proved at the end through their introduction lemmas.
 -/
 
 open Lean.Order RandomChoice NNReal ENNReal
@@ -94,3 +95,27 @@ theorem massSome_optionGen {g : SPMF α} : massSome (optionGen g) = g.mass / 2 :
     Nat.cast_ofNat, one_div, ENNReal.div_eq_inv_mul]
 
 end SPMF
+
+/-! ## The partial-generator laws -/
+
+def genMaybe [Gen G] : G (Option Nat) :=
+  oneOf [fun _ => pure none, fun _ => pure (some 0)]
+
+theorem genMaybe.productive : IsProductive (genMaybe (G := SPMF)) :=
+  IsProductive.of_mem_support (a := 0)
+    (by simp [genMaybe, SPMF.support_oneOf, SPMF.support_pure])
+
+def genSurely [Gen G] : G (Option Nat) :=
+  oneOf [fun _ => pure (some 0), fun _ => pure (some 1)]
+
+theorem genSurely.filter_free : IsFilterFree (genSurely (G := SPMF)) := by
+  have hmass : SPMF.IsPMF (genSurely (G := SPMF)) := by
+    mass_fixpoint using SPMF.LfpIsOne.one
+    norm_num [ENNReal.div_self]
+  rw [IsFilterFree_iff_massNone_eq_zero hmass]
+  show (genSurely (G := SPMF)) none = 0
+  rw [SPMF.apply_eq_zero_iff]
+  simp [genSurely, SPMF.support_oneOf, SPMF.support_pure]
+
+theorem genSurely.productive : IsProductive (genSurely (G := SPMF)) :=
+  IsFilterFree.isProductive genSurely.filter_free

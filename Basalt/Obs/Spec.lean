@@ -51,27 +51,33 @@ namespace Mix
 variable {Ω : Type w} (m : Mix.{u} Ω)
 
 /-- A choice from a range, which is not empty. -/
+@[mix_shape]
 def range (lo hi : Nat) (_h : lo ≤ hi) (F : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → Ω) : Ω :=
   m.mix lo hi F
 
 /-- A choice among `d` outcomes, the first `k` of which mean `t`. -/
+@[mix_shape]
 def threshold (d : Nat) (k : Int) (t e : Ω) : Ω :=
   m.mix 0 (d - 1) fun a => if (a.down.val : Int) < k then t else e
 
 /-- A choice of a list entry. -/
+@[mix_shape]
 def index (l : List γ) (hne : l ≠ []) (F : γ → Ω) : Ω :=
   m.mix 0 (l.length - 1) fun a => F (l[a.down.val]'(Obs.idx_lt hne a.down.property))
 
 /-- A choice of a list entry that is a value: there is nothing under it to bound, so its rules
 speak of the list and not of its entries one by one. -/
+@[mix_shape]
 def element (l : List γ) (hne : l ≠ []) (F : γ → Ω) : Ω := m.index l hne F
 
 /-- A choice of a weighted list entry. -/
+@[mix_shape]
 def select (l : List (Nat × γ)) (_hpos : 0 < (l.map Prod.fst).sum) (F : γ → Ω) (d : Ω) : Ω :=
   m.mix 0 ((l.map Prod.fst).sum - 1) fun a =>
     Obs.selectD (l.map fun p => (p.1, F p.2)) a.down.val d
 
 /-- A choice from a range of integers. -/
+@[mix_shape]
 def rangeInt (lo hi : Int) (_h : lo ≤ hi) (F : Int → Ω) : Ω :=
   m.mix 0 (hi - lo).toNat fun a => F (lo + (a.down.val : Int))
 

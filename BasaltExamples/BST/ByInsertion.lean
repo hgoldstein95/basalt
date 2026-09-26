@@ -147,7 +147,7 @@ theorem Tree.genBSTByInsertion.terminates {lo hi : Int} (h : lo ≤ hi) :
 
 theorem Tree.genBSTByInsertion.faithful (h : lo ≤ hi) :
     IsFaithful (Tree.genBSTByInsertion lo hi h) := by
-  faithful_fixpoint
+  faithful_fixpoint [Tree.genBSTByInsertion.terminates]
 
 /-! ## Cost -/
 
@@ -186,7 +186,7 @@ theorem Tree.genBSTByInsertion.not_cost_bounded {lo hi : Int} (h : lo ≤ hi) (c
     unfold Tree.genBSTByInsertion
     complete_bound
     exact ⟨_, _, cost_mem_replicate h (k + 1), Tree.foldl_insert_replicate lo k, by omega⟩
-  have hle := IsBounded_iff.mp hb _ hmem
+  have hle := hb _ hmem
   dsimp only at hle
   omega
 

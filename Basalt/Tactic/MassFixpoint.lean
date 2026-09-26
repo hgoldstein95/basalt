@@ -52,9 +52,8 @@ elab_rules : tactic
   | `(tactic| mass_fixpoint $[per_seed%$perSeedTk]? $[$fs]? $[using $cert]?) =>
   withMainContext do
     let goal ← getMainGoal
-    let ty := (← instantiateMVars (← goal.getType)).consumeMData
-    let some x := (if ty.isAppOfArity ``IsAlmostSurelyTerminating 2 then some ty.appArg!
-        else if ty.isAppOfArity ``SPMF.IsPMF 2 then some ty.appArg! else none)
+    let ty ← whnfR (← instantiateMVars (← goal.getType))
+    let some x := (if ty.isAppOfArity ``SPMF.IsPMF 2 then some ty.appArg! else none)
       | throwError "mass_fixpoint: expected a goal `IsAlmostSurelyTerminating (gen …)`, \
           got{indentExpr ty}"
     let some gen := x.getAppFn.constName?

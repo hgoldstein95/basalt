@@ -56,7 +56,7 @@ h_r✝ : n_r✝ ≤ 3 * r✝.size + r✝.sum + 1
 -/
 #guard_msgs in
 example : IsCostBounded (Heap.Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1) := by
-  cost_fixpoint
+  cost_fixpoint [Nat.arbitrary.cost_bounded]
   trace_state
   all_goals simp only [Heap.Tree.size, Heap.Tree.sum]; omega
 
@@ -123,7 +123,7 @@ example (n : Nat) (b : Bool) : IsCostBounded (g n b) (fun k => k + 1 + n - n) :=
 
 /-- A generator with no recursion is unfolded and walked. -/
 example : IsCostBounded SortedList.List.genSortedBySorting (fun ys => 2 * ys.length + ys.sum + 1) := by
-  cost_fixpoint
+  cost_fixpoint [ArbList.List.arbitrary.cost_bounded]
   expose_names
   have hperm := List.mergeSort_perm xs (fun a b => a ≤ b)
   simp only [hperm.length_eq, hperm.sum_eq]

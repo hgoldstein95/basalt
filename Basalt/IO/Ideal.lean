@@ -69,6 +69,7 @@ theorem mono {f g : σ → ℝ≥0∞} (h : ∀ s, f s ≤ g s) : src.E f ≤ sr
     _ = src.E g := congrArg src.E (funext fun s => add_tsub_cancel_of_le (h s))
 
 /-- `y` expects no more of any continuation than `x` delivers on the ideal source. -/
+@[walk_rel "ideal_fixpoint"]
 def Below (y : SPMF α) (x : WordModel σ α) : Prop :=
   ∀ G : α → σ → ℝ≥0∞, expect y (fun a => src.E (G a)) ≤ src.E (x.runE G)
 

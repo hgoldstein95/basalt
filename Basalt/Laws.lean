@@ -9,85 +9,62 @@ import Basalt.SPMF.Failure
 /-!
 # Generator Correctness Properties
 
-The basic, mostly orthogonal, correctness properties a PBT generator may have, as plain `def`s —
-there is no bundle: which of them apply depends on the generator, and you prove the ones that do.
+The basic, mostly orthogonal, correctness properties a PBT generator may have, as plain predicates
+— there is no bundle: which of them apply depends on the generator, and you prove the ones that do.
 -/
 
-/-- A generator `g` `IsSound` with respect to `P` if every value in its support satisfies `P`. A
-size-bounded generator is sound and deliberately not complete. -/
+/-- Every value `g` can produce satisfies `P`. A size-bounded generator is sound and deliberately
+not complete. -/
 def IsSound (g : SPMF α) (P : α → Prop) : Prop :=
   ∀ a ∈ SPMF.support g, P a
 
-/-- A generator `g` `IsCompleteFor` a predicate `P` if every value satisfying `P` is in its
-support. -/
+/-- Every value satisfying `P` is one `g` can produce. -/
 def IsCompleteFor (g : SPMF α) (P : α → Prop) : Prop :=
   ∀ a, P a → a ∈ SPMF.support g
 
-/-- We say that a generator `g` `IsSoundAndComplete` with respect to a predicate `P` if, when
-  interpreted as an `SPMF`, all values in the support of `g` satisfy `P` and all values satisfying
-  `P` are in the support of `g`. -/
-def IsSoundAndComplete (g : SPMF α) (P : α → Prop) : Prop :=
-  IsSound g P ∧ IsCompleteFor g P
+/-- The values `g` can produce are exactly those satisfying `P`. -/
+structure IsSoundAndComplete (g : SPMF α) (P : α → Prop) : Prop where
+  intro ::
+  sound : IsSound g P
+  complete : IsCompleteFor g P
 
-theorem IsSoundAndComplete.intro {g : SPMF α} {P : α → Prop} (sound : IsSound g P)
-    (complete : IsCompleteFor g P) : IsSoundAndComplete g P :=
-  ⟨sound, complete⟩
-
-theorem IsSoundAndComplete.sound {g : SPMF α} {P : α → Prop} (h : IsSoundAndComplete g P) :
-    IsSound g P := h.1
-
-theorem IsSoundAndComplete.complete {g : SPMF α} {P : α → Prop} (h : IsSoundAndComplete g P) :
-    IsCompleteFor g P := h.2
-
-/-- Soundness and completeness transfers along a support equation. -/
 theorem IsSoundAndComplete.of_support_eq {g g' : SPMF α} {P : α → Prop}
     (h : SPMF.support g' = SPMF.support g) (hg : IsSoundAndComplete g P) :
-    IsSoundAndComplete g' P := by
-  grind only [IsSoundAndComplete, IsSound, IsCompleteFor]
+    IsSoundAndComplete g' P :=
+  ⟨fun a ha => hg.sound a (h ▸ ha), fun a hP => h ▸ hg.complete a hP⟩
 
-/-- We say that a generator `g` `IsAlmostSurelyTerminating` if, when interpreted as an `SPMF`, its
-mass sums to 1 (i.e., it is a true `PMF`): every infinite path through the generator has probability
-0. This does not require structural termination. -/
-def IsAlmostSurelyTerminating (g : SPMF α) : Prop :=
+/-- `g` terminates with probability 1: its mass is 1, so every infinite path has probability 0. It
+need not terminate structurally. -/
+abbrev IsAlmostSurelyTerminating (g : SPMF α) : Prop :=
   SPMF.IsPMF g
 
-/-- We say that a generator `g` `IsCostBounded` with respect to a cost function `c` if, when
-  generating a value `v`, the generator makes at most `c v` choices. -/
+/-- Producing `v` takes at most `c v` random choices. -/
 def IsCostBounded (g : SPMF.Cost α) (c : α → Nat) : Prop :=
-  IsBounded g c
+  ∀ p ∈ SPMF.support g, p.2 ≤ c p.1
 
-/-- A partial generator `IsFilterFree` if all of its mass lands on *successful* outcomes: it never
-  actually fails.  -/
+theorem IsCostBounded.mono {g : SPMF.Cost α} {c₁ c₂ : α → Nat} (h : IsCostBounded g c₁)
+    (hc : ∀ a, c₁ a ≤ c₂ a) : IsCostBounded g c₂ :=
+  fun p hp => (h p hp).trans (hc p.1)
+
+/-- A partial generator never fails: all of its mass is on successes. -/
 def IsFilterFree (g : SPMF (Option α)) : Prop :=
   SPMF.massSome g = 1
 
-/-- A partial generator `IsProductive` if it succeeds with positive probability.  Proving this shows
-  that rejection sampling is safe. -/
+/-- A partial generator succeeds with positive probability: rejection sampling from it is safe. -/
 def IsProductive (g : SPMF (Option α)) : Prop :=
   0 < SPMF.massSome g
 
-/-- A single reachable outcome makes a generator productive. `massSome` is a sum over *all* successes,
-  so a lower bound needs only one of them — this is the cheap route to `IsProductive`, and the reason
-  productivity is a much weaker ask than filter-freedom. -/
-theorem IsProductive.of_apply_pos {g : SPMF (Option α)} {a : α} (h : 0 < g (some a)) :
-    IsProductive g :=
-  lt_of_lt_of_le h (ENNReal.le_tsum (f := fun a => g (some a)) a)
-
-/-- `IsProductive` from support membership — the form a `support` characterization hands you
-  directly, so exhibiting one value the generator can produce discharges it. -/
+/-- One value the generator can produce makes it productive: `massSome` sums over every success. -/
 theorem IsProductive.of_mem_support {g : SPMF (Option α)} {a : α}
     (h : some a ∈ SPMF.support g) : IsProductive g :=
-  IsProductive.of_apply_pos ((SPMF.apply_pos_iff g (some a)).mpr h)
+  ((SPMF.apply_pos_iff g (some a)).mpr h).trans_le (ENNReal.le_tsum (f := fun a => g (some a)) a)
 
-/-- Filter-freedom is strictly stronger than productivity. -/
 theorem IsFilterFree.isProductive {g : SPMF (Option α)} (h : IsFilterFree g) :
     IsProductive g := by
   rw [IsProductive, h]; exact zero_lt_one
 
-/-- For an almost-surely-terminating generator, filter-freedom is exactly "never *explicitly* fails".
-  This is the form worth proving: `massNone` is a single value of `g`, whereas `massSome` is a sum
-  over the whole success set. The hypothesis is what separates the two failure modes — without
-  `mass = 1`, missing mass could be divergence rather than filtering. -/
+/-- Filter-freedom as a single value of `g`, for a generator that terminates: without `mass = 1`,
+missing mass could be divergence rather than filtering. -/
 theorem IsFilterFree_iff_massNone_eq_zero {g : SPMF (Option α)} (hmass : g.mass = 1) :
     IsFilterFree g ↔ SPMF.massNone g = 0 := by
   have hsplit := SPMF.mass_split g

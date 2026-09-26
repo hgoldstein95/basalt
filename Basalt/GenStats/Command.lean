@@ -6,15 +6,13 @@ Authors: Harrison Goldstein
 import Lean.Elab.Command
 import Lean.Elab.SyntheticMVars
 import Basalt.GenStats.Basic
-import Basalt.Laws
-import Basalt.Walk.Attr
 
 /-!
 # The `#genstats` Command
 
 `#genstats g` draws from the generator `g` many times and prints a summary of the results:
-outcomes, size and choice-count distributions, diversity, samples, and which correctness laws `g`
-carries. The options are documented on `genStatsCmd`.
+outcomes, size and choice-count distributions, diversity, and samples. The options are documented on
+`genStatsCmd`.
 -/
 
 open Lean Elab Command Meta
@@ -149,73 +147,14 @@ private def mkOptArg : Option Term → CommandElabM Term
   | some f => `(some ($f))
   | none => `(none)
 
-/-- One line of the laws block: its label, and the ways it is proved, each a set of suffixes of
-conventionally named theorems (`Basalt.Walk.lawConventions`) that must all exist. -/
-private structure LawSlot where
-  label : Name
-  proofs : Array (Array Name)
-
-/-- The laws `#genstats` reports on, in report order. Laws are found by **naming convention** —
-`genFoo.sound_complete` — and there is no registry to fall out of sync with.
-
-Only Basalt's own laws appear here. A downstream library that emits laws Basalt has no definition
-for is invisible to this report; that is the cost of not having a registry, and it is preferred to
-a registry that can silently disagree with what was actually proved. -/
-private def lawSlots : Array LawSlot := #[
-  { label := `sound_complete, proofs := #[#[`sound_complete], #[`sound, `complete]] },
-  { label := `terminates,     proofs := #[#[`terminates]] },
-  { label := `cost_bounded,   proofs := #[#[`cost_bounded]] },
-  { label := `filter_free,    proofs := #[#[`filter_free]] },
-  { label := `productive,     proofs := #[#[`productive]] },
-  { label := `faithful,       proofs := #[#[`faithful]] }]
-
-/-- Does `declName.suffix` exist *and* actually state the law the convention names?
-
-**The statement is checked, not just the name.** A `theorem genFoo.sound_complete` that happens to
-say something else — or says it about a different generator — must not be reported as a proof, so
-the conclusion has to be headed by the law's constant and to mention `declName`. Without this the
-report would launder any conventionally-named theorem into a ✓. -/
-private def lawProved (env : Environment) (declName : Name) (suffix : Name) : MetaM Bool := do
-  let some (_, lawC) := Basalt.Walk.lawConventions.find? (·.1 == suffix) | return false
-  let some ci := env.find? (declName ++ suffix) | return false
-  forallTelescope ci.type fun _ body => do
-    unless body.isAppOf lawC do return false
-    return body.getAppArgs.any fun a => (a.find? (fun x => x.isConstOf declName)).isSome
-
-private def LawSlot.proved (slot : LawSlot) (env : Environment) (declName : Name) : MetaM Bool :=
-  slot.proofs.anyM fun thms => thms.allM (lawProved env declName)
-
-/-- Testable entry point for the shape check, since a report that silently drops a law looks exactly
-like a generator that has none. See `BasaltTest/LawLine.lean`. -/
-def lawProvedFor (env : Environment) (declName label : Name) : MetaM Bool := do
-  match lawSlots.find? (·.label == label) with
-  | none => return false
-  | some slot => slot.proved env declName
-
-/-- The generator's own constant, if the term has one to speak of.
-
-Tries the head first, then the head of each argument: `#genstats genFoo` has `genFoo` at the head,
-while an adapted `#genstats (toStatGen genFoo)` has the adapter there and the generator one level
-in. A candidate only counts if it carries at least one law, so an adapter that happens to have a
-`.sound_complete` of its own cannot shadow the generator's. -/
-private def genConstant? (e : Expr) : MetaM (Option Name) := do
-  let env ← getEnv
-  let hasLaw (n : Name) : MetaM Bool :=
-    lawSlots.anyM (·.proved env n)
-  let candidates := #[e.getAppFn] ++ e.getAppArgs.map (·.getAppFn)
-  for c in candidates do
-    if let some n := c.constName? then
-      if ← hasLaw n then return some n
-  return none
-
 elab_rules : command
   | `(#genstats $args:genStatsArg* $g:term) => do
     let opts ← parseOpts args
     -- Phase 1: elaborate the generator speculatively to learn its output type and what the type
     -- supports. The result expression is discarded; the generated `#eval` re-elaborates `g`.
-    let (αStx, hasRepr, hasSizeOf, shapes?, laws) ← liftTermElabM do
+    let (αStx, hasRepr, hasSizeOf, shapes?) ← liftTermElabM do
       let α ← mkFreshExprMVar (some (mkSort Level.one))
-      let gE ← Term.elabTermEnsuringType g (mkApp (mkConst ``GenStats.StatGen) α)
+      discard <| Term.elabTermEnsuringType g (mkApp (mkConst ``GenStats.StatGen) α)
       Term.synthesizeSyntheticMVarsNoPostponing
       let α ← instantiateMVars α
       if α.hasExprMVar then
@@ -224,14 +163,7 @@ elab_rules : command
       let hasRepr := (← synthInstance? (← mkAppM ``Repr #[α])).isSome
       let hasSizeOf := (← synthInstance? (← mkAppM ``SizeOf #[α])).isSome
       let shapes? ← getCtorShapes? α
-      -- Laws, by naming convention off the generator's own constant. A term with no constant, or
-      -- one carrying no laws, yields `#[]` and the report omits the block entirely.
-      let laws ← do
-        match ← genConstant? (← instantiateMVars gE) with
-        | none => pure #[]
-        | some n =>
-          lawSlots.mapM fun slot => return (slot.label.toString, ← slot.proved (← getEnv) n)
-      pure (αStx, hasRepr, hasSizeOf, shapes?, laws)
+      pure (αStx, hasRepr, hasSizeOf, shapes?)
     -- Phase 2: generate the helper functions the output type supports.
     let mut sizeArg? : Option Term := opts.size?
     let mut ctorArg? : Option Term := none
@@ -269,13 +201,8 @@ elab_rules : command
       " ".intercalate words.toList
     let cfg ← `({ draws := $(quote opts.draws), fuel := $(quote opts.fuel),
                   seed := $(quote opts.seed) : GenStats.Config })
-    let lawsArg ← do
-      let entries ← laws.mapM fun (n, ok) => do
-        let b ← if ok then `(true) else `(false)
-        `(($(Syntax.mkStrLit n), $b))
-      `(#[$entries,*])
     elabCommand (← `(#eval GenStats.report (($g) : GenStats.StatGen _) $(Syntax.mkStrLit label)
       $cfg (size? := $(← mkOptArg sizeArg?)) (repr? := $(← mkOptArg reprArg?))
-      (ctor? := $(← mkOptArg ctorArg?)) (laws := $lawsArg)))
+      (ctor? := $(← mkOptArg ctorArg?))))
 
 end GenStats.Command

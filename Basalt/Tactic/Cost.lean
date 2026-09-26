@@ -26,8 +26,8 @@ namespace SPMF.Cost
 def Always (g : SPMF.Cost α) (Q : α → Nat → Prop) : Prop :=
   ∀ p ∈ SPMF.support g, Q p.1 p.2
 
-theorem isBounded_iff_always {g : SPMF.Cost α} {c : α → Nat} :
-    IsBounded g c ↔ Always g (fun a n => n ≤ c a) := Iff.rfl
+theorem isCostBounded_iff_always {g : SPMF.Cost α} {c : α → Nat} :
+    IsCostBounded g c ↔ Always g (fun a n => n ≤ c a) := Iff.rfl
 
 /-- `Always`, read through a specification the always observation equals. -/
 theorem always_of_obs {g : SPMF.Cost α} {w : WPC Mix.demonic α} (h : alwaysObs.spec g = w)
@@ -35,8 +35,8 @@ theorem always_of_obs {g : SPMF.Cost α} {w : WPC Mix.demonic α} (h : alwaysObs
   iff_of_eq (congrFun h Q)
 
 /-- A cost bound is a postcondition, up to consequence. -/
-theorem Always.of_isBounded {x : SPMF.Cost α} {c : α → Nat} {Q : α → Nat → Prop}
-    (hx : IsBounded x c) (hq : ∀ a n, n ≤ c a → Q a n) : Always x Q :=
+theorem Always.of_isCostBounded {x : SPMF.Cost α} {c : α → Nat} {Q : α → Nat → Prop}
+    (hx : IsCostBounded x c) (hq : ∀ a n, n ≤ c a → Q a n) : Always x Q :=
   fun p hp => hq _ _ (hx p hp)
 
 open Lean.Order in
@@ -46,6 +46,19 @@ theorem admissible_always (Q : α → Nat → Prop) :
   rw [SPMF.mem_support_csup hc] at hp
   obtain ⟨x, hxc, hxp⟩ := hp
   exact ih x hxc p hxp
+
+/-- A cost bound on a generator argument, when no fact gives one: the argument's worst case, a bound
+that ignores the value. -/
+theorem isCostBounded_of_worst {g : SPMF.Cost α} {b : ℕ∞} {k : Nat}
+    (h : worstObs.spec g (fun _ n => (n : ℕ∞)) ≤ b) (hb : b = (k : ℕ∞)) :
+    IsCostBounded g fun _ => k := fun p hp =>
+  Nat.cast_le.mp ((le_iSup₂_of_le p hp le_rfl).trans (h.trans hb.le))
+
+end SPMF.Cost
+
+attribute [walk_argument "cost_bound" SPMF.Cost.isCostBounded_of_worst] IsCostBounded
+
+namespace SPMF.Cost
 
 /-! ## Leaves
 
@@ -57,8 +70,8 @@ theorem le_always_of_always {x : SPMF.Cost α} {R p : α → Nat → Prop} (hx :
     (∀ a n, R a n → p a n) ≤ alwaysObs.spec x p := fun h q hq => h _ _ (hx q hq)
 
 @[obs_leaf]
-theorem le_always_of_isBounded {x : SPMF.Cost α} {c : α → Nat} {p : α → Nat → Prop}
-    (hx : IsBounded x c) : (∀ a n, n ≤ c a → p a n) ≤ alwaysObs.spec x p :=
+theorem le_always_of_isCostBounded {x : SPMF.Cost α} {c : α → Nat} {p : α → Nat → Prop}
+    (hx : IsCostBounded x c) : (∀ a n, n ≤ c a → p a n) ≤ alwaysObs.spec x p :=
   fun h q hq => h _ _ (hx q hq)
 
 end SPMF.Cost
@@ -70,8 +83,8 @@ after the cost function's as in a residual goal. `tac` is the caller, for the er
 def toAlways (tac : String) (goal : MVarId) : MetaM MVarId := goal.withContext do
   let ty := (← instantiateMVars (← goal.getType)).consumeMData
   if ty.isAppOfArity ``SPMF.Cost.Always 3 then return ← goal.replaceTargetDefEq ty
-  unless ty.isAppOfArity ``IsCostBounded 3 || ty.isAppOfArity ``IsBounded 3 do
-    throwError "{tac}: expected a goal `IsCostBounded (gen …) c`, `IsBounded (gen …) c`, or \
+  unless ty.isAppOfArity ``IsCostBounded 3 do
+    throwError "{tac}: expected a goal `IsCostBounded (gen …) c` or \
       `SPMF.Cost.Always (gen …) Q`, got{indentExpr ty}"
   let #[α, g, c] := ty.getAppArgs | unreachable!
   let v := match c with | .lam v _ _ _ => v.eraseMacroScopes | _ => `v
@@ -90,10 +103,10 @@ partial def walkCost (tac : String) (extras : Array Term) (goal : MVarId) :
   if let some cases ← splitMatch? goal g then return ← cases.flatMapM (walkCost tac extras)
   pathsBound extras ``SPMF.Cost.alwaysObs g post goal
 
-/-- `cost_bound` proves `IsCostBounded (gen …) c` (or `IsBounded`, or `SPMF.Cost.Always … Q`) up to
+/-- `cost_bound` proves `IsCostBounded (gen …) c` (or `SPMF.Cost.Always … Q`) up to
 arithmetic: it walks `gen`'s syntax, pushing the postcondition `n ≤ c v` into each sub-generator,
 and leaves one goal per path through `gen`. Recursive occurrences are closed from the local context,
-callees from their `.cost_bounded` law; any other cost bound can be passed as `cost_bound [h₁, h₂]`.
+and a callee by a cost bound passed as `cost_bound [h₁, h₂]`, such as its `.cost_bounded` law.
 
 In a residual goal, a value drawn by `let x ← …` is `x✝`, the choices that draw took `n_x✝`, and
 what is known about it `h_x✝` (`Basalt/Walk/Names.lean`); name them with `next x n_x h_x =>`, or
@@ -104,12 +117,12 @@ elab_rules : tactic
   | `(tactic| cost_bound $[$fs]?) => withMainContext do
     replaceMainGoal (← walkCost "cost_bound" (walkFacts.terms fs) (← getMainGoal))
 
-/-- `cost_fixpoint` proves `IsCostBounded (gen a₁ … aₙ) c` (or `IsBounded`, or
-`SPMF.Cost.Always`) up to arithmetic. It inducts with `gen.fixpoint_induct` over the arguments some
-recursive call of `gen` changes, unfolds one step, and runs `cost_bound` (extra cost bounds go in
-`cost_fixpoint [h₁, h₂]`). In each residual goal the recursive function is named after `gen`, the
-bound on its every call is `ih`, and the changing arguments keep their names. A `gen` that is not
-recursive is unfolded and walked. -/
+/-- `cost_fixpoint` proves `IsCostBounded (gen a₁ … aₙ) c` (or `SPMF.Cost.Always`) up to
+arithmetic. It inducts with `gen.fixpoint_induct` over the arguments some recursive call of `gen`
+changes, unfolds one step, and runs `cost_bound` (extra cost bounds go in `cost_fixpoint [h₁, h₂]`).
+In each residual goal the recursive function is named after `gen`, the bound on its every call is
+`ih`, and the changing arguments keep their names. A `gen` that is not recursive is unfolded and
+walked. -/
 syntax (name := costFixpointTac) "cost_fixpoint" (walkFacts)? : tactic
 
 elab_rules : tactic
@@ -137,11 +150,11 @@ section generatorArgument
 
 variable {α : Type} {g : SPMF.Cost α} {c : α → Nat} {p : List α → Nat → Prop}
 
-private theorem isBounded_vectorOf_sum (hg : IsBounded g c) {k : Nat} :
-    IsBounded (vectorOf k g : SPMF.Cost (List α)) fun a => (a.map c).sum := by
+private theorem isCostBounded_vectorOf_sum (hg : IsCostBounded g c) {k : Nat} :
+    IsCostBounded (vectorOf k g : SPMF.Cost (List α)) fun a => (a.map c).sum := by
   induction k with
   | zero =>
-    show IsBounded (Pure.pure []) _
+    show IsCostBounded (Pure.pure []) _
     cost_bound
     simp
   | succ k ih =>
@@ -151,9 +164,9 @@ private theorem isBounded_vectorOf_sum (hg : IsBounded g c) {k : Nat} :
     omega
 
 @[gen_rule]
-theorem le_always_vectorOf {k : Nat} (hg : IsBounded g c) :
+theorem le_always_vectorOf {k : Nat} (hg : IsCostBounded g c) :
     (∀ a n, n ≤ (a.map c).sum → p a n) ≤ alwaysObs.spec (vectorOf k g) p :=
-  le_always_of_isBounded (isBounded_vectorOf_sum hg)
+  le_always_of_isCostBounded (isCostBounded_vectorOf_sum hg)
 
 private theorem always_listOfMaxLength {n : Nat} {Q : List α → Nat → Prop}
     (h : ∀ j, j ≤ n → Always (vectorOf j g) fun a m => Q a (1 + 0 + m)) :
@@ -165,13 +178,13 @@ private theorem always_listOfMaxLength {n : Nat} {Q : List α → Nat → Prop}
   exact (Mix.range_demonic _).mpr fun j hj => h j hj.2
 
 @[gen_rule]
-theorem le_always_listOfMaxLength {k : Nat} (hg : IsBounded g c) :
+theorem le_always_listOfMaxLength {k : Nat} (hg : IsCostBounded g c) :
     (∀ a n, n ≤ 1 + (a.map c).sum → p a n) ≤ alwaysObs.spec (listOfMaxLength k g) p :=
   fun h => always_listOfMaxLength fun _ _ =>
-    Always.of_isBounded (isBounded_vectorOf_sum hg) fun a n hn => h a (1 + 0 + n) (by omega)
+    Always.of_isCostBounded (isCostBounded_vectorOf_sum hg) fun a n hn => h a (1 + 0 + n) (by omega)
 
-private theorem isBounded_listOf (hg : IsBounded g c) :
-    IsBounded (listOf g : SPMF.Cost (List α)) fun a => a.length + (a.map c).sum + 1 := by
+private theorem isCostBounded_listOf (hg : IsCostBounded g c) :
+    IsCostBounded (listOf g : SPMF.Cost (List α)) fun a => a.length + (a.map c).sum + 1 := by
   refine listOf.fixpoint_induct g _
     (admissible_always fun a n => n ≤ a.length + (a.map c).sum + 1)
     (fun listOf ih => ?_)
@@ -179,8 +192,8 @@ private theorem isBounded_listOf (hg : IsBounded g c) :
   all_goals simp only [List.length_cons, List.map_cons, List.sum_cons, List.length_nil,
     List.map_nil, List.sum_nil]; omega
 
-private theorem isBounded_nonEmptyListOf (hg : IsBounded g c) :
-    IsBounded (nonEmptyListOf g : SPMF.Cost (List α)) fun a => a.length + (a.map c).sum := by
+private theorem isCostBounded_nonEmptyListOf (hg : IsCostBounded g c) :
+    IsCostBounded (nonEmptyListOf g : SPMF.Cost (List α)) fun a => a.length + (a.map c).sum := by
   refine nonEmptyListOf.fixpoint_induct g _
     (admissible_always fun a n => n ≤ a.length + (a.map c).sum)
     (fun nonEmptyListOf ih => ?_)
@@ -189,14 +202,14 @@ private theorem isBounded_nonEmptyListOf (hg : IsBounded g c) :
     List.map_nil, List.sum_nil]; omega
 
 @[gen_rule]
-theorem le_always_listOf (hg : IsBounded g c) :
+theorem le_always_listOf (hg : IsCostBounded g c) :
     (∀ a n, n ≤ a.length + (a.map c).sum + 1 → p a n) ≤ alwaysObs.spec (listOf g) p :=
-  le_always_of_isBounded (isBounded_listOf hg)
+  le_always_of_isCostBounded (isCostBounded_listOf hg)
 
 @[gen_rule]
-theorem le_always_nonEmptyListOf (hg : IsBounded g c) :
+theorem le_always_nonEmptyListOf (hg : IsCostBounded g c) :
     (∀ a n, n ≤ a.length + (a.map c).sum → p a n) ≤ alwaysObs.spec (nonEmptyListOf g) p :=
-  le_always_of_isBounded (isBounded_nonEmptyListOf hg)
+  le_always_of_isCostBounded (isCostBounded_nonEmptyListOf hg)
 
 end generatorArgument
 
@@ -210,12 +223,6 @@ case, the most choices any run can make, is `SPMF.Cost.worstObs`, and these are 
 
 namespace SPMF.Cost
 
-/-- The judgment `IsBounded g fun _ => k`, with `k` to be found, as an upper bound on `worstObs`. -/
-theorem isBounded_of_worst {g : SPMF.Cost α} {b : ℕ∞} {k : Nat}
-    (h : worstObs.spec g (fun _ n => (n : ℕ∞)) ≤ b) (hb : b = (k : ℕ∞)) :
-    IsBounded g fun _ => k := fun p hp =>
-  Nat.cast_le.mp ((le_iSup₂_of_le p hp le_rfl).trans (h.trans hb.le))
-
 @[obs_leaf]
 theorem worst_le_add_of_le {x : SPMF.Cost α} {p : α → Nat → ℕ∞} {k B : ℕ∞}
     (hx : worstObs.spec x (fun _ n => (n : ℕ∞)) ≤ B) (hp : ∀ a n, p a n = k + (n : ℕ∞)) :
@@ -224,8 +231,8 @@ theorem worst_le_add_of_le {x : SPMF.Cost α} {p : α → Nat → ℕ∞} {k B :
     (add_le_add le_rfl ((le_iSup₂_of_le q hq le_rfl).trans hx))
 
 @[obs_leaf]
-theorem worst_le_add_of_isBounded {x : SPMF.Cost α} {p : α → Nat → ℕ∞} {k : ℕ∞} {K : Nat}
-    (hx : IsBounded x fun _ => K) (hp : ∀ a n, p a n = k + (n : ℕ∞)) :
+theorem worst_le_add_of_isCostBounded {x : SPMF.Cost α} {p : α → Nat → ℕ∞} {k : ℕ∞} {K : Nat}
+    (hx : IsCostBounded x fun _ => K) (hp : ∀ a n, p a n = k + (n : ℕ∞)) :
     worstObs.spec x p ≤ k + (K : ℕ∞) :=
   worst_le_add_of_le (iSup₂_le fun q hq => Nat.cast_le.mpr (hx q hq)) hp
 
@@ -315,11 +322,11 @@ open Basalt.CostBound
 
 variable {α : Type} {g : SPMF.Cost α} {b k : ℕ∞} {p : List α → Nat → ℕ∞}
 
-private theorem isBounded_vectorOf {n k : Nat} (hg : IsBounded g fun _ => k) :
-    IsBounded (vectorOf n g : SPMF.Cost (List α)) fun _ => n * k := by
+private theorem isCostBounded_vectorOf {n k : Nat} (hg : IsCostBounded g fun _ => k) :
+    IsCostBounded (vectorOf n g : SPMF.Cost (List α)) fun _ => n * k := by
   induction n with
   | zero =>
-    show IsBounded (Pure.pure []) _
+    show IsCostBounded (Pure.pure []) _
     cost_bound
     omega
   | succ n ih =>
@@ -330,10 +337,10 @@ private theorem isBounded_vectorOf {n k : Nat} (hg : IsBounded g fun _ => k) :
     rw [Nat.succ_mul]
     omega
 
-private theorem isBounded_listOfMaxLength {n k : Nat} (hg : IsBounded g fun _ => k) :
-    IsBounded (listOfMaxLength n g : SPMF.Cost (List α)) fun _ => 1 + n * k := by
-  refine isBounded_iff_always.mpr (always_listOfMaxLength (Q := fun _ m => m ≤ 1 + n * k)
-    fun j hj => Always.of_isBounded (isBounded_vectorOf hg) fun a m hm => ?_)
+private theorem isCostBounded_listOfMaxLength {n k : Nat} (hg : IsCostBounded g fun _ => k) :
+    IsCostBounded (listOfMaxLength n g : SPMF.Cost (List α)) fun _ => 1 + n * k := by
+  refine isCostBounded_iff_always.mpr (always_listOfMaxLength (Q := fun _ m => m ≤ 1 + n * k)
+    fun j hj => Always.of_isCostBounded (isCostBounded_vectorOf hg) fun a m hm => ?_)
   have := Nat.mul_le_mul_right k hj
   show 1 + 0 + m ≤ 1 + n * k
   omega
@@ -351,7 +358,8 @@ theorem worst_vectorOf_le {n : Nat} (hg : worstObs.spec g (fun _ m => (m : ℕ�
       simp
     | succ n => simp
   | coe K =>
-    refine (worst_le_add_of_isBounded (isBounded_vectorOf (isBounded_of_worst hg rfl)) hp).trans ?_
+    refine (worst_le_add_of_isCostBounded
+      (isCostBounded_vectorOf (isCostBounded_of_worst hg rfl)) hp).trans ?_
     push_cast
     exact le_rfl
 
@@ -363,16 +371,16 @@ theorem worst_listOfMaxLength_le {n : Nat} (hg : worstObs.spec g (fun _ m => (m 
   | top =>
     cases n with
     | zero =>
-      have h0 : IsBounded (listOfMaxLength 0 g : SPMF.Cost (List α)) fun _ => 1 := by
-        refine isBounded_iff_always.mpr (always_listOfMaxLength (Q := fun _ m => m ≤ 1)
+      have h0 : IsCostBounded (listOfMaxLength 0 g : SPMF.Cost (List α)) fun _ => 1 := by
+        refine isCostBounded_iff_always.mpr (always_listOfMaxLength (Q := fun _ m => m ≤ 1)
           fun j hj => ?_)
         obtain rfl : j = 0 := by omega
         exact (always_of_obs (alwaysObs.map_pure _)).mpr (show 1 + 0 + 0 ≤ 1 by omega)
-      exact (worst_le_add_of_isBounded h0 hp).trans (by simp)
+      exact (worst_le_add_of_isCostBounded h0 hp).trans (by simp)
     | succ n => simp
   | coe K =>
-    refine (worst_le_add_of_isBounded
-      (isBounded_listOfMaxLength (isBounded_of_worst hg rfl)) hp).trans ?_
+    refine (worst_le_add_of_isCostBounded
+      (isCostBounded_listOfMaxLength (isCostBounded_of_worst hg rfl)) hp).trans ?_
     push_cast
     exact le_rfl
 
@@ -380,8 +388,8 @@ theorem worst_listOfMaxLength_le {n : Nat} (hg : worstObs.spec g (fun _ m => (m 
 body destructures each draw with a `match`, which the walk does not enter, so its bound is proved
 by support inversion. -/
 
-private theorem isBounded_permutationOf {xs : List α} :
-    IsBounded (permutationOf xs : SPMF.Cost { ys // xs.Perm ys }) fun _ => xs.length := by
+private theorem isCostBounded_permutationOf {xs : List α} :
+    IsCostBounded (permutationOf xs : SPMF.Cost { ys // xs.Perm ys }) fun _ => xs.length := by
   induction xs with
   | nil =>
     rintro ⟨a, n⟩ h
@@ -402,11 +410,11 @@ private theorem isBounded_permutationOf {xs : List α} :
 @[gen_rule]
 theorem le_always_permutationOf {xs : List α} {p : { ys // xs.Perm ys } → Nat → Prop} :
     (∀ a n, n ≤ xs.length → p a n) ≤ alwaysObs.spec (permutationOf xs) p :=
-  le_always_of_isBounded isBounded_permutationOf
+  le_always_of_isCostBounded isCostBounded_permutationOf
 
 @[gen_rule]
 theorem worst_permutationOf_le {xs : List α} {p : { ys // xs.Perm ys } → Nat → ℕ∞}
     (hp : ∀ a m, p a m = k + (m : ℕ∞)) : worstObs.spec (permutationOf xs) p ≤ k + xs.length :=
-  worst_le_add_of_isBounded isBounded_permutationOf hp
+  worst_le_add_of_isCostBounded isCostBounded_permutationOf hp
 
 end SPMF.Cost

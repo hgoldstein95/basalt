@@ -6,6 +6,7 @@ Authors: Harrison Goldstein
 import Basalt.Combinators
 import Basalt.Obs.Basic
 import Basalt.Obs.Spec
+import Basalt.Walk.Attr
 
 /-!
 # Observations Commute with the Combinators
@@ -14,6 +15,8 @@ import Basalt.Obs.Spec
 open RandomChoice
 
 namespace Obs
+
+attribute [gen_map] map_choose map_coin
 
 variable {G : Type → Type v} {W : Type → Type w}
   [Gen G] [LawfulMonad G] [Monad W] [RandomChoice W] [LawfulMonad W] (O : Obs G W)

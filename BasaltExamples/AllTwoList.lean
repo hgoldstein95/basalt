@@ -57,6 +57,6 @@ theorem genAllTwos.cost_bounded : IsCostBounded genAllTwos AllTwos.cost := by
   all_goals simp only [AllTwos.cost, List.length_nil, List.length_cons] at *; omega
 
 theorem genAllTwos.faithful : IsFaithful genAllTwos := by
-  faithful_fixpoint
+  faithful_fixpoint [genAllTwos.terminates]
 
 end AllTwoList

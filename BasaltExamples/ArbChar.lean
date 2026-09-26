@@ -43,6 +43,6 @@ theorem Char.arbitrary.cost_bounded :
   omega
 
 theorem Char.arbitrary.faithful : IsFaithful Char.arbitrary := by
-  faithful_fixpoint
+  faithful_fixpoint [Char.arbitrary.terminates]
 
 end ArbChar

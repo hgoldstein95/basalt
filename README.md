@@ -154,8 +154,7 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
 - `BasaltExamples/` — worked generators with correctness proofs. Because each file proves its
   generator's laws, this directory is also most of the effective regression suite for the library's
   lemma sets and tactics.
-- `BasaltTest/` — regression tests, named for the library module they guard when one exists;
-  `LawLine.lean` has no library counterpart (it pins the `#genstats` law-reporting contract).
+- `BasaltTest/` — regression tests, named for the library module they guard when one exists.
 - `BasaltFuzz/` — the generators, properties, and buggy operations the `basalt-fuzz` executable
   fuzzes. Two things set this directory apart, both explained in `fuzz-run/README.md`: it is linked
   into a native executable, so it must stay Mathlib-free, and it is the only

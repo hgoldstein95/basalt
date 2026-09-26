@@ -47,4 +47,4 @@ theorem genType.cost_bounded : IsCostBounded genType Ty.size := by
   all_goals simp only [Ty.size] at *; omega
 
 theorem genType.faithful : IsFaithful genType := by
-  faithful_fixpoint
+  faithful_fixpoint [genType.terminates]

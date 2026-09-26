@@ -15,6 +15,10 @@ import Lean.Meta.Tactic.NormCast
 import Lean.Meta.Tactic.Replace
 import Lean.Meta.Transform
 import Batteries.Data.List.Basic
+import Mathlib.Algebra.Group.Monoid
+import Mathlib.Data.Nat.Cast.Defs
+import Mathlib.Order.Defs.PartialOrder
+import Basalt.Obs.Ordered
 import Basalt.Walk.Attr
 import Basalt.Walk.Names
 
@@ -114,8 +118,8 @@ def evalClosed (e : Expr) : MetaM Expr := do
       let inst ← whnf (x.getArg! 2)
       if inst.isAppOf ``Decidable.isTrue then return .visit (x.getArg! 3)
       if inst.isAppOf ``Decidable.isFalse then return .visit (x.getArg! 4)
-    if closed x && x.isApp && (x.find? fun e => e.isConstOf `Rat.num || e.isConstOf `Rat.den).isSome
-    then
+    if closed x && x.isApp &&
+        (x.find? fun e => e.isConstOf ``Rat.num || e.isConstOf ``Rat.den).isSome then
       -- `Rat`'s operations are irreducible, which the kernel's `rfl` does not see.
       let ty ← inferType x
       if ty.isConstOf ``Nat then
@@ -165,14 +169,6 @@ private def applyBridge (b : Name) (e : Expr) : MetaM Expr := do
     f := f.app (← mkFreshExprMVar d)
   failure
 
-/-- The head constant of the type of `b`'s first explicit argument. -/
-private def bridgeArgHead (b : Name) : MetaM (Option Name) := do
-  forallTelescope (← getConstInfo b).type fun xs _ => do
-    for x in xs do
-      if (← x.fvarId!.getBinderInfo).isExplicit then
-        return (← whnfR (← inferType x)).getAppFn.constName?
-    return none
-
 /-! ## Postconditions up to a constant -/
 
 /-- `e` with every application of a recursive function to a constructor unfolded
@@ -202,8 +198,8 @@ def solveAffine (goal : MVarId) : MetaM Unit := do
     | throwError "walk: expected an equation between postconditions"
   let lhs ← unfoldCtorApps (← reduceCtorProjs lhs)
   let mut thms ← NormCast.pushCastExt.getTheorems
-  for n in [`add_zero, `zero_add, ``ite_self] do
-    if (← getEnv).contains n then thms ← thms.addConst n
+  for n in [``add_zero, ``zero_add, ``ite_self] do
+    thms ← thms.addConst n
   let ctx ← Simp.mkContext (simpTheorems := #[thms]) (congrTheorems := ← getSimpCongrTheorems)
   let (r, _) ← simp lhs ctx
   -- `ite_self` matters here: a conditional on the drawn value with one bound in both branches.
@@ -227,8 +223,7 @@ def solveAffine (goal : MVarId) : MetaM Unit := do
     throwError "the constant{indentExpr kVal}\ndepends on the value drawn"
   let ac ← mkFreshExprMVar (← mkEq r.expr (← mkAppM ``HAdd.hAdd #[kVal, t]))
   if rest.isEmpty then
-    let some zeroAdd := (← getEnv).find? `zero_add | throwError "walk: `zero_add` is not in scope"
-    let pf ← mkAppM zeroAdd.name #[t]
+    let pf ← mkAppM ``zero_add #[t]
     ac.mvarId!.assign (← mkEqSymm pf)
   else
     AC.rewriteUnnormalizedRefl ac.mvarId!
@@ -251,66 +246,58 @@ def solveCast (goal : MVarId) : MetaM Unit := goal.withContext do
   unless ← isDefEq rhs.appArg! (mkNatLit n) do throwError "walk: could not read off the bound {n}"
   let num ← mkFreshExprMVar (← mkEq r.expr (← instantiateMVars rhs))
   let mut thms : SimpTheorems := {}
-  for c in [``eq_self, `Nat.cast_ofNat, `Nat.cast_one, `Nat.cast_zero] do
-    if (← getEnv).contains c then thms ← thms.addConst c
+  for c in [``eq_self, ``Nat.cast_ofNat, ``Nat.cast_one, ``Nat.cast_zero] do
+    thms ← thms.addConst c
   let ctx ← Simp.mkContext (simpTheorems := #[thms]) (congrTheorems := ← getSimpCongrTheorems)
   let (res, _) ← simpTarget num.mvarId! ctx
   if res.isSome then throwError "walk: could not prove that {n} is its own cast"
   goal.assign (← mkExpectedTypeHint (← mkEqTrans (← r.getProof) num) (← goal.getType))
 
-/-- Close `goal`, a leaf of judgment `j`, with the fact `e` through one of `j`'s bridges or one of
-the observation's `leaves`, `e`'s binders possibly instantiated by `instBinders` first. Returns the
-bridge's premises, not yet walked; `none` if `e` does not apply. -/
-private def tryFact (j : Judgment) (leaves : Leaves) (goal : MVarId) (e : Expr) :
+/-- `e` and, when it proves a structure of propositions (a law that bundles others), its fields,
+recursively: each is a fact of its own. -/
+private partial def withFields (e : Expr) : MetaM (Array Expr) := do
+  let env ← getEnv
+  let some S := (← whnfR (← inferType e)).getAppFn.constName? | return #[e]
+  unless isStructure env S do return #[e]
+  (getStructureFields env S).foldlM (init := #[e]) fun acc f => do
+    return acc ++ (← withFields (← mkProjection e f))
+
+/-- Close `goal`, a leaf, with the fact `e` or one of its fields, as it is or through one of the
+observation's `leaves`, `e`'s binders possibly instantiated by `instBinders` first. `none` if
+nothing applies. -/
+private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
     MetaM (Option (List MVarId)) := do
   for inst in [none, some true, some false] do
     let e ← match inst with
       | none => pure (some e)
       | some ctor => observing? (instBinders ctor e)
     let some e := e | continue
-    let head := (← whnfR (← inferType e)).getAppFn.constName?
-    -- A bridge stated for the fact's own head is tried before one that must unfold the fact, which
-    -- can succeed too, by unification against the unfolded judgment, but with a mangled result.
-    let goalHead := (← whnfR (← goal.getType)).getAppFn.constName?
-    -- A bridge not in scope cannot apply: a stronger law is stated after the rules that use it.
-    let env ← getEnv
-    let bridges := j.bridges.filter fun b => b.all env.contains
-    let exact ← bridges.filterM fun b => return head == (← b.elim (pure goalHead) bridgeArgHead)
-    for bridge in exact ++ bridges.filter (!exact.contains ·) do
+    let facts ← withFields e
+    for h : i in [:facts.size] do
+      let e := facts[i]
       let r ← observing? do
-        let cand ← match bridge with
-          | none => pure e
-          | some b => applyBridge b e
-        let gs ← applyExact goal cand
-        if bridge.isNone && !gs.isEmpty then failure
+        let gs ← applyExact goal e
+        unless gs.isEmpty do failure
         goal.withContext (assumeProps e)
         if (← instantiateMVars e).hasExprMVar then failure
-        return gs
-      if let some gs := r then return some gs
-    for bridge in leaves.facts do
-      let saved ← saveState
-      let some sides ← observing? (do
-        let cand ← applyBridge bridge e
-        applyExact goal (← mkExpectedTypeHint cand
-          (nameBound (← instantiateMVars (← inferType cand))
-            (postNames (← instantiateMVars (← goal.getType)))))) | continue
-      try
-        sides.forM solveAffine
-        goal.withContext (assumeProps e)
-        if (← instantiateMVars e).hasExprMVar then failure
-        return some []
-      catch ex =>
-        saved.restore
-        if leaves.facts.back? == some bridge && inst == some false then throw ex
+      if r.isSome then return some []
+      for bridge in leaves.facts do
+        let saved ← saveState
+        let some sides ← observing? (do
+          let cand ← applyBridge bridge e
+          applyExact goal (← mkExpectedTypeHint cand
+            (nameBound (← instantiateMVars (← inferType cand))
+              (postNames (← instantiateMVars (← goal.getType)))))) | continue
+        try
+          sides.forM solveAffine
+          goal.withContext (assumeProps e)
+          if (← instantiateMVars e).hasExprMVar then failure
+          return some []
+        catch ex =>
+          saved.restore
+          if leaves.facts.back? == some bridge && inst == some false && i + 1 == facts.size then
+            throw ex
   return none
-
-/-- `g`'s head's laws for judgment `j`, under the naming convention (`Judgment.lawSuffixes`). -/
-def law? (j : Judgment) (g : Expr) : MetaM (Array Expr) := do
-  let some head := g.getAppFn.constName? | return #[]
-  let env ← getEnv
-  (j.lawSuffixes.filterMap fun suffix =>
-    if env.contains (head ++ suffix) then some (head ++ suffix) else none).mapM
-    mkConstWithFreshMVarLevels
 
 /-! ## Reading a recursive definition -/
 
@@ -388,8 +375,8 @@ def applyMap (adapter mapLem : Name) (goal : MVarId) : MetaM (List MVarId) := go
   -- With the shapes, what makes a postcondition visibly constant: a draw under which every path
   -- has one bound gets that bound.
   let mut thms ← specApplyExt.getTheorems
-  for c in [``Nat.add_zero, ``ite_self, `mul_one, `one_mul, `one_pow] do
-    if (← getEnv).contains c then thms ← thms.addConst c
+  for c in [``Nat.add_zero, ``ite_self, ``mul_one, ``one_mul, ``one_pow] do
+    thms ← thms.addConst c
   let ctx ← Simp.mkContext (simpTheorems := #[thms]) (congrTheorems := ← getSimpCongrTheorems)
   -- The side that is not the bound being computed.
   let side := if (ty.getArg! 2).getAppFn.isMVar then 3 else 2
@@ -397,7 +384,7 @@ def applyMap (adapter mapLem : Name) (goal : MVarId) : MetaM (List MVarId) := go
     | throwError "walk: no `@[spec_apply]` lemma for the right-hand side of `{mapLem}`:\
         {indentExpr (ty.getArg! side)}"
   let (r, _) ← simp shape ctx
-  unless mixShapes.any r.expr.isAppOf do
+  unless isMixShape (← getEnv) r.expr do
     throwError "walk: the right-hand side of `{mapLem}` is no shape of choice:{indentExpr r.expr}"
   let restate (z : Expr) := mkAppN ty.getAppFn (ty.getAppArgs.set! side z)
   let motive ← withLocalDeclD `z (← inferType (ty.getArg! side)) fun z => do
@@ -434,6 +421,14 @@ private def firstApplying (cands : Array α) (apply : α → TermElabM β)
   if let some ex := appliedErr <|> firstErr then throw ex
   return none
 
+/-- The lemmas, one per family of specification monad, that turn a goal about a combinator into one
+about the right-hand side of the combinator's `@[gen_map]` lemma. The explicit premises of each are
+that equation, then the new goal. -/
+def adapters : Judgment → Array Name
+  | .spec true => #[``Obs.spec_le_of_map, ``Obs.specC_le_of_map]
+  | .spec false => #[``Obs.le_spec_of_map, ``Obs.le_specC_of_map]
+  | _ => #[]
+
 mutual
 
 /-- Prove `goal` by walking the generator, returning the goals no judgment recognizes. `extras` are
@@ -446,8 +441,8 @@ partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
   if let .forallE n _ _ _ := ty then
     let (_, goal) ← goal.intro ((← getLCtx).getUnusedName n.eraseMacroScopes)
     return ← walk extras goal
-  for j in judgments do
-    if let some (g, restate) := j.subject? ty then
+  for j in judgments (← getEnv) do
+    if let some (g, restate) := j.subject? (← getEnv) ty then
       return ← bound j (← j.leaves ty) extras goal restate g
   -- The branch premises of a list combinator, built one branch at a time.
   if let some head := ty.getAppFn.constName? then
@@ -473,12 +468,12 @@ partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
       goal.assign pf
       return []
   -- A bound that is an output, on something that is no generator: the thing itself.
-  if ty.isAppOfArity ``LE.le 4 && (← getEnv).contains `le_refl then
+  if ty.isAppOfArity ``LE.le 4 then
     for (out, val) in [(ty.getArg! 3, ty.getArg! 2), (ty.getArg! 2, ty.getArg! 3)] do
       if out.getAppFn.isMVar && !val.getAppFn.isMVar then
         let val ← tidyExpr val
         if ← isDefEq out val then
-          goal.assign (← mkAppOptM `le_refl #[ty.getArg! 0, none, val])
+          goal.assign (← mkAppOptM ``le_refl #[ty.getArg! 0, none, val])
           return []
   return [← goal.replaceTargetDefEq (← instantiateMVars (← goal.getType)).headBeta]
 
@@ -513,15 +508,15 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
       let some lems := (← j.ruleHead? g').bind (rulesFor (← getEnv) j.key) | continue
       let goal ← if g' == g then pure goal else goal.change (restate g')
       if let some gs ← firstApplying lems (applyRule goal) (finish g' goal) then return some gs
-    unless j.adapters.isEmpty do
+    unless (adapters j).isEmpty do
       for g' in forms do
         let some mapLem := g'.getAppFn.constName?.bind (mapFor (← getEnv)) | continue
         let goal ← if g' == g then pure goal else goal.change (restate g')
-        if let some gs ← firstApplying j.adapters (applyMap · mapLem goal) (finish g' goal) then
+        if let some gs ← firstApplying (adapters j) (applyMap · mapLem goal) (finish g' goal) then
           return some gs
     return none
-  -- A leaf: a caller-supplied fact, a hypothesis (a recursive occurrence), or a proved law, about
-  -- `g` or a reduction of it. The fact is committed to before its bridge's premises are walked, so
+  -- A leaf: a caller-supplied fact or a hypothesis (a recursive occurrence), about `g` or a
+  -- reduction of it. The fact is committed to before its bridge's premises are walked, so
   -- that a failure inside them is reported where it happens.
   let leaf : TermElabM (Option (List MVarId)) := do
     for t in extras do
@@ -530,7 +525,7 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
           let e ← Term.elabTerm t none
           Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
           instantiateMVars e
-        let some gs ← tryFact j leaves goal e | failure
+        let some gs ← tryFact leaves goal e | failure
         namePremises none (← goal.getType) gs
       if let some gs := r then return some (← walkAll extras gs)
     -- A hypothesis is tried only if it mentions `g`'s head: unifying one about another generator
@@ -543,11 +538,7 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
       unless decl.isImplementationDetail do
         unless ← isProp decl.type do continue
         unless mentionsHead (← instantiateMVars decl.type) do continue
-        if let some gs ← tryFact j leaves goal decl.toExpr then
-          return some (← walkAll extras (← namePremises none (← goal.getType) gs))
-    for g in forms do
-      for law in ← law? j g do
-        if let some gs ← tryFact j leaves goal law then
+        if let some gs ← tryFact leaves goal decl.toExpr then
           return some (← walkAll extras (← namePremises none (← goal.getType) gs))
     return none
   -- A combinator's rules that all fail leave the leaves to try, and their error is reported only if
@@ -556,7 +547,6 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
   let mut ruleErr : Option Exception := none
   let reduce : TermElabM (Option (List MVarId)) := do
     let some lem := j.reduceTo | return none
-    unless (← getEnv).contains lem do return none
     return some (← walkAll extras (← applyExact goal (← mkConstWithFreshMVarLevels lem)))
   for (isRules, step) in if j.leavesFirst then [(false, leaf), (true, reduce), (true, rules)]
       else [(true, reduce), (true, rules), (false, leaf)] do
@@ -576,7 +566,7 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
   -- about this observation is one more generator nothing is known about.
   if let some ex := ruleErr then
     if self.isEmpty || (← ruleApplied.get) then throw ex
-  -- Unfolding comes last, so that a law or a caller's fact stays an abstraction boundary.
+  -- Unfolding comes last, so that a caller's fact stays an abstraction boundary.
   for g' in forms do
     if let some (c, body) ← unfold? g' j.unfoldsCombinators then
       let goal ← goal.change (restate body)

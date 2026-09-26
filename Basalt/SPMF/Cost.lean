@@ -10,11 +10,9 @@ import Basalt.SPMF.Support
 /-!
 # Cost-Tracking SPMF
 
-`SPMF.Cost` interprets a generator as a distribution over (value, number of random choices) pairs,
-and `IsBounded` says every value is produced within a given choice budget — enabling proofs like "a
-list generator makes `O(|xs|)` choices to generate `xs`." Its observations land in `WPC`, whose
-`bind` and `choose` do the cost accounting, so a combinator's lemma is its `Obs.map_*` read through
-one of them.
+`SPMF.Cost` interprets a generator as a distribution over (value, number of random choices) pairs.
+Its observations land in `WPC`, whose `bind` and `choose` do the cost accounting, so a combinator's
+lemma is its `Obs.map_*` read through one of them.
 -/
 
 open RandomChoice
@@ -346,25 +344,6 @@ end erasure
 
 end SPMF.Cost
 
-open SPMF.Cost
-
-/-- A cost-tracking generator `x` `IsBounded` by a cost function `f` if every output `a` it can
-produce is produced with at most `f a` random choices. -/
-def IsBounded (x : SPMF.Cost α) (f : α → Nat) : Prop :=
-  ∀ p ∈ SPMF.support x, p.2 ≤ f p.1
-
-/-- `IsBounded`, unfolded to its definition. Useful with `rw` and `simp`. -/
-theorem IsBounded_iff {x : SPMF.Cost α} {f : α → Nat} :
-    IsBounded x f ↔
-    ∀ p ∈ SPMF.support x, p.2 ≤ f p.1 := Iff.rfl
-
-theorem IsBounded_mono
-    (hc₁ : IsBounded x c₁)
-    (h : ∀ a, c₁ a ≤ c₂ a) :
-    IsBounded x c₂ := by
-  simp_all only [IsBounded_iff]
-  grind
-
 namespace SPMF.Cost
 
 section expectation
@@ -414,12 +393,6 @@ theorem expect_frequency {gs : List (Nat × (Unit → SPMF.Cost α))}
   refine (Mix.select_average _ ?_ h _).trans ?_
   · simp [Function.comp_def]
   · simp [Function.comp_def, expectObs]
-
-/-- A worst-case cost law bounds the average: `expectedCost` is at most the expected bound. -/
-theorem expectedCost_le_of_IsBounded {g : SPMF.Cost α} {c : α → Nat} (h : IsBounded g c) :
-    expectedCost g ≤ SPMF.expect g (fun p => (c p.1 : ℝ≥0∞)) := by
-  refine SPMF.expect_mono_support fun p hp => ?_
-  exact_mod_cast h p hp
 
 end expectation
 
