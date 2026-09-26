@@ -9,10 +9,10 @@ import BasaltExamples.ArbNat
 import BasaltTest.OptionGen
 
 /-!
-# The `cost_bound` Contract
+# The Cost Walk Contract
 
-Pins what `cost_bound` leaves behind — one arithmetic goal per path through the generator, named
-after it — and the messages for a sub-generator nothing bounds.
+Pins what `walk` leaves behind on `SPMF.Cost.alwaysObs.spec` — one arithmetic goal per path through
+the generator, named after it — and the messages for a sub-generator nothing bounds.
 -/
 
 open RandomChoice ArbNat ArbChar
@@ -32,7 +32,8 @@ def gen [Gen G] (b : Bool) : G Nat := do
 
 example (b : Bool) : IsCostBounded (gen b) (fun v => v + 6) := by
   unfold gen
-  cost_bound [Nat.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk [Nat.arbitrary.cost_bounded.obs]
   all_goals omega
 
 -- A drawn value is named after its binder, its cost `n_<value>`, and what is known about it
@@ -47,7 +48,8 @@ h_y✝ : n_y✝ ≤ y✝ + 1
 #guard_msgs in
 example : IsCostBounded (do let x ← chooseNat 0 3; let y ← Nat.arbitrary; return x + y)
     (fun v => v + 2) := by
-  cost_bound [Nat.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk [Nat.arbitrary.cost_bounded.obs]
   trace_state
   omega
 
@@ -55,29 +57,34 @@ example : IsCostBounded (do let x ← chooseNat 0 3; let y ← Nat.arbitrary; re
 /--
 trace: xs✝ : List ℕ
 n_xs✝ : ℕ
-h_xs✝ : n_xs✝ ≤ xs✝.length + (List.map (fun n => n + 1) xs✝).sum + 1
+h_xs✝ : n_xs✝ ≤ xs✝.length + (List.map (fun a => a + 1) xs✝).sum + 1
 ⊢ n_xs✝ + 0 ≤ xs✝.length + (List.map (fun x => x + 1) xs✝).sum + 1
 -/
 #guard_msgs in
 example : IsCostBounded (listOf Nat.arbitrary >>= fun xs => pure xs)
     (fun xs => xs.length + (xs.map (· + 1)).sum + 1) := by
-  cost_bound [Nat.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk [Nat.arbitrary.cost_bounded.obs]
   trace_state
   omega
 
 example : IsCostBounded (vectorOf 2 Nat.arbitrary) (fun xs => (xs.map (· + 1)).sum) := by
-  cost_bound [Nat.arbitrary.cost_bounded]; omega
+  rw [IsCostBounded.iff_obs]
+  walk [Nat.arbitrary.cost_bounded.obs]; omega
 
 example : IsCostBounded (listOfMaxLength 3 Nat.arbitrary) (fun xs => 1 + (xs.map (· + 1)).sum) := by
-  cost_bound [Nat.arbitrary.cost_bounded]; omega
+  rw [IsCostBounded.iff_obs]
+  walk [Nat.arbitrary.cost_bounded.obs]; omega
 
 example : IsCostBounded (nonEmptyListOf Nat.arbitrary)
     (fun xs => xs.length + (xs.map (· + 1)).sum) := by
-  cost_bound [Nat.arbitrary.cost_bounded]; omega
+  rw [IsCostBounded.iff_obs]
+  walk [Nat.arbitrary.cost_bounded.obs]; omega
 
 example : IsCostBounded (permutationOf [1, 2, 3] : SPMF.Cost { ys // [1, 2, 3].Perm ys })
     (fun _ => 3) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
   simp at *
   omega
 
@@ -92,12 +99,14 @@ h_x✝ : n_x✝ ≤ x✝ + 1
 -/
 #guard_msgs in
 example : IsCostBounded (optionGen Nat.arbitrary) (fun o => 1 + o.elim 0 (· + 1)) := by
-  cost_bound [Nat.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk [Nat.arbitrary.cost_bounded.obs]
   trace_state
   all_goals simp only [Option.elim]; omega
 
 example : IsCostBounded (biasedOptionGen (1 / 4) Nat.arbitrary) (fun o => 1 + o.elim 0 (· + 1)) := by
-  cost_bound [Nat.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk [Nat.arbitrary.cost_bounded.obs]
   all_goals simp only [Option.elim]; omega
 
 /-- A helper with no law. -/
@@ -115,18 +124,20 @@ h_d₂✝ : 0 ≤ d₂✝ ∧ d₂✝ ≤ 9
 -/
 #guard_msgs in
 example : IsCostBounded (twoDigits >>= fun p => pure (p.1 + p.2)) (fun _ => 2) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
   trace_state
   omega
 
 /--
 error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
   g
-Pass a fact about it to the tactic.
+Pass a fact about it to `walk [_]`.
 -/
 #guard_msgs in
 example (g : SPMF.Cost Nat) : IsCostBounded (g >>= fun _ => pure 0) (fun _ => 1) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
 
 /-- A helper whose body draws from its argument. -/
 def twice [Gen G] (g : G Nat) : G Nat := do
@@ -137,41 +148,45 @@ def twice [Gen G] (g : G Nat) : G Nat := do
 /--
 error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
   g
-Pass a fact about it to the tactic.
+Pass a fact about it to `walk [_]`.
 (in the unfolding of `CostBoundTest.twice`)
 -/
 #guard_msgs in
 example (g : SPMF.Cost Nat) : IsCostBounded (twice g) (fun _ => 1) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
 
 /--
-error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
-  g
-Pass a fact about it to the tactic.
+error: no hypothesis or fact gives
+  SPMF.Cost.alwaysObs.spec g fun v n_v => n_v ≤ ?c v
+of a combinator's generator argument. Prove one and pass it to `walk [h.obs]`.
 -/
 #guard_msgs in
 example (g : SPMF.Cost Nat) : IsCostBounded (listOf g) (fun _ => 1) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
 
 -- A combinator term passed as a generator argument is bounded by its worst case.
 example : IsCostBounded (listOfMaxLength 3 (chooseNat 0 5 >>= fun x => pure (x + 1)))
     (fun xs => 1 + xs.length) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
   simp at *
   omega
 
 -- The worst case of a list combinator is the largest of its branches', a callee's included.
 /--
-trace: xs✝ : List ℕ
-n_xs✝ : ℕ
-h_xs✝ : n_xs✝ ≤ (List.map (fun x => max (1 + 1) (max (1 + 0) 0)) xs✝).sum
-⊢ n_xs✝ ≤ 2 * xs✝.length
+trace: v✝ : List ℕ
+n_v✝ : ℕ
+h_v✝ : n_v✝ ≤ (List.map (fun x => max (1 + 1) (max (1 + 0) 0)) v✝).sum
+⊢ n_v✝ ≤ 2 * v✝.length
 -/
 #guard_msgs in
 example : IsCostBounded
     (vectorOf 3 (oneOf [fun _ => chooseNat 0 5, fun _ => pure 0] (by simp)))
     (fun xs => 2 * xs.length) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
   trace_state
   simp at *
   omega
@@ -179,43 +194,52 @@ example : IsCostBounded
 example : IsCostBounded
     (vectorOf 3 (frequency [(1, fun _ => Char.arbitrary), (2, fun _ => pure 'a')] (by simp)))
     (fun xs => 2 * xs.length) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
   simp at *
   omega
 
 example : IsCostBounded
     (vectorOf 2 (permutationOf [1, 2, 3]) : SPMF.Cost (List { ys // [1, 2, 3].Perm ys }))
     (fun xs => 3 * xs.length) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
   simp at *
   omega
 
-/-- A cost bound the caller supplies for a combinator term is used when its rule fails. -/
+/-- A cost bound the caller supplies for a combinator term is used when its rule fails, passed as a
+fact or stated on the observation in the context. -/
 example (g : SPMF.Cost Nat) (h : IsCostBounded (listOf g) fun _ => 5) :
     IsCostBounded (listOf g >>= fun xs => pure xs) (fun _ => 5) := by
-  cost_bound [h]
+  rw [IsCostBounded.iff_obs]
+  walk [h.obs]
   omega
 
-example (g : SPMF.Cost Nat) (h : IsCostBounded (listOf g) fun _ => 5) :
+example (g : SPMF.Cost Nat) (h : SPMF.Cost.alwaysObs.spec (listOf g) fun _ n => n ≤ 5) :
     IsCostBounded (listOf g) (fun _ => 5) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
   omega
 
 /-- A postcondition over a relation with `nil` and `cons` constructors is left as it is. -/
-example : SPMF.Cost.Always (pure [1, 2] : SPMF.Cost (List Nat)) (fun xs _ => xs.Perm [2, 1]) := by
-  cost_bound
+example :
+    SPMF.Cost.alwaysObs.spec (pure [1, 2] : SPMF.Cost (List Nat)) (fun xs _ => xs.Perm [2, 1]) := by
+  walk
   exact List.Perm.swap 2 1 []
 
 /-- A cost bound the caller supplies, here one that is no law of anything. -/
 example : IsCostBounded (Nat.arbitrary >>= fun n => pure n) (fun n => n + 2) := by
-  cost_bound [IsCostBounded.mono Nat.arbitrary.cost_bounded (c₂ := fun n => n + 2) (by omega)]
+  rw [IsCostBounded.iff_obs]
+  walk [(IsCostBounded.mono Nat.arbitrary.cost_bounded (c₂ := fun n => n + 2) (by omega)).obs]
   omega
 
 /-- A recursive occurrence is bounded by a hypothesis, at arguments computed from drawn values. -/
-example (g : Int → Int → SPMF.Cost Nat) (ih : ∀ lo hi, IsCostBounded (g lo hi) fun n => n)
+example (g : Int → Int → SPMF.Cost Nat)
+    (ih : ∀ lo hi, SPMF.Cost.alwaysObs.spec (g lo hi) fun n m => m ≤ n)
     (lo : Int) :
     IsCostBounded (chooseInt lo (lo + 3) >>= fun x => g lo (x - 1)) (fun n => n + 1) := by
-  cost_bound
+  rw [IsCostBounded.iff_obs]
+  walk
   omega
 
 end CostBoundTest

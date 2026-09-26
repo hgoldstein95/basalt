@@ -121,19 +121,23 @@ theorem Tree.foldl_insert_preorder {lo hi : Int} {t : Tree Int} (h : t.isBST lo 
 theorem Tree.genBSTByInsertion.sound_complete {lo hi : Int} (h : lo ≤ hi) :
     IsSoundAndComplete (Tree.genBSTByInsertion lo hi h) (Tree.isBST lo hi) := by
   -- The element generator is a combinator term, which has no law: its halves are passed as facts.
-  have hs : IsSound (chooseInt lo hi h : SPMF Int) (fun x => lo ≤ x ∧ x ≤ hi) := by
-    sound_bound
+  have hs : IsSoundFor (chooseInt lo hi h : SPMF Int) (fun x => lo ≤ x ∧ x ≤ hi) := by
+    rw [IsSoundFor.iff_obs]
+    walk
     all_goals omega
   have hc : IsCompleteFor (chooseInt lo hi h : SPMF Int) (fun x => lo ≤ x ∧ x ≤ hi) := by
-    complete_bound
-    assumption
+    rw [IsCompleteFor.iff_obs]
+    intro x hx
+    walk
+    exact hx
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [hs]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [hs.obs]
     next xs h_xs => exact Tree.isBST_foldl_insert (t := .leaf) rfl xs h_xs
   case complete =>
     intro t ht
-    rw [Tree.genBSTByInsertion]; complete_bound [hc]
+    rw [Tree.genBSTByInsertion, SPMF.mem_support_iff_may]; walk [hc.obs]
     exact ⟨t.preorder, Tree.mem_preorder_bounds ht, Tree.foldl_insert_preorder ht⟩
 
 /-! ## Termination -/
@@ -167,16 +171,17 @@ private theorem cost_mem_replicate {lo hi : Int} (h : lo ≤ hi) (k : Nat) :
     (List.replicate k lo, 2 * k + 1) ∈
       SPMF.support (listOf (chooseInt lo hi h) : SPMF.Cost (List Int)) := by
   induction k with
-  | zero => rw [listOf]; complete_bound; exact .inl rfl
+  | zero => rw [listOf, SPMF.Cost.mem_support_iff_may]; walk; exact .inl rfl
   | succ k ih =>
-    rw [listOf]; complete_bound
+    rw [listOf, SPMF.Cost.mem_support_iff_may]; walk
     exact .inr ⟨lo, ⟨le_rfl, h⟩, _, _, ih, by simp [List.replicate_succ], by omega⟩
 
 /-- **There is no cost bound.** `IsCostBounded` charges a run to the value it produced, and this
 generator can spend any number of choices to produce `node leaf lo leaf` — drawing `lo` again is
 always possible and always absorbed. Bounding the *keys* with `chooseInt` does not help: what is
 unbounded is the number of insertions, not the size of each one. A bound does exist on the drawn
-list (`SPMF.Cost.always_listOf`), and insertion discards exactly the information it is stated in. -/
+list (`SPMF.Cost.le_always_listOf`), and insertion discards exactly the information it is stated
+in. -/
 theorem Tree.genBSTByInsertion.not_cost_bounded {lo hi : Int} (h : lo ≤ hi) (c : Tree Int → Nat) :
     ¬ IsCostBounded (Tree.genBSTByInsertion lo hi h) c := by
   intro hb
@@ -184,7 +189,8 @@ theorem Tree.genBSTByInsertion.not_cost_bounded {lo hi : Int} (h : lo ≤ hi) (c
   have hmem : ((node leaf lo leaf : Tree Int), 2 * (k + 1) + 1)
       ∈ SPMF.support (Tree.genBSTByInsertion lo hi h : SPMF.Cost (Tree Int)) := by
     unfold Tree.genBSTByInsertion
-    complete_bound
+    rw [SPMF.Cost.mem_support_iff_may]
+    walk
     exact ⟨_, _, cost_mem_replicate h (k + 1), Tree.foldl_insert_replicate lo k, by omega⟩
   have hle := hb _ hmem
   dsimp only at hle

@@ -13,7 +13,7 @@ import Basalt.Walk.Attr
 `IOModel.Approx m x` says that, if `ioGen` behaves as SplitMix specifies (`IOModel.IOGenLaws`), then
 wherever `m` terminates the `IO` action `x` does what `m` does run against `ioGen`. A faithful
 generator's `IsFaithful.approx` is this relation between it at `IOModel` and at `IO`, which
-`io_fixpoint` proves.
+`walk fixpoint` proves.
 -/
 
 open Lean.Order
@@ -182,11 +182,11 @@ theorem toIO_bind (hc : IOGenLaws) (m : IOModel α) (k : α → IOModel β) :
 
 /-- `x` runs `m` wherever `m` terminates, if `ioGen` is lawful: `m.toIO ⊑ x` in `IO`'s order, which
 is flat at each world, with divergence at the bottom. -/
-@[walk_rel "io_fixpoint"]
+@[walk_rel]
 def Approx (m : IOModel α) (x : IO α) : Prop := IOGenLaws → m.toIO ⊑ x
 
 /-- Fixpoint induction on the `IOModel` side needs nothing of `ioGen`: `toIO` is continuous. -/
-theorem admissible_approx (x : IO α) : admissible fun m : IOModel α => Approx m x := by
+theorem Approx.admissible (x : IO α) : admissible fun m : IOModel α => Approx m x := by
   have key : ∀ m : IOModel α, m.toIO ⊑ x ↔ ∀ s, (fun s (o : Option (α × SplitMix)) =>
       ∀ w w', ioGen.get w = ⟨s, w'⟩ → @FlatOrder.rel _ (EST.bot w) (finish o w') (x w))
         s (m s) := by
@@ -201,7 +201,7 @@ theorem admissible_approx (x : IO α) : admissible fun m : IOModel α => Approx 
       rw [toIO, lift_bind_apply]
       rcases hg : ioGen.get w with ⟨s, w'⟩
       exact h s w w' hg
-  have hadm : admissible fun m : IOModel α => m.toIO ⊑ x := by
+  have hadm : Lean.Order.admissible fun m : IOModel α => m.toIO ⊑ x := by
     rw [show (fun m : IOModel α => m.toIO ⊑ x) = fun m => ∀ s, _ from
       funext fun m => propext (key m)]
     exact admissible_pi_apply (β := fun _ => Option (α × SplitMix)) _ fun s =>

@@ -18,11 +18,11 @@ open RandomChoice ENNReal
 namespace MassFixpointTest
 
 -- The seed is the tuple of arguments the recursion changes, introduced under their binder names,
--- and the goal is the certificate's `F c` against the bound `mass_bound` computed.
+-- and the goal is the certificate's `F c` against the bound the walk computed.
 /--
 trace: c : ℝ≥0∞
 hc1 : c ≤ 1
-hrec : ∀ (j : ℤ × ℤ), c ≤ (BST.Tree.genBST j.1 j.2).mass
+hrec : ∀ (j : ℤ × ℤ), c ≤ SPMF.expectObs.spec (BST.Tree.genBST j.1 j.2) fun x => 1
 lo hi : ℤ
 ⊢ 1 / 2 + 0 * c + 1 / 2 * c ^ 2 ≤
     if h : lo > hi then 1
@@ -106,11 +106,11 @@ example (n : Nat) : IsAlmostSurelyTerminating (countdown n) := by
 
 -- A combinator term is not a generator definition: there is no seed to find or equation to unfold.
 /--
-error: mass_fixpoint: `frequency` is a combinator, not a generator definition; prove `SPMF.IsPMF` of a combinator term with `SPMF.IsPMF.of_one_le` and `mass_bound`
+error: mass_fixpoint: `frequency` is a combinator, not a generator definition; prove the termination of a combinator term with `rw [IsAlmostSurelyTerminating.iff_obs]` and `walk`
 -/
 #guard_msgs in
-example : SPMF.IsPMF (frequency [(1, fun _ => Pure.pure 0), (1, fun _ => Pure.pure 1)]
-    (by simp) : SPMF Nat) := by
+example : IsAlmostSurelyTerminating
+    (frequency [(1, fun _ => Pure.pure 0), (1, fun _ => Pure.pure 1)] (by simp) : SPMF Nat) := by
   mass_fixpoint using SPMF.LfpIsOne.one
 
 /-- Matching on an argument makes it no seed when nothing recurses, so an argument whose type
@@ -140,7 +140,7 @@ trace: m : ℕ
 c : ℝ≥0∞
 hc1 : c ≤ 1
 k : ℕ
-hrec : ∀ (j : ℕ), c ≤ (passThrough (m + 1) j).mass
+hrec : ∀ (j : ℕ), c ≤ SPMF.expectObs.spec (passThrough (m + 1) j) fun x => 1
 ⊢ 1 - 1 / 2 + 1 / 2 * c ≤ [1, c].sum / ↑[1, c].length
 -/
 #guard_msgs in
@@ -155,7 +155,7 @@ def fuelled [Gen G] (fuel : Nat) : G Nat :=
 termination_by fuel
 
 /--
-error: mass_fixpoint: `MassFixpointTest.fuelled` is recursive but not a `partial_fixpoint`; induct on its decreasing argument, unfold it, and apply `SPMF.IsPMF.of_one_le` and `mass_bound`
+error: mass_fixpoint: `MassFixpointTest.fuelled` is recursive but not a `partial_fixpoint`; induct on its decreasing argument, `rw [IsAlmostSurelyTerminating.iff_obs]`, unfold it, and `walk`
 -/
 #guard_msgs in
 example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
@@ -165,11 +165,10 @@ example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
 -- bounds both branches, and nothing bounds `fuelled (0 - 1)`.
 example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
   induction fuel with
-  | zero => apply SPMF.IsPMF.of_one_le; rw [fuelled, dite_eq_left rfl]; mass_bound; rfl
+  | zero => rw [IsAlmostSurelyTerminating.iff_obs, fuelled, dite_eq_left rfl]; walk; rfl
   | succ n ih =>
-    apply SPMF.IsPMF.of_one_le
-    rw [fuelled]
-    mass_bound
+    rw [IsAlmostSurelyTerminating.iff_obs, fuelled]
+    walk [ih.obs]
     norm_num [ENNReal.div_self]
 
 /-- The geometric loop, stopped by a `coin` rather than a two-branch `oneOf`. -/

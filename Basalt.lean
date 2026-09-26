@@ -35,29 +35,28 @@ import Basalt.SPMF.Cost
 import Basalt.SPMF.Expect.Basic
 import Basalt.SPMF.Expect.Combinators
 import Basalt.SPMF.Expect.Obs
-import Basalt.SPMF.Failure
 import Basalt.SPMF.Mass
 import Basalt.SPMF.Ranking
 import Basalt.SPMF.Support
 import Basalt.SPMF.Termination
 import Basalt.Sized
-import Basalt.Tactic.Average
-import Basalt.Tactic.Complete
-import Basalt.Tactic.Cost
 import Basalt.Tactic.ENNReal
-import Basalt.Tactic.Expect
 import Basalt.Tactic.Faithful
-import Basalt.Tactic.IO
-import Basalt.Tactic.Ideal
-import Basalt.Tactic.Mass
 import Basalt.Tactic.MassFixpoint
-import Basalt.Tactic.Sound
 import Basalt.Tactic.Support
 import Basalt.Tuning.Attr
 import Basalt.Tuning.Basic
 import Basalt.Walk.Attr
+import Basalt.Walk.Average
 import Basalt.Walk.Basic
+import Basalt.Walk.Complete
+import Basalt.Walk.Cost
 import Basalt.Walk.Entry
+import Basalt.Walk.Expect
+import Basalt.Walk.IO
+import Basalt.Walk.Ideal
+import Basalt.Walk.Mass
+import Basalt.Walk.Sound
 
 /-!
 # Basalt

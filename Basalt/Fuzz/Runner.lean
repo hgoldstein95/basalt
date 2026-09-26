@@ -55,11 +55,7 @@ def runOneIO (counters : IO.Ref (Nat × Nat)) (T : PropM FuzzGen Unit)
 
 /-- Start a fuzzing campaign for property `T`. `argv` is forwarded to libFuzzer (corpus dirs,
 `-runs`, `-max_len`, `-artifact_prefix`, …). A failure aborts the process, with the artifact saved and
-the exit code set by libFuzzer.
-
-Report nothing after `goImpl`: libFuzzer's driver `exit()`s when `-runs` is exhausted, so a line
-placed there silently never appears — which is why `runOneIO` carries the run tally and the bridge
-prints its buffer statistics from an `atexit` handler. -/
+the exit code set by libFuzzer. -/
 def go (T : PropM FuzzGen Unit) (argv : Array String := #[]) (grow : Bool := false) : IO Unit := do
   IO.println s!"[basalt] starting libFuzzer campaign (grow={grow}, {argv.toList})"
   -- libFuzzer announces that the linked custom mutator disables `-len_control` on every campaign,
@@ -68,6 +64,8 @@ def go (T : PropM FuzzGen Unit) (argv : Array String := #[]) (grow : Bool := fal
     IO.println s!"[basalt] {lc} is explicit and overrides libFuzzer's \
       \"Disabling -len_control by default\""
   let counters ← IO.mkRef (0, 0)
+  -- Report nothing after `goImpl`: libFuzzer `exit()`s when `-runs` is exhausted, so a line placed
+  -- there silently never appears (the tally lives in `runOneIO`, the statistics in an `atexit`).
   goImpl (fun bytes => runOneIO counters T bytes) argv grow
 
 /-- Replay one saved input file against a property (no fuzzer): reproduces the outcome

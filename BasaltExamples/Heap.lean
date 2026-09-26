@@ -62,20 +62,21 @@ theorem Tree.genHeap.sound_complete :
     IsSoundAndComplete (Tree.genHeap lo) (Tree.isHeap lo) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [Nat.arbitrary.sound_complete]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]
     all_goals simp_all [Tree.isHeap]
   case complete =>
     intro t
     induction t generalizing lo with
-    | leaf => intro _; rw [Tree.genHeap]; complete_bound
+    | leaf => intro _; rw [Tree.genHeap, SPMF.mem_support_iff_may]; walk
     | node l x r ihl ihr =>
       intro ⟨hle, hl, hr⟩
       obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
-      rw [Tree.genHeap]; complete_bound [Nat.arbitrary.sound_complete]
+      rw [Tree.genHeap, SPMF.mem_support_iff_may]; walk [Nat.arbitrary.sound_complete.complete.obs]
       exact ⟨d, l, ihl hl, r, ihr hr, rfl⟩
 
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
-  mass_fixpoint [Nat.arbitrary.terminates]
+  mass_fixpoint [Nat.arbitrary.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
     (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
@@ -83,7 +84,8 @@ theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) :=
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/
 theorem Tree.genHeap.cost_bounded :
     IsCostBounded (Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1) := by
-  cost_fixpoint [Nat.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint [Nat.arbitrary.cost_bounded.obs]
   all_goals simp only [Tree.size, Tree.sum]; omega
 
 theorem Tree.genHeap.faithful : IsFaithful (Tree.genHeap lo) := by

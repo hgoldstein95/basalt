@@ -27,14 +27,14 @@ partial_fixpoint
 
 theorem genType.sound_complete : IsSoundAndComplete genType (fun _ => True) := by
   refine .intro ?sound ?complete
-  case sound => sound_fixpoint
+  case sound => rw [IsSoundFor.iff_obs]; walk fixpoint
   case complete =>
     intro τ
     induction τ with
-    | Bool => intro _; rw [genType]; complete_bound
+    | Bool => intro _; rw [genType, SPMF.mem_support_iff_may]; walk
     | Fun τ1 τ2 ih1 ih2 =>
       intro _
-      rw [genType]; complete_bound
+      rw [genType, SPMF.mem_support_iff_may]; walk
       exact ⟨τ1, ih1 trivial, τ2, ih2 trivial, rfl⟩
 
 theorem genType.terminates : IsAlmostSurelyTerminating genType := by
@@ -43,7 +43,8 @@ theorem genType.terminates : IsAlmostSurelyTerminating genType := by
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genType.cost_bounded : IsCostBounded genType Ty.size := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   all_goals simp only [Ty.size] at *; omega
 
 theorem genType.faithful : IsFaithful genType := by

@@ -6,48 +6,14 @@ Authors: Harrison Goldstein
 import Mathlib.Data.List.Forall2
 import Basalt.GenRel
 import Basalt.IO.Approx
-import Basalt.Walk.Entry
+import Basalt.Walk.Attr
 
 /-!
 # Walking `IO` Against `IOModel`
 
-`io_fixpoint` proves `IOModel.Approx (gen …) (gen …)`, a generator at `IOModel` run by the same
-generator at `IO`: it inducts over the `IOModel` side's fixpoint, unfolds the other side one step,
-and walks the two together (`io_bound`).
+The rules by which `walk` relates a generator at `IOModel` to the same generator at `IO`,
+`IOModel.Approx (gen …) (gen …)`: each combinator's is `GenRel`'s.
 -/
-
-open Lean Meta Elab Tactic Basalt.Walk
-
-namespace Basalt.IOBound
-
-/-- `io_bound` proves `IOModel.Approx m x`, for `m` and `x` one generator term at `IOModel` and at
-`IO`, by walking the two together: a bind, a map, a conditional, and a choice on each side are
-related by their rules, a combinator with none is unfolded on both, and a leaf is a hypothesis or a
-fact passed as `io_bound [h]`, such as a callee's `.faithful` law. -/
-syntax (name := ioBoundTac) "io_bound" (walkFacts)? : tactic
-
-elab_rules : tactic
-  | `(tactic| io_bound $[$fs]?) => withMainContext do
-    replaceMainGoal (← walkRel "io_bound" ``IOModel.Approx (walkFacts.terms fs)
-      (← getMainGoal))
-
-/-- `io_fixpoint` proves `IOModel.Approx (gen a₁ … aₙ) (gen a₁ … aₙ)`. It inducts with
-`gen.fixpoint_induct` on the `IOModel` side, admissible because `toIO` is continuous, unfolds the
-`IO` side one step, and runs `io_bound`, where a recursive call is closed by `ih`. A `gen` that is
-not recursive is unfolded on both sides and walked. -/
-syntax (name := ioFixpointTac) "io_fixpoint" (walkFacts)? : tactic
-
-elab_rules : tactic
-  | `(tactic| io_fixpoint $[$fs]?) => withMainContext do
-    replaceMainGoal (← relFixpoint "io_fixpoint" "io_bound" ``IOModel.Approx
-      (fun args => mkAppM ``IOModel.admissible_approx #[args.back!])
-      (walkFacts.terms fs) (← getMainGoal))
-
-end Basalt.IOBound
-
-/-! ## Combinators the walk does not enter
-
-`Approx` is a `GenRel`, so each combinator's rule is `GenRel`'s. -/
 
 namespace IOModel
 
@@ -57,7 +23,7 @@ theorem genRel : GenRel IOModel IO @Approx where
   map := approx_map
   default := approx_default
   choose := approx_choose
-  admissible := admissible_approx
+  admissible := Approx.admissible
 
 @[gen_rule]
 theorem approx_elements (xs : List α) (hne : xs ≠ []) :

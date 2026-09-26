@@ -141,6 +141,12 @@ noncomputable def expectObs : Obs SPMF.{u} (WP Mix.average) where
   map_bind x k := by funext f; exact expect_bind x k f
   map_choose _ _ _ := rfl
 
+/-- An expectation, stated on its observation for `walk`. -/
+theorem expect_eq_obs (g : SPMF α) (f : α → ℝ≥0∞) : expect g f = expectObs.spec g f := rfl
+
+/-- The mass, stated on the expectation observation for `walk`. -/
+theorem mass_eq_obs (g : SPMF α) : g.mass = expectObs.spec g fun _ => 1 := (expect_one g).symm
+
 instance : expectObs.Monotone := ⟨fun _ _ _ h => expect_mono h⟩
 
 section expect

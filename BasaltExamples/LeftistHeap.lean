@@ -71,24 +71,27 @@ theorem Tree.genLeftist.sound_complete :
     IsSoundAndComplete (Tree.genLeftist lo) (Tree.isLeftist lo) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [Nat.arbitrary.sound_complete]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]
     all_goals simp_all [Tree.isLeftist]
     all_goals omega
   case complete =>
     intro t
     induction t generalizing lo with
-    | leaf => intro _; rw [Tree.genLeftist]; complete_bound
+    | leaf => intro _; rw [Tree.genLeftist, SPMF.mem_support_iff_may]; walk
     | node l x r ihl ihr =>
       intro ⟨hle, hrank, hl, hr⟩
       obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
-      rw [Tree.genLeftist]; complete_bound [Nat.arbitrary.sound_complete]
+      rw [Tree.genLeftist, SPMF.mem_support_iff_may]
+      walk [Nat.arbitrary.sound_complete.complete.obs]
       exact ⟨d, l, ihl hl, r, ihr hr, by rw [ite_eq_left hrank]⟩
 
 theorem Tree.genLeftistOfRank.sound_complete :
     IsSoundAndComplete (Tree.genLeftistOfRank lo k) (fun t => Tree.isLeftist lo t ∧ t.rank = k) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [Nat.arbitrary.sound_complete]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]
     all_goals simp_all [Tree.isLeftist, Tree.rank]
   case complete =>
     intro t
@@ -96,16 +99,17 @@ theorem Tree.genLeftistOfRank.sound_complete :
     | leaf =>
       intro ⟨_, hk⟩
       obtain rfl : k = 0 := hk.symm
-      rw [Tree.genLeftistOfRank]; complete_bound
+      rw [Tree.genLeftistOfRank, SPMF.mem_support_iff_may]; walk
     | node l x r ihl ihr =>
       intro ⟨⟨hle, hrank, hl, hr⟩, hk⟩
       obtain rfl : k = r.rank + 1 := hk.symm
       obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
-      rw [Tree.genLeftistOfRank]; complete_bound [Nat.arbitrary.sound_complete]
+      rw [Tree.genLeftistOfRank, SPMF.mem_support_iff_may]
+      walk [Nat.arbitrary.sound_complete.complete.obs]
       exact ⟨d, r, ihr ⟨hr, rfl⟩, l.rank - r.rank, l, ihl ⟨hl, by omega⟩, rfl⟩
 
 theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist lo) := by
-  mass_fixpoint [Nat.arbitrary.terminates]
+  mass_fixpoint [Nat.arbitrary.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
     (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
@@ -115,10 +119,10 @@ theorem Tree.genLeftist.faithful : IsFaithful (Tree.genLeftist lo) := by
 
 theorem Tree.genLeftistOfRank.ideal [WordSource σ] (src : IdealSource σ) :
     src.Below (Tree.genLeftistOfRank lo k) (Tree.genLeftistOfRank lo k) := by
-  ideal_fixpoint [Nat.arbitrary.faithful]
+  walk fixpoint [Nat.arbitrary.faithful.below]
 
 theorem Tree.genLeftistOfRank.io :
     IOModel.Approx (Tree.genLeftistOfRank lo k) (Tree.genLeftistOfRank lo k) := by
-  io_fixpoint [Nat.arbitrary.faithful]
+  walk fixpoint [Nat.arbitrary.faithful.approx]
 
 end LeftistHeap

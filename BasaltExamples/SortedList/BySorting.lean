@@ -47,16 +47,18 @@ theorem List.genSortedBySorting.sound_complete :
     IsSoundAndComplete List.genSortedBySorting List.sorted := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [ArbList.List.arbitrary.sound_complete]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [ArbList.List.arbitrary.sound_complete.sound.obs]
     next xs _ => exact List.sorted_mergeSort xs
   case complete =>
     intro ys h
-    rw [List.genSortedBySorting]; complete_bound [ArbList.List.arbitrary.sound_complete]
+    rw [List.genSortedBySorting, SPMF.mem_support_iff_may]
+    walk [ArbList.List.arbitrary.sound_complete.complete.obs]
     exact ⟨ys, List.mergeSort_of_sorted h⟩
 
 theorem List.genSortedBySorting.terminates :
     IsAlmostSurelyTerminating List.genSortedBySorting := by
-  mass_fixpoint [ArbList.List.arbitrary.terminates] using SPMF.LfpIsOne.one
+  mass_fixpoint [ArbList.List.arbitrary.terminates.obs] using SPMF.LfpIsOne.one
   simp
 
 theorem List.genSortedBySorting.faithful : IsFaithful List.genSortedBySorting := by
@@ -66,7 +68,8 @@ theorem List.genSortedBySorting.faithful : IsFaithful List.genSortedBySorting :=
 and being a permutation it changes neither the length nor the sum the bound is stated in. -/
 theorem List.genSortedBySorting.cost_bounded :
     IsCostBounded List.genSortedBySorting (fun ys => 2 * ys.length + ys.sum + 1) := by
-  cost_fixpoint [ArbList.List.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint [ArbList.List.arbitrary.cost_bounded.obs]
   expose_names
   have hperm := List.mergeSort_perm xs (fun a b => a ≤ b)
   simp only [hperm.length_eq, hperm.sum_eq]

@@ -25,13 +25,15 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 
 - **Writing a generator and proving it correct** — `WORKFLOW.md`: a recipe for each of the three
   obligations (support, termination, cost) as a skeleton with named holes, the table of judgments
-  (observation, algebra, direction, who supplies the induction), the unfolding-idiom table, and a
-  when-stuck table. [BasaltExamples/](BasaltExamples/) holds the worked instances
-  each recipe names. Start there for any per-generator work; do not improvise a proof shape.
-- **The laws** (`IsSoundAndComplete` and its halves `IsSound` and `IsCompleteFor`,
-  `IsAlmostSurelyTerminating`, `IsCostBounded`, `IsFilterFree`, `IsProductive`) and their
-  introduction lemmas — [Basalt/Laws.lean](Basalt/Laws.lean); `IsFaithful`, which relates `IO` to
-  `SPMF` — [Basalt/IO/Laws.lean](Basalt/IO/Laws.lean).
+  (the lemma that restates each on its observation, algebra, direction, who supplies the induction),
+  the unfolding-idiom table, and a when-stuck table. [BasaltExamples/](BasaltExamples/) holds the
+  worked instances each recipe names. Start there for any per-generator work; do not improvise a
+  proof shape.
+- **The laws** (`IsSoundAndComplete` and its halves `IsSoundFor` and `IsCompleteFor`,
+  `IsAlmostSurelyTerminating`, `IsCostBounded`), each but the bundle restated on its observation
+  (`iff_obs`, and `.obs` for a fact), and their introduction lemmas —
+  [Basalt/Laws.lean](Basalt/Laws.lean); `IsFaithful`, which relates `IO` to `SPMF` and so has no
+  observation — [Basalt/IO/Laws.lean](Basalt/IO/Laws.lean).
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
 - **Compiled choice** (`oneOf!`, `frequency!`) — the `compiled_choice` section of
   [Basalt/Combinators.lean](Basalt/Combinators.lean). Its contract (no list in the compiled code, the
@@ -41,22 +43,25 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `Obs.map_*` lemma per combinator, the specification monads and the presentation of each shape of
   choice: [Basalt/Obs/](Basalt/Obs/). An observation lives with its interpretation — the
   expectation one in [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean), may and always in
-  [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean), the cost ones and erasure in
+  [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean), the cost ones in
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean). A new combinator needs its `map_` lemma and
   nothing per judgment; [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour.
 - **Support** — a support law is two walks: soundness, a lower bound on `SPMF.alwaysObs` in the
-  demonic algebra (`sound_bound` and `sound_fixpoint`,
-  [Basalt/Tactic/Sound.lean](Basalt/Tactic/Sound.lean), pinned by
-  [BasaltTest/Tactic/Sound.lean](BasaltTest/Tactic/Sound.lean)); and completeness, a lower bound on
-  `SPMF.mayObs` in the angelic one, under an induction the user chooses (`complete_bound` and
-  `IsCompleteFor.of_measure`, [Basalt/Tactic/Complete.lean](Basalt/Tactic/Complete.lean), pinned by
-  [BasaltTest/Tactic/Complete.lean](BasaltTest/Tactic/Complete.lean)). The practical entry is
+  demonic algebra ([Basalt/Walk/Sound.lean](Basalt/Walk/Sound.lean), pinned by
+  [BasaltTest/Walk/Sound.lean](BasaltTest/Walk/Sound.lean)); and completeness, a lower bound on
+  `SPMF.mayObs` in the angelic one, under an induction the user chooses (`IsCompleteFor.of_measure`
+  or their own; [Basalt/Walk/Complete.lean](Basalt/Walk/Complete.lean), pinned by
+  [BasaltTest/Walk/Complete.lean](BasaltTest/Walk/Complete.lean)). The practical entry is
   WORKFLOW.md's Recipe 1. Support inversion outside a law (`mem_support_*_iff`, for a probability
   goal or a support equation) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean); the
   `support_simp` / `cost_support_simp` wrappers —
   [Basalt/Tactic/Support.lean](Basalt/Tactic/Support.lean).
-- **Termination** — the criterion (`IsPMF_of_lfp_eq_one`) and its `LfpIsOne` certificates:
-  [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); the `mass_fixpoint` tactic:
+- **Termination** — the criterion (`IsAlmostSurelyTerminating.of_lfpIsOne`, in
+  [Basalt/Laws.lean](Basalt/Laws.lean), on `SPMF.mass_eq_one_of_lfpIsOne`) and its `LfpIsOne`
+  certificates: [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); what the walk needs
+  of a mass bound:
+  [Basalt/Walk/Mass.lean](Basalt/Walk/Mass.lean), pinned by
+  [BasaltTest/Walk/Mass.lean](BasaltTest/Walk/Mass.lean); the `mass_fixpoint` tactic:
   [Basalt/Tactic/MassFixpoint.lean](Basalt/Tactic/MassFixpoint.lean), contract pinned by
   [BasaltTest/Tactic/MassFixpoint.lean](BasaltTest/Tactic/MassFixpoint.lean). Ranking functions and
   expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). The equations of `mass`:
@@ -66,46 +71,43 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   combinator has no rule: its `@[gen_map]` lemma is applied and rewritten (`@[spec_apply]`) into a
   *shape of choice* in the algebra. The `@[gen_rule]` rules are for the host constructs, once for
   every monotone observation ([Basalt/Obs/Ordered.lean](Basalt/Obs/Ordered.lean)), for the shapes,
-  per algebra and direction ([Basalt/Tactic/Average.lean](Basalt/Tactic/Average.lean) for
-  expectations; the demonic and angelic ones beside the presentations they are derived from, in
+  per algebra and direction ([Basalt/Walk/Average.lean](Basalt/Walk/Average.lean) for expectations;
+  the demonic and angelic ones beside the presentations they are derived from, in
   [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean); the `sup` ones in
-  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean)), and for bridging a recursive combinator's
-  law. What closes a leaf of a bound on one observation is tagged `@[obs_leaf]` beside the tactic
-  that uses it. The judgments and the registries are
-  [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean), each judgment registered by the file that owns
-  it; the walk and its side-goal solvers are
+  [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean)), and for bridging a recursive combinator's law.
+  What closes a leaf of a bound on one observation is tagged `@[obs_leaf]`. The registries are
+  [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean); the walk and its side-goal solvers are
   [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean), and the names it gives what it leaves
-  [Basalt/Walk/Names.lean](Basalt/Walk/Names.lean). What an entry tactic is made of —
-  `computeBound`, `fixpointStep`, and the residual handlers — is
-  [Basalt/Walk/Entry.lean](Basalt/Walk/Entry.lean): a `_bound` tactic restates its goal and relates
-  the computed bound to it, and a `_fixpoint` tactic is `fixpointStep` and its `_bound`
-  (`mass_fixpoint` excepted, which goes through the `LfpIsOne` criterion). The entry tactics are
-  `sound_bound` and `complete_bound` (above), `mass_bound`
-  ([Basalt/Tactic/Mass.lean](Basalt/Tactic/Mass.lean), pinned by
-  [BasaltTest/Tactic/Mass.lean](BasaltTest/Tactic/Mass.lean)), `cost_bound`
-  ([Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean), pinned by
-  [BasaltTest/Tactic/Cost.lean](BasaltTest/Tactic/Cost.lean)), and `expect_bound`
-  ([Basalt/Tactic/Expect.lean](Basalt/Tactic/Expect.lean), pinned by
-  [BasaltTest/Tactic/Expect.lean](BasaltTest/Tactic/Expect.lean)), each but `complete_bound` with
-  its `_fixpoint` in the same file. Two judgments relate a generator at two monads instead of
-  bounding it: `ideal_fixpoint` ([Basalt/Tactic/Ideal.lean](Basalt/Tactic/Ideal.lean)) and
-  `io_fixpoint` ([Basalt/Tactic/IO.lean](Basalt/Tactic/IO.lean)), which unfold any combinator with
-  no rule; `faithful_fixpoint` ([Basalt/Tactic/Faithful.lean](Basalt/Tactic/Faithful.lean)) runs
-  both. Their combinator rules are instances of [Basalt/GenRel.lean](Basalt/GenRel.lean).
-  [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and
-  fails the build when one of the combinators it names loses its `@[gen_map]` lemma or a list
-  combinator loses a bridge — it checks that list, not the registry, so a *new* combinator with no
-  lemma is not caught. Nothing else in a termination, cost, or expectation proof mentions
-  combinators.
+  [Basalt/Walk/Names.lean](Basalt/Walk/Names.lean). The one entry tactic, `walk`, is
+  [Basalt/Walk/Entry.lean](Basalt/Walk/Entry.lean): it reads the observation and direction off a
+  goal stated on an observation, finishes by the algebra (one goal per path, a pruned precondition,
+  or one inequality), and `walk fixpoint` first inducts, admissible by the observation's
+  `admissible`/`admissible_le` or the relation's `admissible`. What the walk knows of each judgment
+  — its leaves, its list-combinator rules, its admissibility — is one file per judgment in
+  [Basalt/Walk/](Basalt/Walk/); each bound's is pinned by its namesake in
+  [BasaltTest/Walk/](BasaltTest/Walk/). [Basalt/Tactic/](Basalt/Tactic/) holds, besides the
+  `support_simp` and `ennreal_to_real` helpers, the tactics that do more than walk: `mass_fixpoint`
+  (above) and `faithful_fixpoint`. Two judgments relate a generator at two monads instead of
+  bounding it, tagged `@[walk_rel]`: `src.Below` ([Basalt/Walk/Ideal.lean](Basalt/Walk/Ideal.lean))
+  and `IOModel.Approx` ([Basalt/Walk/IO.lean](Basalt/Walk/IO.lean)), for which the walk unfolds any
+  combinator with no rule; `faithful_fixpoint`
+  ([Basalt/Tactic/Faithful.lean](Basalt/Tactic/Faithful.lean), pinned by
+  [BasaltTest/Tactic/Faithful.lean](BasaltTest/Tactic/Faithful.lean)) walks both. Their combinator
+  rules are instances of [Basalt/GenRel.lean](Basalt/GenRel.lean).
+  [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and fails the build when one of the
+  combinators it names loses its `@[gen_map]` lemma or a list combinator loses a bridge — it checks
+  that list, not the registry, so a *new* combinator with no lemma is not caught. Nothing else in a
+  termination, cost, or expectation proof mentions combinators.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
   [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean). The practical entry
   for a bound is WORKFLOW.md's Recipe 4.
-- **Cost** — the interpretation (`SPMF.Cost`, its support inversion, expected cost):
-  [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); the `cost_fixpoint` tactic:
-  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean), contract pinned by
-  [BasaltTest/Tactic/CostFixpoint.lean](BasaltTest/Tactic/CostFixpoint.lean). The practical entry is
+- **Cost** — the interpretation (`SPMF.Cost` and its support inversion):
+  [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); what the walk needs of it:
+  [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean), pinned by
+  [BasaltTest/Walk/Cost.lean](BasaltTest/Walk/Cost.lean) and, for `walk fixpoint`,
+  [BasaltTest/Walk/CostFixpoint.lean](BasaltTest/Walk/CostFixpoint.lean). The practical entry is
   WORKFLOW.md's Recipe 3.
 - **ENNReal arithmetic** — `ennreal_to_real` in
   [Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean).
@@ -165,11 +167,16 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   defeq means a runner's `IO TestOutcome` argument does not determine `G`: ascribe the
   interpretation (`(prop : PropM IO Unit)`) at the call site.
 
-- **A walk ignores the hypothesis you have about a combinator term** (`ih : IsCostBounded (vectorOf n g) …`
-  is in context, and the goal comes back stated through `vectorOf`'s own bridge) — for a generator
-  headed by a combinator the walker tries the combinator's rule or `@[gen_map]` lemma before any
-  fact. `generalize` the term to a variable first, as `isCostBounded_vectorOf` does in
-  [Basalt/Tactic/Cost.lean](Basalt/Tactic/Cost.lean).
+- **A walk reports that nothing bounds a recursive occurrence you have an induction hypothesis
+  for** — the hypothesis is stated as a law (`IsSoundFor …`), and a walk uses a hypothesis only when
+  it is stated on an observation, so it skips this one silently. Pass it as `walk [ih.obs]`
+  (WORKFLOW.md, When Stuck).
+
+- **A walk ignores the hypothesis you have about a combinator term**
+  (`ih : SPMF.Cost.alwaysObs.spec (vectorOf n g) …` is in context, and the goal comes back stated
+  through `vectorOf`'s own bridge) — for a generator headed by a combinator the walker tries the
+  combinator's rule or `@[gen_map]` lemma before any fact. `generalize` the term to a variable
+  first, as `always_vectorOf` does in [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean).
 
 - **`rw [support_oneOf]` (or `prob_frequency`, …) finds no occurrence in a goal that shows
   `oneOf! [...]`** — `oneOf!`/`frequency!` elaborate to `oneOfWith`/`frequencyWith`, which only

@@ -9,10 +9,10 @@ import BasaltExamples.Heap
 import BasaltExamples.SortedList.BySorting
 
 /-!
-# The `cost_fixpoint` Contract
+# The Cost Fixpoint Contract
 
-Pins the step `cost_fixpoint` leaves: the recursive function named after the generator, `ih` over
-the arguments its recursive calls change, and the `cost_bound` residuals.
+Pins the step `walk fixpoint` leaves on `SPMF.Cost.alwaysObs.spec`: the recursive function named
+after the generator, `ih` over the arguments its recursive calls change, and the walk's residuals.
 -/
 
 open RandomChoice ArbNat
@@ -21,29 +21,30 @@ namespace CostFixpointTest
 
 /--
 trace: arbitrary : SPMF.Cost ℕ
-ih : arbitrary.Always fun n n_n => n_n ≤ n + 1
+ih : SPMF.Cost.alwaysObs.spec arbitrary fun v n_v => n_v ≤ v + 1
 ⊢ 1 + 0 ≤ 0 + 1
 
 arbitrary : SPMF.Cost ℕ
-ih : arbitrary.Always fun n n_n => n_n ≤ n + 1
+ih : SPMF.Cost.alwaysObs.spec arbitrary fun v n_v => n_v ≤ v + 1
 n✝ n_n✝ : ℕ
 h_n✝ : n_n✝ ≤ n✝ + 1
 ⊢ 1 + (n_n✝ + 0) ≤ n✝ + 1 + 1
 -/
 #guard_msgs in
 example : IsCostBounded Nat.arbitrary (fun n => n + 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   trace_state
   all_goals omega
 
 /--
 trace: genHeap : ℕ → SPMF.Cost Heap.Tree
-ih : ∀ (lo : ℕ), (genHeap lo).Always fun t n_t => n_t ≤ 3 * t.size + t.sum + 1
+ih : ∀ (lo : ℕ), SPMF.Cost.alwaysObs.spec (genHeap lo) fun v n_v => n_v ≤ 3 * v.size + v.sum + 1
 lo : ℕ
 ⊢ 1 + 0 ≤ 3 * Heap.Tree.leaf.size + Heap.Tree.leaf.sum + 1
 
 genHeap : ℕ → SPMF.Cost Heap.Tree
-ih : ∀ (lo : ℕ), (genHeap lo).Always fun t n_t => n_t ≤ 3 * t.size + t.sum + 1
+ih : ∀ (lo : ℕ), SPMF.Cost.alwaysObs.spec (genHeap lo) fun v n_v => n_v ≤ 3 * v.size + v.sum + 1
 lo delta✝ n_delta✝ : ℕ
 h_delta✝ : n_delta✝ ≤ delta✝ + 1
 l✝ : Heap.Tree
@@ -56,7 +57,8 @@ h_r✝ : n_r✝ ≤ 3 * r✝.size + r✝.sum + 1
 -/
 #guard_msgs in
 example : IsCostBounded (Heap.Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1) := by
-  cost_fixpoint [Nat.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint [Nat.arbitrary.cost_bounded.obs]
   trace_state
   all_goals simp only [Heap.Tree.size, Heap.Tree.sum]; omega
 
@@ -64,19 +66,19 @@ example : IsCostBounded (Heap.Tree.genHeap lo) (fun t => 3 * t.size + t.sum + 1)
 -- is a hypothesis.
 /--
 trace: genBST : ℤ → ℤ → SPMF.Cost (BST.Tree ℤ)
-ih : ∀ (lo hi : ℤ), (genBST lo hi).Always fun t n_t => n_t ≤ 3 * t.size + 1
+ih : ∀ (lo hi : ℤ), SPMF.Cost.alwaysObs.spec (genBST lo hi) fun v n_v => n_v ≤ 3 * v.size + 1
 lo hi : ℤ
 h✝ : lo > hi
 ⊢ 0 ≤ 3 * BST.Tree.leaf.size + 1
 
 genBST : ℤ → ℤ → SPMF.Cost (BST.Tree ℤ)
-ih : ∀ (lo hi : ℤ), (genBST lo hi).Always fun t n_t => n_t ≤ 3 * t.size + 1
+ih : ∀ (lo hi : ℤ), SPMF.Cost.alwaysObs.spec (genBST lo hi) fun v n_v => n_v ≤ 3 * v.size + 1
 lo hi : ℤ
 h✝ : ¬lo > hi
 ⊢ 1 + 0 ≤ 3 * BST.Tree.leaf.size + 1
 
 genBST : ℤ → ℤ → SPMF.Cost (BST.Tree ℤ)
-ih : ∀ (lo hi : ℤ), (genBST lo hi).Always fun t n_t => n_t ≤ 3 * t.size + 1
+ih : ∀ (lo hi : ℤ), SPMF.Cost.alwaysObs.spec (genBST lo hi) fun v n_v => n_v ≤ 3 * v.size + 1
 lo hi : ℤ
 h✝ : ¬lo > hi
 x✝ : ℤ
@@ -91,7 +93,8 @@ h_r✝ : n_r✝ ≤ 3 * r✝.size + 1
 -/
 #guard_msgs in
 example : IsCostBounded (BST.Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   trace_state
   all_goals simp only [BST.Tree.size]; omega
 
@@ -104,37 +107,40 @@ partial_fixpoint
 /--
 trace: b : Bool
 g : ℕ → SPMF.Cost ℕ
-ih : ∀ (n : ℕ), (g n).Always fun k n_k => n_k ≤ k + 1 + n - n
+ih : ∀ (n : ℕ), SPMF.Cost.alwaysObs.spec (g n) fun v n_v => n_v ≤ v + 1 + n - n
 n : ℕ
 ⊢ 1 + 0 ≤ 0 + 1 + n - n
 
 b : Bool
 g : ℕ → SPMF.Cost ℕ
-ih : ∀ (n : ℕ), (g n).Always fun k n_k => n_k ≤ k + 1 + n - n
+ih : ∀ (n : ℕ), SPMF.Cost.alwaysObs.spec (g n) fun v n_v => n_v ≤ v + 1 + n - n
 n k✝ n_k✝ : ℕ
 h_k✝ : n_k✝ ≤ k✝ + 1 + (n + 1) - (n + 1)
 ⊢ 1 + (n_k✝ + 0) ≤ k✝ + 1 + 1 + n - n
 -/
 #guard_msgs in
 example (n : Nat) (b : Bool) : IsCostBounded (g n b) (fun k => k + 1 + n - n) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   trace_state
   all_goals omega
 
 /-- A generator with no recursion is unfolded and walked. -/
 example : IsCostBounded SortedList.List.genSortedBySorting (fun ys => 2 * ys.length + ys.sum + 1) := by
-  cost_fixpoint [ArbList.List.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint [ArbList.List.arbitrary.cost_bounded.obs]
   expose_names
   have hperm := List.mergeSort_perm xs (fun a b => a ≤ b)
   simp only [hperm.length_eq, hperm.sum_eq]
   omega
 
 /--
-error: cost_fixpoint: `listOf` is a combinator, not a generator definition; prove a bound on a combinator term with `cost_bound`
+error: walk fixpoint: `listOf` is a combinator, not a generator definition; prove a bound on a combinator term with `walk`
 -/
 #guard_msgs in
 example : IsCostBounded (listOf Nat.arbitrary) (fun xs => xs.length + (xs.map (· + 1)).sum + 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
 
 /-- The goals of a tactic `match` are recognized. -/
 def byCases [Gen G] (n : Nat) : G Nat :=
@@ -144,8 +150,8 @@ def byCases [Gen G] (n : Nat) : G Nat :=
 
 example (n : Nat) : IsCostBounded (byCases n) (fun _ => 1) := by
   match n with
-  | 0 => cost_fixpoint; omega
-  | _ + 1 => cost_fixpoint; omega
+  | 0 => rw [IsCostBounded.iff_obs]; walk fixpoint; omega
+  | _ + 1 => rw [IsCostBounded.iff_obs]; walk fixpoint; omega
 
 
 -- A `match` on the seed that is stuck is split into its cases before the walk.
@@ -153,13 +159,14 @@ example (n : Nat) : IsCostBounded (byCases n) (fun _ => 1) := by
 trace: n : ℕ
 ⊢ 0 ≤ 1
 
-n n_1 x✝ : ℕ
-h_x✝ : 0 ≤ x✝ ∧ x✝ ≤ 1
+n n_1 v✝ : ℕ
+h_v✝ : 0 ≤ v✝ ∧ v✝ ≤ 1
 ⊢ 1 ≤ 1
 -/
 #guard_msgs in
 example (n : Nat) : IsCostBounded (byCases n) (fun _ => 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   trace_state
   all_goals omega
 
@@ -173,20 +180,21 @@ def fuelled [Gen G] (fuel : Nat) : G (BST.Tree Nat) :=
 termination_by fuel
 
 /--
-error: cost_fixpoint: `CostFixpointTest.fuelled` is recursive but not a `partial_fixpoint`; induct on its decreasing argument, unfold it, and apply `cost_bound`
+error: walk fixpoint: `CostFixpointTest.fuelled` is recursive but not a `partial_fixpoint`; induct on its decreasing argument, unfold it, and apply `walk`
 -/
 #guard_msgs in
 example (fuel : Nat) : IsCostBounded (fuelled fuel) (fun t => 3 * t.size + 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
 
 -- The route the error names. The base case discards the branch it cannot take first: the walk
 -- bounds both branches, and nothing bounds `fuelled (0 - 1)`.
 example (fuel : Nat) : IsCostBounded (fuelled fuel) (fun t => 3 * t.size + 1) := by
   induction fuel with
-  | zero => rw [fuelled, dite_eq_left rfl]; cost_bound; simp
+  | zero => rw [fuelled, dite_eq_left rfl, IsCostBounded.iff_obs]; walk; simp
   | succ n ih =>
-    rw [fuelled]
-    cost_bound
+    rw [fuelled, IsCostBounded.iff_obs]
+    walk [ih.obs]
     all_goals simp only [BST.Tree.size]; omega
 
 end CostFixpointTest

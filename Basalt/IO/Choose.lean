@@ -4,7 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.IO.Ideal
-import Basalt.Tactic.Expect
+import Basalt.Walk.Expect
 import Basalt.Tactic.MassFixpoint
 
 /-!
@@ -155,7 +155,8 @@ theorem rejectVia_terminates (hR : R < N) :
 theorem expect_rejectVia_le (hR : R < N) (a : {x // x ≤ R}) :
     expect (rejectVia (chooseNat 0 (N - 1) : SPMF Nat) R) (fun y => if y = a then 1 else 0)
       ≤ ((R + 1 : Nat) : ℝ≥0∞)⁻¹ := by
-  expect_fixpoint
+  rw [expect_eq_obs]
+  walk fixpoint
   rw [sum_Icc_dite hR (fun x => if x = a then 1 else 0), Finset.sum_ite_eq']
   simp only [Finset.mem_univ, ite_true, show N - 1 - 0 + 1 = N by omega]
   have hR1 : ((R + 1 : Nat) : ℝ≥0∞) * ((R + 1 : Nat) : ℝ≥0∞)⁻¹ = 1 :=
@@ -256,7 +257,7 @@ private theorem below_go {word' : SPMF UInt64} {word : WordModel σ UInt64}
 theorem below_rejectVia {cand' : SPMF Nat} {cand : WordModel σ Nat} (hc : src.Below cand' cand)
     (range : Nat) : src.Below (rejectVia cand' range) (rejectVia cand range) := by
   refine rejectVia.fixpoint_induct (m := SPMF) cand' range
-    (fun y => src.Below y (rejectVia cand range)) (src.admissible_below _) (fun z ih => ?_)
+    (fun y => src.Below y (rejectVia cand range)) (Below.admissible src _) (fun z ih => ?_)
   rw [rejectVia]
   exact src.below_bind (fun _ => src.below_dite (fun h => src.below_pure _) fun _ => ih) hc
 

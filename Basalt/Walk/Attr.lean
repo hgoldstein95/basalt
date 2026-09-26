@@ -12,11 +12,11 @@ import Basalt.Obs.Basic
 # The Walker's Judgments and Registries
 
 The judgments the generator walker (`Basalt/Walk/Basic.lean`) proves, and its registries: the
-judgments a file registers (`@[walk_argument]`, `@[walk_rel]`), the shapes of choice
-(`@[mix_shape]`), the `@[gen_rule]` rules, keyed by judgment and by the head constant of what the
-rule is about; the `@[gen_map]` lemmas, keyed by combinator; the `@[obs_leaf]` lemmas, keyed by
-observation; the `@[spec_apply]` simp set; and the `@[gen_branches]` relations. Each attribute
-reads its key off the statement it tags, and fails on one it cannot.
+relations a file registers (`@[walk_rel]`), the shapes of choice (`@[mix_shape]`), the `@[gen_rule]`
+rules, keyed by judgment and by the head constant of what the rule is about; the `@[gen_map]`
+lemmas, keyed by combinator; the `@[obs_leaf]` lemmas, keyed by observation; the `@[spec_apply]`
+simp set; and the `@[gen_branches]` relations. Each attribute reads its key off the statement it
+tags, and fails on one it cannot.
 -/
 open Lean Meta
 
@@ -79,10 +79,6 @@ def shapeRuleHead? (shape : Expr) : MetaM (Option Name) := do
 
 /-- A statement about a generator proved by induction. -/
 inductive Judgment where
-  /-- `law g R` with `R` to be found: a list combinator's generator argument, which the
-  combinator's rule asks about. No rule concludes one: a fact closes it, and failing one `reduceTo`
-  restates it. `tactic` is the entry tactic that takes the fact, for the error. -/
-  | argument (law : Name) (reduceTo : Option Name) (tactic : String)
   /-- `O.spec g post ≤ b` (`upper`) or `b ≤ O.spec g post`: a bound on an observation into an
   ordered algebra, computed by the rules from the postcondition. The rules are stated once for
   every monotone observation; a combinator with none goes through its `@[gen_map]` lemma. -/
@@ -93,7 +89,7 @@ inductive Judgment where
   /-- `rel … y x`: one generator at two monads, related construct by construct, `y` the side the
   induction is on and the one a rule is keyed by. A combinator with no rule is unfolded on both
   sides, which stay in step because they are one term; a leaf is a hypothesis or a fact. -/
-  | rel (rel : Name) (tactic : String)
+  | rel (rel : Name)
 
 namespace Judgment
 
@@ -102,18 +98,14 @@ private def side (upper : Bool) : Nat := if upper then 2 else 3
 
 /-- The registry key, the constant the judgment is stated with. -/
 def key : Judgment → Name
-  | argument law .. => law
   | spec upper => if upper then ``Obs.spec else ``Obs.spec ++ `ge
   | mix upper => if upper then `mix else `mix ++ `ge
-  | rel r .. => r
+  | rel r => r
 
 /-- On a statement already in `whnfR`: the subject it is about, and how to restate it about a
 subject that is definitionally equal. -/
 def subject? (env : Environment) (j : Judgment) (ty : Expr) : Option (Expr × (Expr → Expr)) :=
   match j with
-  | argument law .. => do
-    guard (ty.isAppOfArity law 3)
-    return (ty.getArg! 1, fun g => mkApp3 ty.getAppFn (ty.getArg! 0) g (ty.getArg! 2))
   | spec upper => do
     guard (ty.isAppOfArity ``LE.le 4)
     let (g, restate) ← specSubject? (ty.getArg! (side upper))
@@ -123,7 +115,7 @@ def subject? (env : Environment) (j : Judgment) (ty : Expr) : Option (Expr × (E
     let shape := ty.getArg! (side upper)
     guard (isMixShape env shape)
     return (shape, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! (side upper) g))
-  | rel r .. => do
+  | rel r => do
     guard (ty.isAppOf r && 2 ≤ ty.getAppNumArgs)
     let i := ty.getAppNumArgs - 2
     return (ty.getArg! i, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! i g))
@@ -134,23 +126,14 @@ def ruleHead? : Judgment → Expr → MetaM (Option Name)
   | mix _, g => shapeRuleHead? g
   | _, g => pure g.getAppFn.constName?
 
-/-- A lemma that restates a goal of this judgment, about any generator, as goals of other
-judgments; tried after the facts. -/
-def reduceTo : Judgment → Option Name
-  | argument _ r _ => r
-  | _ => none
-
 /-- The error for a leaf nothing closes. -/
 def noLeaf (j : Judgment) (g : Expr) : MessageData :=
   match j with
-  | argument law _ tactic => m!"{tactic}: no hypothesis or fact gives `{law} _ _` of the \
-      combinator argument{indentExpr g}\nProve one and pass it to `{tactic} [_]`."
   | spec _ => m!"no rule, `@[gen_map]` lemma, hypothesis, or fact bounds{indentExpr g}\n\
-      Pass a fact about it to the tactic."
+      Pass a fact about it to `walk [_]`."
   | mix _ => m!"no rule bounds the choice{indentExpr g}"
-  | rel r tactic => m!"{tactic}: no rule, hypothesis, or fact relates{indentExpr g}\nto its \
-      counterpart. Pass a fact about it to `{tactic} [_]`; a recursive combinator needs a `{r}` \
-      rule of its own."
+  | rel r => m!"no rule, hypothesis, or fact relates{indentExpr g}\nto its counterpart. Pass a \
+      fact about it to `walk [_]`; a recursive combinator needs a `{r}` rule of its own."
 
 /-- Whether a combinator with no rule is unfolded rather than being an error. -/
 def unfoldsCombinators : Judgment → Bool
@@ -159,7 +142,7 @@ def unfoldsCombinators : Judgment → Bool
 
 end Judgment
 
-/-- The judgments registered by `@[walk_argument]` and `@[walk_rel]`, in registration order. -/
+/-- The judgments registered by `@[walk_rel]`, in registration order. -/
 initialize judgmentExt : SimplePersistentEnvExtension Judgment (Array Judgment) ←
   registerSimplePersistentEnvExtension {
     addEntryFn := Array.push
@@ -171,33 +154,22 @@ observation and on a choice. -/
 def judgments (env : Environment) : Array Judgment :=
   judgmentExt.getState env ++ #[.spec true, .mix true, .spec false, .mix false]
 
-/-- `@[walk_argument "tac"]` on a law `law g R` — the walker's judgment for a list combinator's
-generator argument, closed by a fact passed to the entry tactic `tac`. With a lemma,
-`@[walk_argument "tac" lem]`, a goal no fact closes is restated by `lem`. -/
-syntax (name := walkArgumentAttr) "walk_argument " str (ppSpace ident)? : attr
-
-initialize registerBuiltinAttribute {
-  name := `walkArgumentAttr
-  descr := "a law the generator walker asks of a list combinator's generator argument"
-  add := fun declName stx kind => do
-    unless kind == .global do throwError "walk_argument: must be a global attribute"
-    let tac := stx[1].isStrLit?.getD ""
-    let reduceTo ← if stx[2].isNone then pure none
-      else some <$> Elab.realizeGlobalConstNoOverloadWithInfo stx[2][0]
-    modifyEnv (judgmentExt.addEntry · (.argument declName reduceTo tac))
-}
-
-/-- `@[walk_rel "tac"]` on a relation `rel … y x` between one generator at two monads — the
-walker's judgment relating them construct by construct, proved by the entry tactic `tac`. -/
-syntax (name := walkRelAttr) "walk_rel " str : attr
+/-- `@[walk_rel]` on a relation `rel … y x` between one generator at two monads — the walker's
+judgment relating them construct by construct. `walk fixpoint` inducts on `y` with
+`rel.admissible`. -/
+syntax (name := walkRelAttr) "walk_rel" : attr
 
 initialize registerBuiltinAttribute {
   name := `walkRelAttr
   descr := "a relation between one generator at two monads, proved by the generator walker"
-  add := fun declName stx kind => do
+  add := fun declName _ kind => do
     unless kind == .global do throwError "walk_rel: must be a global attribute"
-    modifyEnv (judgmentExt.addEntry · (.rel declName (stx[1].isStrLit?.getD "")))
+    modifyEnv (judgmentExt.addEntry · (.rel declName))
 }
+
+/-- Whether `head` is a relation tagged `@[walk_rel]`. -/
+def isWalkRel (env : Environment) (head : Name) : Bool :=
+  (judgmentExt.getState env).any fun | .rel r => r == head | _ => false
 
 /-! ## Leaves of a bound on an observation -/
 

@@ -12,8 +12,7 @@ import Basalt.SPMF.Expect.Obs
 Support inversion for the host constructs (`bind`, `pure`, `map`, `ite`, `dite`, `choose`), stated
 on monad notation, which is what do-notation elaborates to; the may and always observations built
 from them; and the support laws of the list combinators, which the walker's rules bridge. A
-combinator's support is otherwise not a lemma: it is what `sound_bound` and `complete_bound` compute
-from its `Obs.map_*`.
+combinator's support is otherwise not a lemma: it is what `walk` computes from its `Obs.map_*`.
 -/
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
@@ -430,7 +429,7 @@ theorem bind_congr_support
   congr
   funext v
   by_cases hsupport : v ∈ x.support
-  · rw [h]; assumption
+  · rwa [h]
   · simp only [support, Function.notMem_support] at hsupport
     simp_all [DFunLike.coe]
 

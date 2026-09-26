@@ -16,11 +16,11 @@ terminates almost surely, with infinite expected size.
 
 theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by
   induction τ generalizing Γ with
-  | Bool => apply SPMF.IsPMF.of_one_le; rw [genZero]; mass_bound; norm_num [ENNReal.div_self]
-  | Fun τ1 τ2 _ ih2 => apply SPMF.IsPMF.of_one_le; rw [genZero]; mass_bound [ih2]; rfl
+  | Bool => rw [IsAlmostSurelyTerminating.iff_obs, genZero]; walk; norm_num [ENNReal.div_self]
+  | Fun τ1 τ2 _ ih2 => rw [IsAlmostSurelyTerminating.iff_obs, genZero]; walk [ih2.obs]; rfl
 
 theorem genTerm.terminates : IsAlmostSurelyTerminating (genTerm Γ τ) := by
-  mass_fixpoint [genZero.terminates, genType.terminates]
+  mass_fixpoint [genZero.terminates.obs, genType.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 3) (b := 1 / 3) (d := 1 / 3)
     (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   all_goals

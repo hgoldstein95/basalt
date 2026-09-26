@@ -112,7 +112,7 @@ def reduceCtorProjs (e : Expr) : MetaM Expr := do
     let some info ← getProjectionFnInfo? f | return .continue
     unless x.getAppNumArgs > info.numParams do return .continue
     let r ← whnfR x
-    return if r.isProj then .continue else .done r)
+    return if r.getAppFn.isProj then .continue else .done r)
 
 /-- `e` with its leading binders instantiated by `mkCtorMVar`, and its type ascribed with the
 resulting projections reduced. A family criterion hands over a recursive bound
@@ -145,15 +145,6 @@ def applyBridge (b : Name) (e : Expr) : MetaM Expr := do
       return f.app e
     f := f.app (← mkFreshExprMVar d)
   failure
-
-/-- `e` and, when it proves a structure of propositions (a law that bundles others), its fields,
-recursively: each is a fact of its own. -/
-partial def withFields (e : Expr) : MetaM (Array Expr) := do
-  let env ← getEnv
-  let some S := (← whnfR (← inferType e)).getAppFn.constName? | return #[e]
-  unless isStructure env S do return #[e]
-  (getStructureFields env S).foldlM (init := #[e]) fun acc f => do
-    return acc ++ (← withFields (← mkProjection e f))
 
 /-! ## Tidying what a walk leaves -/
 
@@ -302,38 +293,41 @@ def solveSideGoal (goal : MVarId) (ty : Expr) : MetaM Bool := goal.withContext d
 
 /-! ## Leaves -/
 
-/-- Close `goal`, a leaf, with the fact `e` (or, when `fields`, one of its fields), as it is or
-through one of the observation's `leaves`, `e`'s binders possibly instantiated by `instBinders`
-first. `none` if nothing applies. -/
-private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) (fields : Bool) :
+/-- Close `goal`, a leaf, with the fact `e`, as it is or through one of the observation's `leaves`,
+`e`'s binders possibly instantiated by `instBinders` first. `none` if nothing applies. -/
+private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
     MetaM (Option (List MVarId)) := do
+  -- A fact that is the goal, binders and all: a generator argument's family of observations.
+  let whole ← observing? do
+    unless ← isDefEq (← goal.getType) (← inferType e) do failure
+    goal.assign e
+    goal.withContext (assumeProps e)
+    if (← instantiateMVars e).hasExprMVar then failure
+  if whole.isSome then return some []
   for inst in [false, true] do
     let some e ← if inst then observing? (instBinders e) else pure (some e) | continue
-    let facts ← if fields then withFields e else pure #[e]
-    for h : i in [:facts.size] do
-      let e := facts[i]
-      let r ← observing? do
-        let gs ← applyExact goal e
-        unless gs.isEmpty do failure
+    let r ← observing? do
+      let gs ← applyExact goal e
+      unless gs.isEmpty do failure
+      goal.withContext (assumeProps e)
+      if (← instantiateMVars e).hasExprMVar then failure
+    if r.isSome then return some []
+    for bridge in leaves.facts do
+      let saved ← saveState
+      let some sides ← observing? (do
+        let cand ← applyBridge bridge e
+        applyExact goal (← mkExpectedTypeHint cand
+          (nameBound (← instantiateMVars (← inferType cand))
+            (postNames (← instantiateMVars (← goal.getType)))))) | continue
+      try
+        sides.forM solveAffine
         goal.withContext (assumeProps e)
         if (← instantiateMVars e).hasExprMVar then failure
-      if r.isSome then return some []
-      for bridge in leaves.facts do
-        let saved ← saveState
-        let some sides ← observing? (do
-          let cand ← applyBridge bridge e
-          applyExact goal (← mkExpectedTypeHint cand
-            (nameBound (← instantiateMVars (← inferType cand))
-              (postNames (← instantiateMVars (← goal.getType)))))) | continue
-        try
-          sides.forM solveAffine
-          goal.withContext (assumeProps e)
-          if (← instantiateMVars e).hasExprMVar then failure
-          return some []
-        catch ex =>
-          saved.restore
-          if leaves.facts.back? == some bridge && inst && i + 1 == facts.size then
-            throw ex
+        return some []
+      catch ex =>
+        saved.restore
+        if leaves.facts.back? == some bridge && inst then
+          throw ex
   return none
 
 /-! ## Reading a recursive definition -/
@@ -503,7 +497,7 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
         let e ← Term.elabTerm t none
         Term.synthesizeSyntheticMVarsNoPostponing
         instantiateMVars e
-      let some gs ← tryFact leaves goal e (fields := true) | failure
+      let some gs ← tryFact leaves goal e | failure
       namePremises none (← goal.getType) gs
     if let some gs := r then return some (← rest gs)
   -- A hypothesis is tried only if it mentions `g`'s head: unifying one about another generator
@@ -516,15 +510,19 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
     unless decl.isImplementationDetail do
       unless ← isProp decl.type do continue
       unless mentionsHead (← instantiateMVars decl.type) do continue
-      if let some gs ← tryFact leaves goal decl.toExpr (fields := false) then
+      if let some gs ← tryFact leaves goal decl.toExpr then
         return some (← rest (← namePremises none (← goal.getType) gs))
   return none
 
-/-- `j`'s `reduceTo` lemma, which restates the goal as goals of other judgments. -/
-private def tryReduce (j : Judgment) (goal : MVarId) (rest : WalkRest) :
-    TermElabM (Option (List MVarId)) := do
-  let some lem := j.reduceTo | return none
-  return some (← rest (← applyExact goal (← mkConstWithFreshMVarLevels lem)))
+/-- The generator `ty` is about when it states `O.spec g post`, possibly under binders, rather than
+bounding it: a rule's premise about a combinator's generator argument, whose postcondition is the
+rule's to learn, so that only a fact can close it. -/
+private def argumentSubject? (ty : Expr) : MetaM (Option Expr) :=
+  forallTelescope ty fun xs concl => do
+    let concl := concl.headBeta.consumeMData
+    unless concl.isAppOfArity ``Obs.spec 10 do return none
+    let g := concl.getArg! 8
+    return if g.hasAnyFVar (fun v => xs.contains (.fvar v)) then none else some g
 
 /-- A bound on `g` by itself (`@[obs_leaf self]`), the tightest first. -/
 private def trySelf (leaves : Leaves) (goal : MVarId) (g : Expr) (rest : WalkRest) :
@@ -549,6 +547,10 @@ the facts the caller passed, kept as syntax because one may be used at several s
 elaborating once would freeze its metavariables at the first. -/
 partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
   goal.withContext do
+  if let some g ← argumentSubject? (← instantiateMVars (← goal.getType)) then
+    if let some gs ← tryFacts {} extras goal g (walkAll extras) then return gs
+    throwError "no hypothesis or fact gives{indentExpr (← instantiateMVars (← goal.getType))}\nof \
+      a combinator's generator argument. Prove one and pass it to `walk [h.obs]`."
   let ty ← whnfR (← instantiateMVars (← goal.getType))
   -- A rule's premise may be a `∀` (a bind's continuation, an `ite`'s branch condition).
   if let .forallE n _ _ _ := ty then
@@ -571,8 +573,8 @@ partial def walkAll (extras : Array Term) (goals : List MVarId) : TermElabM (Lis
   goals.flatMapM (walk extras)
 
 /-- The case of `walk` for a goal of judgment `j` about `g`, tried in order: a rule for `g`'s
-combinator, a fact about `g`, `j`'s `reduceTo`, `g` unfolded when it is a definition with no rule,
-and a bound on `g` by itself. -/
+combinator, a fact about `g`, `g` unfolded when it is a definition with no rule, and a bound on `g`
+by itself. -/
 partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal : MVarId)
     (restate : Expr → Expr) (g : Expr) : TermElabM (List MVarId) := goal.withContext do
   -- The reduction covers a branch that is still a redex or a projection (`(fun () => …) ()`,
@@ -584,17 +586,13 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
   let goal ← if g' == g then pure goal else goal.change (restate g')
   let g := g'
   let rest := walkAll extras
-  -- Rules that all fail leave a fact or `reduceTo` to try, and their error is reported only if
-  -- neither applies.
+  -- Rules that all fail leave a fact to try, and their error is reported only if none applies.
   let rules ← attempt (tryRules j goal g rest)
   if let .ok (some gs) := rules then return gs
   if let some gs ← tryFacts leaves extras goal g rest then return gs
-  let reduce ← attempt (tryReduce j goal rest)
-  if let .ok (some gs) := reduce then return gs
   -- Where the generator may be left in the bound as itself, a combinator none of whose rules is
   -- about this observation is one more generator nothing is known about.
   if leaves.self.isEmpty then
-    if let .error ex := reduce then throw ex
     if let .error ex := rules then throw ex
   -- Unfolding comes after the facts, so that a caller's fact stays an abstraction boundary.
   if let some (c, body) ← unfold? g j.unfoldsCombinators then

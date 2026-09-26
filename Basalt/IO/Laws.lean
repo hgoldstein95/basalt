@@ -25,11 +25,11 @@ distribution does not; `terminates` turns one into the other. `faithful_fixpoint
 three. -/
 structure IsFaithful (gen : {G : Type → Type} → [Gen G] → G α) : Prop where
   terminates : IsAlmostSurelyTerminating (gen (G := SPMF))
-  below : ∀ {σ : Type} [WordSource σ] (src : IdealSource σ), src.Below gen gen
+  below : ∀ (σ : Type) [WordSource σ] (src : IdealSource σ), src.Below gen gen
   approx : IOModel.Approx gen gen
 
 /-- A faithful generator, run on an ideal source, has its `SPMF` distribution. -/
 theorem IsFaithful.dist {gen : {G : Type → Type} → [Gen G] → G α} (h : IsFaithful gen)
     {σ : Type} [WordSource σ] (src : IdealSource σ) :
     src.dist (gen (G := WordModel σ)) = gen (G := SPMF) :=
-  src.dist_eq (h.below src) h.terminates
+  src.dist_eq (h.below σ src) h.terminates

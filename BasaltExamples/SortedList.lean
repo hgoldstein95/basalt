@@ -58,7 +58,8 @@ theorem List.genSortedGt.sound_complete :
       (fun xs => List.sorted xs ∧ List.Forall (m ≤ ·) xs) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [Nat.arbitrary.sound_complete]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]
     · trivial
     · trivial
     · next xs _ => cases xs <;> simp_all [List.sorted, List.Forall]
@@ -66,7 +67,7 @@ theorem List.genSortedGt.sound_complete :
   case complete =>
     intro xs
     induction xs generalizing m with
-    | nil => intro _; rw [List.genSortedGt]; complete_bound
+    | nil => intro _; rw [List.genSortedGt, SPMF.mem_support_iff_may]; walk
     | cons x xs ih =>
       intro ⟨hs, hf⟩
       have hx : m ≤ x := List.forall_iff_forall_mem.mp hf x (by simp)
@@ -75,19 +76,20 @@ theorem List.genSortedGt.sound_complete :
         cases xs with
         | nil => trivial
         | cons y ys => exact hs.2
-      rw [List.genSortedGt]; complete_bound [Nat.arbitrary.sound_complete]
+      rw [List.genSortedGt, SPMF.mem_support_iff_may]
+      walk [Nat.arbitrary.sound_complete.complete.obs]
       exact ⟨d, xs, ih ⟨htl, List.sorted_cons_forall_le hs⟩, rfl⟩
 
 theorem List.genSorted.sound_complete : IsSoundAndComplete List.genSorted List.sorted := by
   unfold genSorted
   simpa [List.forall_iff_forall_mem] using List.genSortedGt.sound_complete (m := 0)
 
-theorem List.genSortedGt.terminates (m : Nat) : IsAlmostSurelyTerminating (List.genSortedGt m) := by
-  mass_fixpoint [Nat.arbitrary.terminates] using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+theorem List.genSortedGt.terminates : IsAlmostSurelyTerminating (List.genSortedGt m) := by
+  mass_fixpoint [Nat.arbitrary.terminates.obs] using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp [ENNReal.div_eq_inv_mul, mul_add]
 
 theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=
-  List.genSortedGt.terminates 0
+  List.genSortedGt.terminates (m := 0)
 
 theorem List.genSortedGt.faithful : IsFaithful (List.genSortedGt m) := by
   faithful_fixpoint [List.genSortedGt.terminates, Nat.arbitrary.faithful]
@@ -99,7 +101,8 @@ theorem List.genSorted.faithful : IsFaithful List.genSorted := by
 one per cons cell and the final nil, plus each element `n`'s `Nat.arbitrary` cost of `n + 1`. -/
 theorem List.genSortedGt.cost_bounded :
     IsCostBounded (List.genSortedGt m) (fun xs => xs.length + xs.sum + xs.length + 1) := by
-  cost_fixpoint [Nat.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint [Nat.arbitrary.cost_bounded.obs]
   all_goals simp only [List.length_nil, List.sum_nil, List.length_cons, List.sum_cons]; omega
 
 theorem List.genSorted.cost_bounded :

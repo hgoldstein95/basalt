@@ -35,7 +35,7 @@ private noncomputable def wordLaw : Measure UInt64 :=
 private instance : IsProbabilityMeasure wordLaw := ⟨by
   rw [wordLaw, Measure.sum_apply _ MeasurableSet.univ]
   simp only [Measure.smul_apply, Measure.dirac_apply_of_mem (Set.mem_univ _), smul_eq_mul, mul_one]
-  exact SPMF.uniformWord_isPMF⟩
+  exact SPMF.mass_uniformWord⟩
 
 /-- The law of the stream: every word independent and uniform. -/
 private noncomputable def law : Measure WordStream := Measure.infinitePi fun _ : ℕ => wordLaw

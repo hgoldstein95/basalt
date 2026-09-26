@@ -35,17 +35,18 @@ partial_fixpoint
 theorem genAllTwos.sound_complete : IsSoundAndComplete genAllTwos AllTwos := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint
     · simp [AllTwos]
     · next xs h_xs => simpa [AllTwos] using h_xs
   case complete =>
     intro xs
     induction xs with
-    | nil => intro _; rw [genAllTwos]; complete_bound
+    | nil => intro _; rw [genAllTwos, SPMF.mem_support_iff_may]; walk
     | cons x xs ih =>
       intro h
       obtain rfl : x = 2 := h x (by simp)
-      rw [genAllTwos]; complete_bound
+      rw [genAllTwos, SPMF.mem_support_iff_may]; walk
       exact ⟨xs, ih fun y hy => h y (by simp [hy]), rfl⟩
 
 theorem genAllTwos.terminates : IsAlmostSurelyTerminating genAllTwos := by
@@ -53,7 +54,8 @@ theorem genAllTwos.terminates : IsAlmostSurelyTerminating genAllTwos := by
   simp [ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genAllTwos.cost_bounded : IsCostBounded genAllTwos AllTwos.cost := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   all_goals simp only [AllTwos.cost, List.length_nil, List.length_cons] at *; omega
 
 theorem genAllTwos.faithful : IsFaithful genAllTwos := by

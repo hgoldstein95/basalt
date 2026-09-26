@@ -153,22 +153,24 @@ theorem Tree.genWeightedBST.faithful : IsFaithful (Tree.genWeightedBST lo hi) :=
 
 theorem Tree.genWeightedBST.cost_bounded :
     IsCostBounded (Tree.genWeightedBST lo hi) (fun t => 3 * t.size + 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   all_goals simp only [Tree.size]; omega
 
 theorem Tree.genWeightedBST.sound_complete :
     IsSoundAndComplete (Tree.genWeightedBST lo hi) (Tree.isBST lo hi) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint
     all_goals simp_all [Tree.isBST]
   case complete =>
     intro t
     induction t generalizing lo hi with
-    | leaf => intro _; rw [Tree.genWeightedBST]; complete_bound
+    | leaf => intro _; rw [Tree.genWeightedBST, SPMF.mem_support_iff_may]; walk
     | node l x r ihl ihr =>
       intro ⟨h1, h2, hl, hr⟩
-      rw [Tree.genWeightedBST]; complete_bound
+      rw [Tree.genWeightedBST, SPMF.mem_support_iff_may]; walk
       rw [dite_eq_right (by omega)]
       exact ⟨x, ⟨h1, h2⟩, l, ihl hl, r, ihr hr, rfl⟩
 

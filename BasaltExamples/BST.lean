@@ -53,15 +53,16 @@ theorem Tree.genBST.sound_complete :
     IsSoundAndComplete (Tree.genBST lo hi) (Tree.isBST lo hi) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint
     all_goals simp_all [Tree.isBST]
   case complete =>
     intro t
     induction t generalizing lo hi with
-    | leaf => intro _; rw [Tree.genBST]; complete_bound
+    | leaf => intro _; rw [Tree.genBST, SPMF.mem_support_iff_may]; walk
     | node l x r ihl ihr =>
       intro ⟨h1, h2, hl, hr⟩
-      rw [Tree.genBST]; complete_bound
+      rw [Tree.genBST, SPMF.mem_support_iff_may]; walk
       rw [dite_eq_right (by omega)]
       exact ⟨x, ⟨h1, h2⟩, l, ihl hl, r, ihr hr, rfl⟩
 
@@ -92,7 +93,8 @@ theorem Tree.genBST.faithful : IsFaithful (Tree.genBST lo hi) := by
 pivot, and two recursive calls per node. -/
 theorem Tree.genBST.cost_bounded :
     IsCostBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   all_goals simp only [Tree.size]; omega
 
 /-! ## Distribution -/
@@ -171,7 +173,8 @@ halves each level's contribution. -/
 theorem Tree.genBST.expect_size_le {lo hi : Int} :
     SPMF.expect (Tree.genBST lo hi) (fun t => (t.size : ℝ≥0∞))
       ≤ harmonic (hi + 1 - lo).toNat / 2 := by
-  expect_fixpoint
+  rw [SPMF.expect_eq_obs]
+  walk fixpoint
   split
   · simp [Tree.size]
   · rename_i hgt

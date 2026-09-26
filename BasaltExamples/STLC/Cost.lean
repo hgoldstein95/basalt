@@ -42,16 +42,16 @@ theorem Term.two_le_costInCtx (Γ : Ctx) (e : Term) : 2 ≤ Term.costInCtx Γ e 
   | App e1 e2 IH1 _ => simp only [Term.costInCtx]; have := IH1 Γ; omega
 
 theorem genZero.cost_typed :
-    SPMF.Cost.Always (genZero Γ τ) (fun e n => Typing Γ e τ ∧ n ≤ 1) := by
+    SPMF.Cost.alwaysObs.spec (genZero Γ τ) (fun e n => Typing Γ e τ ∧ n ≤ 1) := by
   induction τ generalizing Γ with
-  | Bool => rw [genZero]; cost_bound <;> grind [Typing]
-  | Fun τ1 τ2 _ ih2 => rw [genZero]; cost_bound [ih2] <;> grind [Typing]
+  | Bool => rw [genZero]; walk <;> grind [Typing]
+  | Fun τ1 τ2 _ ih2 => rw [genZero]; walk [ih2] <;> grind [Typing]
 
 /-- The cost law with well-typedness carried alongside. Bounding an application's cost needs its
 argument's type, which only the argument's typing fixes, so the induction must carry it. -/
 theorem genTerm.cost_typed :
-    SPMF.Cost.Always (genTerm Γ τ) (fun e n => Typing Γ e τ ∧ n ≤ Term.costInCtx Γ e) := by
-  cost_fixpoint [genZero.cost_typed, genType.cost_bounded]
+    SPMF.Cost.alwaysObs.spec (genTerm Γ τ) (fun e n => Typing Γ e τ ∧ n ≤ Term.costInCtx Γ e) := by
+  walk fixpoint [genZero.cost_typed, genType.cost_bounded.obs]
   all_goals grind [Term.costInCtx, typeCheck_getD_of_typing, Term.two_le_costInCtx,
     varsWithType_sound, Typing]
 

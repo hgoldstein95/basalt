@@ -26,11 +26,12 @@ theorem Char.arbitrary.sound_complete :
     IsSoundAndComplete Char.arbitrary (fun c => c.isAlphanum = true) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint
     next c h_c => exact (alphanumChars_eq_filter c).mp h_c
   case complete =>
     intro c hc
-    rw [Char.arbitrary]; complete_bound
+    rw [Char.arbitrary, SPMF.mem_support_iff_may]; walk
     exact (alphanumChars_eq_filter c).mpr hc
 
 theorem Char.arbitrary.terminates : IsAlmostSurelyTerminating Char.arbitrary := by
@@ -39,7 +40,8 @@ theorem Char.arbitrary.terminates : IsAlmostSurelyTerminating Char.arbitrary := 
 
 theorem Char.arbitrary.cost_bounded :
     IsCostBounded Char.arbitrary (fun _ => 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   omega
 
 theorem Char.arbitrary.faithful : IsFaithful Char.arbitrary := by

@@ -9,11 +9,11 @@ import BasaltExamples.Heap
 import BasaltExamples.SortedList
 
 /-!
-# The `complete_bound` Contract
+# The Completeness Walk Contract
 
-Pins the precondition `complete_bound` leaves: an `∃` per draw under the generator's names, the
-refuted branches pruned and the surviving ones not chosen between, and a recursive occurrence left as
-itself.
+Pins the precondition `walk` leaves on `SPMF.mayObs.spec`: an `∃` per draw under the generator's
+names, the refuted branches pruned and the surviving ones not chosen between, and a recursive
+occurrence left as itself.
 -/
 
 open RandomChoice ArbNat
@@ -52,17 +52,18 @@ hr : Heap.Tree.isHeap (lo + d) r
 example : IsSoundAndComplete (genHeap lo) (Heap.Tree.isHeap lo) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [Nat.arbitrary.sound_complete]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]
     all_goals simp_all [Heap.Tree.isHeap]
   case complete =>
     intro t
     induction t generalizing lo with
-    | leaf => intro _; rw [genHeap]; complete_bound
+    | leaf => intro _; rw [genHeap, SPMF.mem_support_iff_may]; walk
     | node l x r ihl ihr =>
       intro ht
       obtain ⟨hle, hl, hr⟩ := ht
       obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
-      rw [genHeap]; complete_bound [Nat.arbitrary.sound_complete]
+      rw [genHeap, SPMF.mem_support_iff_may]; walk [Nat.arbitrary.sound_complete.complete.obs]
       trace_state
       exact ⟨d, l, ihl hl, r, ihr hr, rfl⟩
 
@@ -104,11 +105,11 @@ hr : BST.Tree.isBST (x + 1) hi r
 example : IsCompleteFor (genBST lo hi) (BST.Tree.isBST lo hi) := by
   intro t
   induction t generalizing lo hi with
-  | leaf => intro _; rw [genBST]; complete_bound
+  | leaf => intro _; rw [genBST, SPMF.mem_support_iff_may]; walk
   | node l x r ihl ihr =>
     intro ht
     obtain ⟨h1, h2, hl, hr⟩ := ht
-    rw [genBST]; complete_bound
+    rw [genBST, SPMF.mem_support_iff_may]; walk
     trace_state
     rw [dite_eq_right (by omega)]
     exact ⟨x, ⟨h1, h2⟩, l, ihl hl, r, ihr hr, rfl⟩
@@ -143,7 +144,7 @@ hP : List.sorted xs ∧ List.Forall (fun x => m ≤ x) xs
 #guard_msgs in
 example : IsCompleteFor (genSortedGt m) (fun xs => List.sorted xs ∧ List.Forall (m ≤ ·) xs) := by
   apply IsCompleteFor.of_measure (fun _ xs => xs.length) fun n ih m xs hn hP => ?_
-  rw [genSortedGt]; complete_bound [Nat.arbitrary.sound_complete]
+  rw [genSortedGt, SPMF.mem_support_iff_may]; walk [Nat.arbitrary.sound_complete.complete.obs]
   trace_state
   match xs, hP with
   | [], _ => exact .inl rfl
@@ -182,7 +183,8 @@ hn : n ≤ 1
 #guard_msgs in
 example (b : Bool) (n : Nat) (hn : n ≤ 1) : n ∈ (gen b : SPMF Nat).support := by
   unfold gen
-  complete_bound [Nat.arbitrary.sound_complete]
+  rw [SPMF.mem_support_iff_may]
+  walk [Nat.arbitrary.sound_complete.complete.obs]
   trace_state
   exact .inl (.inl (by omega))
 
@@ -197,7 +199,8 @@ hg : 3 ∈ g.support
 -/
 #guard_msgs in
 example (g : SPMF Nat) (hg : 3 ∈ g.support) : 0 ∈ (g >>= fun _ => pure 0).support := by
-  complete_bound
+  rw [SPMF.mem_support_iff_may]
+  walk
   trace_state
   exact ⟨3, hg⟩
 
@@ -208,7 +211,7 @@ def genTwo [Gen G] : G Nat := pure 2
 
 theorem genTwo.complete : IsCompleteFor (genTwo (G := SPMF)) (· = 2) := by
   intro n hn
-  rw [genTwo]; complete_bound
+  rw [genTwo, SPMF.mem_support_iff_may]; walk
   exact hn.symm
 
 /--
@@ -216,7 +219,8 @@ trace: ⊢ ∃ n, n = 2 ∧ n + 1 = 3
 -/
 #guard_msgs in
 example : 3 ∈ (genTwo >>= fun n => pure (n + 1) : SPMF Nat).support := by
-  complete_bound [genTwo.complete]
+  rw [SPMF.mem_support_iff_may]
+  walk [genTwo.complete.obs]
   trace_state
   exact ⟨2, rfl, rfl⟩
 
@@ -242,9 +246,9 @@ example {lo hi : Int} (h : lo ≤ hi) (k : Nat) :
     (List.replicate k lo, 2 * k + 1) ∈
       SPMF.support (listOf (chooseInt lo hi h) : SPMF.Cost (List Int)) := by
   induction k with
-  | zero => rw [listOf]; complete_bound; exact .inl rfl
+  | zero => rw [listOf, SPMF.Cost.mem_support_iff_may]; walk; exact .inl rfl
   | succ k ih =>
-    rw [listOf]; complete_bound
+    rw [listOf, SPMF.Cost.mem_support_iff_may]; walk
     trace_state
     exact .inr ⟨lo, ⟨le_rfl, h⟩, _, _, ih, by simp [List.replicate_succ], by omega⟩
 
@@ -252,32 +256,29 @@ example {lo hi : Int} (h : lo ≤ hi) (k : Nat) :
 for. -/
 
 /--
-trace: xs a✝ : List ℕ
-h_a✝ : xs.Perm a✝
-⊢ ∃ x, ↑x = a✝
+trace: xs ys : List ℕ
+h : xs.Perm ys
+⊢ ∃ x, ↑x = ys
 -/
 #guard_msgs in
 example (xs : List Nat) :
     IsCompleteFor ((·.1) <$> permutationOf xs : SPMF (List Nat)) xs.Perm := by
-  complete_bound
+  rw [IsCompleteFor.iff_obs]
+  intro ys h
+  walk
   trace_state
-  next ys h => exact ⟨⟨ys, h⟩, rfl⟩
+  exact ⟨⟨ys, h⟩, rfl⟩
+
+/-! Completeness is a lower bound on a least fixed point, which fixpoint induction cannot prove: the
+induction is the user's. -/
 
 /--
-error: complete_bound: expected a goal `a ∈ SPMF.support (gen …)` or `IsCompleteFor (gen …) P`, got
-  IsSound (genHeap lo) (Heap.Tree.isHeap lo)
+error: walk fixpoint: a lower bound on `SPMF.mayObs` is false of the generator that never returns, so fixpoint induction cannot prove it. Induct yourself (`IsCompleteFor.of_measure`), or certify termination (`mass_fixpoint`), and then `walk`.
 -/
 #guard_msgs in
-example : IsSound (genHeap lo) (Heap.Tree.isHeap lo) := by
-  complete_bound
-
-/--
-error: complete_bound: expected a goal `a ∈ SPMF.support (gen …)` or `IsCompleteFor (gen …) P`, got
-  IsSoundAndComplete (genHeap lo) (Heap.Tree.isHeap lo)
-Split the law into its halves first: `refine .intro ?sound ?complete`.
--/
-#guard_msgs in
-example : IsSoundAndComplete (genHeap lo) (Heap.Tree.isHeap lo) := by
-  complete_bound
+example : IsCompleteFor (genHeap lo) (Heap.Tree.isHeap lo) := by
+  rw [IsCompleteFor.iff_obs]
+  intro t ht
+  walk fixpoint
 
 end CompleteBoundTest

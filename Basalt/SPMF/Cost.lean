@@ -171,39 +171,6 @@ end support
 
 section observations
 
-open scoped ENNReal
-
-theorem expect_pure (a : α) (φ : α × Nat → ℝ≥0∞) :
-    SPMF.expect (Pure.pure a : SPMF.Cost α) φ = φ (a, 0) := by
-  have h : (Pure.pure a : SPMF.Cost α) = (Pure.pure (a, 0) : SPMF (α × Nat)) := rfl
-  rw [h, SPMF.expect_pure]
-
-/-- The tower rule at the cost interpretation: the two stages' costs add. -/
-theorem expect_bind (m : SPMF.Cost α) (f : α → SPMF.Cost β) (φ : β × Nat → ℝ≥0∞) :
-    SPMF.expect (m >>= f : SPMF.Cost β) φ
-      = SPMF.expect m (fun p => SPMF.expect (f p.1) (fun q => φ (q.1, p.2 + q.2))) := by
-  have h : (m >>= f : SPMF.Cost β)
-      = SPMF.bind m fun p => SPMF.bind (f p.1) fun q => SPMF.pure (q.1, p.2 + q.2) := rfl
-  rw [h, SPMF.bind_eq, SPMF.expect_bind]
-  congr 1
-  funext p
-  rw [SPMF.bind_eq, SPMF.expect_bind]
-  congr 1
-  funext q
-  rw [SPMF.pure_eq, SPMF.expect_pure]
-
-/-- The expectation observation: the postcondition sees the value and the choices it took. -/
-noncomputable def expectObs : Obs SPMF.Cost.{u} (WPC Mix.average) where
-  spec g := fun post => SPMF.expect g fun p => post p.1 p.2
-  map_pure a := by funext post; exact expect_pure a _
-  map_bind x k := by funext post; exact expect_bind x k _
-  map_choose lo hi h := by
-    funext post
-    show SPMF.expect (SPMF.bind (choose lo hi h : SPMF _) fun n => SPMF.pure (n, 1)) _ = _
-    rw [SPMF.bind_eq, SPMF.expect_bind]
-    simp only [SPMF.pure_eq, SPMF.expect_pure]
-    rfl
-
 /-- The may observation. -/
 def mayObs : Obs SPMF.Cost.{u} (WPC Mix.angelic) where
   spec g := fun Q => ∃ p ∈ SPMF.support g, Q p.1 p.2
@@ -282,7 +249,6 @@ noncomputable def worstObs : Obs SPMF.Cost.{u} (WPC Mix.sup) where
       exact le_iSup (fun a => post a 1) a
     · exact le_iSup₂_of_le (a, 1) (mem_support_choose_iff.mpr rfl) le_rfl
 
-instance : expectObs.MonotoneC := ⟨fun _ _ _ h => SPMF.expect_mono fun p => h p.1 p.2⟩
 
 instance : mayObs.MonotoneC := ⟨fun _ _ _ h ⟨q, hq, hp⟩ => ⟨q, hq, h _ _ hp⟩⟩
 
@@ -302,98 +268,6 @@ theorem mem_support_iff_may {g : SPMF.Cost α} {a : α} {n : Nat} :
     (a, n) ∈ SPMF.support g ↔ mayObs.spec g fun b m => b = a ∧ m = n :=
   mem_support_of_may rfl
 
-/-- An expectation, read through a specification the expectation observation equals. -/
-theorem expect_of_obs {g : SPMF.Cost α} {w : WPC Mix.average α} (h : expectObs.spec g = w)
-    (φ : α × Nat → ℝ≥0∞) : SPMF.expect g φ = w fun a n => φ (a, n) :=
-  congrFun h fun a n => φ (a, n)
-
 end observations
-
-section erasure
-
-open scoped ENNReal
-
-/-- The value distribution of a cost-tracking generator: `Prod.fst <$> g` in `SPMF`. -/
-noncomputable def erase (g : SPMF.Cost α) : SPMF α := SPMF.bind g fun p => SPMF.pure p.1
-
-/-- The erasure observation. A generator's two interpretations agree on values wherever `erase`
-commutes with it, which for a combinator is its `Obs.map_*` lemma read at this observation. -/
-noncomputable def eraseObs : Obs SPMF.Cost.{u} SPMF where
-  spec := erase
-  map_pure a := SPMF.pure_bind (a, 0) _
-  map_bind x k := by
-    show SPMF.bind (SPMF.bind x fun p => SPMF.bind (k p.1) fun q => SPMF.pure (q.1, p.2 + q.2))
-        (fun r => SPMF.pure r.1)
-      = SPMF.bind (SPMF.bind x fun p => SPMF.pure p.1) fun a =>
-          SPMF.bind (k a) fun q => SPMF.pure q.1
-    simp only [SPMF.bind_assoc, SPMF.pure_bind]
-  map_choose lo hi h := by
-    show SPMF.bind (SPMF.bind (choose lo hi h : SPMF _) fun n => SPMF.pure (n, 1))
-        (fun r => SPMF.pure r.1) = _
-    simp only [SPMF.bind_assoc, SPMF.pure_bind]
-    exact SPMF.bind_pure _
-
-/-- An expectation over values may be taken at either interpretation. -/
-theorem expect_erase (g : SPMF.Cost α) (f : α → ℝ≥0∞) :
-    SPMF.expect (erase g) f = SPMF.expect g fun p => f p.1 := by
-  unfold erase
-  rw [SPMF.bind_eq, SPMF.expect_bind]
-  simp only [SPMF.pure_eq, SPMF.expect_pure]
-
-end erasure
-
-end SPMF.Cost
-
-namespace SPMF.Cost
-
-section expectation
-
-open scoped ENNReal
-
-/-- The expected number of random choices a cost-tracking generator makes. -/
-noncomputable def expectedCost (g : SPMF.Cost α) : ℝ≥0∞ :=
-  SPMF.expect g (fun p => (p.2 : ℝ≥0∞))
-
-theorem expect_coin {r : Rat} (h0 : 0 ≤ r) (h1 : r ≤ 1) (φ : Bool × Nat → ℝ≥0∞) :
-    SPMF.expect (coin r : SPMF.Cost Bool) φ
-      = (r.num.toNat : ℝ≥0∞) / (r.den : ℝ≥0∞) * φ (true, 1)
-        + ((r.den - r.num.toNat : ℕ) : ℝ≥0∞) / (r.den : ℝ≥0∞) * φ (false, 1) := by
-  obtain ⟨hnum, hle⟩ := SPMF.coin_num_bounds h0 h1
-  refine (expect_of_obs (expectObs.map_coin r) φ).trans ?_
-  simp only [coin, WPC.choose_bind_apply, WPC.ite_apply]
-  exact Mix.threshold_average r.den_pos hnum hle _ _
-
-theorem expect_chooseNat {lo hi : Nat} (h : lo ≤ hi) (φ : Nat × Nat → ℝ≥0∞) :
-    SPMF.expect (chooseNat lo hi h : SPMF.Cost Nat) φ
-      = (∑ x ∈ Finset.Icc lo hi, φ (x, 1)) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) :=
-  (expect_of_obs (expectObs.map_chooseNat lo hi h) φ).trans
-    (Mix.range_average lo hi fun x => φ (x, 1))
-
-theorem expect_elements {xs : List α} (hne : xs ≠ []) (φ : α × Nat → ℝ≥0∞) :
-    SPMF.expect (elements xs hne : SPMF.Cost α) φ
-      = (xs.map fun a => φ (a, 1)).sum / (xs.length : ℝ≥0∞) :=
-  (expect_of_obs (expectObs.map_elements xs hne) φ).trans
-    (Mix.index_average xs hne fun a => φ (a, 1))
-
-theorem expect_oneOf {gs : List (Unit → SPMF.Cost α)} (hne : gs ≠ []) (φ : α × Nat → ℝ≥0∞) :
-    SPMF.expect (oneOf gs hne : SPMF.Cost α) φ
-      = (gs.map fun g => SPMF.expect (g ()) fun p => φ (p.1, 1 + p.2)).sum
-          / (gs.length : ℝ≥0∞) :=
-  (expect_of_obs (expectObs.map_oneOf gs hne) φ).trans
-    (Mix.index_average gs hne fun g => SPMF.expect (g ()) fun p => φ (p.1, 1 + p.2))
-
-theorem expect_frequency {gs : List (Nat × (Unit → SPMF.Cost α))}
-    (h : 0 < (gs.map Prod.fst).sum) (φ : α × Nat → ℝ≥0∞) :
-    SPMF.expect (frequency gs h : SPMF.Cost α) φ
-      = (gs.map fun p => (p.1 : ℝ≥0∞) * SPMF.expect (p.2 ()) fun q => φ (q.1, 1 + q.2)).sum
-          / (((gs.map Prod.fst).sum : ℕ) : ℝ≥0∞) := by
-  refine (expect_of_obs (expectObs.map_frequency gs h) φ).trans ?_
-  simp only [Obs.select, WPC.choose_bind_apply,
-    Obs.selectD_map (fun w : WPC Mix.average α => w fun b n => φ (b, 1 + n)), List.map_map]
-  refine (Mix.select_average _ ?_ h _).trans ?_
-  · simp [Function.comp_def]
-  · simp [Function.comp_def, expectObs]
-
-end expectation
 
 end SPMF.Cost

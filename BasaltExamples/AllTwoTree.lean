@@ -56,16 +56,17 @@ partial_fixpoint
 theorem genTree.sound_complete : IsSoundAndComplete genTree Tree.isAllTwos := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint
     all_goals simp_all [Tree.isAllTwos]
   case complete =>
     intro t
     induction t with
-    | leaf => intro _; rw [genTree]; complete_bound
+    | leaf => intro _; rw [genTree, SPMF.mem_support_iff_may]; walk
     | node l v r ihl ihr =>
       intro ⟨hv, hl, hr⟩
       subst hv
-      rw [genTree]; complete_bound
+      rw [genTree, SPMF.mem_support_iff_may]; walk
       exact ⟨l, ihl hl, r, ihr hr, rfl⟩
 
 theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
@@ -74,7 +75,8 @@ theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genTree.cost_bounded : IsCostBounded genTree Tree.cost := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   all_goals simp only [Tree.cost, Tree.size] at *; omega
 
 theorem genTree.faithful : IsFaithful genTree := by

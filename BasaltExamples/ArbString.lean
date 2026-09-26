@@ -26,11 +26,13 @@ theorem String.arbitrary_support :
     IsSoundAndComplete String.arbitrary (fun s => ∀ c ∈ s.toList, c.isAlphanum = true) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [Char.arbitrary.sound_complete]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [Char.arbitrary.sound_complete.sound.obs]
     simp_all
   case complete =>
     intro s hs
-    rw [String.arbitrary]; complete_bound [Char.arbitrary.sound_complete]
+    rw [String.arbitrary, SPMF.mem_support_iff_may]
+    walk [Char.arbitrary.sound_complete.complete.obs]
     exact ⟨s.toList, hs, String.ofList_toList⟩
 
 /-- `NonEmptyString.arbitrary`'s support is exactly the set of
@@ -39,11 +41,13 @@ theorem NonEmptyString.arbitrary_support :
     IsSoundAndComplete NonEmptyString.arbitrary (fun s => !s.isEmpty ∧ ∀ c ∈ s.toList, c.isAlphanum = true) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [Char.arbitrary.sound_complete]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [Char.arbitrary.sound_complete.sound.obs]
     all_goals simp_all [String.isEmpty]
   case complete =>
     intro s ⟨hne, hs⟩
-    rw [NonEmptyString.arbitrary]; complete_bound [Char.arbitrary.sound_complete]
+    rw [NonEmptyString.arbitrary, SPMF.mem_support_iff_may]
+    walk [Char.arbitrary.sound_complete.complete.obs]
     refine ⟨s.toList, ⟨?_, hs⟩, String.ofList_toList⟩
     simpa [String.isEmpty, String.toList_eq_nil_iff] using hne
 
@@ -67,7 +71,8 @@ theorem NonEmptyString.arbitrary.faithful : IsFaithful NonEmptyString.arbitrary 
 per element, plus the `oneOf` that ends the list. -/
 theorem String.arbitrary_cost :
     IsCostBounded String.arbitrary (fun s => 2 * s.length + 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   simp only [String.length_ofList, List.map_const', List.sum_replicate, smul_eq_mul] at *
   omega
 
@@ -75,7 +80,8 @@ theorem String.arbitrary_cost :
 directly. -/
 theorem NonEmptyString.arbitrary_cost :
     IsCostBounded NonEmptyString.arbitrary (fun s => 2 * s.length) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   simp only [String.length_ofList, List.map_const', List.sum_replicate, smul_eq_mul] at *
   omega
 

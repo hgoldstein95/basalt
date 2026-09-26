@@ -37,10 +37,11 @@ example : (frequency [(1, fun _ => Pure.pure 0), (1, fun _ => Pure.pure 1),
     (by simp) : SPMF Nat) 2 = 1 / 4 := by
   simp
 
-example : IsPMF (frequency [(2, fun _ => Pure.pure true), (3, fun _ => Pure.pure false)]
-    (by simp) : SPMF Bool) := by
-  refine IsPMF.of_one_le ?_
-  mass_bound
+example : IsAlmostSurelyTerminating
+    (frequency [(2, fun _ => Pure.pure true), (3, fun _ => Pure.pure false)] (by simp)
+      : SPMF Bool) := by
+  rw [IsAlmostSurelyTerminating.iff_obs]
+  walk
   norm_num [ENNReal.div_self]
 
 end FrequencyExamples
@@ -95,7 +96,8 @@ def natGen [Gen G] : G Nat :=
 partial_fixpoint
 
 theorem natGen.cost_bounded : IsCostBounded natGen (fun n => n + 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   all_goals omega
 
 end DeprecatedPick
@@ -115,39 +117,39 @@ elab "#same_walk " tac:tactic " on " a:term " and " b:term : command => liftTerm
   let (ra, rb) := (← run a, ← run b)
   unless ra == rb do throwError "the walks differ:{indentD ra}\nand{indentD rb}"
 
-#same_walk sound_bound
-  on IsSound (oneOf [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
-  and IsSound (oneOf! [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
+#same_walk (rw [IsSoundFor.iff_obs]; walk)
+  on IsSoundFor (oneOf [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
+  and IsSoundFor (oneOf! [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
 
-#same_walk (intro _ _; complete_bound)
+#same_walk (rw [IsCompleteFor.iff_obs]; intro _ _; walk)
   on IsCompleteFor (oneOf [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
   and IsCompleteFor (oneOf! [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat) (· ≤ 3)
 
-#same_walk cost_bound
+#same_walk (rw [IsCostBounded.iff_obs]; walk)
   on IsCostBounded (oneOf [fun _ => pure 0, fun _ => chooseNat 1 3]) (fun _ => 2)
   and IsCostBounded (oneOf! [fun _ => pure 0, fun _ => chooseNat 1 3]) (fun _ => 2)
 
-#same_walk expect_bound
+#same_walk (rw [SPMF.expect_eq_obs]; walk)
   on SPMF.expect (oneOf [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat)
     (fun n => (n : ℝ≥0∞)) ≤ ⊤
   and SPMF.expect (oneOf! [fun _ => pure 0, fun _ => chooseNat 1 3] : SPMF Nat)
     (fun n => (n : ℝ≥0∞)) ≤ ⊤
 
-#same_walk sound_bound
-  on IsSound (frequency [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat) (· ≤ 3)
-  and IsSound (frequency! [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat) (· ≤ 3)
+#same_walk (rw [IsSoundFor.iff_obs]; walk)
+  on IsSoundFor (frequency [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat) (· ≤ 3)
+  and IsSoundFor (frequency! [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat) (· ≤ 3)
 
-#same_walk (intro _ _; complete_bound)
+#same_walk (rw [IsCompleteFor.iff_obs]; intro _ _; walk)
   on IsCompleteFor (frequency [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat)
     (· ≤ 3)
   and IsCompleteFor (frequency! [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat)
     (· ≤ 3)
 
-#same_walk cost_bound
+#same_walk (rw [IsCostBounded.iff_obs]; walk)
   on IsCostBounded (frequency [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)]) (fun _ => 2)
   and IsCostBounded (frequency! [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)]) (fun _ => 2)
 
-#same_walk expect_bound
+#same_walk (rw [SPMF.expect_eq_obs]; walk)
   on SPMF.expect (frequency [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat)
     (fun n => (n : ℝ≥0∞)) ≤ ⊤
   and SPMF.expect (frequency! [(1, fun _ => pure 0), (2, fun _ => chooseNat 1 3)] : SPMF Nat)

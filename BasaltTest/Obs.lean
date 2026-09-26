@@ -44,20 +44,9 @@ theorem expect_sized {n : Nat} {g : Nat → SPMF α} (f : α → ℝ≥0∞) :
 /-! The cost of the draw appears in each postcondition without being stated: it is `WPC`'s. -/
 
 theorem costAlways_sized_iff {n : Nat} {g : Nat → SPMF.Cost α} {Q : α → Nat → Prop} :
-    SPMF.Cost.Always (sized n g) Q
-      ↔ ∀ k, 0 ≤ k ∧ k ≤ n → SPMF.Cost.Always (g k) fun a m => Q a (1 + m) :=
-  (SPMF.Cost.always_of_obs (map_sized SPMF.Cost.alwaysObs n g)).trans (Mix.range_demonic _)
-
-theorem costExpect_sized {n : Nat} {g : Nat → SPMF.Cost α} (φ : α × Nat → ℝ≥0∞) :
-    expect (sized n g : SPMF.Cost α) φ
-      = (∑ k ∈ Finset.Icc 0 n, expect (g k) fun p => φ (p.1, 1 + p.2))
-          / ((n - 0 + 1 : ℕ) : ℝ≥0∞) :=
-  (SPMF.Cost.expect_of_obs (map_sized SPMF.Cost.expectObs n g) φ).trans
-    (Mix.range_average 0 n fun k => expect (g k) fun p => φ (p.1, 1 + p.2))
-
-theorem erase_sized {n : Nat} {g : Nat → SPMF.Cost α} :
-    SPMF.Cost.erase (sized n g) = sized n fun k => SPMF.Cost.erase (g k) :=
-  map_sized SPMF.Cost.eraseObs n g
+    SPMF.Cost.alwaysObs.spec (sized n g) Q
+      ↔ ∀ k, 0 ≤ k ∧ k ≤ n → SPMF.Cost.alwaysObs.spec (g k) fun a m => Q a (1 + m) :=
+  (iff_of_eq (congrFun (map_sized SPMF.Cost.alwaysObs n g) Q)).trans (Mix.range_demonic _)
 
 end ObsTest
 

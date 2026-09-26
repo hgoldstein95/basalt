@@ -6,48 +6,14 @@ Authors: Harrison Goldstein
 import Basalt.GenRel
 import Basalt.IO.Choose
 import Basalt.IO.Ideal
-import Basalt.Walk.Entry
+import Basalt.Walk.Attr
 
 /-!
 # Walking the Ideal Source
 
-`ideal_fixpoint` proves `src.Below (gen …) (gen …)`, a generator at `SPMF` below the same generator
-at `WordModel σ`: it inducts over the `SPMF` side's fixpoint, unfolds the other side one step, and
-walks the two together (`ideal_bound`).
+The rules by which `walk` relates a generator at `SPMF` to the same generator at `WordModel σ`,
+`src.Below (gen …) (gen …)`: each combinator's is `GenRel`'s.
 -/
-
-open Lean Meta Elab Tactic Basalt.Walk
-
-namespace Basalt.IdealBound
-
-/-- `ideal_bound` proves `src.Below y x`, for `y` and `x` one generator term at `SPMF` and at
-`WordModel σ`, by walking the two together: a bind, a map, a conditional, and a choice on each side
-are related by their rules, a combinator with none is unfolded on both, and a leaf is a hypothesis,
-a fact passed as `ideal_bound [h]`, such as a callee's `.faithful` law. -/
-syntax (name := idealBoundTac) "ideal_bound" (walkFacts)? : tactic
-
-elab_rules : tactic
-  | `(tactic| ideal_bound $[$fs]?) => withMainContext do
-    replaceMainGoal (← walkRel "ideal_bound" ``IdealSource.Below (walkFacts.terms fs)
-      (← getMainGoal))
-
-/-- `ideal_fixpoint` proves `src.Below (gen a₁ … aₙ) (gen a₁ … aₙ)`. It inducts with
-`gen.fixpoint_induct` on the `SPMF` side, admissible because `expect` is continuous, unfolds the
-`WordModel σ` side one step, and runs `ideal_bound`, where a recursive call is closed by `ih`. A
-`gen` that is not recursive is unfolded on both sides and walked. -/
-syntax (name := idealFixpointTac) "ideal_fixpoint" (walkFacts)? : tactic
-
-elab_rules : tactic
-  | `(tactic| ideal_fixpoint $[$fs]?) => withMainContext do
-    replaceMainGoal (← relFixpoint "ideal_fixpoint" "ideal_bound" ``IdealSource.Below
-      (fun args => mkAppM ``IdealSource.admissible_below #[args[2]!, args.back!])
-      (walkFacts.terms fs) (← getMainGoal))
-
-end Basalt.IdealBound
-
-/-! ## Combinators the walk does not enter
-
-`Below` is a `GenRel`, so each combinator's rule is `GenRel`'s. -/
 
 namespace IdealSource
 
@@ -59,7 +25,7 @@ theorem genRel : GenRel SPMF (WordModel σ) (@IdealSource.Below σ _ src) where
   map := src.below_map
   default := src.below_default
   choose := src.below_choose
-  admissible := src.admissible_below
+  admissible := IdealSource.Below.admissible src
 
 @[gen_rule]
 theorem below_elements (xs : List α) (hne : xs ≠ []) :

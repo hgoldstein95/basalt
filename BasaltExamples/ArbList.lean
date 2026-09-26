@@ -41,28 +41,29 @@ theorem List.arbitrary.sound_complete : IsSoundAndComplete List.arbitrary ⊤ :=
   refine .intro (fun _ _ => trivial) ?complete
   intro xs
   induction xs with
-  | nil => intro _; rw [List.arbitrary]; complete_bound
+  | nil => intro _; rw [List.arbitrary, SPMF.mem_support_iff_may]; walk
   | cons x xs ih =>
     intro _
-    rw [List.arbitrary]; complete_bound [Nat.arbitrary.sound_complete]
+    rw [List.arbitrary, SPMF.mem_support_iff_may]; walk [Nat.arbitrary.sound_complete.complete.obs]
     exact ⟨x, xs, ih trivial, rfl⟩
 
 theorem List.arbitrary.terminates : IsAlmostSurelyTerminating List.arbitrary := by
-  mass_fixpoint [Nat.arbitrary.terminates] using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint [Nat.arbitrary.terminates.obs] using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp [ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Producing `xs` costs at most `2 * xs.length + xs.sum + 1` choices: one `oneOf` and one
 `Nat.arbitrary` (bounded by the element plus one) per cons cell, plus the final `oneOf`. -/
 theorem List.arbitrary.cost_bounded :
     IsCostBounded List.arbitrary (fun xs => 2 * xs.length + xs.sum + 1) := by
-  cost_fixpoint [Nat.arbitrary.cost_bounded]
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint [Nat.arbitrary.cost_bounded.obs]
   all_goals simp only [List.length_nil, List.sum_nil, List.length_cons, List.sum_cons]; omega
 
 theorem List.arbitrary.faithful : IsFaithful List.arbitrary := by
   faithful_fixpoint [List.arbitrary.terminates, Nat.arbitrary.faithful]
 
 theorem List.arbitrary'.terminates : IsAlmostSurelyTerminating List.arbitrary' := by
-  mass_fixpoint [Nat.arbitrary.terminates] using SPMF.LfpIsOne.one
+  mass_fixpoint [Nat.arbitrary.terminates.obs] using SPMF.LfpIsOne.one
   simp
 
 theorem List.arbitrary'.faithful : IsFaithful List.arbitrary' := by

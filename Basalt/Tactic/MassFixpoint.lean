@@ -4,22 +4,22 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Laws
-import Basalt.SPMF.Termination
-import Basalt.Tactic.Mass
+import Basalt.Walk.Mass
 
 /-!
 # The `mass_fixpoint` Tactic
 
-`mass_fixpoint` reduces a `.terminates` law to the termination criterion of
-`Basalt/SPMF/Termination.lean`: it builds the family over the generator's seed, unfolds one step, and
-runs `mass_bound`. The list combinators' termination facts live here because they are proved with it.
+`mass_fixpoint` reduces a `.terminates` law to its criterion,
+`IsAlmostSurelyTerminating.of_lfpIsOne`: it builds the family over the generator's seed, unfolds one
+step, and walks it. The list combinators' termination facts live here because they are proved with
+it.
 -/
 
 open ENNReal RandomChoice
 
 namespace Basalt.MassFixpoint
 
-open Lean Meta Elab Tactic Basalt.Walk Basalt.MassBound
+open Lean Meta Elab Tactic Basalt.Walk
 
 /-- Right-nested tuple of `es` (`Unit` when empty), with its type. -/
 private def mkTuple (es : Array Expr) : MetaM Expr := do
@@ -33,18 +33,16 @@ private def untuple (s : Expr) : Nat → MetaM (Array Expr)
   | n + 1 => do
     return #[← mkAppM ``Prod.fst #[s]] ++ (← untuple (← mkAppM ``Prod.snd #[s]) n)
 
-/-- `mass_fixpoint using hF` proves `IsAlmostSurelyTerminating (gen a₁ … aₙ)` (or `SPMF.IsPMF _`)
-from a certificate `hF : LfpIsOne F`. The seed is the arguments some recursive call of `gen`
-changes. It unfolds one step of `gen` and runs `mass_bound` (extra facts go in
-`mass_fixpoint [h₁, h₂] using hF`), leaving the `ℝ≥0∞` goal `F c ≤ <bound>` with `c`,
-`hc1 : c ≤ 1`, `hrec : ∀ j, c ≤ (gen … j …).mass`, and the seed, under its binder names, in context.
-Without `using`, `F` is the computed bound itself and the goal left is `LfpIsOne F`
-(`SPMF.LfpIsOne.mono` reduces it to a named certificate).
+/-- Proves `IsAlmostSurelyTerminating (gen …)` for a recursive `gen`.
 
-`mass_fixpoint per_seed` goes through `SPMF.IsPMF_of_lfp_eq_one` instead, for a certificate over the
-seed (`LfpIsOne.ranking`): `c : Seed → ℝ≥0∞`, `hrec : ∀ j, c j ≤ (gen … j …).mass`, and the goal
-`T c seed ≤ <bound>`; without `using`, `T` is the computed bound as a function of `c` and the seed.
-A certificate over the seed selects this mode without the keyword. -/
+`mass_fixpoint [h₁.obs, …] using hF` takes a certificate `hF : LfpIsOne F` and the callees'
+termination facts, unfolds `gen` once, and leaves one arithmetic goal, `F c ≤ <bound>`, where
+`<bound>` is a lower bound on the mass of the unfolded step. In context:
+* `c`, a lower bound on the mass of every recursive call (`hrec`), with `hc1 : c ≤ 1`;
+* the arguments the recursion changes, under their own names.
+
+Without `using`, the goal left is `LfpIsOne F` for the computed `F` instead. With `per_seed` (or a
+certificate over the arguments), `c` is a function of the arguments: one bound per call. -/
 syntax (name := massFixpointTac)
   "mass_fixpoint" (&" per_seed")? (walkFacts)? (" using " term)? : tactic
 
@@ -53,21 +51,22 @@ elab_rules : tactic
   withMainContext do
     let goal ← getMainGoal
     let ty ← whnfR (← instantiateMVars (← goal.getType))
-    let some x := (if ty.isAppOfArity ``SPMF.IsPMF 2 then some ty.appArg! else none)
+    let some x := (if ty.isAppOfArity ``IsAlmostSurelyTerminating 2 then some ty.appArg! else none)
       | throwError "mass_fixpoint: expected a goal `IsAlmostSurelyTerminating (gen …)`, \
           got{indentExpr ty}"
     let some gen := x.getAppFn.constName?
       | throwError "mass_fixpoint: expected a generator applied to its arguments, got{indentExpr x}"
     if isCombinator (← getEnv) gen then
-      throwError "mass_fixpoint: `{gen}` is a combinator, not a generator definition; prove \
-        `SPMF.IsPMF` of a combinator term with `SPMF.IsPMF.of_one_le` and `mass_bound`"
+      throwError "mass_fixpoint: `{gen}` is a combinator, not a generator definition; prove the \
+        termination of a combinator term with `rw [IsAlmostSurelyTerminating.iff_obs]` and `walk`"
     let args := x.getAppArgs
     let seed ← match ← fixpointSeed? gen with
       | some (_, seed) => pure seed
       | none => do
         if ← isRecursiveDefinition gen then
           throwError "mass_fixpoint: `{gen}` is recursive but not a `partial_fixpoint`; induct on \
-            its decreasing argument, unfold it, and apply `SPMF.IsPMF.of_one_le` and `mass_bound`"
+            its decreasing argument, `rw [IsAlmostSurelyTerminating.iff_obs]`, unfold it, and \
+            `walk`"
         pure #[]
     unless seed.all (· < args.size) do
       throwError "mass_fixpoint: `{gen}` is not fully applied in{indentExpr x}"
@@ -85,7 +84,8 @@ elab_rules : tactic
       let body := mkAppN x.getAppFn args'
       unless ← isTypeCorrect body do
         throwError "mass_fixpoint: the seed of `{gen}` has an argument whose type depends on \
-          another; apply `SPMF.IsPMF_of_lfp_eq_one_uniform` to an explicit family instead"
+          another; apply `IsAlmostSurelyTerminating.of_lfpIsOne_uniform` to an explicit family \
+          instead"
       mkLambdaFVars #[s] body
     let point ← mkTuple (seed.map (args[·]!))
     -- The certificate, and the mode it selects.
@@ -116,8 +116,8 @@ elab_rules : tactic
         F.mvarId!.assign T
         pure hF
       | none => mkFreshExprSyntheticOpaqueMVar (← mkAppM ``SPMF.LfpIsOne #[F]) `certificate
-    let crit ← mkAppM (if perSeed then ``SPMF.IsPMF_of_lfp_eq_one
-      else ``SPMF.IsPMF_of_lfp_eq_one_uniform) #[family, hF]
+    let crit ← mkAppM (if perSeed then ``IsAlmostSurelyTerminating.of_lfpIsOne
+      else ``IsAlmostSurelyTerminating.of_lfpIsOne_uniform) #[family, hF]
     let .forallE _ stepTy _ _ ← whnfR (← inferType crit) | throwError "mass_fixpoint: internal error"
     let step ← mkFreshExprSyntheticOpaqueMVar stepTy
     let pf := mkApp2 crit step point
@@ -149,7 +149,9 @@ elab_rules : tactic
     evalTactic (← `(tactic| first
       | conv_rhs => rw [$genId:ident]
       | conv_rhs => unfold $genId:ident))
-    replaceMainGoal (← walkMass (walkFacts.terms fs) (← getMainGoal))
+    let facts := walkFacts.terms fs
+    for t in facts do checkFact t
+    replaceMainGoal (← walkGoal facts (← getMainGoal))
     if cert.isNone then
       let arith ← getMainGoal
       arith.withContext do
@@ -185,29 +187,29 @@ section combinators
 
 variable {α : Type*}
 
-/-- If a generator `g` is an SPMF, then `listOf g` is also an SPMF. -/
-theorem IsPMF_listOf {g : SPMF α} (hg : IsPMF g) : IsPMF (listOf g) := by
-  mass_fixpoint using LfpIsOne.affine (m := 1 / 2) (by norm_num)
+theorem isAlmostSurelyTerminating_listOf {g : SPMF α} (hg : IsAlmostSurelyTerminating g) :
+    IsAlmostSurelyTerminating (listOf g) := by
+  mass_fixpoint [hg.obs] using LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp [ENNReal.one_sub_inv_two, div_eq_mul_inv, add_mul, mul_comm]
 
-/-- If a generator `g` is an SPMF, then `nonEmptyListOf g` is also an SPMF. -/
-theorem IsPMF_nonEmptyListOf {g : SPMF α} (hg : IsPMF g) : IsPMF (nonEmptyListOf g) := by
-  mass_fixpoint using LfpIsOne.affine (m := 1 / 2) (by norm_num)
+theorem isAlmostSurelyTerminating_nonEmptyListOf {g : SPMF α} (hg : IsAlmostSurelyTerminating g) :
+    IsAlmostSurelyTerminating (nonEmptyListOf g) := by
+  mass_fixpoint [hg.obs] using LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp [ENNReal.one_sub_inv_two, div_eq_mul_inv, add_mul, mul_comm]
 
-private theorem ite_le_mass_listOf {g : SPMF α} {c : ℝ≥0∞}
-    (hg : c ≤ expectObs.spec g fun _ => 1) : (if 1 ≤ c then 1 else 0) ≤ (listOf g).mass := by
+private theorem ite_le_listOf {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ expectObs.spec g fun _ => 1) :
+    (if 1 ≤ c then 1 else 0) ≤ expectObs.spec (listOf g) fun _ => 1 := by
   split
-  · exact (IsPMF_listOf (le_antisymm (mass_le_one g)
-      (‹1 ≤ c›.trans (hg.trans_eq (expect_one g))))).ge
+  · exact (isAlmostSurelyTerminating_listOf
+      (IsAlmostSurelyTerminating.iff_obs.mpr (‹1 ≤ c›.trans hg))).obs
   · exact zero_le
 
-private theorem ite_le_mass_nonEmptyListOf {g : SPMF α} {c : ℝ≥0∞}
+private theorem ite_le_nonEmptyListOf {g : SPMF α} {c : ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) :
-    (if 1 ≤ c then 1 else 0) ≤ (nonEmptyListOf g).mass := by
+    (if 1 ≤ c then 1 else 0) ≤ expectObs.spec (nonEmptyListOf g) fun _ => 1 := by
   split
-  · exact (IsPMF_nonEmptyListOf (le_antisymm (mass_le_one g)
-      (‹1 ≤ c›.trans (hg.trans_eq (expect_one g))))).ge
+  · exact (isAlmostSurelyTerminating_nonEmptyListOf
+      (IsAlmostSurelyTerminating.iff_obs.mpr (‹1 ≤ c›.trans hg))).obs
   · exact zero_le
 
 /-- An unbounded-length list only passes termination through: its bound is `1` exactly when its
@@ -216,25 +218,25 @@ element generator's is, which is the shape that still chains when that generator
 theorem le_expect_listOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
     (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (listOf g) p :=
-  le_expect_of_le_mass (ite_le_mass_listOf hg) hp
+  le_expect_of_le (ite_le_listOf hg) hp
 
 @[gen_rule, inherit_doc le_expect_vectorOf_iInf]
 theorem le_expect_listOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) :
     (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (listOf g) p :=
-  le_expect_iInf_of_le_mass (ite_le_mass_listOf hg)
+  le_expect_iInf_of_le (ite_le_listOf hg)
 
 @[gen_rule, inherit_doc le_expect_listOf]
 theorem le_expect_nonEmptyListOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
     (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (nonEmptyListOf g) p :=
-  le_expect_of_le_mass (ite_le_mass_nonEmptyListOf hg) hp
+  le_expect_of_le (ite_le_nonEmptyListOf hg) hp
 
 @[gen_rule, inherit_doc le_expect_vectorOf_iInf]
 theorem le_expect_nonEmptyListOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) :
     (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (nonEmptyListOf g) p :=
-  le_expect_iInf_of_le_mass (ite_le_mass_nonEmptyListOf hg)
+  le_expect_iInf_of_le (ite_le_nonEmptyListOf hg)
 
 end combinators
 

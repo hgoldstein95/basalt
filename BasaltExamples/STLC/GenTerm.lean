@@ -95,18 +95,23 @@ partial_fixpoint
 
 theorem Bool.arbitrary.sound_complete : IsSoundAndComplete Bool.arbitrary ⊤ := by
   refine .intro ?sound ?complete
-  case sound => sound_bound <;> trivial
-  case complete => intro b _; cases b <;> complete_bound
+  case sound => rw [IsSoundFor.iff_obs]; walk <;> trivial
+  case complete => intro b _; cases b <;> (rw [SPMF.mem_support_iff_may]; walk)
 
-theorem genZero.sound : IsSound (genZero Γ τ) (Typing Γ · τ) := by
+theorem genZero.sound : IsSoundFor (genZero Γ τ) (Typing Γ · τ) := by
   induction τ generalizing Γ with
-  | Bool => unfold genZero; sound_bound [Bool.arbitrary.sound_complete]; constructor
-  | Fun τ1 τ2 _ ih2 => unfold genZero; sound_bound [ih2]; constructor; assumption
+  | Bool =>
+    unfold genZero; rw [IsSoundFor.iff_obs]; walk [Bool.arbitrary.sound_complete.sound.obs]
+    constructor
+  | Fun τ1 τ2 _ ih2 =>
+    unfold genZero; rw [IsSoundFor.iff_obs]; walk [ih2.obs]; constructor; assumption
 
 theorem genTerm.sound_complete : IsSoundAndComplete (genTerm Γ τ) (Typing Γ · τ) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint [genZero.sound, genType.sound_complete, Bool.arbitrary.sound_complete]
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint [genZero.sound.obs, genType.sound_complete.sound.obs,
+      Bool.arbitrary.sound_complete.sound.obs]
     all_goals first
       | assumption
       | exact varsWithType_sound ‹_›
@@ -115,20 +120,22 @@ theorem genTerm.sound_complete : IsSoundAndComplete (genTerm Γ τ) (Typing Γ �
     intro e h
     induction h with
     | TBool Γ b =>
-      rw [genTerm]; complete_bound [genType.sound_complete, Bool.arbitrary.sound_complete]
+      rw [genTerm, SPMF.mem_support_iff_may]
+      walk [genType.sound_complete.complete.obs, Bool.arbitrary.sound_complete.complete.obs]
       split <;> simp
     | TVar Γ x τ hx =>
       have hmem := varsWithType_complete hx
-      rw [genTerm.eq_def]
-      complete_bound [genType.sound_complete, Bool.arbitrary.sound_complete]
+      rw [genTerm.eq_def, SPMF.mem_support_iff_may]
+      walk [genType.sound_complete.complete.obs, Bool.arbitrary.sound_complete.complete.obs]
       all_goals simp [List.ne_nil_of_mem hmem, hmem]
     | TAbs Γ body τ1 τ2 _ ih =>
-      rw [genTerm]; complete_bound [genType.sound_complete, Bool.arbitrary.sound_complete]
+      rw [genTerm, SPMF.mem_support_iff_may]
+      walk [genType.sound_complete.complete.obs, Bool.arbitrary.sound_complete.complete.obs]
       split <;> simp [ih]
     | TApp Γ e1 e2 τ1 τ2 _ _ ih2 ih1 =>
       have happ : ∃ argTy, ∃ e1' ∈ SPMF.support (genTerm Γ (.Fun argTy τ2)),
           ∃ e2' ∈ SPMF.support (genTerm Γ argTy), Term.App e1' e2' = .App e1 e2 :=
         ⟨τ1, e1, ih1, e2, ih2, rfl⟩
-      rw [genTerm.eq_def]
-      complete_bound [genType.sound_complete, Bool.arbitrary.sound_complete]
+      rw [genTerm.eq_def, SPMF.mem_support_iff_may]
+      walk [genType.sound_complete.complete.obs, Bool.arbitrary.sound_complete.complete.obs]
       all_goals split <;> simp only [happ, or_true]

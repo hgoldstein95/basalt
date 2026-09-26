@@ -9,28 +9,28 @@ import BasaltExamples.Heap
 import BasaltExamples.LeftistHeap
 
 /-!
-# The `sound_bound` and `sound_fixpoint` Contract
+# The Soundness Walk Contract
 
-Pins the step `sound_fixpoint` leaves: the recursive function named after the generator, `ih` over
-the arguments its recursive calls change, and one goal per path, stated on the value the path built
-under the generator's own names.
+Pins the step `walk fixpoint` leaves on `SPMF.alwaysObs.spec`: the recursive function named after
+the generator, `ih` over the arguments its recursive calls change, and one goal per path, stated on
+the value the path built under the generator's own names.
 -/
 
 open RandomChoice
 
 namespace SoundBoundTest
 
-/-! A callee (`Nat.arbitrary`) is closed by the `sound` field of its `.sound_complete` law,
-passed as a fact. -/
+/-! A callee (`Nat.arbitrary`) is closed by the `sound` half of its `.sound_complete` law, passed as
+a fact on its observation. -/
 
 /--
 trace: genHeap : ℕ → SPMF Heap.Tree
-ih : ∀ (lo : ℕ), IsSound (genHeap lo) (Heap.Tree.isHeap lo)
+ih : ∀ (lo : ℕ), SPMF.alwaysObs.spec (genHeap lo) (Heap.Tree.isHeap lo)
 lo : ℕ
 ⊢ Heap.Tree.isHeap lo Heap.Tree.leaf
 
 genHeap : ℕ → SPMF Heap.Tree
-ih : ∀ (lo : ℕ), IsSound (genHeap lo) (Heap.Tree.isHeap lo)
+ih : ∀ (lo : ℕ), SPMF.alwaysObs.spec (genHeap lo) (Heap.Tree.isHeap lo)
 lo delta✝ : ℕ
 h_delta✝ : ⊤ delta✝
 l✝ : Heap.Tree
@@ -40,8 +40,9 @@ h_r✝ : Heap.Tree.isHeap (lo + delta✝) r✝
 ⊢ Heap.Tree.isHeap lo (l✝.node (lo + delta✝) r✝)
 -/
 #guard_msgs in
-example : IsSound (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo) := by
-  sound_fixpoint [ArbNat.Nat.arbitrary.sound_complete]
+example : IsSoundFor (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo) := by
+  rw [IsSoundFor.iff_obs]
+  walk fixpoint [ArbNat.Nat.arbitrary.sound_complete.sound.obs]
   trace_state
   all_goals simp_all [Heap.Tree.isHeap]
 
@@ -49,19 +50,19 @@ example : IsSound (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo) := by
 
 /--
 trace: genBST : ℤ → ℤ → SPMF (BST.Tree ℤ)
-ih : ∀ (lo hi : ℤ), IsSound (genBST lo hi) (BST.Tree.isBST lo hi)
+ih : ∀ (lo hi : ℤ), SPMF.alwaysObs.spec (genBST lo hi) (BST.Tree.isBST lo hi)
 lo hi : ℤ
 h✝ : lo > hi
 ⊢ BST.Tree.isBST lo hi BST.Tree.leaf
 
 genBST : ℤ → ℤ → SPMF (BST.Tree ℤ)
-ih : ∀ (lo hi : ℤ), IsSound (genBST lo hi) (BST.Tree.isBST lo hi)
+ih : ∀ (lo hi : ℤ), SPMF.alwaysObs.spec (genBST lo hi) (BST.Tree.isBST lo hi)
 lo hi : ℤ
 h✝ : ¬lo > hi
 ⊢ BST.Tree.isBST lo hi BST.Tree.leaf
 
 genBST : ℤ → ℤ → SPMF (BST.Tree ℤ)
-ih : ∀ (lo hi : ℤ), IsSound (genBST lo hi) (BST.Tree.isBST lo hi)
+ih : ∀ (lo hi : ℤ), SPMF.alwaysObs.spec (genBST lo hi) (BST.Tree.isBST lo hi)
 lo hi : ℤ
 h✝ : ¬lo > hi
 x✝ : ℤ
@@ -73,8 +74,9 @@ h_r✝ : BST.Tree.isBST (x✝ + 1) hi r✝
 ⊢ BST.Tree.isBST lo hi (l✝.node x✝ r✝)
 -/
 #guard_msgs in
-example : IsSound (BST.Tree.genBST lo hi) (BST.Tree.isBST lo hi) := by
-  sound_fixpoint
+example : IsSoundFor (BST.Tree.genBST lo hi) (BST.Tree.isBST lo hi) := by
+  rw [IsSoundFor.iff_obs]
+  walk fixpoint
   trace_state
   all_goals simp_all [BST.Tree.isBST]
 
@@ -82,12 +84,12 @@ example : IsSound (BST.Tree.genBST lo hi) (BST.Tree.isBST lo hi) := by
 
 /--
 trace: genLeftist : ℕ → SPMF LeftistHeap.Tree
-ih : ∀ (lo : ℕ), IsSound (genLeftist lo) (LeftistHeap.Tree.isLeftist lo)
+ih : ∀ (lo : ℕ), SPMF.alwaysObs.spec (genLeftist lo) (LeftistHeap.Tree.isLeftist lo)
 lo : ℕ
 ⊢ LeftistHeap.Tree.isLeftist lo LeftistHeap.Tree.leaf
 
 genLeftist : ℕ → SPMF LeftistHeap.Tree
-ih : ∀ (lo : ℕ), IsSound (genLeftist lo) (LeftistHeap.Tree.isLeftist lo)
+ih : ∀ (lo : ℕ), SPMF.alwaysObs.spec (genLeftist lo) (LeftistHeap.Tree.isLeftist lo)
 lo delta✝ : ℕ
 h_delta✝ : ⊤ delta✝
 a✝ : LeftistHeap.Tree
@@ -98,7 +100,7 @@ _h✝ : b✝.rank ≤ a✝.rank
 ⊢ LeftistHeap.Tree.isLeftist lo (a✝.node (lo + delta✝) b✝)
 
 genLeftist : ℕ → SPMF LeftistHeap.Tree
-ih : ∀ (lo : ℕ), IsSound (genLeftist lo) (LeftistHeap.Tree.isLeftist lo)
+ih : ∀ (lo : ℕ), SPMF.alwaysObs.spec (genLeftist lo) (LeftistHeap.Tree.isLeftist lo)
 lo delta✝ : ℕ
 h_delta✝ : ⊤ delta✝
 a✝ : LeftistHeap.Tree
@@ -109,8 +111,9 @@ _h✝ : ¬b✝.rank ≤ a✝.rank
 ⊢ LeftistHeap.Tree.isLeftist lo (b✝.node (lo + delta✝) a✝)
 -/
 #guard_msgs in
-example : IsSound (LeftistHeap.Tree.genLeftist lo) (LeftistHeap.Tree.isLeftist lo) := by
-  sound_fixpoint [ArbNat.Nat.arbitrary.sound_complete]
+example : IsSoundFor (LeftistHeap.Tree.genLeftist lo) (LeftistHeap.Tree.isLeftist lo) := by
+  rw [IsSoundFor.iff_obs]
+  walk fixpoint [ArbNat.Nat.arbitrary.sound_complete.sound.obs]
   trace_state
   all_goals simp_all [LeftistHeap.Tree.isLeftist]
   all_goals omega
@@ -119,17 +122,17 @@ example : IsSound (LeftistHeap.Tree.genLeftist lo) (LeftistHeap.Tree.isLeftist l
 
 /--
 trace: genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
-ih : ∀ (lo a : ℕ), IsSound (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
+ih : ∀ (lo a : ℕ), SPMF.alwaysObs.spec (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
 lo x : ℕ
 ⊢ LeftistHeap.Tree.isLeftist lo LeftistHeap.Tree.leaf
 
 genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
-ih : ∀ (lo a : ℕ), IsSound (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
+ih : ∀ (lo a : ℕ), SPMF.alwaysObs.spec (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
 lo x : ℕ
 ⊢ LeftistHeap.Tree.leaf.rank = 0
 
 genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
-ih : ∀ (lo a : ℕ), IsSound (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
+ih : ∀ (lo a : ℕ), SPMF.alwaysObs.spec (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
 lo x k delta✝ : ℕ
 h_delta✝ : ⊤ delta✝
 r✝ : LeftistHeap.Tree
@@ -141,7 +144,7 @@ h_l✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) l✝ ∧ l✝.rank = k + gap
 ⊢ LeftistHeap.Tree.isLeftist lo (l✝.node (lo + delta✝) r✝)
 
 genLeftistOfRank : ℕ → ℕ → SPMF LeftistHeap.Tree
-ih : ∀ (lo a : ℕ), IsSound (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
+ih : ∀ (lo a : ℕ), SPMF.alwaysObs.spec (genLeftistOfRank lo a) fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = a
 lo x k delta✝ : ℕ
 h_delta✝ : ⊤ delta✝
 r✝ : LeftistHeap.Tree
@@ -153,9 +156,10 @@ h_l✝ : LeftistHeap.Tree.isLeftist (lo + delta✝) l✝ ∧ l✝.rank = k + gap
 ⊢ (l✝.node (lo + delta✝) r✝).rank = k.succ
 -/
 #guard_msgs in
-example : IsSound (LeftistHeap.Tree.genLeftistOfRank lo k)
+example : IsSoundFor (LeftistHeap.Tree.genLeftistOfRank lo k)
     (fun t => LeftistHeap.Tree.isLeftist lo t ∧ t.rank = k) := by
-  sound_fixpoint [ArbNat.Nat.arbitrary.sound_complete]
+  rw [IsSoundFor.iff_obs]
+  walk fixpoint [ArbNat.Nat.arbitrary.sound_complete.sound.obs]
   trace_state
   all_goals simp_all [LeftistHeap.Tree.isLeftist, LeftistHeap.Tree.rank]
 
@@ -169,9 +173,10 @@ error: the walk does not enter a `match`:
 One on the generator's arguments is split before the walk; one on a drawn value, or inside a helper the walk unfolds, is not supported.
 -/
 #guard_msgs in
-example : IsSound (ArbNat.Nat.arbitrary >>= fun x => match x with
+example : IsSoundFor (ArbNat.Nat.arbitrary >>= fun x => match x with
     | 0 => Pure.pure 0 | n + 1 => Pure.pure n : SPMF Nat) (fun _ => True) := by
-  sound_bound
+  rw [IsSoundFor.iff_obs]
+  walk
 
 /-! A `match` on an argument inside a branch is split before the walk, as one at the head is. -/
 
@@ -181,29 +186,30 @@ partial_fixpoint
 
 /--
 trace: genBelow : ℕ → SPMF ℕ
-ih : ∀ (n : ℕ), IsSound (genBelow n) fun x => x ≤ n
+ih : ∀ (n : ℕ), SPMF.alwaysObs.spec (genBelow n) fun x => x ≤ n
 n : ℕ
 ⊢ 0 ≤ 0
 
 genBelow : ℕ → SPMF ℕ
-ih : ∀ (n : ℕ), IsSound (genBelow n) fun x => x ≤ n
+ih : ∀ (n : ℕ), SPMF.alwaysObs.spec (genBelow n) fun x => x ≤ n
 n : ℕ
 ⊢ 0 ≤ 0
 
 genBelow : ℕ → SPMF ℕ
-ih : ∀ (n : ℕ), IsSound (genBelow n) fun x => x ≤ n
+ih : ∀ (n : ℕ), SPMF.alwaysObs.spec (genBelow n) fun x => x ≤ n
 n k : ℕ
 ⊢ 0 ≤ k.succ
 
 genBelow : ℕ → SPMF ℕ
-ih : ∀ (n : ℕ), IsSound (genBelow n) fun x => x ≤ n
+ih : ∀ (n : ℕ), SPMF.alwaysObs.spec (genBelow n) fun x => x ≤ n
 n k x✝ : ℕ
 h_x✝ : x✝ ≤ k
 ⊢ x✝ ≤ k.succ
 -/
 #guard_msgs in
-example : IsSound (genBelow n) (· ≤ n) := by
-  sound_fixpoint
+example : IsSoundFor (genBelow n) (· ≤ n) := by
+  rw [IsSoundFor.iff_obs]
+  walk fixpoint
   trace_state
   all_goals omega
 
@@ -220,15 +226,18 @@ One on the generator's arguments is split before the walk; one on a drawn value,
 (in the unfolding of `SoundBoundTest.pickBelow`)
 -/
 #guard_msgs in
-example : IsSound (oneOf [fun _ => pure 0, fun _ => pickBelow n] (by simp) : SPMF Nat) (· ≤ n) := by
-  sound_bound
+example :
+    IsSoundFor (oneOf [fun _ => pure 0, fun _ => pickBelow n] (by simp) : SPMF Nat) (· ≤ n) := by
+  rw [IsSoundFor.iff_obs]
+  walk
 
 /-! A callee that has only a half of the law is closed by that half, passed as a fact. -/
 
 def genTwo [Gen G] : G Nat := pure 2
 
-theorem genTwo.sound : IsSound (genTwo (G := SPMF)) (· = 2) := by
-  sound_fixpoint
+theorem genTwo.sound : IsSoundFor (genTwo (G := SPMF)) (· = 2) := by
+  rw [IsSoundFor.iff_obs]
+  walk fixpoint
   rfl
 
 /--
@@ -237,8 +246,9 @@ h_n✝ : n✝ = 2
 ⊢ n✝ + 1 = 3
 -/
 #guard_msgs in
-example : IsSound (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := by
-  sound_bound [genTwo.sound]
+example : IsSoundFor (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := by
+  rw [IsSoundFor.iff_obs]
+  walk [genTwo.sound.obs]
   trace_state
   omega
 
@@ -250,20 +260,47 @@ a✝ : { ys // xs.Perm ys }
 ⊢ xs.Perm ↑a✝
 -/
 #guard_msgs in
-example (xs : List Nat) : IsSound ((·.1) <$> permutationOf xs : SPMF (List Nat)) xs.Perm := by
-  sound_bound
+example (xs : List Nat) : IsSoundFor ((·.1) <$> permutationOf xs : SPMF (List Nat)) xs.Perm := by
+  rw [IsSoundFor.iff_obs]
+  walk
   trace_state
   next a => exact a.2
 
-/-! The combined law is split by hand; the tactics take a half. -/
+/-! The combined law is split by hand; `walk` takes a half. -/
 
 /--
-error: sound_fixpoint: expected a goal `IsSound (gen …) P`, got
+error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation tagged `@[walk_rel]`, got
   IsSoundAndComplete (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo)
 Split the law into its halves first: `refine .intro ?sound ?complete`.
 -/
 #guard_msgs in
 example : IsSoundAndComplete (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo) := by
-  sound_fixpoint
+  walk fixpoint
+
+/-! A law is walked on its observation: the goal is restated by `iff_obs` first, and a fact is
+passed as `.obs`. -/
+
+/--
+error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation tagged `@[walk_rel]`, got
+  IsSoundFor
+    (do
+      let n ← genTwo
+      pure (n + 1))
+    fun x => x = 3
+Restate it on its observation first: `rw [IsSoundFor.iff_obs]`.
+-/
+#guard_msgs in
+example : IsSoundFor (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := by
+  walk [genTwo.sound.obs]
+
+/--
+error: walk: the fact
+  genTwo.sound
+is stated as `IsSoundFor`; a walk takes facts stated on an observation. Pass `genTwo.sound.obs`.
+-/
+#guard_msgs in
+example : IsSoundFor (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := by
+  rw [IsSoundFor.iff_obs]
+  walk [genTwo.sound]
 
 end SoundBoundTest

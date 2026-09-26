@@ -9,9 +9,10 @@ import BasaltExamples.SortedList
 import BasaltTest.OptionGen
 
 /-!
-# The `mass_bound` Contract
+# The Mass Walk Contract
 
-Pins what `mass_bound` leaves behind: a bound whose shape mirrors the generator's, built from one
+Pins what `walk` leaves behind on a lower bound on a generator's mass,
+`c ≤ SPMF.expectObs.spec g fun _ => 1`: a bound whose shape mirrors the generator's, built from one
 `@[gen_rule]` rule per combinator and walked through the unfolding of any other definition, and the
 message for a generator that has neither.
 -/
@@ -21,7 +22,7 @@ open RandomChoice ArbNat ENNReal
 namespace MassBoundTest
 
 /-- One branch per combinator that takes no generator argument. `Nat.arbitrary` is a callee, not a
-combinator: its `.terminates` law is passed to the tactic. -/
+combinator: its `.terminates` law is passed to the walk. -/
 def gen [Gen G] (b : Bool) : G Nat := do
   let x ← oneOf [
     fun () => pure 0,
@@ -49,18 +50,20 @@ trace: b : Bool
 #guard_msgs in
 example (b : Bool) : (0 : ℝ≥0∞) ≤ (gen b : SPMF Nat).mass := by
   unfold gen
-  mass_bound [Nat.arbitrary.terminates]
+  rw [SPMF.mass_eq_obs]
+  walk [Nat.arbitrary.terminates.obs]
   trace_state
   exact zero_le
 
 /--
 error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
   g
-Pass a fact about it to the tactic.
+Pass a fact about it to `walk [_]`.
 -/
 #guard_msgs in
 example (g : SPMF Nat) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
 
 -- A definition with no rule is unfolded: `optionGen`'s body draws a coin and branches on it.
 /--
@@ -68,13 +71,16 @@ trace: ⊢ 1 ≤ ↑1 / ↑2 * 1 + ↑1 / ↑2 * 1
 -/
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤ (optionGen Nat.arbitrary : SPMF (Option Nat)).mass := by
-  mass_bound [Nat.arbitrary.terminates]
+  rw [SPMF.mass_eq_obs]
+  walk [Nat.arbitrary.terminates.obs]
   trace_state
   simp [ENNReal.inv_two_add_inv_two]
 
 /-- The same generator, bounded by a fact the caller supplies instead. -/
-example (g : SPMF Nat) (hg : SPMF.IsPMF g) : (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
-  mass_bound [hg]
+example (g : SPMF Nat) (hg : IsAlmostSurelyTerminating g) :
+    (1 : ℝ≥0∞) ≤ (g >>= fun _ => pure 0).mass := by
+  rw [SPMF.mass_eq_obs]
+  walk [hg.obs]
   norm_num
 
 -- An unbounded-length list combinator only passes termination through: its bound is `1` exactly
@@ -84,34 +90,40 @@ trace: ⊢ 1 ≤ (if 1 ≤ 1 then 1 else 0) * 1
 -/
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤ (listOf Nat.arbitrary : SPMF (List Nat)).mass := by
-  mass_bound [Nat.arbitrary.terminates]
+  rw [SPMF.mass_eq_obs]
+  walk [Nat.arbitrary.terminates.obs]
   trace_state
   simp
 
 /-- `permutationOf` draws one index per element and always succeeds, so its bound is `1` for any
 list. -/
 example : (1 : ℝ≥0∞) ≤ (permutationOf [1, 2, 3] : SPMF { ys // [1, 2, 3].Perm ys }).mass := by
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
   simp
 
 /-- A recursive bound over a tupled seed, the form a family criterion hands over, closes calls whose
 arguments are projections of another seed. -/
 example (g : Int → Int → SPMF Nat) (c : ℝ≥0∞)
-    (hrec : ∀ j : Int × Int, c ≤ ((fun p : Int × Int => g p.1 p.2) j).mass) (p : Int × Int) :
-    c * c ≤ (g p.1 (p.2 - 1) >>= fun _ => g 0 p.2).mass := by
-  mass_bound
+    (hrec : ∀ j : Int × Int,
+      c ≤ SPMF.expectObs.spec ((fun p : Int × Int => g p.1 p.2) j) fun _ => 1)
+    (p : Int × Int) : c * c ≤ (g p.1 (p.2 - 1) >>= fun _ => g 0 p.2).mass := by
+  rw [SPMF.mass_eq_obs]
+  walk
   exact le_rfl
 
 /-- The same over the `Unit` seed of a single generator. -/
-example (g : SPMF Nat) (c : ℝ≥0∞) (hrec : ∀ _ : Unit, c ≤ g.mass) :
+example (g : SPMF Nat) (c : ℝ≥0∞) (hrec : ∀ _ : Unit, c ≤ SPMF.expectObs.spec g fun _ => 1) :
     c ≤ (g >>= fun x => pure (x + 1)).mass := by
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
   simp
 
 /-- A callee's `.terminates` law that takes an argument is instantiated at the call. -/
 example : (1 : ℝ≥0∞) ≤
     ((Nat.arbitrary >>= SortedList.List.genSortedGt : SPMF (List Nat))).mass := by
-  mass_bound [Nat.arbitrary.terminates, SortedList.List.genSortedGt.terminates]
+  rw [SPMF.mass_eq_obs]
+  walk [Nat.arbitrary.terminates.obs, SortedList.List.genSortedGt.terminates.obs]
   simp
 
 -- A conditional on a drawn value belongs to that draw's postexpectation, so both branches are
@@ -122,7 +134,8 @@ trace: ⊢ 1 ≤ 1
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤
     (chooseNat 0 1 >>= fun x => if x = 0 then pure 0 else pure 1 : SPMF Nat).mass := by
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
   trace_state
   simp
 
@@ -131,14 +144,16 @@ example : (1 : ℝ≥0∞) ≤
 /--
 trace: g : ℕ → SPMF ℕ
 c : ℕ → ℝ≥0∞
-hrec : ∀ (j : ℕ), c j ≤ (g j).mass
+hrec : ∀ (j : ℕ), c j ≤ SPMF.expectObs.spec (g j) fun x => 1
 n : ℕ
 ⊢ 0 ≤ (∑ x ∈ Finset.Icc 0 n, c x) / ↑(n - 0 + 1)
 -/
 #guard_msgs in
-example (g : Nat → SPMF Nat) (c : Nat → ℝ≥0∞) (hrec : ∀ j, c j ≤ (g j).mass) (n : Nat) :
+example (g : Nat → SPMF Nat) (c : Nat → ℝ≥0∞)
+    (hrec : ∀ j, c j ≤ SPMF.expectObs.spec (g j) fun _ => 1) (n : Nat) :
     0 ≤ (chooseNat 0 n (by omega) >>= g).mass := by
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
   trace_state
   exact zero_le
 
@@ -150,26 +165,31 @@ trace: ⊢ 1 ≤ 1
 #guard_msgs in
 example : (1 : ℝ≥0∞) ≤
     (elements [1, 2] (by simp) >>= fun k => vectorOf k (pure 0) : SPMF (List Nat)).mass := by
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
   trace_state
   simp
 
 /-- A drawn value is named after its binder, so a fact passed for a sub-generator can mention it. -/
-example (g : Nat → SPMF Nat) (h : ∀ k, k ≤ 3 → 1 ≤ (g k).mass) :
+example (g : Nat → SPMF Nat) (h : ∀ k, k ≤ 3 → 1 ≤ SPMF.expectObs.spec (g k) fun _ => 1) :
     (1 : ℝ≥0∞) ≤ (ULift.down <$> choose 0 3 (by omega) >>= fun k => g k.1 : SPMF Nat).mass := by
-  mass_bound [h k.1 k.2.2]
+  rw [SPMF.mass_eq_obs]
+  walk [h k.1 k.2.2]
   simp
 
 /-- A fact over a subtype is matched through the value alone. -/
-example (g : Nat → SPMF Nat) (h : ∀ k : {k // 0 ≤ k ∧ k ≤ 3}, 1 ≤ (g k.1).mass) :
+example (g : Nat → SPMF Nat)
+    (h : ∀ k : {k // 0 ≤ k ∧ k ≤ 3}, 1 ≤ SPMF.expectObs.spec (g k.1) fun _ => 1) :
     (1 : ℝ≥0∞) ≤ (ULift.down <$> choose 0 3 (by omega) >>= fun k => g k.1 : SPMF Nat).mass := by
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
   simp
 
 /-- A fact's premise that its use does not determine is found among the hypotheses. -/
-example (b : Bool) (g : SPMF Nat) (h : b = true → 1 ≤ g.mass) :
+example (b : Bool) (g : SPMF Nat) (h : b = true → 1 ≤ SPMF.expectObs.spec g fun _ => 1) :
     (1 : ℝ≥0∞) ≤ (if b = true then g else pure 0 : SPMF Nat).mass := by
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
   simp
 
 /-- A generator over a long literal alphabet, and one that calls it. -/
@@ -186,9 +206,11 @@ def genLongText [Gen G] (n : Nat) : G (List Char) := listOfMaxLength n genLongCh
 
 /-- A hypothesis about another generator is not tried as a leaf: unifying it with the callee would
 unfold both, and the literal alphabet exceeds the recursion depth. -/
-example (c : ℝ≥0∞) (_hrec : ∀ _ : Unit, c ≤ (genLongText n : SPMF (List Char)).mass) :
+example (c : ℝ≥0∞)
+    (_hrec : ∀ _ : Unit, c ≤ SPMF.expectObs.spec (genLongText n : SPMF (List Char)) fun _ => 1) :
     (1 : ℝ≥0∞) ≤ (genLongChar : SPMF Char).mass := by
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
   simp
 
 /-- A generator defined by cases on its argument. -/
@@ -208,7 +230,8 @@ n n_1 : ℕ
 #guard_msgs in
 example (n : Nat) : (1 : ℝ≥0∞) ≤ (byCases n : SPMF Nat).mass := by
   unfold byCases
-  mass_bound
+  rw [SPMF.mass_eq_obs]
+  walk
   trace_state
   all_goals simp
 

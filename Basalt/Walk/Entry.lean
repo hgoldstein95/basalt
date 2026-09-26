@@ -12,20 +12,19 @@ import Basalt.Walk.Basic
 /-!
 # The Walker's Entry Points
 
-Shared pieces of the `_bound` and `_fixpoint` tactics. A `_bound` tactic restates its goal as a
-bound on an observation, runs the walk with `computeBound`, and turns the result into goals for the
-user: `pathsBound` gives one goal per path of a demonic precondition, `prunePaths` simplifies an
-angelic precondition, and `arithBound` gives one inequality to close by arithmetic. A `_fixpoint`
-tactic takes one induction step with `fixpointStep` and then runs its `_bound` tactic. A relational
-judgment, one generator at two monads, walks with `walkRel`, and takes its step with `relFixpoint`.
+The `walk` tactic, and the pieces a specialized tactic builds on. A statement on an observation is
+walked with `computeBound`, and the result turned into goals for the user by the observation's
+algebra: `pathsBound` gives one goal per path of a demonic precondition, `prunedBound` simplifies an
+angelic one, and `arithBound` gives one inequality to close by arithmetic. `walk fixpoint` first
+takes one induction step with `fixpointStep`. A relational judgment, one generator at two monads,
+walks with `walkRel`, and takes its step with `relFixpoint`.
 -/
 open Lean Meta Elab Tactic Lean.Order
 
 namespace Basalt.Walk
 
-/-- The facts a caller passes a walk, `[h₁, h₂]`: each is tried at every leaf, and so is each field
-of one that bundles laws (`IsSoundAndComplete`, `IsFaithful`). A callee's law reaches the walk only
-this way. -/
+/-- The facts a caller passes a walk, `[h₁, h₂]`: each is tried at every leaf. A callee's law
+reaches the walk only this way, stated on an observation (`h.obs`). -/
 syntax walkFacts := " [" term,* "]"
 
 /-- The terms of `walkFacts`, none when they are absent. -/
@@ -66,7 +65,7 @@ unification cannot find it. -/
 private partial def mkAdmissible (gTy : Expr) (leaf : Array Expr → MetaM Expr)
     (ys : Array Expr := #[]) : MetaM Expr := do
   -- `whnfR`, here and for `fTy` in `fixpointStep`: `whnf` unfolds `IOModel α` to a function type.
-  -- A generator with no arguments then fails `io_fixpoint` on an `admissible_pi_apply` mismatch.
+  -- A generator with no arguments then fails `walk fixpoint` on an `admissible_pi_apply` mismatch.
   match ← whnfR gTy with
   | .forallE n d b _ =>
     withLocalDeclD n d fun y => do
@@ -285,5 +284,194 @@ def arithBound (extras : Array Term) (obs : Name) (lower : Bool) (g post other :
   goal.assign (← if lower then mkAppM ``le_trans #[arith, structural]
     else mkAppM ``le_trans #[structural, arith])
   (arith.mvarId! :: rest).mapM fun g => tidy lctx g
+
+/-- Prove `goal`, which is `O.spec g post` for `O` the observation `obs` into `Prop`, by the walk of
+a lower bound in an angelic algebra: the precondition it computed, pruned (`prunePaths`), then
+whatever else the walk left, tidied. -/
+def prunedBound (extras : Array Term) (obs : Name) (g post : Expr) (goal : MVarId) :
+    TermElabM (List MVarId) := do
+  let lctx := (← goal.getDecl).lctx
+  let (pre, structural, rest) ← computeBound extras obs true g post
+  let paths ← mkFreshExprMVar pre
+  goal.assign (mkApp structural paths)
+  return (← prunePaths paths.mvarId!) ++ (← rest.mapM fun g => tidy lctx g)
+
+/-! ## The `walk` tactic -/
+
+/-- A statement on an observation: `O.spec g post` for an observation into `Prop` (`bound` is
+`none`), or a bound `b ≤ O.spec g post` (`bound` is `(b, true)`) or `O.spec g post ≤ b`. -/
+structure SpecGoal where
+  /-- The observation, `O`. -/
+  obs : Name
+  /-- `O` itself, as it appears in the goal. -/
+  obsExpr : Expr
+  g : Expr
+  post : Expr
+  bound : Option (Expr × Bool)
+
+/-- `e` as `O.spec g post`, for `O` a constant. -/
+private def specParts? (e : Expr) : Option (Name × Expr × Expr × Expr) := do
+  let e := e.headBeta
+  guard (e.isAppOfArity ``Obs.spec 10)
+  let O := e.getArg! 6
+  let obs ← O.getAppFn.constName?
+  return (obs, O, e.getArg! 8, e.getArg! 9)
+
+/-- `ty` as a statement on an observation. -/
+def specGoal? (ty : Expr) : Option SpecGoal :=
+  if let some (obs, O, g, post) := specParts? ty then some ⟨obs, O, g, post, none⟩
+  else if ty.isAppOfArity ``LE.le 4 then
+    if let some (obs, O, g, post) := specParts? (ty.getArg! 3) then
+      some ⟨obs, O, g, post, some (ty.getArg! 2, true)⟩
+    else if let some (obs, O, g, post) := specParts? (ty.getArg! 2) then
+      some ⟨obs, O, g, post, some (ty.getArg! 3, false)⟩
+    else none
+  else none
+
+/-- Whether the observation `O` is into an angelic algebra: its specification monad is `WP` or `WPC`
+of `Mix.angelic`. -/
+private def isAngelic (O : Expr) : MetaM Bool := do
+  let ty ← whnfR (← inferType O)
+  unless ty.isAppOf ``Obs && 2 ≤ ty.getAppNumArgs do return false
+  let W := ty.getArg! 1
+  return W.isApp && W.appArg!.getAppFn.isConstOf ``Mix.angelic
+
+/-- The error for a goal `walk` does not take, with the rewrite that would restate it when its head
+has one. -/
+private def notASpec (ty : Expr) : MetaM MessageData := do
+  let hint ← match ty.getAppFn.constName? with
+    | some `IsSoundAndComplete =>
+      pure m!"\nSplit the law into its halves first: `refine .intro ?sound ?complete`."
+    | some L =>
+      if (← getEnv).contains (L ++ `iff_obs) then
+        pure m!"\nRestate it on its observation first: `rw [{.ofConstName (L ++ `iff_obs)}]`."
+      else pure m!""
+    | none => pure m!""
+  return m!"walk: expected a statement on an observation, `O.spec (gen …) post`, \
+    `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation tagged `@[walk_rel]`, \
+    got{indentExpr ty}{hint}"
+
+/-- `e` with its leading lambda binders renamed `ns`, in order. -/
+private def nameLambdas : Expr → List Name → Expr
+  | .lam _ d b bi, n :: ns => .lam n d (nameLambdas b ns) bi
+  | e, _ => e
+
+/-- `post`, a postcondition, as a lambda: one that is not is given binders, for the walk to name
+the last value drawn after. -/
+private def etaPost (post : Expr) : MetaM Expr := do
+  if post.isLambda then return post
+  return nameLambdas (← etaExpand post) [`v, `n_v]
+
+/-- `goal`'s statement, reduced only as far as it takes to show a statement on an observation: to
+`whnfR` a bare `O.spec g post` is the stuck projection `O.1 g post`. -/
+def goalStatement (goal : MVarId) : MetaM Expr := do
+  let ty ← Core.betaReduce (← instantiateMVars (← goal.getType)).consumeMData
+  if (specGoal? ty).isSome then return ty
+  Core.betaReduce (← whnfR ty)
+
+/-- Walk `goal`, a statement on an observation or a relation (see `walk`). -/
+partial def walkGoal (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
+  goal.withContext do
+  let ty ← goalStatement goal
+  if let some rel := ty.getAppFn.constName? then
+    if isWalkRel (← getEnv) rel then return ← walkRel "walk" rel extras goal
+  let some sg := specGoal? ty | throwError (← notASpec ty)
+  let goal ← goal.replaceTargetDefEq ty
+  if let some cases ← splitMatch? goal sg.g then return ← cases.flatMapM (walkGoal extras)
+  match sg.bound with
+  | some (b, lower) => arithBound extras sg.obs lower sg.g sg.post b goal
+  | none =>
+    let post ← etaPost sg.post
+    if ← isAngelic sg.obsExpr then prunedBound extras sg.obs sg.g post goal
+    else pathsBound extras sg.obs sg.g post goal
+
+/-- `rel.admissible`, instantiated to the motive `fun y => rel … y x` of the goal `rel … y x` whose
+arguments are `args`. -/
+private def relAdmissible (rel : Name) (args : Array Expr) : MetaM Expr := do
+  let lemName := rel ++ `admissible
+  unless (← getEnv).contains lemName do
+    throwError "walk fixpoint: no `{.ofConstName lemName}` to induct on `{.ofConstName rel}` with"
+  let lem ← mkConstWithFreshMVarLevels lemName
+  let (xs, _, concl) ← forallMetaTelescope (← inferType lem)
+  let i := args.size - 2
+  let P ← withLocalDeclD `y (← inferType args[i]!) fun y => do
+    mkLambdaFVars #[y] (← mkAppOptM rel ((args.set! i y).map some))
+  unless ← isDefEq concl.appArg! P do
+    throwError "walk fixpoint: `{.ofConstName lemName}` does not prove{indentExpr P}\nadmissible"
+  for x in xs do
+    unless ← x.mvarId!.isAssigned do
+      x.mvarId!.assign (← synthInstance (← inferType x))
+  instantiateMVars (mkAppN lem xs)
+
+/-- The admissibility of `sg`'s statement, for fixpoint induction on its generator: `O.admissible`
+for an observation into `Prop`, `O.admissible_le` for an upper bound. -/
+private def specAdmissible (sg : SpecGoal) : MetaM Expr := do
+  -- In an angelic algebra, a statement by itself is a lower bound too: some run reaches it.
+  let lower ← match sg.bound with
+    | some (_, lower) => pure lower
+    | none => isAngelic sg.obsExpr
+  if lower then
+    throwError "walk fixpoint: a lower bound on `{.ofConstName sg.obs}` is false of the generator \
+      that never returns, so fixpoint induction cannot prove it. Induct yourself \
+      (`IsCompleteFor.of_measure`), or certify termination (`mass_fixpoint`), and then `walk`."
+  let (lemName, args) := match sg.bound with
+    | some (b, _) => (sg.obs ++ `admissible_le, #[sg.post, b])
+    | none => (sg.obs ++ `admissible, #[sg.post])
+  unless (← getEnv).contains lemName do
+    throwError "walk fixpoint: no `{.ofConstName lemName}`: fixpoint induction needs the statement \
+      admissible"
+  mkAppM lemName args
+
+/-- `walk fixpoint`: one step of `gen.fixpoint_induct` on `goal`, then `walkGoal`. -/
+def walkFixpoint (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
+  goal.withContext do
+  let ty ← goalStatement goal
+  if let some rel := ty.getAppFn.constName? then
+    if isWalkRel (← getEnv) rel then
+      return ← relFixpoint "walk fixpoint" "walk" rel (relAdmissible rel) extras goal
+  let some sg := specGoal? ty | throwError (← notASpec ty)
+  let goal ← goal.replaceTargetDefEq ty
+  walkGoal extras (← fixpointStep "walk fixpoint" "walk" sg.g (← specAdmissible sg) goal)
+
+/-- The error for a fact passed in the form a reader checks: `h : L …` when `L.obs` exists. -/
+def checkFact (t : Term) : TermElabM Unit := do
+  let some ty ← observing? do
+      let e ← Term.withoutErrToSorry do
+        let e ← Term.elabTerm t none
+        Term.synthesizeSyntheticMVarsNoPostponing
+        instantiateMVars e
+      inferType e
+    | return
+  let some L ← forallTelescope ty fun _ concl => return concl.getAppFn.constName? | return
+  if (← getEnv).contains (L ++ `obs) then
+    throwError "walk: the fact{indentD t}\nis stated as `{.ofConstName L}`; a walk takes facts \
+      stated on an observation. Pass `{t}.obs`."
+
+/-- Proves a statement about a generator by walking its syntax, leaving what only you can supply.
+
+Restate the goal on its observation first (`rw [<Law>.iff_obs]`), then `walk [h₁.obs, …]`, passing
+the callees' laws. What is left depends on the goal:
+
+* `alwaysObs.spec (gen …) P` (soundness, cost): one goal per path, `P` of the value it built;
+* `mayObs.spec (gen …) P` (completeness): one precondition, an `∃` per draw and an `∨` per choice,
+  with the branches that cannot satisfy `P` pruned;
+* `b ≤ O.spec (gen …) f` or `O.spec (gen …) f ≤ b` (mass, expectation): one inequality between `b`
+  and the bound the walk computed;
+* a `@[walk_rel]` relation (`IsFaithful`'s fields): whatever relates the two sides.
+
+A value drawn by `let x ← …` is `x✝` in what is left, with what is known of it as `h_x✝` (and its
+cost as `n_x✝`); name them with `next x h_x =>`.
+
+`walk fixpoint` first inducts over `gen`'s recursion, with `ih` for every recursive call. It proves
+only what holds of a generator that never returns — soundness, cost, an upper bound on an
+expectation, the relations — and refuses a lower bound. -/
+syntax (name := walkTac) "walk" (&" fixpoint")? (walkFacts)? : tactic
+
+elab_rules : tactic
+  | `(tactic| walk $[fixpoint%$fix]? $[$fs]?) => withMainContext do
+    let facts := walkFacts.terms fs
+    for t in facts do checkFact t
+    let goal ← getMainGoal
+    replaceMainGoal (← if fix.isSome then walkFixpoint facts goal else walkGoal facts goal)
 
 end Basalt.Walk

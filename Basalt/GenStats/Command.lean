@@ -32,7 +32,8 @@ syntax genStatsArg := atomic("(" ident " := ") term ")"
 ```
 
 Options (all optional, in any order, before the generator term): `(draws := n)`, `(fuel := n)`,
-and `(seed := n)`. -/
+`(seed := n)`, and `(size := f)`, which measures each value with `f` in place of the size derived
+for an inductive output type. -/
 syntax (name := genStatsCmd) "#genstats " genStatsArg* term : command
 
 private structure Opts where

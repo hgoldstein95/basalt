@@ -28,7 +28,7 @@ theorem expect_uniformWord (f : UInt64 → ℝ≥0∞) :
     expect uniformWord f = expect (chooseNat 0 (2 ^ 64 - 1)) (f ∘ Nat.toUInt64) :=
   expect_map _ _ _
 
-theorem uniformWord_isPMF : uniformWord.IsPMF := by
+theorem mass_uniformWord : uniformWord.mass = 1 := by
   show uniformWord.mass = 1
   rw [← expect_one, expect_uniformWord, expect_chooseNat_zero (by positivity)]
   simp only [Function.comp_apply, Finset.sum_const, Finset.card_range, nsmul_eq_mul, mul_one]
@@ -69,12 +69,13 @@ theorem mono {f g : σ → ℝ≥0∞} (h : ∀ s, f s ≤ g s) : src.E f ≤ sr
     _ = src.E g := congrArg src.E (funext fun s => add_tsub_cancel_of_le (h s))
 
 /-- `y` expects no more of any continuation than `x` delivers on the ideal source. -/
-@[walk_rel "ideal_fixpoint"]
+@[walk_rel]
 def Below (y : SPMF α) (x : WordModel σ α) : Prop :=
-  ∀ G : α → σ → ℝ≥0∞, expect y (fun a => src.E (G a)) ≤ src.E (x.runE G)
+  ∀ G : α → σ → ℝ≥0∞, expectObs.spec y (fun a => src.E (G a)) ≤ src.E (x.runE G)
 
 @[gen_rule]
 theorem below_pure (a : α) : src.Below (Pure.pure a) (Pure.pure a) := fun G => by
+  show expect _ _ ≤ _
   rw [expect_pure]
   rfl
 
@@ -82,6 +83,7 @@ theorem below_pure (a : α) : src.Below (Pure.pure a) (Pure.pure a) := fun G => 
 theorem below_bind {y : SPMF α} {x : WordModel σ α} {k' : α → SPMF β} {k : α → WordModel σ β}
     (hk : ∀ a, src.Below (k' a) (k a)) (hx : src.Below y x) : src.Below (y >>= k') (x >>= k) :=
   fun G => by
+    show expect _ _ ≤ _
     rw [expect_bind]
     refine (expect_mono fun a => hk a G).trans ((hx fun a => (k a).runE G).trans (le_of_eq ?_))
     congr 1
@@ -110,24 +112,27 @@ theorem below_dite {p : Prop} [Decidable p] {y₁ : p → SPMF α} {y₂ : ¬p �
 
 @[gen_rule]
 theorem below_default (x : WordModel σ α) : src.Below default x := fun G => by
-  simp [expect, default_apply]
+  simp [expectObs, expect, default_apply]
 
 theorem below_word : src.Below uniformWord fun s => some (WordSource.next s) := fun G =>
   (src.word fun w s => G w s).ge
 
 /-- Fixpoint induction on the `SPMF` side needs nothing of `E`: `expect` is continuous. -/
-theorem admissible_below (x : WordModel σ α) :
+theorem Below.admissible (x : WordModel σ α) :
     Lean.Order.admissible fun y : SPMF α => src.Below y x := by
   intro c hc ih G
+  show expect _ _ ≤ _
   rw [expect_csup]
   exact iSup₂_le fun y hy => ih y hy G
 
 /-- A terminating `y` below `x` is `x`'s distribution on the ideal source: the bound holds for `f`
 and for `1 - f`, and on each side the two add up to at most, and to exactly, `1`. -/
-theorem expect_eq_of_below {y : SPMF α} {x : WordModel σ α} (h : src.Below y x) (hy : y.IsPMF)
+theorem expect_eq_of_below {y : SPMF α} {x : WordModel σ α} (h : src.Below y x) (hy : y.mass = 1)
     {f : α → ℝ≥0∞} (hf : ∀ a, f a ≤ 1) : src.E (x.runE fun a _ => f a) = expect y f := by
   have hbelow (g : α → ℝ≥0∞) : expect y g ≤ src.E (x.runE fun a _ => g a) := by
-    simpa only [src.const] using h fun a _ => g a
+    have hg := h fun a _ => g a
+    simp only [src.const] at hg
+    exact hg
   have hx : src.E (x.runE fun a _ => f a) + src.E (x.runE fun a _ => 1 - f a) ≤ 1 := by
     refine (src.add_le _ _).trans ((src.mono fun s => ?_).trans (src.const 1).le)
     simp only [WordModel.runE]
@@ -168,7 +173,7 @@ noncomputable def dist (x : WordModel σ α) : SPMF α :=
     | some p => simp only; rw [Finset.sum_ite_eq]; split <;> simp⟩
 
 /-- On the ideal source, `x` has the distribution of a terminating `y` below it. -/
-theorem dist_eq {y : SPMF α} {x : WordModel σ α} (h : src.Below y x) (hy : y.IsPMF) :
+theorem dist_eq {y : SPMF α} {x : WordModel σ α} (h : src.Below y x) (hy : y.mass = 1) :
     src.dist x = y := by
   classical
   ext a

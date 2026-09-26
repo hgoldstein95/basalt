@@ -59,7 +59,7 @@ theorem prob_vectorOf_all {g : SPMF α} (E : Set α) (n : Nat) :
       _ = prob g E ^ (n + 1) := (pow_succ _ _).symm
 
 /-- The length of a `listOf` draw is geometrically distributed. -/
-theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
+theorem prob_listOf_length (g : SPMF α) (hg : g.mass = 1) (k : Nat) :
     prob (listOf g) {xs | xs.length = k} = (1/2 : ℝ≥0∞) ^ (k + 1) := by
   induction k with
   | zero =>
@@ -112,7 +112,7 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
     simp only [zero_add, add_zero]
     norm_num [pow_succ, div_eq_mul_inv, one_div]
 
-/-- No `IsPMF` hypothesis: missing mass only lowers the expectation. -/
+/-- No mass hypothesis: missing mass only lowers the expectation. -/
 theorem expect_listOf_length_le (g : SPMF α) :
     expect (listOf g) (fun xs => (xs.length : ℝ≥0∞)) ≤ 1 := by
   delta listOf

@@ -44,11 +44,15 @@ the generator at `WithSize G` and close it with `.run n`. See `Basalt/Sized.lean
 depends on the generator, and you prove the ones that do:
 
 - `IsSoundAndComplete g P` — the support of `g` is exactly `P` (nothing invalid, nothing missed).
-  Its halves are laws of their own: `IsSound g P` (nothing invalid) and `IsCompleteFor g P` (nothing
-  missed), for a generator that has only one.
+  Its halves are laws of their own: `IsSoundFor g P` (nothing invalid) and `IsCompleteFor g P`
+  (nothing missed), for a generator that has only one.
 - `IsAlmostSurelyTerminating g` — `g` terminates with probability 1.
 - `IsCostBounded g c` — producing `v` takes at most `c v` random choices.
-- `IsFilterFree g` / `IsProductive g` — for filtering (`Option`-valued) generators.
+
+Each but the bundle `IsSoundAndComplete`, which a proof splits into its halves, is defined in the
+form a reader checks, and restated by `<Law>.iff_obs` on the observation a proof walks:
+`IsSoundFor g P ↔ SPMF.alwaysObs.spec g P`. A proof rewrites its goal with `iff_obs` and runs
+`walk`, and passes a callee's law to it as `h.obs`.
 
 One more, in `Basalt/IO/Laws.lean`, relates two interpretations rather than constraining one, so it
 takes the polymorphic generator:
@@ -59,8 +63,8 @@ takes the polymorphic generator:
 
 `BasaltExamples/` is a cookbook of worked generators, each carrying proofs of the properties that
 apply to it. `WORKFLOW.md` walks through writing a generator and proving it correct, with a recipe
-for each obligation, and one for bounding an expected value (`SPMF.expect`: the expected size of what
-is generated, the expected number of choices).
+for each obligation, and one for bounding an expected value (`SPMF.expect`, such as the expected
+size of what is generated).
 
 ## Running Properties
 
@@ -144,10 +148,12 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
     judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
     `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
     saying that every observation commutes with it — `Walk/`, the judgment-agnostic walk over
-    observations that every proof obligation is discharged by, and `GenRel.lean`, each combinator
-    related to itself at two monads, for the judgments that relate interpretations;
-  - *what a proof calls*: `Tactic/`, one entry tactic per judgment over that walk, plus the support
-    and `ℝ≥0∞` helpers; and `PBT/` and `Tuning/`, the front ends above.
+    observations that every proof obligation is discharged by, its `walk` tactic, and one file per
+    judgment of what the walk knows about it, and `GenRel.lean`, each combinator related to itself
+    at two monads, for the judgments that relate interpretations;
+  - *what a proof calls*: `walk`, and `Tactic/`, the tactics that do more than walk
+    (`mass_fixpoint`, `faithful_fixpoint`) plus the support and `ℝ≥0∞` helpers; and `PBT/` and
+    `Tuning/`, the front ends above.
 
   `Basalt.lean` is the only module that imports the library wholesale; every other module, inside
   the library and out, imports the narrowest thing it needs.
