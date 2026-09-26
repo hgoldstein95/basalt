@@ -61,11 +61,6 @@ theorem le_always_of_isBounded {x : SPMF.Cost α} {c : α → Nat} {p : α → N
     (hx : IsBounded x c) : (∀ a n, n ≤ c a → p a n) ≤ alwaysObs.spec x p :=
   fun h q hq => h _ _ (hx q hq)
 
-@[obs_leaf]
-theorem le_always_of_isCostBounded {x : SPMF.Cost α} {c : α → Nat} {p : α → Nat → Prop}
-    (hx : IsCostBounded x c) : (∀ a n, n ≤ c a → p a n) ≤ alwaysObs.spec x p :=
-  le_always_of_isBounded hx
-
 end SPMF.Cost
 
 namespace Basalt.CostBound

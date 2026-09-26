@@ -63,9 +63,9 @@ def shapeRuleHead? (shape : Expr) : MetaM (Option Name) := do
 inductive Judgment where
   /-- `law g R` with `R` to be found: a list combinator's generator argument, which the
   combinator's rule asks about. No rule concludes one: a fact closes it, as it is or through
-  `bridge` (from a stronger law), and failing one `reduceTo` restates it. `tactic` is the entry
+  `bridge` (from a stronger law, if there is one), and failing one `reduceTo` restates it. `tactic` is the entry
   tactic that takes the fact, for the error. -/
-  | argument (law bridge : Name) (reduceTo : Option Name) (tactic : String)
+  | argument (law : Name) (bridge reduceTo : Option Name) (tactic : String)
   /-- `O.spec g post ≤ b` (`upper`) or `b ≤ O.spec g post`: a bound on an observation into an
   ordered algebra, computed by the rules from the postcondition. The rules are stated once for
   every monotone observation; a combinator with none goes through its `@[gen_map]` lemma. -/
@@ -122,7 +122,7 @@ def ruleHead? : Judgment → Expr → MetaM (Option Name)
 passes it as the first explicit argument of `b`, whose remaining premises are walked. A choice is
 never a leaf. -/
 def bridges : Judgment → Array (Option Name)
-  | argument _ bridge .. => #[none, some bridge]
+  | argument _ bridge .. => #[none] ++ (bridge.map some).toArray
   | spec _ => #[none]
   | rel _ _ stronger _ => #[none, some stronger.2]
   | mix _ => #[]
@@ -169,9 +169,9 @@ end Judgment
 /-- Every judgment the walker knows, tried in order. -/
 def judgments : Array Judgment := #[
   -- Failing a fact, a cost bound is the argument's worst case, a bound that ignores the value.
-  .argument `IsBounded `IsCostBounded.isBounded (some `SPMF.Cost.isBounded_of_worst) "cost_bound",
-  .argument `IsSound `IsSoundAndComplete.sound none "sound_bound",
-  .argument `IsCompleteFor `IsSoundAndComplete.complete none "complete_bound",
+  .argument `IsBounded none (some `SPMF.Cost.isBounded_of_worst) "cost_bound",
+  .argument `IsSound (some `IsSoundAndComplete.sound) none "sound_bound",
+  .argument `IsCompleteFor (some `IsSoundAndComplete.complete) none "complete_bound",
   .spec true, .mix true, .spec false, .mix false,
   .rel `IdealSource.Below `ideal (`faithful, `IsFaithful.below) "ideal_fixpoint",
   .rel `IOModel.Approx `io (`faithful, `IsFaithful.approx) "io_fixpoint"]

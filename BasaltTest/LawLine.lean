@@ -142,7 +142,7 @@ def genMaybe [Gen G] : G (Option Nat) :=
   oneOf [fun _ => pure none, fun _ => pure (some 0)]
 
 theorem genMaybe.productive : IsProductive (genMaybe (G := SPMF)) :=
-  IsProductive_of_mem_support (a := 0)
+  IsProductive.of_mem_support (a := 0)
     (by simp [genMaybe, SPMF.support_oneOf, SPMF.support_pure])
 
 /--
@@ -190,7 +190,7 @@ theorem genSurely.filter_free : IsFilterFree (genSurely (G := SPMF)) := by
   simp [genSurely, SPMF.support_oneOf, SPMF.support_pure]
 
 theorem genSurely.productive : IsProductive (genSurely (G := SPMF)) :=
-  IsProductive_of_IsFilterFree genSurely.filter_free
+  IsFilterFree.isProductive genSurely.filter_free
 
 /--
 info: genSurely — 5 draws (seed 0, fuel 10000)

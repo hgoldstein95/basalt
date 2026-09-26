@@ -56,9 +56,6 @@ def IsAlmostSurelyTerminating (g : SPMF α) : Prop :=
 def IsCostBounded (g : SPMF.Cost α) (c : α → Nat) : Prop :=
   IsBounded g c
 
-theorem IsCostBounded.isBounded {g : SPMF.Cost α} {c : α → Nat} (h : IsCostBounded g c) :
-    IsBounded g c := h
-
 /-- A partial generator `IsFilterFree` if all of its mass lands on *successful* outcomes: it never
   actually fails.  -/
 def IsFilterFree (g : SPMF (Option α)) : Prop :=
@@ -72,18 +69,18 @@ def IsProductive (g : SPMF (Option α)) : Prop :=
 /-- A single reachable outcome makes a generator productive. `massSome` is a sum over *all* successes,
   so a lower bound needs only one of them — this is the cheap route to `IsProductive`, and the reason
   productivity is a much weaker ask than filter-freedom. -/
-theorem IsProductive_of_apply_pos {g : SPMF (Option α)} {a : α} (h : 0 < g (some a)) :
+theorem IsProductive.of_apply_pos {g : SPMF (Option α)} {a : α} (h : 0 < g (some a)) :
     IsProductive g :=
   lt_of_lt_of_le h (ENNReal.le_tsum (f := fun a => g (some a)) a)
 
 /-- `IsProductive` from support membership — the form a `support` characterization hands you
   directly, so exhibiting one value the generator can produce discharges it. -/
-theorem IsProductive_of_mem_support {g : SPMF (Option α)} {a : α}
+theorem IsProductive.of_mem_support {g : SPMF (Option α)} {a : α}
     (h : some a ∈ SPMF.support g) : IsProductive g :=
-  IsProductive_of_apply_pos ((SPMF.apply_pos_iff g (some a)).mpr h)
+  IsProductive.of_apply_pos ((SPMF.apply_pos_iff g (some a)).mpr h)
 
 /-- Filter-freedom is strictly stronger than productivity. -/
-theorem IsProductive_of_IsFilterFree {g : SPMF (Option α)} (h : IsFilterFree g) :
+theorem IsFilterFree.isProductive {g : SPMF (Option α)} (h : IsFilterFree g) :
     IsProductive g := by
   rw [IsProductive, h]; exact zero_lt_one
 
