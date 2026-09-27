@@ -278,6 +278,9 @@ generator that uses every combinator). Of the generator, only its callees' laws 
   `mass_fixpoint [Nat.arbitrary.terminates.obs] using …`.
 - a **helper with no law**, or a derived combinator (`optionGen`, `BasaltTest/OptionGen.lean`), is
   unfolded and walked through when it is not recursive.
+- a **`suchThat g p`** asks for `g`'s termination law and a bound `r` on how often `p` rejects,
+  `SPMF.expectObs.spec g (fun a => if p a then 0 else 1) ≤ r`, and leaves `r < 1` to the
+  arithmetic (`NonEmptyList.genNonEmpty.terminates`, `NonEmptyList.lean`).
 - an **`if`/`dite`** is no different from any other combinator: the bound is the same conditional
   over the branches' bounds, which the arithmetic `split`s — `Tree.genBST` (`BST.lean`) shortcuts on
   an exhausted interval. A conditional on a value drawn inside the step belongs to that draw's
