@@ -39,7 +39,7 @@ def Tree.genBST [Gen G] (lo hi : Int) : G (Tree Int) := do
   if h : lo > hi then
     return leaf
   else
-    frequency [
+    frequency! [
       (1, fun () => pure leaf),
       (1, fun () => do
         let x ← chooseInt lo hi (by omega)
@@ -53,15 +53,16 @@ theorem Tree.genBST.sound_complete :
     IsSoundAndComplete (Tree.genBST lo hi) (Tree.isBST lo hi) := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint
     all_goals simp_all [Tree.isBST]
   case complete =>
     intro t
     induction t generalizing lo hi with
-    | leaf => intro _; rw [Tree.genBST]; complete_bound
+    | leaf => intro _; rw [Tree.genBST, SPMF.mem_support_iff_may]; walk
     | node l x r ihl ihr =>
       intro ⟨h1, h2, hl, hr⟩
-      rw [Tree.genBST]; complete_bound
+      rw [Tree.genBST, SPMF.mem_support_iff_may]; walk
       rw [dif_neg (by omega)]
       exact ⟨x, ⟨h1, h2⟩, l, ihl hl, r, ihr hr, rfl⟩
 
@@ -81,13 +82,19 @@ theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) :
 
 end termination
 
+/-! ## Faithfulness -/
+
+theorem Tree.genBST.faithful : IsFaithful (Tree.genBST lo hi) := by
+  faithful_fixpoint [Tree.genBST.terminates]
+
 /-! ## Cost -/
 
 /-- Producing a tree of `n` nodes costs at most `3 * n + 1` choices: one `frequency` choice, one
 pivot, and two recursive calls per node. -/
 theorem Tree.genBST.cost_bounded :
     IsCostBounded (Tree.genBST lo hi) (fun t => 3 * t.size + 1) := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   all_goals simp only [Tree.size]; omega
 
 /-! ## Distribution -/
@@ -99,7 +106,7 @@ open scoped ENNReal
 theorem Tree.genBST.prob_leaf {lo hi : Int} (h : lo ≤ hi) :
     SPMF.prob (Tree.genBST lo hi) {Tree.leaf} = 1/2 := by
   conv_lhs => rw [Tree.genBST]
-  rw [dif_neg (by omega), SPMF.prob_frequency]
+  rw [dif_neg (by omega), frequencyWith_eq, SPMF.prob_frequency]
   have hleaf : SPMF.prob (Pure.pure Tree.leaf : SPMF (Tree Int)) {Tree.leaf} = 1 := by
     rw [SPMF.prob_singleton]
     simp
@@ -166,7 +173,8 @@ halves each level's contribution. -/
 theorem Tree.genBST.expect_size_le {lo hi : Int} :
     SPMF.expect (Tree.genBST lo hi) (fun t => (t.size : ℝ≥0∞))
       ≤ harmonic (hi + 1 - lo).toNat / 2 := by
-  expect_fixpoint
+  rw [SPMF.expect_eq_obs]
+  walk fixpoint
   split
   · simp [Tree.size]
   · rename_i hgt
@@ -198,6 +206,25 @@ theorem Tree.genBST.expect_size_le {lo hi : Int} :
       _ = ((n : ℝ≥0∞) * harmonic n) / (n : ℝ≥0∞) := by rw [sum_harmonic]
       _ ≤ harmonic n := by
           rw [mul_comm, ENNReal.mul_div_cancel_right hn0 (by finiteness)]
+
+theorem Tree.genBST.cost_faithful : IsCostFaithful (Tree.genBST lo hi) :=
+  ⟨by walk fixpoint, by walk fixpoint⟩
+
+/-- `cost_bounded` in expectation: three choices per node of the expected size, and one more. -/
+theorem Tree.genBST.expected_cost {lo hi : Int} :
+    IsExpectedCostBounded (Tree.genBST lo hi : SPMF.Cost (Tree Int))
+      (3 * (harmonic (hi + 1 - lo).toNat / 2) + 1) := by
+  refine (IsExpectedCostBounded.of_costBounded Tree.genBST.cost_faithful
+    Tree.genBST.cost_bounded).mono ?_
+  calc SPMF.expect (Tree.genBST lo hi) (fun t => ((3 * t.size + 1 : ℕ) : ℝ≥0∞))
+      = 3 * SPMF.expect (Tree.genBST lo hi) (fun t => (t.size : ℝ≥0∞))
+          + SPMF.expect (Tree.genBST lo hi) (fun _ => 1) := by
+        push_cast
+        rw [SPMF.expect_add, SPMF.expect_mul_left]
+    _ ≤ 3 * (harmonic (hi + 1 - lo).toNat / 2) + 1 := by
+        gcongr
+        · exact Tree.genBST.expect_size_le
+        · rw [SPMF.expect_one]; exact SPMF.mass_le_one _
 
 end distribution
 

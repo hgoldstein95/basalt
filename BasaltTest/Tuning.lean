@@ -24,6 +24,8 @@ alongside it. This file exercises the whole contract:
    distribution.
 4. `sites` reports each site's offset, arity, and per-branch recursive calls.
 5. A literal `0` weight is rejected at elaboration.
+
+`genWeightedBST` is written with `frequency!`; section 9 has the other recursion forms.
 -/
 
 open RandomChoice
@@ -372,6 +374,59 @@ example [Gen G] (θ : Tuning) (depth : Nat) :
           return .node l 0 r)
       ] (Tuning.sum_map_fst_pos θ 0 depth _ _) := by
   rw [genTree.tuned.eq_def]
+
+/-! ## 9. Compiled choice
+
+A `frequency!` site is tuned as a `frequency` one is, and the tuned generator runs it compiled too.
+Under a `oneOf!` its branches occur several times in the elaborated term, and it is still one site. -/
+
+@[tunable]
+def genNested [Gen G] (size : Nat) : G (BST.Tree Nat) :=
+  match size with
+  | 0 => pure .leaf
+  | n + 1 =>
+    oneOf! [
+      fun _ => pure .leaf,
+      fun _ => frequency! [
+        (1, fun _ => pure .leaf),
+        (5, fun _ => do
+          let l ← genNested n
+          let r ← genNested n
+          return .node l 0 r)]]
+
+example : genNested.sites = #[⟨`TunableExamples.genNested.site0, 0, 2, #[0, 2]⟩] := rfl
+
+example [Gen G] (size : Nat) :
+    (genNested.tuned genNested.defaults size : G (BST.Tree Nat)) = genNested size :=
+  genNested.tuned_defaults size
+
+@[tunable]
+def genWFCompiled [Gen G] (fuel : Nat) : G (BST.Tree Nat) :=
+  if h : fuel = 0 then pure .leaf
+  else
+    frequency! [
+      (1, fun _ => pure .leaf),
+      (5, fun _ => do
+        let l ← genWFCompiled (fuel - 1)
+        let r ← genWFCompiled (fuel - 1)
+        return .node l 0 r)]
+termination_by fuel
+decreasing_by all_goals omega
+
+example [Gen G] (fuel : Nat) :
+    (genWFCompiled.tuned genWFCompiled.defaults fuel : G (BST.Tree Nat)) = genWFCompiled fuel :=
+  genWFCompiled.tuned_defaults fuel
+
+open Lean in
+run_cmd do
+  let env ← getEnv
+  for n in [``genNested.tuned, ``genWFCompiled.tuned] do
+    let code := (IR.getDecls env).filter (n.isPrefixOf ·.name)
+      |>.foldl (fun acc d => acc ++ toString (format d)) ""
+    if code.isEmpty then throwError "`{n}` has no compiled code in this module"
+    for c in ["List.cons", "oneOf", "frequency"] do
+      unless (code.splitOn c).length == 1 do
+        throwError "`{n}`'s compiled code mentions `{c}`"
 
 end TunableExamples
 

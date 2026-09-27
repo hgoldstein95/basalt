@@ -6,6 +6,7 @@ Authors: Harrison Goldstein
 import Basalt.Combinators
 import Basalt.Obs.Basic
 import Basalt.Obs.Spec
+import Basalt.Walk.Attr
 
 /-!
 # Observations Commute with the Combinators
@@ -14,6 +15,8 @@ import Basalt.Obs.Spec
 open RandomChoice
 
 namespace Obs
+
+attribute [gen_map] map_choose map_coin
 
 variable {G : Type → Type v} {W : Type → Type w}
   [Gen G] [LawfulMonad G] [Monad W] [RandomChoice W] [LawfulMonad W] (O : Obs G W)
@@ -73,5 +76,19 @@ theorem map_oneOf {G : Type u → Type v} {W : Type u → Type w} [Gen G] [Monad
     O.spec (oneOf gs hne) = index gs hne fun g => O.spec (g ()) := by
   unfold oneOf index
   rw [O.map_bind, O.map_choose]
+
+@[gen_map]
+theorem map_oneOfWith {G : Type u → Type v} {W : Type u → Type w} [Gen G] [Monad W]
+    [RandomChoice W] (O : Obs G W) {α : Type u} (gs : List (Unit → G α)) (hne : gs ≠ [])
+    (impl : G α) (h : impl = oneOf gs hne) :
+    O.spec (oneOfWith gs hne impl h) = index gs hne fun g => O.spec (g ()) := by
+  rw [oneOfWith_eq, O.map_oneOf]
+
+@[gen_map]
+theorem map_frequencyWith (gs : List (Nat × (Unit → G α))) (h : 0 < (gs.map Prod.fst).sum)
+    (impl : G α) (he : impl = frequency gs h) :
+    O.spec (frequencyWith gs h impl he)
+      = select gs h (fun g => O.spec (g ())) (O.spec default) := by
+  rw [frequencyWith_eq, O.map_frequency]
 
 end Obs

@@ -55,4 +55,4 @@ rev = "v4.29.1"
 [[require]]
 name = "splitmix"
 git = "https://github.com/hgoldstein95/splitmix"
-rev = "v4.33.0-rc2"
+rev = "splitmix-0.1.0"

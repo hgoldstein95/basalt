@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Lean.Meta.Tactic.Replace
+import Basalt.Obs.Basic
 
 /-!
 # The Walker's Names
@@ -21,7 +22,7 @@ partial def postNames (ty : Expr) : Option (Name × Option Name) :=
   ty.getAppArgs.findSome? fun
     | .lam v _ (.lam n _ _ _) _ => some (v.eraseMacroScopes, some n.eraseMacroScopes)
     | .lam v _ _ _ => some (v.eraseMacroScopes, none)
-    | e => if e.isAppOf `Obs.spec then postNames e else none
+    | e => if e.isAppOf ``Obs.spec then postNames e else none
 
 /-- `ty`, a rule's or a bridge's statement, with the binders of the bound it computes named after
 the generator: `∀ a n, R a n → p a n` and `∀ x hx, d x hx` become `∀ v n_v h_v, …` and `∀ v h_v, …`,
@@ -125,7 +126,7 @@ private def nameBinders (t : Expr) (hint : Option Name) (post : Option (Name × 
         | none => none
       if let some t' := renameIn t then return t'
       let args := t.getAppArgs
-      let some i := args.findIdx? (·.isAppOf `Obs.spec) | return t
+      let some i := args.findIdx? (·.isAppOf ``Obs.spec) | return t
       let some spec := renameIn args[i]! | return t
       return mkAppN t.getAppFn (args.set! i spec)
   go t #[] none 0 false

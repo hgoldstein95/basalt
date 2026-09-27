@@ -34,15 +34,16 @@ theorem ENNReal.inv_ne_top' {x : ℝ≥0∞} (h : x ≠ 0) : x⁻¹ ≠ ⊤ :=
 attribute [aesop unsafe 90% apply (rule_sets := [finiteness])]
   ENNReal.ne_top_of_le_one' ENNReal.inv_ne_top'
 
-/-! ## The transfer macro
+/-! ## The transfer macro -/
 
-Caveats:
-- transfer a hypothesis *before* the ENNReal facts it needs for finiteness are themselves
-  transferred (or `have` a copy);
-- one location per invocation;
-- an atom with no `≠ ⊤` evidence needs `rcases eq_or_ne t ⊤ with rfl | htop` first
-  (the `⊤` case is usually `simp`). -/
+/-- Moves an `ℝ≥0∞` goal `a ≤ b` or `a = b` (or a hypothesis: `ennreal_to_real at h`) to `ℝ`,
+discharging the finiteness side conditions, to be finished by `norm_num`, `linarith`, or
+`nlinarith`.
 
+* Transfer a hypothesis before the facts its finiteness needs are transferred (or `have` a copy).
+* One location per call.
+* A term with no `≠ ⊤` evidence needs `rcases eq_or_ne t ⊤ with rfl | htop` first; the `⊤` case is
+  usually `simp`. -/
 macro "ennreal_to_real" loc:(Lean.Parser.Tactic.location)? : tactic =>
   `(tactic|
     ((try rw [ge_iff_le] $[$loc]?);

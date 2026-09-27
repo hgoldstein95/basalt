@@ -224,7 +224,7 @@ Read the two halves separately, because they say opposite things:
 
 - **Shallow bugs: random usually wins, and the margin is noise.** Where one unlucky draw exposes the
   bug, coverage guidance is pure overhead — libFuzzer spends its first inputs mapping coverage, and
-  its per-run cost is higher (~54k runs/s vs `io`'s ~360k and `plausible`'s ~205k on `bst-gen`). All
+  its per-run cost is higher (~250k runs/s vs `io`'s ~1.3M and `plausible`'s ~480k on `bst-gen`). All
   four BST bugs are of this kind, and every backend finds them in well under a millisecond. Do not
   read the ordering within a row: at a median of single-digit runs the trial-to-trial spread of a
   geometric distribution swamps it, which is why `bst-buggy-insert` here has the fuzzer ahead while

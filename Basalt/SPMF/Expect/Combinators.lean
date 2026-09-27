@@ -59,11 +59,11 @@ theorem prob_vectorOf_all {g : SPMF α} (E : Set α) (n : Nat) :
       _ = prob g E ^ (n + 1) := (pow_succ _ _).symm
 
 /-- The length of a `listOf` draw is geometrically distributed. -/
-theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
+theorem prob_listOf_length (g : SPMF α) (hg : g.mass = 1) (k : Nat) :
     prob (listOf g) {xs | xs.length = k} = (1/2 : ℝ≥0∞) ^ (k + 1) := by
   induction k with
   | zero =>
-    rw [listOf, prob_oneOf]
+    rw [listOf, oneOfWith_eq, prob_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, prob_pure, Set.mem_setOf_eq]
     have hz : prob (g >>= fun x => listOf g >>= fun xs => Pure.pure (x :: xs))
@@ -76,7 +76,7 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
     rw [hz]
     norm_num
   | succ k ih =>
-    rw [listOf, prob_oneOf]
+    rw [listOf, oneOfWith_eq, prob_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, prob_pure, Set.mem_setOf_eq]
     rw [if_neg (by omega)]
@@ -112,7 +112,7 @@ theorem prob_listOf_length (g : SPMF α) (hg : IsPMF g) (k : Nat) :
     simp only [zero_add, add_zero]
     norm_num [pow_succ, div_eq_mul_inv, one_div]
 
-/-- No `IsPMF` hypothesis: missing mass only lowers the expectation. -/
+/-- No mass hypothesis: missing mass only lowers the expectation. -/
 theorem expect_listOf_length_le (g : SPMF α) :
     expect (listOf g) (fun xs => (xs.length : ℝ≥0∞)) ≤ 1 := by
   delta listOf
@@ -122,7 +122,7 @@ theorem expect_listOf_length_le (g : SPMF α) :
   case admissible => exact admissible_expect_le _ _
   case step =>
     intro listOf_rec ih
-    rw [expect_oneOf]
+    rw [oneOfWith_eq, expect_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, expect_pure, Nat.cast_zero, add_zero, zero_add]
     rw [ENNReal.div_eq_inv_mul, ← one_div]

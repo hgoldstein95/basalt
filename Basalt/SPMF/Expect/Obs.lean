@@ -141,6 +141,12 @@ noncomputable def expectObs : Obs SPMF.{u} (WP Mix.average) where
   map_bind x k := by funext f; exact expect_bind x k f
   map_choose _ _ _ := rfl
 
+/-- An expectation, stated on its observation for `walk`. -/
+theorem expect_eq_obs (g : SPMF α) (f : α → ℝ≥0∞) : expect g f = expectObs.spec g f := rfl
+
+/-- The mass, stated on the expectation observation for `walk`. -/
+theorem mass_eq_obs (g : SPMF α) : g.mass = expectObs.spec g fun _ => 1 := (expect_one g).symm
+
 instance : expectObs.Monotone := ⟨fun _ _ _ h => expect_mono h⟩
 
 section expect
@@ -149,6 +155,12 @@ theorem expect_chooseNat {lo hi : Nat} (h : lo ≤ hi) (f : Nat → ℝ≥0∞) 
     expect (chooseNat lo hi h) f
       = (∑ x ∈ Finset.Icc lo hi, f x) / ((hi - lo + 1 : ℕ) : ℝ≥0∞) :=
   (congrFun (expectObs.map_chooseNat lo hi h) f).trans (Mix.range_average lo hi f)
+
+theorem expect_chooseNat_zero {N : Nat} (hN : 0 < N) (f : Nat → ℝ≥0∞) :
+    expect (chooseNat 0 (N - 1)) f = (∑ x ∈ Finset.range N, f x) / N := by
+  rw [expect_chooseNat]
+  have : Finset.Icc 0 (N - 1) = Finset.range N := by ext; simp; omega
+  rw [this, show N - 1 - 0 + 1 = N by omega]
 
 theorem expect_chooseInt {lo hi : Int} (h : lo ≤ hi) (f : Int → ℝ≥0∞) :
     expect (chooseInt lo hi h) f

@@ -9,7 +9,7 @@ import Basalt.SPMF.Support
 # SPMF Mass
 
 The equations of `SPMF.mass` for each combinator, each the combinator's expectation equation at the
-postcondition `1`, and `SPMF.IsPMF` (mass exactly 1).
+postcondition `1`.
 -/
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
@@ -92,20 +92,5 @@ theorem mass_frequency
   simpa only [expect_one] using expect_frequency h fun _ => 1
 
 end mass
-
-section is_pmf
-
-/-- An SPMF is a PMF if the mass sums to exactly 1.
-
-This means that the probability of non-termination is vanishingly small, and therefore that the
-generator almost-surely terminates. -/
-def IsPMF (p : SPMF α) : Prop := p.mass = 1
-
-/-- The lower half is the only half a termination proof has to supply: it is the form `mass_bound`
-proves, for an `SPMF` term that is not a generator definition. -/
-theorem IsPMF.of_one_le {p : SPMF α} (h : 1 ≤ p.mass) : IsPMF p :=
-  le_antisymm (mass_le_one p) h
-
-end is_pmf
 
 end SPMF

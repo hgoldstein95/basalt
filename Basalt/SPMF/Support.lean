@@ -12,8 +12,7 @@ import Basalt.SPMF.Expect.Obs
 Support inversion for the host constructs (`bind`, `pure`, `map`, `ite`, `dite`, `choose`), stated
 on monad notation, which is what do-notation elaborates to; the may and always observations built
 from them; and the support laws of the list combinators, which the walker's rules bridge. A
-combinator's support is otherwise not a lemma: it is what `sound_bound` and `complete_bound` compute
-from its `Obs.map_*`.
+combinator's support is otherwise not a lemma: it is what `walk` computes from its `Obs.map_*`.
 -/
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
@@ -431,13 +430,30 @@ theorem bind_congr_support
   congr
   funext v
   by_cases hsupport : v ∈ x.support
-  · rw [h]; assumption
+  · rwa [h]
   · simp only [support, Function.notMem_support] at hsupport
     simp_all [DFunLike.coe]
 
 theorem mem_support_csup {c : SPMF α → Prop} (hc : chain c) {a : α} :
     a ∈ (CCPO.csup hc).support ↔ ∃ f, c f ∧ a ∈ f.support := by
   simp only [mem_support_iff_prob_pos, prob, expect_csup, lt_iSup_iff, exists_prop]
+
+/-- A value is reachable by `suchThat g p` exactly when `g` reaches it and `p` accepts it, whatever
+the chance of acceptance: the first draw can be that value. -/
+theorem mem_support_suchThat {g : SPMF α} {p : α → Bool} {a : α} :
+    a ∈ (suchThat g p).support ↔ a ∈ g.support ∧ p a = true := by
+  have key : ∀ a ∈ (suchThat g p).support, a ∈ g.support ∧ p a = true := by
+    refine suchThat.fixpoint_induct g p (fun x => ∀ a ∈ x.support, a ∈ g.support ∧ p a = true)
+      (fun c hc ih a ha => ?_) (fun z ih a ha => ?_)
+    · obtain ⟨x, hxc, hxa⟩ := (mem_support_csup hc).mp ha
+      exact ih x hxc a hxa
+    · obtain ⟨b, hb, hab⟩ := mem_support_bind_iff.mp ha
+      split at hab
+      · exact (mem_support_pure_iff.mp hab) ▸ ⟨hb, ‹_›⟩
+      · exact ih a hab
+  refine ⟨key a, fun ⟨ha, hp⟩ => ?_⟩
+  rw [suchThat]
+  exact mem_support_bind_iff.mpr ⟨a, ha, by simp only [hp, ↓reduceIte, mem_support_pure_iff]⟩
 
 /-- Reweighting a uniform choice preserves its support. Replacing `oneOf gs` by a `frequency`
 over the same branches leaves the set of reachable values unchanged, provided every weight is

@@ -11,17 +11,17 @@ import Basalt.Tuning.Basic
 /-!
 # The `@[tunable]` attribute
 
-`@[tunable]` makes a generator's `frequency` weights runtime-addressable. If the user tags a
-generator definition:
+`@[tunable]` makes a generator's `frequency` and `frequency!` weights runtime-addressable. If the
+user tags a generator definition:
 
 ```lean
 @[tunable]
 def genBST [Gen G] (lo hi : Int) : G (Tree Int) := do
   if h : lo > hi then return leaf
-  else frequency [
+  else frequency! [
     (1, fun _ => pure leaf),
     (5, fun _ => do … genBST … genBST …)
-  ] (by simp)
+  ]
 partial_fixpoint
 ```
 
@@ -154,9 +154,9 @@ private def inlineAux? (declName : Name) (e : Expr) : MetaM (Option Expr) := do
 
 mutual
 
-/-- Rewrite every `frequency` under `e`.  `pre` handles the three things that are not leaf rewrites:
+/-- Rewrite every `frequency` under `e`.  `pre` handles the things that are not leaf rewrites:
 inlining this declaration's auxiliaries, `Lean.Order.fix` (whose monotonicity proof must be rebuilt),
-and the `frequency` sites themselves. -/
+the `frequency` sites themselves, and the compiled choices `oneOf!`/`frequency!`. -/
 private partial def tune (ctx : TuneCtx) (e : Expr) : TuneM Expr :=
   Meta.transform e (pre := fun e => do
     if let some e' ← inlineAux? ctx.declName e then
@@ -165,7 +165,43 @@ private partial def tune (ctx : TuneCtx) (e : Expr) : TuneM Expr :=
       return .done (← tuneFix ctx e)
     if e.getAppFn.isConstOf ``frequency && e.getAppNumArgs ≥ 5 then
       return .done (← tuneFrequency ctx e)
+    if e.getAppFn.isConstOf ``oneOf && e.getAppNumArgs ≥ 5 then
+      return .done (← tuneOneOf ctx e)
+    if e.getAppFn.isConstOf ``frequencyWith && e.getAppNumArgs ≥ 7 then
+      return .done (← tuneCompiled ctx ``frequency mkFrequencyWith? e)
+    if e.getAppFn.isConstOf ``oneOfWith && e.getAppNumArgs ≥ 7 then
+      return .done (← tuneCompiled ctx ``oneOf mkOneOfWith? e)
     return .continue)
+
+/-- A compiled choice `oneOfWith`/`frequencyWith gs h impl h'`: tune its model and compile that
+again. Its branches occur in `impl` and in the types inside `h'` as well as in `gs`, so traversing it
+would record each site under them several times, and would leave `impl` running the literal weights.
+Tuned weights are not closed terms, so the chain the model compiles to compares against their sums. -/
+private partial def tuneCompiled (ctx : TuneCtx) (model : Name)
+    (compile : Expr → MetaM (Option Expr)) (e : Expr) : TuneM Expr := do
+  let args := e.getAppArgs
+  let m := mkAppN (mkConst model e.getAppFn.constLevels!) (args.extract 0 5)
+  let m' ← tune ctx m
+  let rest ← (args.extract 7 args.size).mapM (tune ctx)
+  if m' == m then return mkAppN e.getAppFn (args.extract 0 7 ++ rest)
+  let some e' ← compile m'
+    | throwError "tunable: `{ctx.declName}` has a `{model}!` whose tuned form is not a literal list"
+  return mkAppN e' rest
+
+/-- One `oneOf` site: it has no weights of its own, but a site inside a branch changes the branch
+list, and the non-emptiness side condition is stated at that list — a proof carried over from the
+untuned one is ill-typed, and the kernel is what reports it. -/
+private partial def tuneOneOf (ctx : TuneCtx) (e : Expr) : TuneM Expr := do
+  let args := e.getAppArgs
+  let gs ← tune ctx args[3]!
+  let rest ← (args.extract 5 args.size).mapM (tune ctx)
+  if gs == args[3]! then
+    return mkAppN e.getAppFn (args.extract 0 5 ++ rest)
+  unless gs.isAppOfArity ``List.cons 3 do
+    throwError "tunable: `{ctx.declName}` has a `oneOf` with a site inside it whose branch list is \
+      not a literal list — its non-emptiness cannot be re-proved:{indentExpr gs}"
+  let hne ← mkAppM ``List.cons_ne_nil #[gs.appFn!.appArg!, gs.appArg!]
+  return mkAppN e.getAppFn (args.extract 0 3 ++ #[gs, hne] ++ rest)
 
 /-- `Lean.Order.fix f hmono`: tune `f`, then re-prove `monotone f'` with the same procedure
 `partial_fixpoint` uses.  `θ` is bound outside the fix, so `f'` has exactly `f`'s type and the

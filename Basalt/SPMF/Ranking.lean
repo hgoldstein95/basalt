@@ -10,8 +10,8 @@ import Basalt.SPMF.Termination
 
 `SPMF.LfpIsOne.ranking`, the certificate for a generator whose seed shrinks: a ranking function
 whose expected value drops by `ε` under a level operator `SPMF.LevelOp` forces the one-step mass
-bound's least fixed point to `1`, and bounds the expected number of unfolding steps by `φ / ε`. The
-union bounds that discharge its deficit condition live here too.
+bound's least fixed point to `1`. The union bounds that discharge its deficit condition live here
+too.
 -/
 
 open ENNReal
@@ -79,9 +79,8 @@ theorem sum_iterate_le (hA : LevelOp A) (φ : ι → ℝ≥0∞) {ε : ℝ≥0�
         ≤ A (fun j => φ j / ε) i + 1 := by gcongr; exact hA.mono _ _ ih i
       _ ≤ φ i / ε := hpre i
 
-/-- **The expected-size bound.** `∑ₖ A^[k] 1 i` is the expected total number of unfolding steps
-taken from seed `i` (level `k` contributes its expected number of seeds); an `ε`-drifting ranking
-function bounds it by `φ i / ε`. -/
+/-- `∑ₖ A^[k] 1 i`, the level operator's expected number of seeds over every level from seed `i`,
+is at most `φ i / ε`: the finiteness `LfpIsOne.ranking` rests on. -/
 theorem tsum_iterate_le (hA : LevelOp A) (φ : ι → ℝ≥0∞) {ε : ℝ≥0∞}
     (hε0 : ε ≠ 0) (hε_top : ε ≠ ⊤) (hdrift : ∀ i, A φ i + ε ≤ φ i) (i : ι) :
     ∑' k, A^[k] (fun _ => 1) i ≤ φ i / ε := by
@@ -89,33 +88,6 @@ theorem tsum_iterate_le (hA : LevelOp A) (φ : ι → ℝ≥0∞) {ε : ℝ≥0�
   refine iSup_le fun n => ?_
   have h := hA.sum_iterate_le φ hε0 hε_top hdrift n i
   simpa [Finset.sum_apply] using h
-
-/-- The expected total number of unfolding steps of a level operator from seed `i`: level `k`
-contributes its expected number of seeds, `A^[k] 1 i`. -/
-noncomputable def expectedSteps (A : (ι → ℝ≥0∞) → (ι → ℝ≥0∞)) (i : ι) : ℝ≥0∞ :=
-  ∑' k, A^[k] (fun _ => 1) i
-
-/-- The drift certificate bounds the expected number of unfolding steps by `φ/ε`. -/
-theorem expectedSteps_le (hA : LevelOp A) (φ : ι → ℝ≥0∞) {ε : ℝ≥0∞}
-    (hε0 : ε ≠ 0) (hε_top : ε ≠ ⊤) (hdrift : ∀ i, A φ i + ε ≤ φ i) (i : ι) :
-    expectedSteps A i ≤ φ i / ε :=
-  hA.tsum_iterate_le φ hε0 hε_top hdrift i
-
-/-- For the static-seed operator with mean offspring `m`, the expected number of steps is the
-geometric sum `1/(1-m)`. -/
-theorem expectedSteps_const_mul (m : ℝ≥0∞) (i : ι) :
-    expectedSteps (fun e j => m * e j) i = (1 - m)⁻¹ := by
-  have hiter : ∀ k, (fun (e : ι → ℝ≥0∞) j => m * e j)^[k] (fun _ => 1) = fun _ => m ^ k := by
-    intro k
-    induction k with
-    | zero => simp
-    | succ k ih =>
-      rw [Function.iterate_succ_apply', ih]
-      funext j
-      rw [pow_succ, mul_comm]
-  unfold expectedSteps
-  rw [tsum_congr fun k => congrFun (hiter k) i]
-  exact ENNReal.tsum_geometric m
 
 end LevelOp
 

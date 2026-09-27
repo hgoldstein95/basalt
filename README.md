@@ -21,6 +21,7 @@ def myGen [Gen G] : G α := ...
 | Interpretation | What it gives you |
 |---|---|
 | `Plausible.Gen` / `IO` | run it and get values |
+| `WordModel σ` / `IOModel` | `IO`'s draws with the PRNG state threaded purely — what `IsFaithful` (below) relates `IO` and `SPMF` through |
 | `SPMF` | a sub-probability mass function — reason about the distribution and its `support` |
 | `SPMF.Cost` | the same, plus a count of random choices |
 | `GenStats.StatGen` | seeded, fuel-guarded execution that counts choices (drives `#genstats`) |
@@ -28,7 +29,9 @@ def myGen [Gen G] : G α := ...
 
 `RandomChoice.choose` is the only source of randomness; every combinator (`elements`, `oneOf`,
 `frequency`, `listOf`, …) is built on it. Recursive generators are defined by
-`partial_fixpoint` over the `CCPO`.
+`partial_fixpoint` over the `CCPO`. A choice between literal branches is written `oneOf! [g₀, g₁, …]`
+or `frequency! [(w₀, g₀), …]`: it runs as a chain of tests on the drawn index, allocating no list of
+branches, while every proof sees the plain `oneOf` / `frequency` (`Basalt/Combinators.lean`).
 
 A generator that branches on a size adds a `[Sized G]` constraint and reads it with `getSize` or
 `Sized.sized`, shrinking it for recursive calls with `Sized.resize` (plus `[MonoSized G]` when the
@@ -41,16 +44,34 @@ the generator at `WithSize G` and close it with `.run n`. See `Basalt/Sized.lean
 depends on the generator, and you prove the ones that do:
 
 - `IsSoundAndComplete g P` — the support of `g` is exactly `P` (nothing invalid, nothing missed).
-  Its halves are laws of their own: `IsSound g P` (nothing invalid) and `IsCompleteFor g P` (nothing
-  missed), for a generator that has only one.
+  Its halves are laws of their own: `IsSoundFor g P` (nothing invalid) and `IsCompleteFor g P`
+  (nothing missed), for a generator that has only one.
 - `IsAlmostSurelyTerminating g` — `g` terminates with probability 1.
 - `IsCostBounded g c` — producing `v` takes at most `c v` random choices.
-- `IsFilterFree g` / `IsProductive g` — for filtering (`Option`-valued) generators.
+- `IsExpectedCostBounded g B` — producing a value takes at most `B` random choices on average, so a
+  generator that sometimes retries is allowed. With `IsAlmostSurelyTerminating` and a finite `B`,
+  it says that `g` terminates positively almost surely.
+
+Each but the bundle `IsSoundAndComplete`, which a proof splits into its halves, is defined in the
+form a reader checks, and restated by `<Law>.iff_obs` on the observation a proof walks:
+`IsSoundFor g P ↔ SPMF.alwaysObs.spec g P`. A proof rewrites its goal with `iff_obs` and runs
+`walk`, and passes a callee's law to it as `h.obs`.
+
+Two more relate two interpretations rather than constraining one, so they take the polymorphic
+generator:
+
+- `IsFaithful gen` (`Basalt/IO/Laws.lean`) — on any ideal source of words, `gen` has its `SPMF`
+  distribution, and at `IO` it runs as `IOModel` does wherever that terminates. This connects the
+  proofs about `SPMF` to what `IO` runs; what it leaves out is `idealized_faithful`'s
+  (`Basalt/IO/Faithful.lean`).
+- `IsCostFaithful gen` — `gen` at `SPMF.Cost`, its costs dropped, has its `SPMF` distribution, so
+  a law at one interpretation can be read at the other: termination gives the cost interpretation
+  mass `1`, which a lower bound on an expected cost needs.
 
 `BasaltExamples/` is a cookbook of worked generators, each carrying proofs of the properties that
 apply to it. `WORKFLOW.md` walks through writing a generator and proving it correct, with a recipe
-for each obligation, and one for bounding an expected value (`SPMF.expect`: the expected size of what
-is generated, the expected number of choices).
+for each obligation, and one for bounding an expected value (`SPMF.expect`, such as the expected
+size of what is generated).
 
 ## Running Properties
 
@@ -117,7 +138,7 @@ properties, the failure model, and the supported platforms.
 Because a property is polymorphic in its monad, the same executable also runs it under the random
 interpretations — `--backend=io` or `--backend=plausible` instead of the default coverage-guided
 `fuzz` — from one shared property registry. Which backend finds a bug faster is a property of the
-bug: blind random sampling wins on shallow bugs (fewer runs, ~3–5× the throughput), while a bug
+bug: blind random sampling wins on shallow bugs (fewer runs, ~2–5× the throughput), while a bug
 behind several nested guards is reachable only by coverage guidance. `fuzz-run/compare-backends.sh` measures it and
 `fuzz-run/README.md` records the numbers.
 
@@ -127,24 +148,26 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
   - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean`, and
     `Laws.lean`, the properties a generator may be proved to have;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
-    expectations, cost, almost-sure termination), `IO.lean`, `PlausibleGen.lean`, `OptionT.lean`,
-    `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean` holding the facts about core's `randNat`
-    that the PRNG-backed ones share;
+    expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
+    `PlausibleGen.lean`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean`
+    holding the facts about core's `randNat` that the PRNG-backed ones share;
   - *the proof machinery*: `Obs/`, the layer every per-combinator lemma is derived from — a
     judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
     `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
-    saying that every observation commutes with it — and `Walk/`, the judgment-agnostic walk over
-    observations that every proof obligation is discharged by;
-  - *what a proof calls*: `Tactic/`, one entry tactic per judgment over that walk, plus the support
-    and `ℝ≥0∞` helpers; and `PBT/` and `Tuning/`, the front ends above.
+    saying that every observation commutes with it — `Walk/`, the judgment-agnostic walk over
+    observations that every proof obligation is discharged by, its `walk` tactic, and one file per
+    judgment of what the walk knows about it, and `GenRel.lean`, each combinator related to itself
+    at two monads, for the judgments that relate interpretations;
+  - *what a proof calls*: `walk`, and `Tactic/`, the tactics that do more than walk
+    (`mass_fixpoint`, `faithful_fixpoint`) plus the support and `ℝ≥0∞` helpers; and `PBT/` and
+    `Tuning/`, the front ends above.
 
   `Basalt.lean` is the only module that imports the library wholesale; every other module, inside
   the library and out, imports the narrowest thing it needs.
 - `BasaltExamples/` — worked generators with correctness proofs. Because each file proves its
   generator's laws, this directory is also most of the effective regression suite for the library's
   lemma sets and tactics.
-- `BasaltTest/` — regression tests, named for the library module they guard when one exists;
-  `LawLine.lean` has no library counterpart (it pins the `#genstats` law-reporting contract).
+- `BasaltTest/` — regression tests, named for the library module they guard when one exists.
 - `BasaltFuzz/` — the generators, properties, and buggy operations the `basalt-fuzz` executable
   fuzzes. Two things set this directory apart, both explained in `fuzz-run/README.md`: it is linked
   into a native executable, so it must stay Mathlib-free, and it is the only

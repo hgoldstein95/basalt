@@ -12,12 +12,10 @@ Binary trees whose every node holds `2`. This example exists to contrast two ter
 the *same* shape:
 
 - `genTree` recurses on both children with a uniform `oneOf`, giving mean offspring exactly `1` — it
-  is **critical**. It still terminates almost surely, but with *infinite expected size*.
+  is **critical**. It still terminates almost surely, but no finite bound holds of its expected
+  cost (`genTree.not_expected_cost_bounded`), which is one choice per constructor.
 - `genWeightedTree` uses `frequency` to make the leaf branch twice as likely (mean offspring `2/3`),
-  making it **subcritical** and giving finite expected size.
-
-The `expectedSteps` theorems at the end make the contrast quantitative: `3` for the weighted
-generator versus `⊤` for the critical one.
+  making it **subcritical**, with expected cost at most `3` (`genWeightedTree.cost`).
 -/
 
 open RandomChoice
@@ -43,9 +41,9 @@ def Tree.isAllTwos : Tree → Prop
 def Tree.cost : Tree → Nat := fun t => 3 * t.size + 1
 
 /-- Generates an all-`2`s tree with a uniform `oneOf`. Mean offspring `1`: critical, so almost surely
-terminating but with infinite expected size. -/
+terminating, with no finite bound on its expected cost (`genTree.not_expected_cost_bounded`). -/
 def genTree [Gen G] : G Tree :=
-  oneOf [
+  oneOf! [
     fun _ => pure .leaf,
     fun _ => do
       let l ← genTree
@@ -56,16 +54,17 @@ partial_fixpoint
 theorem genTree.sound_complete : IsSoundAndComplete genTree Tree.isAllTwos := by
   refine .intro ?sound ?complete
   case sound =>
-    sound_fixpoint
+    rw [IsSoundFor.iff_obs]
+    walk fixpoint
     all_goals simp_all [Tree.isAllTwos]
   case complete =>
     intro t
     induction t with
-    | leaf => intro _; rw [genTree]; complete_bound
+    | leaf => intro _; rw [genTree, SPMF.mem_support_iff_may]; walk
     | node l v r ihl ihr =>
       intro ⟨hv, hl, hr⟩
       subst hv
-      rw [genTree]; complete_bound
+      rw [genTree, SPMF.mem_support_iff_may]; walk
       exact ⟨l, ihl hl, r, ihr hr, rfl⟩
 
 theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
@@ -74,8 +73,28 @@ theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genTree.cost_bounded : IsCostBounded genTree Tree.cost := by
-  cost_fixpoint
+  rw [IsCostBounded.iff_obs]
+  walk fixpoint
   all_goals simp only [Tree.cost, Tree.size] at *; omega
+
+theorem genTree.faithful : IsFaithful genTree := by
+  faithful_fixpoint [genTree.terminates]
+
+theorem genTree.cost_faithful : IsCostFaithful genTree := ⟨by walk fixpoint, by walk fixpoint⟩
+
+open scoped ENNReal in
+/-- Unfolded once, the expected cost `E` is at least `1 + E`: one choice, then two subtrees half the
+time. -/
+theorem genTree.not_expected_cost_bounded {B : ℝ≥0∞} (hB : B ≠ ⊤) :
+    ¬ IsExpectedCostBounded (genTree : SPMF.Cost Tree) B := by
+  have hm := genTree.cost_faithful.one_le_mass genTree.terminates
+  refine IsExpectedCostBounded.not_of_step one_ne_zero hB ?_
+  conv_rhs => rw [genTree]
+  walk [SPMF.Cost.le_expect_add (x := genTree) (h := fun _ n => (n : ℝ≥0∞)) hm le_rfl]
+  generalize SPMF.Cost.expectObs.spec (genTree : SPMF.Cost Tree) (fun _ n => (n : ℝ≥0∞)) = E
+  norm_num
+  rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num)]
+  exact le_of_eq (by ring)
 
 section weighted
 
@@ -83,7 +102,7 @@ open scoped NNReal ENNReal
 
 /-- Generates an all-`2`s tree, but weights the leaf branch twice as heavily as the node branch. -/
 def genWeightedTree [Gen G] : G Tree :=
-  frequency [
+  frequency! [
     (2, fun _ => pure .leaf),
     (1, fun _ => do
       let l ← genWeightedTree
@@ -97,17 +116,15 @@ theorem genWeightedTree.terminates : IsAlmostSurelyTerminating genWeightedTree :
     (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
-/-- Expected size of the subcritical `genWeightedTree`: `1 / (1 - 2/3) = 3`. -/
-theorem genWeightedTree_expectedSteps :
-    SPMF.LevelOp.expectedSteps (fun e (j : Unit) => 2 / 3 * e j) () = 3 := by
-  rw [SPMF.LevelOp.expectedSteps_const_mul,
-    show (1 : ℝ≥0∞) - 2 / 3 = 1 / 3 from by ennreal_to_real; norm_num, one_div, inv_inv]
+theorem genWeightedTree.faithful : IsFaithful genWeightedTree := by
+  faithful_fixpoint [genWeightedTree.terminates]
 
-/-- Expected size of the critical `genTree` is infinite, even though it terminates a.s. -/
-theorem genTree_expectedSteps_infinite :
-    SPMF.LevelOp.expectedSteps (fun e (j : Unit) => 1 * e j) () = ⊤ := by
-  rw [SPMF.LevelOp.expectedSteps_const_mul]
-  simp
+/-- One choice per constructor, `1 / (1 - 2/3) = 3` of them on average. -/
+theorem genWeightedTree.cost : IsExpectedCostBounded (genWeightedTree : SPMF.Cost Tree) 3 := by
+  rw [IsExpectedCostBounded.iff_obs]
+  walk fixpoint
+  norm_num
+  exact ENNReal.div_le_of_le_mul (by norm_num)
 
 end weighted
 

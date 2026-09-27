@@ -27,10 +27,11 @@ def LfpIsOne [Preorder β] [One β] (T : β → β) : Prop :=
   ∀ c ≤ 1, T c ≤ c → c = 1
 
 /-- **The termination criterion.** If one unfolding of the family `g` bounds its masses below by
-`T c` whenever `c` bounds them below, and `T` has least fixed point `1`, every member is a PMF. -/
-theorem IsPMF_of_lfp_eq_one (g : ι → SPMF α) {T : (ι → ℝ≥0∞) → (ι → ℝ≥0∞)} (hT : LfpIsOne T)
-    (hstep : ∀ c ≤ 1, (∀ j, c j ≤ (g j).mass) → ∀ i, T c i ≤ (g i).mass) :
-    ∀ i, IsPMF (g i) := by
+`T c` whenever `c` bounds them below, and `T` has least fixed point `1`, every member has mass
+`1`. -/
+theorem mass_eq_one_of_lfpIsOne (g : ι → SPMF α) {T : (ι → ℝ≥0∞) → (ι → ℝ≥0∞)}
+    (hT : LfpIsOne T) (hstep : ∀ c ≤ 1, (∀ j, c j ≤ (g j).mass) → ∀ i, T c i ≤ (g i).mass) :
+    ∀ i, (g i).mass = 1 := by
   have hle : (fun j => (g j).mass) ≤ 1 := fun j => mass_le_one _
   exact congrFun (hT _ hle fun i => hstep _ hle (fun _ => le_rfl) i)
 
@@ -42,14 +43,13 @@ theorem LfpIsOne.iInf [Nonempty ι] {F : ℝ≥0∞ → ℝ≥0∞} (hF : LfpIsO
   funext i
   exact le_antisymm (hc i) (hinf.symm.le.trans (iInf_le _ i))
 
-/-- The criterion with one bound `c` for every member of the family, which is what a recursive
-occurrence is discharged by. -/
-theorem IsPMF_of_lfp_eq_one_uniform (g : ι → SPMF α) {F : ℝ≥0∞ → ℝ≥0∞} (hF : LfpIsOne F)
+/-- The criterion with one bound `c` for every member of the family. -/
+theorem mass_eq_one_of_lfpIsOne_uniform (g : ι → SPMF α) {F : ℝ≥0∞ → ℝ≥0∞} (hF : LfpIsOne F)
     (hstep : ∀ c ≤ 1, (∀ j, c ≤ (g j).mass) → ∀ i, F c ≤ (g i).mass) :
-    ∀ i, IsPMF (g i) := by
+    ∀ i, (g i).mass = 1 := by
   intro i
   have : Nonempty ι := ⟨i⟩
-  refine IsPMF_of_lfp_eq_one g hF.iInf (fun c hc hrec k => hstep _ ?_ ?_ k) i
+  refine mass_eq_one_of_lfpIsOne g hF.iInf (fun c hc hrec k => hstep _ ?_ ?_ k) i
   · exact (iInf_le _ i).trans (hc i)
   · exact fun j => (iInf_le _ j).trans (hrec j)
 

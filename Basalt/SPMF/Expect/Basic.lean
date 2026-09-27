@@ -137,6 +137,18 @@ theorem prob_singleton (p : SPMF α) (a : α) : prob p {a} = p a := by
   · intro b hb
     simp [Set.indicator, hb]
 
+theorem expect_ite_eq [DecidableEq α] (p : SPMF α) (a : α) :
+    expect p (fun b => if b = a then 1 else 0) = p a := by
+  unfold expect
+  rw [tsum_eq_single a fun b hb => by simp [hb]]
+  simp
+
+/-- Distributions agree when their expectations do. -/
+theorem ext_expect {p q : SPMF α} (h : ∀ f, expect p f = expect q f) : p = q := by
+  ext a
+  rw [← prob_singleton, ← prob_singleton]
+  exact h _
+
 theorem prob_pure (a : α) (E : Set α) [Decidable (a ∈ E)] :
     prob (Pure.pure a : SPMF α) E = if a ∈ E then 1 else 0 := by
   unfold prob

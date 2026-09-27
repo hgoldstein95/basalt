@@ -41,10 +41,6 @@ info: BST.Tree.genBST 0 10 — 200 draws (seed 0, fuel 10000)
     BST.Tree.node (BST.Tree.leaf) 10 (BST.Tree.leaf)
     BST.Tree.leaf
     BST.Tree.leaf
-
-  laws: sound_complete ✓  terminates ✓  cost_bounded ✓
-        filter_free     — (not proved)
-        productive      — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 200) BST.Tree.genBST 0 10
@@ -72,10 +68,6 @@ info: BST.Tree.genWeightedBST 0 10 — 200 draws (seed 0, fuel 10000)
     BST.Tree.node (BST.Tree.node (BST.Tree.leaf) 0 (BST.Tree.leaf)) 10 (BST.Tree.leaf)
     BST.Tree.leaf
     BST.Tree.leaf
-
-  laws: sound_complete ✓  terminates ✓  cost_bounded ✓
-        filter_free     — (not proved)
-        productive      — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 200) (size := BST.Tree.size) BST.Tree.genWeightedBST 0 10
@@ -90,20 +82,15 @@ info: AllTwoTree.genTree — 1000 draws (seed 0, fuel 10000)
   head constructor
     leaf    50.6%  (503)
     node    49.4%  (492)
-
-  laws: sound_complete ✓  terminates ✓  cost_bounded ✓
-        filter_free     — (not proved)
-        productive      — (not proved)
 -/
 #guard_msgs in
 #genstats AllTwoTree.genTree
 
 /-
-The subcritical variant (`m = 2/3`): the branching-process theory predicts an expected
-`1/(1 - 2/3) = 3` constructors (`AllTwoTree.genWeightedTree_expectedSteps`), and the measured
-mean below is 2.9 — against `genTree`'s fueled mean of 75.4 with a 9851-node maximum above.
-The size function counts constructors (`2 * size + 1` for a binary tree), matching what
-`LevelOp.expectedSteps` counts.
+The subcritical variant (`m = 2/3`) makes at most `3` choices on average, one per constructor
+(`AllTwoTree.genWeightedTree.cost`), and the measured mean below is 2.9 — against `genTree`'s fueled
+mean of 75.4 with a 9851-node maximum above. The size function counts constructors
+(`2 * size + 1` for a binary tree).
 -/
 /--
 info: AllTwoTree.genWeightedTree — 200 draws (seed 0, fuel 10000)
@@ -115,12 +102,6 @@ info: AllTwoTree.genWeightedTree — 200 draws (seed 0, fuel 10000)
   head constructor
     leaf    65.5%  (131)
     node    34.5%   (69)
-
-  laws: terminates ✓
-        sound_complete  — (not proved)
-        cost_bounded    — (not proved)
-        filter_free     — (not proved)
-        productive      — (not proved)
 -/
 #guard_msgs in
 #genstats (draws := 200) (size := fun t => 2 * t.size + 1) AllTwoTree.genWeightedTree

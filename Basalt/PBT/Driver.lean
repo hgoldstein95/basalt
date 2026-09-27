@@ -42,13 +42,9 @@ def plausibleBackend : Backend where
   name := "plausible"
   campaign T argv := plausibleCampaign T (runsOf argv) (discardRatioOf argv)
 
-/-- Report a usage error and exit nonzero.
-
-The exit code is the point. A campaign reports its verdict *only* through the exit status, so while
-these paths exited `0` a misspelled property name was indistinguishable from a property that passed:
-the `.github/workflows/fuzz_build.yml` steps that assert "this property must fail" would have read
-that `0` as the property having survived a campaign that never ran. `2` also distinguishes it from a
-counterexample (`77` at `IO`/`Plausible`, libFuzzer's own code under the fuzzer). -/
+/-- Report a usage error and exit with code `2`. A campaign reports its verdict only through its exit
+status, so a usage error must read as neither a pass (`0`) nor a counterexample (`77` at
+`IO`/`Plausible`, libFuzzer's own code under the fuzzer). -/
 def usageError (msg : String) : IO α := do
   IO.eprintln msg
   IO.Process.exit 2
