@@ -224,6 +224,33 @@ example : IsSoundFor (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := b
   trace_state
   omega
 
+/-! `suchThat` returns what its generator produces and its predicate accepts: the generator's fact
+when one is passed, and the predicate alone otherwise. -/
+
+/--
+trace: x✝ : ℕ
+h_x✝ : x✝ = 2 ∧ (x✝ != 3) = true
+⊢ x✝ = 2
+-/
+#guard_msgs in
+example : IsSoundFor (suchThat genTwo (· != 3) : SPMF Nat) (· = 2) := by
+  rw [IsSoundFor.iff_obs]
+  walk [genTwo.sound.obs]
+  trace_state
+  next _ h => exact h.1
+
+/--
+trace: x✝ : ℕ
+h_x✝ : (x✝ != 0) = true
+⊢ x✝ ≠ 0
+-/
+#guard_msgs in
+example : IsSoundFor (suchThat (elements [0, 1]) (· != 0) : SPMF Nat) (· ≠ 0) := by
+  rw [IsSoundFor.iff_obs]
+  walk
+  trace_state
+  next _ h => simpa using h
+
 /-! `permutationOf` asks nothing of the postcondition: the value it draws carries its proof. -/
 
 /--

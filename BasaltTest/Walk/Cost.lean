@@ -253,4 +253,15 @@ example : SPMF.Cost.worstObs.spec (listOf (chooseNat 0 1) : SPMF.Cost (List Nat)
     (fun _ n => (n : ℕ∞)) ≤ ⊤ := by
   walk
 
+-- Rejection sampling has no cost bound: any number of rejected draws can precede a value.
+/--
+error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
+  suchThat (elements [0, 1] ⋯) fun x => x != 0
+Pass a fact about it to `walk [_]`.
+-/
+#guard_msgs in
+example : IsCostBounded (suchThat (elements [0, 1]) (· != 0) : SPMF.Cost Nat) (fun _ => 1) := by
+  rw [IsCostBounded.iff_obs]
+  walk
+
 end CostBoundTest

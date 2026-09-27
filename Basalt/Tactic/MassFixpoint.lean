@@ -11,8 +11,8 @@ import Basalt.Walk.Mass
 
 `mass_fixpoint` reduces a `.terminates` law to its criterion,
 `IsAlmostSurelyTerminating.of_lfpIsOne`: it builds the family over the generator's seed, unfolds one
-step, and walks it. The list combinators' termination facts live here because they are proved with
-it.
+step, and walks it. The termination facts of the list combinators and of `suchThat` live here
+because they are proved with it.
 -/
 
 open ENNReal RandomChoice
@@ -237,6 +237,62 @@ theorem le_expect_nonEmptyListOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List �
     (hg : c ≤ expectObs.spec g fun _ => 1) :
     (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (nonEmptyListOf g) p :=
   le_expect_iInf_of_le (ite_le_nonEmptyListOf hg)
+
+/-- One step of rejection sampling: a draw accepted with chance at least `1 - r`, or else a retry of
+mass at least `c`. -/
+private theorem le_expect_accept {g : SPMF α} {p : α → Bool} {r c : ℝ≥0∞}
+    (hg : IsAlmostSurelyTerminating g) (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r)
+    (hr1 : r ≤ 1) (hc : c ≤ 1) :
+    (1 - r) + r * c ≤ expectObs.spec g fun a => if p a then 1 else c := by
+  have hsum : (expectObs.spec g fun a => if p a then 1 else c)
+      + (1 - c) * expectObs.spec g (fun a => if p a then 0 else 1) = 1 := by
+    show expect g _ + (1 - c) * expect g _ = 1
+    rw [← expect_mul_left, ← expect_add,
+      show (fun a => (if p a then 1 else c) + (1 - c) * if p a then 0 else 1) = fun _ => (1 : ℝ≥0∞)
+        from funext fun a => by split <;> simp [add_tsub_cancel_of_le hc],
+      expect_one]
+    exact hg
+  have hone : (1 - r) + r * c + (1 - c) * r = 1 := by
+    rw [add_assoc, mul_comm (1 - c), ← mul_add, add_tsub_cancel_of_le hc, mul_one,
+      tsub_add_cancel_of_le hr1]
+  refine ENNReal.le_of_add_le_add_right (a := (1 - c) * r)
+    (ENNReal.mul_ne_top (ENNReal.sub_ne_top ENNReal.one_ne_top)
+      (ne_top_of_le_ne_top ENNReal.one_ne_top hr1)) ?_
+  calc (1 - r) + r * c + (1 - c) * r = 1 := hone
+    _ = _ := hsum.symm
+    _ ≤ _ := by gcongr
+
+theorem isAlmostSurelyTerminating_suchThat {g : SPMF α} {p : α → Bool} {r : ℝ≥0∞}
+    (hg : IsAlmostSurelyTerminating g) (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r)
+    (hr1 : r < 1) : IsAlmostSurelyTerminating (suchThat g p) := by
+  mass_fixpoint [le_expect_accept hg hr hr1.le hc1] using LfpIsOne.affine (m := r) hr1
+  exact le_rfl
+
+private theorem ite_le_suchThat {g : SPMF α} {p : α → Bool} {c r : ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1)
+    (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r) :
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) ≤ expectObs.spec (suchThat g p) fun _ => 1 := by
+  split
+  · rename_i h
+    exact (isAlmostSurelyTerminating_suchThat
+      (IsAlmostSurelyTerminating.iff_obs.mpr (h.1.trans hg)) hr h.2).obs
+  · exact zero_le
+
+/-- Rejection sampling terminates when `g` does and rejects with a chance `r < 1`, which the bound
+asks of the arithmetic: a fact about how often `g` rejects closes `hr`. -/
+@[gen_rule]
+theorem le_expect_suchThat {g : SPMF α} {p : α → Bool} {c r d : ℝ≥0∞} {post : α → ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1)
+    (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r) (hp : ∀ a, post a = d) :
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) * d ≤ expectObs.spec (suchThat g p) post :=
+  le_expect_of_le (ite_le_suchThat hg hr) hp
+
+@[gen_rule, inherit_doc le_expect_vectorOf_iInf]
+theorem le_expect_suchThat_iInf {g : SPMF α} {p : α → Bool} {c r : ℝ≥0∞} {post : α → ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1)
+    (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r) :
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) * ⨅ a, post a ≤ expectObs.spec (suchThat g p) post :=
+  le_expect_iInf_of_le (ite_le_suchThat hg hr)
 
 end combinators
 

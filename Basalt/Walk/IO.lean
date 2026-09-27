@@ -46,6 +46,11 @@ theorem approx_nonEmptyListOf {g' : IOModel α} {g : IO α} (hg : Approx g' g) :
   genRel.nonEmptyListOf hg
 
 @[gen_rule]
+theorem approx_suchThat {g' : IOModel α} {g : IO α} (p : α → Bool) (hg : Approx g' g) :
+    Approx (suchThat g' p) (suchThat g p) :=
+  genRel.suchThat p hg
+
+@[gen_rule]
 theorem approx_permutationOf (xs : List α) : Approx (permutationOf xs) (permutationOf xs) :=
   genRel.permutationOf xs
 

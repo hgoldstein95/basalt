@@ -121,6 +121,13 @@ theorem nonEmptyListOf {g' : M α} {g : N α} (hg : R g' g) :
   exact h.oneOf (.cons (h.bind (fun _ => h.pure _) hg)
     (.cons (h.bind (fun _ => h.bind (fun _ => h.pure _) ih) hg) .nil))
 
+theorem suchThat {g' : M α} {g : N α} (p : α → Bool) (hg : R g' g) :
+    R (suchThat g' p) (suchThat g p) := by
+  refine _root_.suchThat.fixpoint_induct (G := M) g' p (fun y => R y (_root_.suchThat g p))
+    (h.admissible _) fun z ih => ?_
+  rw [_root_.suchThat]
+  exact h.bind (fun a => GenRel.ite (R := @R) (fun _ => h.pure a) fun _ => ih) hg
+
 theorem permutationOf (xs : List α) : R (permutationOf xs) (permutationOf xs) := by
   induction xs with
   | nil => exact h.pure _

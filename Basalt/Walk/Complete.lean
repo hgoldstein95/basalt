@@ -10,10 +10,10 @@ import Basalt.Walk.Attr
 # Walking Completeness
 
 What the walk needs of `SPMF.mayObs`, on which `a ∈ SPMF.support g` is `mayObs.spec g (· = a)`:
-how a fact about a sub-generator closes a leaf, and the rules of the list combinators. A lower bound
-on a least fixed point needs a ranking, which is the user's induction (`IsCompleteFor.of_measure`),
-so there is no admissibility here, and a recursive occurrence is left in the precondition as
-itself.
+how a fact about a sub-generator closes a leaf, and the rules of the list combinators and of
+`suchThat`. A lower bound on a least fixed point needs a ranking, which is the user's induction
+(`IsCompleteFor.of_measure`), so there is no admissibility here, and a recursive occurrence is left
+in the precondition as itself.
 -/
 
 open RandomChoice
@@ -76,6 +76,14 @@ theorem le_may_nonEmptyListOf (hg : ∀ a, R a → mayObs.spec g (· = a)) :
     ⟨xs, mem_support_nonEmptylistOf.mpr ⟨hne, fun x hx => mem_of_may hg x (hR x hx)⟩, hp⟩
 
 end generatorArgument
+
+/-- `suchThat` reaches what `g` reaches and `p` accepts, however rarely `p` accepts. -/
+@[gen_rule]
+theorem le_may_suchThat {α : Type} {g : SPMF α} {p : α → Bool} {R post : α → Prop}
+    (hg : ∀ a, R a → mayObs.spec g (· = a)) :
+    (∃ a, (R a ∧ p a = true) ∧ post a) ≤ mayObs.spec (suchThat g p) post :=
+  fun ⟨a, ⟨hR, hp⟩, hpost⟩ =>
+    ⟨a, mem_support_suchThat.mpr ⟨mem_support_iff_may.mpr (hg a hR), hp⟩, hpost⟩
 
 @[gen_rule]
 theorem le_may_permutationOf {α : Type} {xs : List α} {p : { ys // xs.Perm ys } → Prop} :

@@ -232,4 +232,18 @@ example (n : Nat) : (1 : ℝ≥0∞) ≤ (byCases n : SPMF Nat).mass := by
   trace_state
   all_goals simp
 
+-- `suchThat` terminates when its generator does and rejects with a chance below `1`, both of which
+-- the bound leaves to the arithmetic.
+/--
+trace: ⊢ 1 ≤
+    (if 1 ≤ 1 ∧ (List.map (fun x => if (x != 0) = true then 0 else 1) [0, 1]).sum / ↑[0, 1].length < 1 then 1 else 0) *
+      1
+-/
+#guard_msgs in
+example : (1 : ℝ≥0∞) ≤ (suchThat (elements [0, 1]) (· != 0) : SPMF Nat).mass := by
+  rw [SPMF.mass_eq_obs]
+  walk
+  trace_state
+  simp
+
 end MassBoundTest

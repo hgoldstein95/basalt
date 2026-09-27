@@ -710,4 +710,34 @@ theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
     · simp at h1
       omega
 
+/-- Draws from `g` until the value drawn satisfies `p`: rejection sampling. It terminates exactly
+when `g` accepts with positive probability, and each rejected draw costs as much as an accepted one;
+the rules that bound it ask for how often `g` rejects. -/
+def suchThat [Gen G] (g : G α) (p : α → Bool) : G α := do
+  let a ← g
+  if p a then pure a else suchThat g p
+partial_fixpoint
+
+@[partial_fixpoint_monotone]
+theorem monotone_suchThat [Gen G] {γ : Sort w} [PartialOrder γ]
+    (g : γ → G α) (p : α → Bool) (hg : monotone g) :
+    monotone (fun x => suchThat (g x) p) := by
+  unfold monotone
+  intro x y hxy
+  show suchThat (g x) p ⊑ suchThat (g y) p
+  generalize hw : suchThat (g y) p = w
+  delta suchThat
+  apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
+  · intro c hc hall
+    apply Lean.Order.csup_le <;> assumption
+  · intro z hz
+    subst hw
+    unfold suchThat
+    apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
+    apply MonoBind.bind_mono_right
+    intro a
+    split
+    · apply PartialOrder.rel_refl
+    · assumption
+
 end recursive_combinators

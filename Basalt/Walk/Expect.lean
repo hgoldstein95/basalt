@@ -9,8 +9,8 @@ import Basalt.Walk.Average
 # Walking Expectation Bounds
 
 What the walk needs of an upper bound `SPMF.expectObs.spec g f ≤ B`: how a fact about a
-sub-generator closes a leaf, the rules of the list combinators, and the admissibility
-`walk fixpoint` inducts with.
+sub-generator closes a leaf, the rules of the list combinators and of `suchThat`, and the
+admissibility `walk fixpoint` inducts with.
 -/
 
 open ENNReal RandomChoice
@@ -80,6 +80,12 @@ variable {α : Type} {g : SPMF α} {p : List α → ℝ≥0∞} {d : ℝ≥0∞}
     expectObs.spec (nonEmptyListOf g) p ≤ ⨆ a, p a := expect_le_iSup
 
 end listCombinators
+
+@[gen_rule] theorem expect_suchThat_le_const {g : SPMF α} {p' : α → Bool} {p : α → ℝ≥0∞}
+    {d : ℝ≥0∞} (hp : ∀ a, p a = d) : expectObs.spec (suchThat g p') p ≤ d := expect_le_of_const hp
+
+@[gen_rule] theorem expect_suchThat_le_iSup {g : SPMF α} {p' : α → Bool} {p : α → ℝ≥0∞} :
+    expectObs.spec (suchThat g p') p ≤ ⨆ a, p a := expect_le_iSup
 
 @[gen_rule] theorem expect_permutationOf_le_const {xs : List α}
     {p : { ys // xs.Perm ys } → ℝ≥0∞} {d : ℝ≥0∞} (hp : ∀ a, p a = d) :

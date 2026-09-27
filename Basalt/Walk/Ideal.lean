@@ -48,6 +48,11 @@ theorem below_nonEmptyListOf {g' : SPMF α} {g : WordModel σ α} (hg : src.Belo
   src.genRel.nonEmptyListOf hg
 
 @[gen_rule]
+theorem below_suchThat {g' : SPMF α} {g : WordModel σ α} (p : α → Bool) (hg : src.Below g' g) :
+    src.Below (suchThat g' p) (suchThat g p) :=
+  src.genRel.suchThat p hg
+
+@[gen_rule]
 theorem below_permutationOf (xs : List α) : src.Below (permutationOf xs) (permutationOf xs) :=
   src.genRel.permutationOf xs
 
