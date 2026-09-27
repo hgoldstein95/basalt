@@ -11,7 +11,8 @@ import BasaltExamples.BST
 
 `Tree.genBSTByFiltering` draws a tree sized by `n` with keys in `[lo, hi]`, and retries until it
 draws a search tree. Its source is only known to accept its leaves, a `1 / (n + 1)` share of its
-draws (`Tree.genTree.reject_le`); compare `NonEmptyList.lean`, whose source rarely rejects.
+draws, so the bound on its expected cost is its source's times `n + 1`
+(`Tree.genBSTByFiltering.cost`); compare `NonEmptyList.lean`, whose source rarely rejects.
 -/
 
 open RandomChoice
@@ -109,5 +110,57 @@ theorem Tree.genBSTByFiltering.terminates {lo hi : Int} (h : lo ≤ hi) (n : Nat
   walk [(Tree.genTree.terminates h n).obs, Tree.genTree.reject_le h n]
   rw [ite_eq_left ⟨le_rfl, ENNReal.div_lt_of_lt_mul (by
     rw [one_mul]; exact_mod_cast n.lt_succ_self)⟩, one_mul]
+
+/-! ## Cost -/
+
+theorem Tree.genTree.cost {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
+    IsExpectedCostBounded (Tree.genTree lo hi h n : SPMF.Cost (Tree Int)) (3 * n + 1) := by
+  induction n using Nat.strong_induction_on with
+  | _ n ih =>
+    rw [IsExpectedCostBounded.iff_obs, Tree.genTree]
+    rcases Nat.eq_zero_or_pos n with rfl | hn
+    · rw [dite_eq_left rfl]; walk; simp
+    · rw [dite_eq_right (by omega)]
+      walk [(ih (n / 2) (by omega)).obs]
+      simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]
+      refine ENNReal.div_le_of_le_mul ?_
+      have h2 := Nat.mul_le_mul_left n (Nat.div_mul_le_self n 2)
+      exact_mod_cast (show 1 * (1 + 0) + n * (1 + 1 + 3 * (n / 2) + 1 + (3 * (n / 2) + 1))
+        ≤ (3 * n + 1) * (1 + (n + 0)) by nlinarith)
+
+@[inherit_doc Tree.genTree.reject_le]
+theorem Tree.genTree.reject_le_cost {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
+    SPMF.Cost.expectObs.spec (Tree.genTree lo hi h n : SPMF.Cost (Tree Int))
+      (fun t _ => if t.isBSTb lo hi = true then 0 else 1) ≤ n / (n + 1) := by
+  have hle : ∀ m (p : Tree Int → ℕ → ℝ≥0∞),
+      SPMF.Cost.expectObs.spec (Tree.genTree lo hi h m : SPMF.Cost (Tree Int)) p ≤
+        ⨆ a, ⨆ k, p a k :=
+    fun _ _ => SPMF.Cost.expect_le_iSup
+  rw [Tree.genTree]
+  rcases Nat.eq_zero_or_pos n with rfl | hn
+  · rw [dite_eq_left rfl]; walk; simp [Tree.isBSTb]
+  · rw [dite_eq_right (by omega)]
+    walk [hle]
+    have hS := average_le (lo := lo) (hi := hi) (d := 1)
+      (F := fun x => ⨆ a, ⨆ _k : ℕ, ⨆ b, ⨆ _k' : ℕ,
+        if (Tree.node a x b).isBSTb lo hi = true then (0 : ℝ≥0∞) else 1) fun x => by
+        simp only [iSup_le_iff]; intros; split <;> simp
+    simp only [show (Tree.leaf : Tree Int).isBSTb lo hi = true from rfl, ite_true, List.map_cons,
+      List.map_nil, List.sum_cons, List.sum_nil, Nat.cast_one, one_mul, add_zero, Nat.cast_add,
+      zero_add]
+    rw [add_comm (1 : ℝ≥0∞)]
+    gcongr
+    exact mul_le_of_le_one_right' hS
+
+/-- `n + 1` times its source's expected cost: one draw, and `n / (n + 1)` of a retry. -/
+theorem Tree.genBSTByFiltering.cost {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
+    IsExpectedCostBounded (Tree.genBSTByFiltering lo hi h n : SPMF.Cost (Tree Int))
+      ((n + 1) * (3 * n + 1)) := by
+  rw [IsExpectedCostBounded.iff_obs]
+  walk [(Tree.genTree.cost h n).obs, Tree.genTree.reject_le_cost h n]
+  rw [zero_add]
+  refine SPMF.Cost.div_one_sub_le (by finiteness) ?_
+  rw [← mul_assoc, ENNReal.div_mul_cancel (by simp) (by simp)]
+  exact le_of_eq (by ring)
 
 end BST

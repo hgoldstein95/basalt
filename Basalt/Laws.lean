@@ -119,3 +119,22 @@ theorem IsCostBounded.obs {g : SPMF.Cost α} {c : α → Nat} (h : IsCostBounded
 theorem IsCostBounded.mono {g : SPMF.Cost α} {c₁ c₂ : α → Nat} (h : IsCostBounded g c₁)
     (hc : ∀ a, c₁ a ≤ c₂ a) : IsCostBounded g c₂ :=
   fun p hp => (h p hp).trans (hc p.1)
+
+/-- Producing a value takes at most `B` random choices on average. Unlike `IsCostBounded`, a run may
+spend choices its value does not show — a retry, an absorbed duplicate — as long as the average
+stays within `B`. A run that never returns has no mass, so this says nothing of termination: with
+`IsAlmostSurelyTerminating` and a finite `B`, the generator terminates positively almost surely. -/
+def IsExpectedCostBounded (g : SPMF.Cost α) (B : ℝ≥0∞) : Prop :=
+  SPMF.expect g (fun p => (p.2 : ℝ≥0∞)) ≤ B
+
+theorem IsExpectedCostBounded.iff_obs {g : SPMF.Cost α} {B : ℝ≥0∞} :
+    IsExpectedCostBounded g B ↔ SPMF.Cost.expectObs.spec g (fun _ n => (n : ℝ≥0∞)) ≤ B :=
+  Iff.rfl
+
+theorem IsExpectedCostBounded.obs {g : SPMF.Cost α} {B : ℝ≥0∞} (h : IsExpectedCostBounded g B) :
+    SPMF.Cost.expectObs.spec g (fun _ n => (n : ℝ≥0∞)) ≤ B :=
+  h
+
+theorem IsExpectedCostBounded.mono {g : SPMF.Cost α} {B₁ B₂ : ℝ≥0∞}
+    (h : IsExpectedCostBounded g B₁) (hB : B₁ ≤ B₂) : IsExpectedCostBounded g B₂ :=
+  h.trans hB

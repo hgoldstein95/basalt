@@ -51,7 +51,8 @@ For a list generator that flips a coin per element, the bound is `fun xs => xs.l
 
 Keep the bound *tight*: a precise bound is what catches accidental backtracking or other
 inefficiency, and (see the cost recipe) a too-tight bound fails as a legible `omega` goal that
-shows you exactly which term is missing.
+shows you exactly which term is missing. A generator that retries or discards draws has no such
+bound; bound its expected cost instead (Recipe 3).
 
 ### Step 3: Create and Validate Your Generator
 
@@ -115,6 +116,7 @@ direction of the bound, and who supplies the induction:
 | Completeness, `a ∈ SPMF.support g` | `SPMF.mem_support_iff_may` | angelic: `∃`, `∨` | lower | yours, on the value or on `P` | one goal: an `∃` per draw, an `∨` per choice, recursive occurrences as themselves |
 | Termination, `IsAlmostSurelyTerminating g` | `IsAlmostSurelyTerminating.iff_obs` | average | lower | `mass_fixpoint using <certificate>` | `F c ≤ <computed bound>`, in `ℝ≥0∞` |
 | Cost, `IsCostBounded g c` | `IsCostBounded.iff_obs` | demonic | lower, by `True` | `walk fixpoint` | one arithmetic goal per path |
+| Expected cost, `IsExpectedCostBounded g B` | `IsExpectedCostBounded.iff_obs` | average | upper | `walk fixpoint` | `<computed bound> ≤ B`, in `ℝ≥0∞` |
 | Expected value, `SPMF.expect g f ≤ B` | `SPMF.expect_eq_obs` | average | upper | `walk fixpoint` | `<computed bound> ≤ B`, in `ℝ≥0∞` |
 
 The induction column is forced. Fixpoint induction proves what holds of the generator that never
@@ -256,9 +258,10 @@ call: a two-branch `oneOf` with one recursive branch has `m = 1/2`;
 `frequency [(2, leaf…), (1, node…)]` with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a
 quadratic, `a = 2/3`, `d = 1/3`; a two-branch `oneOf` between a leaf and two calls is the quadratic
 `a = d = 1/2`. **A critical generator
-(`m = 1`) terminates but has infinite expected size** (`AllTwoTree.genTree_expectedSteps_infinite`)
-— reweight it if you can. The side conditions of a certificate are closed numerals: `by norm_num`,
-or `by ennreal_to_real; norm_num`.
+(`m = 1`) terminates but has infinite expected size** (`AllTwoTree.genTree_expectedSteps_infinite`),
+so no finite `IsExpectedCostBounded`: its walk leaves `1 + B ≤ B`
+(`BasaltTest/Walk/ExpectedCost.lean`) — reweight it if you can. The side conditions of a
+certificate are closed numerals: `by norm_num`, or `by ennreal_to_real; norm_num`.
 
 **`mass_fixpoint`** applies the criterion to the family over the generator's seed, unfolds one
 step, and walks it; its docstring says what it leaves in context, `hrec` among it: the bound on
@@ -363,6 +366,33 @@ Adjust the bound in Step 2; nothing else in the proof changes. A bare combinator
 definition to unfold, is `walk` alone (`BasaltTest/Walk/Cost.lean`). A generator recursive by
 `termination_by` is induction on its decreasing argument and `walk [ih.obs]` in each case
 (`BasaltTest/Walk/CostFixpoint.lean`).
+
+**Expected cost.** A generator that discards draws — retrying a rejected value, absorbing a
+duplicate — has no `<COST>`: any number of choices can end in the same value
+(`Tree.genBSTByInsertion.not_cost_bounded`, `BST/ByInsertion.lean`). Bound what a run costs on
+average instead, by `B`, a function of the arguments:
+
+```lean
+theorem <GEN>.cost : IsExpectedCostBounded (<GEN> <ARGS>) <B> := by
+  rw [IsExpectedCostBounded.iff_obs]
+  walk fixpoint [<CALLEES>]
+  <arithmetic>          -- `<computed bound> ≤ <B>`, in `ℝ≥0∞`, with `ih` in context
+```
+
+The walk is Recipe 4's, over `SPMF.Cost.expectObs`, with each draw adding its choice to the cost:
+a recursive occurrence is bounded by `ih`, and a callee by its `IsExpectedCostBounded` law, passed
+as `h.obs`. A generator recursive by `termination_by` is induction on its decreasing argument, as
+above (`Tree.genTree.cost`, `BST/ByFiltering.lean`). `BasaltTest/Walk/ExpectedCost.lean` pins the
+goals.
+
+**Rejection sampling** is `suchThat g p`. Its rule takes `g`'s expected cost `C` and a bound `r` on
+how often `p` rejects, `SPMF.Cost.expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r`, and
+bounds the loop by `C / (1 - r)`; `SPMF.Cost.div_one_sub_le` turns the arithmetic into one step of
+the loop, `C + r * B ≤ B`. The rejection bound is the one fact about `g` a filter needs. Its walk
+bounds a recursive call of `g` by its largest value, passing `SPMF.Cost.expect_le_iSup` as a fact,
+since what `g` builds from the call is what decides acceptance (`Tree.genTree.reject_le_cost`,
+`BST/ByFiltering.lean`). `NonEmptyList.genNonEmpty.cost` (`NonEmptyList.lean`) is the same proof
+for a source that rarely rejects.
 
 ### Recipe 4: Expected Values
 

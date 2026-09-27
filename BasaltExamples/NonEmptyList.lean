@@ -9,8 +9,9 @@ import Basalt
 # Non-Empty Lists by Filtering
 
 `genNonEmpty` draws a list sized by `n` and retries until the list is not empty. Its source rejects
-only a `1 / (n + 1)` share of its draws (`genList.reject_le`); compare `BST/ByFiltering.lean`,
-whose source is only known to accept its leaves.
+only a `1 / (n + 1)` share of its draws, so the retries add a constant to its expected cost
+(`genNonEmpty.cost`); compare `BST/ByFiltering.lean`, whose source is only known to accept its
+leaves.
 -/
 
 open RandomChoice
@@ -100,5 +101,40 @@ theorem genNonEmpty.terminates {n : Nat} (hn : 0 < n) :
   walk [(genList.terminates n).obs, genList.reject_le n]
   rw [ite_eq_left ⟨le_rfl, ENNReal.div_lt_of_lt_mul (by
     rw [one_mul]; exact_mod_cast (show 1 < n + 1 by omega))⟩, one_mul]
+
+/-! ## Cost -/
+
+theorem genList.cost (n : Nat) :
+    IsExpectedCostBounded (genList n : SPMF.Cost (List Nat)) (2 * n + 1) := by
+  rw [IsExpectedCostBounded.iff_obs]
+  walk fixpoint
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]
+  refine ENNReal.div_le_of_le_mul ?_
+  exact_mod_cast (show 1 * (1 + 0) + n * (1 + 1 + (2 * n + 1)) ≤ (2 * n + 1) * (1 + (n + 0))
+    from le_of_eq (by ring))
+
+@[inherit_doc genList.reject_le]
+theorem genList.reject_le_cost (n : Nat) :
+    SPMF.Cost.expectObs.spec (genList n : SPMF.Cost (List Nat))
+      (fun xs _ => if (!xs.isEmpty) = true then 0 else 1) ≤ 1 / (n + 1) := by
+  have hle : ∀ (p : List Nat → ℕ → ℝ≥0∞),
+      SPMF.Cost.expectObs.spec (genList n : SPMF.Cost (List Nat)) p ≤ ⨆ a, ⨆ k, p a k :=
+    fun _ => SPMF.Cost.expect_le_iSup
+  rw [genList]
+  walk [hle]
+  simp [add_comm]
+
+/-- At most three choices more than its source's expected cost, whatever `n`. -/
+theorem genNonEmpty.cost {n : Nat} (hn : 0 < n) :
+    IsExpectedCostBounded (genNonEmpty n : SPMF.Cost (List Nat)) (2 * n + 4) := by
+  rw [IsExpectedCostBounded.iff_obs]
+  walk [(genList.cost n).obs, genList.reject_le_cost n]
+  rw [zero_add]
+  refine SPMF.Cost.div_one_sub_le (by finiteness) ?_
+  have h3 : 1 / ((n : ℝ≥0∞) + 1) * (2 * n + 4) ≤ 3 := by
+    rw [one_div, ← ENNReal.div_eq_inv_mul]
+    exact ENNReal.div_le_of_le_mul (by exact_mod_cast (show 2 * n + 4 ≤ 3 * (n + 1) by omega))
+  calc _ ≤ 2 * (n : ℝ≥0∞) + 1 + 3 := by gcongr
+    _ = 2 * n + 4 := by ring
 
 end NonEmptyList

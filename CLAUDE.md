@@ -30,8 +30,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   worked instances each recipe names. Start there for any per-generator work; do not improvise a
   proof shape.
 - **The laws** (`IsSoundAndComplete` and its halves `IsSoundFor` and `IsCompleteFor`,
-  `IsAlmostSurelyTerminating`, `IsCostBounded`), each but the bundle restated on its observation
-  (`iff_obs`, and `.obs` for a fact), and their introduction lemmas —
+  `IsAlmostSurelyTerminating`, `IsCostBounded`, `IsExpectedCostBounded`), each but the bundle
+  restated on its observation (`iff_obs`, and `.obs` for a fact), and their introduction lemmas —
   [Basalt/Laws.lean](Basalt/Laws.lean); `IsFaithful`, which relates `IO` to `SPMF` and so has no
   observation — [Basalt/IO/Laws.lean](Basalt/IO/Laws.lean).
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
@@ -109,7 +109,9 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); what the walk needs of it:
   [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean), pinned by
   [BasaltTest/Walk/Cost.lean](BasaltTest/Walk/Cost.lean) and, for `walk fixpoint`,
-  [BasaltTest/Walk/CostFixpoint.lean](BasaltTest/Walk/CostFixpoint.lean). The practical entry is
+  [BasaltTest/Walk/CostFixpoint.lean](BasaltTest/Walk/CostFixpoint.lean); for its expectation,
+  [Basalt/Walk/ExpectedCost.lean](Basalt/Walk/ExpectedCost.lean), pinned by
+  [BasaltTest/Walk/ExpectedCost.lean](BasaltTest/Walk/ExpectedCost.lean). The practical entry is
   WORKFLOW.md's Recipe 3.
 - **ENNReal arithmetic** — `ennreal_to_real` in
   [Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean).

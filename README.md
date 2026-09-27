@@ -48,6 +48,9 @@ depends on the generator, and you prove the ones that do:
   (nothing missed), for a generator that has only one.
 - `IsAlmostSurelyTerminating g` — `g` terminates with probability 1.
 - `IsCostBounded g c` — producing `v` takes at most `c v` random choices.
+- `IsExpectedCostBounded g B` — producing a value takes at most `B` random choices on average, so a
+  generator that sometimes retries is allowed. With `IsAlmostSurelyTerminating` and a finite `B`,
+  it says that `g` terminates positively almost surely.
 
 Each but the bundle `IsSoundAndComplete`, which a proof splits into its halves, is defined in the
 form a reader checks, and restated by `<Law>.iff_obs` on the observation a proof walks:

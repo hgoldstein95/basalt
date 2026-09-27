@@ -250,7 +250,26 @@ noncomputable def worstObs : Obs SPMF.Cost.{u} (WPC Mix.sup) where
     · exact le_iSup₂_of_le (a, 1) (mem_support_choose_iff.mpr rfl) le_rfl
 
 
+/-- The expectation observation: the average of the postexpectation over runs and their costs. -/
+noncomputable def expectObs : Obs SPMF.Cost.{u} (WPC Mix.average) where
+  spec g := fun post => SPMF.expect g fun p => post p.1 p.2
+  map_pure a := by
+    funext post
+    exact SPMF.expect_pure (a, 0) _
+  map_bind x k := by
+    funext post
+    show SPMF.expect (x >>= fun p => k p.1 >>= fun q => Pure.pure (q.1, p.2 + q.2)) _ = _
+    simp only [SPMF.expect_bind, SPMF.expect_pure]
+    rfl
+  map_choose lo hi h := by
+    funext post
+    show SPMF.expect ((choose lo hi h : SPMF _) >>= fun a => Pure.pure (a, 1)) _ = _
+    simp only [SPMF.expect_bind, SPMF.expect_pure]
+    rfl
+
 instance : mayObs.MonotoneC := ⟨fun _ _ _ h ⟨q, hq, hp⟩ => ⟨q, hq, h _ _ hp⟩⟩
+
+instance : expectObs.MonotoneC := ⟨fun _ _ _ h => SPMF.expect_mono fun p => h p.1 p.2⟩
 
 instance : alwaysObs.MonotoneC := ⟨fun _ _ _ h hp _ ha => h _ _ (hp _ ha)⟩
 

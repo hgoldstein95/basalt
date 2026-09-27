@@ -53,6 +53,7 @@ import Basalt.Walk.Complete
 import Basalt.Walk.Cost
 import Basalt.Walk.Entry
 import Basalt.Walk.Expect
+import Basalt.Walk.ExpectedCost
 import Basalt.Walk.IO
 import Basalt.Walk.Ideal
 import Basalt.Walk.Mass

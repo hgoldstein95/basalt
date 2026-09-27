@@ -253,7 +253,8 @@ example : SPMF.Cost.worstObs.spec (listOf (chooseNat 0 1) : SPMF.Cost (List Nat)
     (fun _ n => (n : ℕ∞)) ≤ ⊤ := by
   walk
 
--- Rejection sampling has no cost bound: any number of rejected draws can precede a value.
+-- Rejection sampling has no cost bound: any number of rejected draws can precede a value. Only the
+-- expected cost bounds it (`BasaltTest/Walk/ExpectedCost.lean`).
 /--
 error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
   suchThat (elements [0, 1] ⋯) fun x => x != 0
