@@ -302,4 +302,21 @@ example : IsSoundFor (genTwo >>= fun n => pure (n + 1) : SPMF Nat) (· = 3) := b
   rw [IsSoundFor.iff_obs]
   walk [genTwo.sound]
 
+-- A fact that does not elaborate is skipped, and the leaf it was meant for says why.
+/--
+error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
+  ArbNat.Nat.arbitrary
+Pass a fact about it to `walk [_]`.
+The fact
+  (ArbNat.Nat.arbitrary.sound_complete.sound 0).obs
+does not elaborate here: Invalid field `obs`: The environment does not contain `Function.obs`, so it is not possible to project the field `obs` from an expression
+  ArbNat.Nat.arbitrary.sound_complete.sound 0
+of type
+  0 ∈ ArbNat.Nat.arbitrary.support → ⊤ 0
+-/
+#guard_msgs in
+example : IsSoundFor (ArbNat.Nat.arbitrary >>= fun n => pure (n + 1) : SPMF Nat) (0 < ·) := by
+  rw [IsSoundFor.iff_obs]
+  walk [(ArbNat.Nat.arbitrary.sound_complete.sound 0).obs]
+
 end SoundBoundTest

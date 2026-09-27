@@ -539,6 +539,24 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
         return some (← rest (← namePremises none (← goal.getType) gs))
   return none
 
+/-- Why each of `extras` that does not elaborate at `goal` does not, for the error of a leaf nothing
+closed. A fact may name a value drawn at some leaves and not others, so one that does not elaborate
+is skipped rather than rejected, and the leaf it was meant for would otherwise report it missing. -/
+private def unelaboratedFacts (extras : Array Term) (goal : MVarId) : TermElabM MessageData :=
+  goal.withContext do
+  let mut msg := m!""
+  for t in extras do
+    let saved ← saveState
+    try
+      discard <| Term.withoutErrToSorry do
+        let e ← Term.elabTerm t none
+        Term.synthesizeSyntheticMVarsNoPostponing
+        instantiateMVars e
+    catch ex =>
+      msg := msg ++ m!"\nThe fact{indentD t}\ndoes not elaborate here: {ex.toMessageData}"
+    saved.restore
+  return msg
+
 /-- The generator `ty` is about when it states `O.spec g post`, possibly under binders, rather than
 bounding it: a rule's premise about a combinator's generator argument, whose postcondition is the
 rule's to learn, so that only a fact can close it. -/
@@ -575,7 +593,8 @@ partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
   if let some g ← argumentSubject? (← instantiateMVars (← goal.getType)) then
     if let some gs ← tryFacts {} extras goal g (walkAll extras) then return gs
     throwError "no hypothesis or fact gives{indentExpr (← instantiateMVars (← goal.getType))}\nof \
-      a combinator's generator argument. Prove one and pass it to `walk [h.obs]`."
+      a combinator's generator argument. Prove one and pass it to `walk [h.obs]`.\
+      {← unelaboratedFacts extras goal}"
   let ty ← whnfR (← instantiateMVars (← goal.getType))
   -- A rule's premise may be a `∀` (a bind's continuation, an `ite`'s branch condition).
   if let .forallE n _ _ _ := ty then
@@ -630,7 +649,7 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
       not depend on its discriminants, that is applied to nothing further, and, on a relation, \
       whose counterpart is the same `match`."
   if let some gs ← trySelf leaves goal g rest then return gs
-  throwError j.noLeaf g
+  throwError m!"{j.noLeaf g}{← unelaboratedFacts extras goal}"
 
 end
 
