@@ -11,7 +11,8 @@ import BasaltExamples.STLC.GenTerm
 
 `genTerm` is critical: with an empty context at a function type its branches are `genZero`, an
 application (two recursive calls), and an abstraction (one), so its mean offspring is `1`. It
-terminates almost surely, with infinite expected size.
+terminates almost surely; its expected cost has no finite bound
+(`genTerm.not_expected_cost_bounded`, `STLC/Cost.lean`).
 -/
 
 theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by

@@ -410,6 +410,10 @@ equation, and pass its own expected cost as the fact about its recursive calls:
 `IsCostFaithful.one_le_mass` of its termination law. The walk leaves `E`'s one-step inequality. A
 critical generator's is `1 + E ≤ E`, and `IsExpectedCostBounded.not_of_step` turns it into the
 absence of any finite bound (`AllTwoTree.genTree.not_expected_cost_bounded`, `AllTwoTree.lean`).
+When the recursive calls change the generator's arguments, bound each by the least expected cost
+over all of them, `⨅ j, E j`, and conclude with `not_of_step_iInf`
+(`Tree.genHeap.not_expected_cost_bounded`, `Heap.lean`). A callee with no finite bound passes its
+`⊤` on, with no step inequality at all (`genTerm.not_expected_cost_bounded`, `STLC/Cost.lean`).
 
 ### Recipe 4: Expected Values
 

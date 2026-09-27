@@ -5,13 +5,15 @@ Authors: Harrison Goldstein & Ernest Ng
 -/
 import Basalt
 import BasaltExamples.STLC.GenTerm
+import BasaltExamples.STLC.Termination
 import BasaltExamples.STLC.TypeCheck
 
 /-!
-# Cost Bound for `genTerm`
+# Cost Bounds for `genTerm`
 
 `genTerm Γ τ` makes at most `Term.costInCtx Γ e` random choices to produce `e`. The bound needs the
-context, and the proof carries well-typedness alongside the cost.
+context, and the proof carries well-typedness alongside the cost. Yet no finite bound holds of its
+expected cost (`genTerm.not_expected_cost_bounded`).
 -/
 
 /-- The choices `genTerm Γ` makes to produce a term: one `oneOf` per node, one more for a literal or
@@ -57,3 +59,40 @@ theorem genTerm.cost_typed :
 
 theorem genTerm.cost_bounded : IsCostBounded (genTerm Γ τ) (Term.costInCtx Γ) :=
   fun p hp => (genTerm.cost_typed p hp).2
+
+theorem genZero.cost_faithful : IsCostFaithful (genZero Γ τ) where
+  erasedLe := by
+    induction τ generalizing Γ with
+    | Bool => unfold genZero; walk
+    | Fun τ1 τ2 _ ih => unfold genZero; walk
+  leErased := by
+    induction τ generalizing Γ with
+    | Bool => unfold genZero; walk
+    | Fun τ1 τ2 _ ih => unfold genZero; walk
+
+theorem genTerm.cost_faithful : IsCostFaithful (genTerm Γ τ) :=
+  ⟨by walk fixpoint [genZero.cost_faithful.erasedLe, genType.cost_faithful.erasedLe],
+    by walk fixpoint [genZero.cost_faithful.leErased, genType.cost_faithful.leErased]⟩
+
+open scoped ENNReal in
+/-- An application draws its argument type from `genType`, whose expected cost has no finite bound;
+the branch is taken at every type, so one unfolding is enough. -/
+theorem genTerm.not_expected_cost_bounded {B : ℝ≥0∞} (hB : B ≠ ⊤) :
+    ¬ IsExpectedCostBounded (genTerm Γ τ : SPMF.Cost Term) B := by
+  intro h
+  have htype : ⊤ ≤ SPMF.Cost.expectObs.spec (genType : SPMF.Cost Ty) (fun _ n => (n : ℝ≥0∞)) := by
+    by_contra hlt
+    exact genType.not_expected_cost_bounded (lt_top_iff_ne_top.mp (not_le.mp hlt)) le_rfl
+  have hty := genType.cost_faithful.one_le_mass genType.terminates
+  have hm := fun Γ τ => (genTerm.cost_faithful (Γ := Γ) (τ := τ)).one_le_mass genTerm.terminates
+  have hz := fun Γ τ => (genZero.cost_faithful (Γ := Γ) (τ := τ)).one_le_mass genZero.terminates
+  have htop : ⊤ ≤ SPMF.Cost.expectObs.spec (genTerm Γ τ : SPMF.Cost Term)
+      (fun _ n => (n : ℝ≥0∞)) := by
+    rw [genTerm.eq_def]
+    walk [SPMF.Cost.le_expect_add (x := genType) (h := fun _ n => (n : ℝ≥0∞)) hty htype,
+      fun Γ τ => SPMF.Cost.le_expect_add (x := genTerm Γ τ) (h := fun _ n => (n : ℝ≥0∞))
+        (hm Γ τ) zero_le,
+      fun Γ τ => SPMF.Cost.le_expect_add (x := genZero Γ τ) (h := fun _ n => (n : ℝ≥0∞))
+        (hz Γ τ) zero_le]
+    all_goals split <;> simp [ENNReal.top_div_of_ne_top]
+  exact hB (top_unique (htop.trans h))

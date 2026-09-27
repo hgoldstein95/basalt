@@ -140,17 +140,30 @@ theorem IsExpectedCostBounded.mono {g : SPMF.Cost α} {B₁ B₂ : ℝ≥0∞}
     (h : IsExpectedCostBounded g B₁) (hB : B₁ ≤ B₂) : IsExpectedCostBounded g B₂ :=
   h.trans hB
 
-/-- No finite bound holds of a generator whose expected cost `E` is at least `a + E`, for `a > 0`:
-what one unfolding of a critical generator shows. -/
+/-- No finite bound holds of any member of a family whose expected costs `E i` are each at least
+`a + ⨅ j, E j`, for `a > 0`: what one unfolding of a critical generator shows, its recursive calls,
+at whatever arguments, bounded below by the least. -/
+theorem IsExpectedCostBounded.not_of_step_iInf {ι : Type*} {g : ι → SPMF.Cost α} {a B : ℝ≥0∞}
+    (ha : a ≠ 0) (hB : B ≠ ⊤)
+    (hstep : ∀ i, a + ⨅ j, SPMF.Cost.expectObs.spec (g j) (fun _ n => (n : ℝ≥0∞))
+      ≤ SPMF.Cost.expectObs.spec (g i) fun _ n => (n : ℝ≥0∞)) (i : ι) :
+    ¬ IsExpectedCostBounded (g i) B := fun h => by
+  have hm := le_iInf hstep
+  have hmB := (iInf_le (fun j => SPMF.Cost.expectObs.spec (g j) (fun _ n => (n : ℝ≥0∞))) i).trans
+    (iff_obs.mp h)
+  generalize ⨅ j, SPMF.Cost.expectObs.spec (g j) (fun _ n => (n : ℝ≥0∞)) = m at hm hmB
+  exact ha (nonpos_iff_eq_zero.mp (ENNReal.le_of_add_le_add_right (ne_top_of_le_ne_top hB hmB)
+    (hm.trans_eq (zero_add m).symm)))
+
+/-- `not_of_step_iInf` for a generator whose recursive calls are itself. -/
 theorem IsExpectedCostBounded.not_of_step {g : SPMF.Cost α} {a B : ℝ≥0∞} (ha : a ≠ 0)
     (hB : B ≠ ⊤)
     (hstep : a + SPMF.Cost.expectObs.spec g (fun _ n => (n : ℝ≥0∞))
       ≤ SPMF.Cost.expectObs.spec g fun _ n => (n : ℝ≥0∞)) :
-    ¬ IsExpectedCostBounded g B := fun h => by
-  have hE := iff_obs.mp h
-  generalize SPMF.Cost.expectObs.spec g (fun _ n => (n : ℝ≥0∞)) = E at hstep hE
-  exact ha (nonpos_iff_eq_zero.mp (ENNReal.le_of_add_le_add_right (ne_top_of_le_ne_top hB hE)
-    (hstep.trans_eq (zero_add E).symm)))
+    ¬ IsExpectedCostBounded g B :=
+  not_of_step_iInf (g := fun _ : Unit => g) ha hB
+    (fun _ => (add_le_add le_rfl (iInf_le (fun _ => SPMF.Cost.expectObs.spec g
+      (fun _ n => (n : ℝ≥0∞))) ())).trans hstep) ()
 
 /-- `gen` at `SPMF.Cost`, its costs dropped, has its `SPMF` distribution, so a law stated at one
 interpretation can be read at the other. It is a free theorem, which Lean cannot prove once for

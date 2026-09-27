@@ -51,4 +51,7 @@ theorem Nat.arbitrary.cost_bounded :
 theorem Nat.arbitrary.faithful : IsFaithful Nat.arbitrary := by
   faithful_fixpoint [Nat.arbitrary.terminates]
 
+theorem Nat.arbitrary.cost_faithful : IsCostFaithful Nat.arbitrary :=
+  ⟨by walk fixpoint, by walk fixpoint⟩
+
 end ArbNat
