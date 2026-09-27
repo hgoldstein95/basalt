@@ -120,11 +120,14 @@ resulting projections reduced. A family criterion hands over a recursive bound
 `∀ j, c ≤ (g j).mass` over a tupled (or `Unit`) seed, and `apply` alone cannot match `g j.1 j.2`
 against `g lo (x - 1)`, nor invent the `()`; left unreduced, `(?a, ?b).1 =?= p.1` is solved by
 structure eta, which fixes `?b := p.2` and fails on the second argument. A callee's law with
-arguments (`<gen>.terminates : ∀ m, …`) is instantiated the same way. -/
-def instBinders (e : Expr) : MetaM Expr := do
+arguments (`<gen>.terminates : ∀ m, …`) is instantiated the same way. The last `keep` binders are
+left, for a bridge whose premise has its own (`∀ a, R a → …`). -/
+def instBinders (e : Expr) (keep : Nat := 0) : MetaM Expr := do
   let mut e := e
   repeat
-    let .forallE _ d _ _ ← instantiateMVars (← inferType e) | break
+    let ty ← instantiateMVars (← inferType e)
+    let .forallE _ d _ _ := ty | break
+    if ty.getNumHeadForalls ≤ keep then break
     e := e.app (← mkCtorMVar d)
   mkExpectedTypeHint e (← reduceCtorProjs (← inferType e))
 
@@ -146,6 +149,14 @@ def applyBridge (b : Name) (e : Expr) : MetaM Expr := do
       return f.app e
     f := f.app (← mkFreshExprMVar d)
   failure
+
+/-- The number of leading binders of the bridge `b`'s first explicit argument. -/
+def bridgeArity (b : Name) : MetaM Nat := do
+  forallTelescope (← inferType (← mkConstWithFreshMVarLevels b)) fun xs _ => do
+    for x in xs do
+      if (← x.fvarId!.getBinderInfo).isExplicit then
+        return (← inferType x).getNumHeadForalls
+    return 0
 
 /-! ## Tidying what a walk leaves -/
 
@@ -295,7 +306,8 @@ def solveSideGoal (goal : MVarId) (ty : Expr) : MetaM Bool := goal.withContext d
 /-! ## Leaves -/
 
 /-- Close `goal`, a leaf, with the fact `e`, as it is or through one of the observation's `leaves`,
-`e`'s binders possibly instantiated by `instBinders` first. `none` if nothing applies. -/
+`e`'s binders instantiated by `instBinders` first: possibly all of them for the fact as it is, and
+all but the bridge's own for a bridge. `none` if nothing applies. -/
 private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
     MetaM (Option (List MVarId)) := do
   -- A fact that is the goal, binders and all: a generator argument's family of observations.
@@ -313,22 +325,23 @@ private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
       goal.withContext (assumeProps e)
       if (← instantiateMVars e).hasExprMVar then failure
     if r.isSome then return some []
-    for bridge in leaves.facts do
-      let saved ← saveState
-      let some sides ← observing? (do
-        let cand ← applyBridge bridge e
-        applyExact goal (← mkExpectedTypeHint cand
-          (nameBound (← instantiateMVars (← inferType cand))
-            (postNames (← instantiateMVars (← goal.getType)))))) | continue
-      try
-        sides.forM solveAffine
-        goal.withContext (assumeProps e)
-        if (← instantiateMVars e).hasExprMVar then failure
-        return some []
-      catch ex =>
-        saved.restore
-        if leaves.facts.back? == some bridge && inst then
-          throw ex
+  for bridge in leaves.facts do
+    let saved ← saveState
+    let some (e, sides) ← observing? (do
+      let e ← instBinders e (← bridgeArity bridge)
+      let cand ← applyBridge bridge e
+      return (e, ← applyExact goal (← mkExpectedTypeHint cand
+        (nameBound (← instantiateMVars (← inferType cand))
+          (postNames (← instantiateMVars (← goal.getType))))))) | continue
+    try
+      sides.forM solveAffine
+      goal.withContext (assumeProps e)
+      if (← instantiateMVars e).hasExprMVar then failure
+      return some []
+    catch ex =>
+      saved.restore
+      if leaves.facts.back? == some bridge then
+        throw ex
   return none
 
 /-! ## Reading a recursive definition -/
@@ -492,21 +505,22 @@ is committed to before its bridge's premises are walked, so that a failure insid
 where it happens. -/
 private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g : Expr)
     (rest : WalkRest) : TermElabM (Option (List MVarId)) := do
+  -- A fact is tried only if it mentions `g`'s head: unifying one about another generator unfolds
+  -- both, and on a generator over a long literal list that exceeds the recursion depth.
+  let mentionsHead (e : Expr) : Bool := match g.getAppFn with
+    | .const n _ => (e.find? (·.isConstOf n)).isSome
+    | .fvar x => e.containsFVar x
+    | _ => true
   for t in extras do
     let r ← observing? do
       let e ← Term.withoutErrToSorry do
         let e ← Term.elabTerm t none
         Term.synthesizeSyntheticMVarsNoPostponing
         instantiateMVars e
+      unless mentionsHead (← instantiateMVars (← inferType e)) do failure
       let some gs ← tryFact leaves goal e | failure
       namePremises none (← goal.getType) gs
     if let some gs := r then return some (← rest gs)
-  -- A hypothesis is tried only if it mentions `g`'s head: unifying one about another generator
-  -- unfolds both, and on a generator over a long literal list that exceeds the recursion depth.
-  let mentionsHead (e : Expr) : Bool := match g.getAppFn with
-    | .const n _ => (e.find? (·.isConstOf n)).isSome
-    | .fvar x => e.containsFVar x
-    | _ => true
   for decl in ← getLCtx do
     unless decl.isImplementationDetail do
       unless ← isProp decl.type do continue

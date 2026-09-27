@@ -224,6 +224,21 @@ example : 3 ∈ (genTwo >>= fun n => pure (n + 1) : SPMF Nat).support := by
   trace_state
   exact ⟨2, rfl, rfl⟩
 
+/-! A callee's law with arguments is passed as a family: the bridge keeps the law's own binders. -/
+
+/--
+trace: g : ℕ → ℕ → SPMF ℕ
+h : ∀ (k m : ℕ), IsCompleteFor (g k m) fun x => x = k + m
+⊢ ∃ n, n = 2 + 3 ∧ n + 1 = 6
+-/
+#guard_msgs in
+example (g : Nat → Nat → SPMF Nat) (h : ∀ k m, IsCompleteFor (g k m) (· = k + m)) :
+    6 ∈ (g 2 3 >>= fun n => pure (n + 1)).support := by
+  rw [SPMF.mem_support_iff_may]
+  walk [fun k m => (h k m).obs]
+  trace_state
+  exact ⟨5, rfl, rfl⟩
+
 /-! ## A run with its cost
 
 At `SPMF.Cost` the value is a run, and the precondition carries the choices it took. A combinator
