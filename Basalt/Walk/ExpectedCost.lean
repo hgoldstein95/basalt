@@ -9,10 +9,10 @@ import Basalt.Walk.Average
 /-!
 # Walking Expected-Cost Bounds
 
-What the walk needs of an upper bound `SPMF.Cost.expectObs.spec g f ≤ B`, on which
-`IsExpectedCostBounded g B` is `f = fun _ n => n`: how a fact about a sub-generator closes a leaf,
-the rules of the list combinators and of `suchThat`, and the admissibility `walk fixpoint` inducts
-with.
+What the walk needs of a bound on `SPMF.Cost.expectObs.spec g f`, on which
+`IsExpectedCostBounded g B` is the upper bound at `f = fun _ n => n`: how a fact about a
+sub-generator closes a leaf in either direction, the rules of the list combinators and of
+`suchThat`, and the admissibility `walk fixpoint` inducts with for an upper bound.
 -/
 
 open ENNReal RandomChoice
@@ -36,6 +36,29 @@ theorem expect_le_add_of_le {x : SPMF.Cost α} {h p : α → Nat → ℝ≥0∞}
   show SPMF.expect x (fun q => p q.1 q.2) ≤ k + B
   rw [funext fun q : α × Nat => hp q.1 q.2, SPMF.expect_add, SPMF.expect_const]
   exact add_le_add (mul_le_of_le_one_left' (SPMF.mass_le_one x)) hx
+
+/-! ## Lower bounds
+
+The generator that never returns costs nothing, so no fixpoint induction proves a lower bound on an
+expected cost. One is had by unfolding a generator once, since that is an equation, and passing its
+own expected cost as the fact about its recursive calls. The walk meets them under `k + h`, which
+the fact bounds only when the mass is `1`: `le_expect_add` states it that way. -/
+
+/-- A lower bound `B` on `x`'s expectation of `h`, for use under any `k + h`, from `x`'s mass. -/
+theorem le_expect_add {x : SPMF.Cost α} {h : α → Nat → ℝ≥0∞} {B : ℝ≥0∞}
+    (hm : 1 ≤ expectObs.spec x fun _ _ => 1) (hx : B ≤ expectObs.spec x h) (k : ℝ≥0∞) :
+    k + B ≤ expectObs.spec x fun a n => k + h a n := by
+  show _ ≤ SPMF.expect x fun q => k + h q.1 q.2
+  rw [SPMF.expect_add, SPMF.expect_const]
+  exact add_le_add (le_mul_of_one_le_left' (hm.trans_eq (SPMF.expect_one x))) hx
+
+@[obs_leaf]
+theorem le_expect_of_add_le {x : SPMF.Cost α} {h p : α → Nat → ℝ≥0∞} {k B : ℝ≥0∞}
+    (hx : ∀ k, k + B ≤ expectObs.spec x fun a n => k + h a n) (hp : ∀ a n, p a n = k + h a n) :
+    k + B ≤ expectObs.spec x p := by
+  have : p = fun a n => k + h a n := funext fun a => funext fun n => hp a n
+  subst this
+  exact hx k
 
 /-! ## The list combinators
 

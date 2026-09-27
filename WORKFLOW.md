@@ -258,9 +258,8 @@ call: a two-branch `oneOf` with one recursive branch has `m = 1/2`;
 `frequency [(2, leaf…), (1, node…)]` with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a
 quadratic, `a = 2/3`, `d = 1/3`; a two-branch `oneOf` between a leaf and two calls is the quadratic
 `a = d = 1/2`. **A critical generator
-(`m = 1`) terminates but has infinite expected size** (`AllTwoTree.genTree_expectedSteps_infinite`),
-so no finite `IsExpectedCostBounded`: its walk leaves `1 + B ≤ B`
-(`BasaltTest/Walk/ExpectedCost.lean`) — reweight it if you can. The side conditions of a
+(`m = 1`) terminates but has no finite `IsExpectedCostBounded`**
+(`AllTwoTree.genTree.not_expected_cost_bounded`) — reweight it if you can. The side conditions of a
 certificate are closed numerals: `by norm_num`, or `by ennreal_to_real; norm_num`.
 
 **`mass_fixpoint`** applies the criterion to the family over the generator's seed, unfolds one
@@ -307,8 +306,8 @@ induction hypothesis as `ih.obs` (`BasaltTest/Tactic/MassFixpoint.lean`).
 content, and the one where the bound is not a single `F c`: `mass_fixpoint per_seed` takes the
 bound family `c` and the computed bound `T c seed` as functions of the seed, and leaves
 `LfpIsOne T`. You supply a ranking function `φ : Seed → ℝ≥0∞` whose expected value drops by `ε` at
-every step, and `SPMF.LfpIsOne.ranking` (`Basalt/SPMF/Ranking.lean`) discharges the certificate,
-with `E[#steps] ≤ φ/ε` as a byproduct. Its obligations are a `LevelOp` `A` (three algebra laws), a
+every step, and `SPMF.LfpIsOne.ranking` (`Basalt/SPMF/Ranking.lean`) discharges the certificate.
+Its obligations are a `LevelOp` `A` (three algebra laws), a
 drift lemma (`A φ + ε ≤ φ` — pure arithmetic about your rank), and the deficit condition
 `1 - T c seed ≤ A (1 - c) seed` — arithmetic about `T`, with no generator in sight, pushed through
 the branches by `ENNReal.one_sub_le_mul_one_sub`, `one_sub_sum_div_le`, and `one_sub_mul_le_add`.
@@ -388,11 +387,29 @@ goals.
 **Rejection sampling** is `suchThat g p`. Its rule takes `g`'s expected cost `C` and a bound `r` on
 how often `p` rejects, `SPMF.Cost.expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r`, and
 bounds the loop by `C / (1 - r)`; `SPMF.Cost.div_one_sub_le` turns the arithmetic into one step of
-the loop, `C + r * B ≤ B`. The rejection bound is the one fact about `g` a filter needs. Its walk
-bounds a recursive call of `g` by its largest value, passing `SPMF.Cost.expect_le_iSup` as a fact,
-since what `g` builds from the call is what decides acceptance (`Tree.genTree.reject_le_cost`,
-`BST/ByFiltering.lean`). `NonEmptyList.genNonEmpty.cost` (`NonEmptyList.lean`) is the same proof
-for a source that rarely rejects.
+the loop, `C + r * B ≤ B`. The rejection bound is the one fact about `g` a filter needs, and it is
+the termination proof's, read at `SPMF.Cost` through `g`'s `IsCostFaithful` law
+(`IsCostFaithful.expect_eq`; `Tree.genBSTByFiltering.cost`, `BST/ByFiltering.lean`).
+`NonEmptyList.genNonEmpty.cost` (`NonEmptyList.lean`) is the same proof for a source that rarely
+rejects.
+
+**`IsCostFaithful gen`** is `walk fixpoint` on each field, `⟨by walk fixpoint, by walk fixpoint⟩`,
+passing a callee's law by the field being proved (`h.erasedLe`, `h.leErased`); a generator
+recursive by `termination_by` is induction, `unfold`, and `walk`, as for `IsFaithful`
+(`Tree.genTree.cost_faithful`). `BasaltTest/Walk/CostErasure.lean` pins it.
+
+**From a cost bound.** A generator with an `IsCostBounded` law and an `IsCostFaithful` one has its
+expected cost bounded by the `SPMF` expectation of its cost function,
+`IsExpectedCostBounded.of_costBounded`, which is Recipe 4's (`Tree.genBST.expected_cost`,
+`BST.lean`).
+
+**A lower bound** on an expected cost cannot be had by fixpoint induction: the generator that never
+returns costs nothing. Unfold the generator once instead (`conv_rhs => rw [<GEN>]`), which is an
+equation, and pass its own expected cost as the fact about its recursive calls:
+`SPMF.Cost.le_expect_add hm le_rfl`, where `hm`, its mass at `SPMF.Cost`, is
+`IsCostFaithful.one_le_mass` of its termination law. The walk leaves `E`'s one-step inequality. A
+critical generator's is `1 + E ≤ E`, and `IsExpectedCostBounded.not_of_step` turns it into the
+absence of any finite bound (`AllTwoTree.genTree.not_expected_cost_bounded`, `AllTwoTree.lean`).
 
 ### Recipe 4: Expected Values
 
@@ -512,5 +529,4 @@ once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`)
 
 For the *theory* behind the termination recipe — the least-fixed-point criterion and its
 certificates — see `Basalt/SPMF/Termination.lean` (the tactic is `Basalt/Tactic/MassFixpoint.lean`);
-for the ranking-function certificate and why critical generators have infinite expected size,
-`Basalt/SPMF/Ranking.lean`.
+for the ranking-function certificate, `Basalt/SPMF/Ranking.lean`.

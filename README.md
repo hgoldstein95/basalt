@@ -57,12 +57,16 @@ form a reader checks, and restated by `<Law>.iff_obs` on the observation a proof
 `IsSoundFor g P ↔ SPMF.alwaysObs.spec g P`. A proof rewrites its goal with `iff_obs` and runs
 `walk`, and passes a callee's law to it as `h.obs`.
 
-One more, in `Basalt/IO/Laws.lean`, relates two interpretations rather than constraining one, so it
-takes the polymorphic generator:
+Two more relate two interpretations rather than constraining one, so they take the polymorphic
+generator:
 
-- `IsFaithful gen` — on any ideal source of words, `gen` has its `SPMF` distribution, and at `IO`
-  it runs as `IOModel` does wherever that terminates. This connects the proofs about `SPMF` to what
-  `IO` runs; what it leaves out is `idealized_faithful`'s (`Basalt/IO/Faithful.lean`).
+- `IsFaithful gen` (`Basalt/IO/Laws.lean`) — on any ideal source of words, `gen` has its `SPMF`
+  distribution, and at `IO` it runs as `IOModel` does wherever that terminates. This connects the
+  proofs about `SPMF` to what `IO` runs; what it leaves out is `idealized_faithful`'s
+  (`Basalt/IO/Faithful.lean`).
+- `IsCostFaithful gen` — `gen` at `SPMF.Cost`, its costs dropped, has its `SPMF` distribution, so
+  a law at one interpretation can be read at the other: termination gives the cost interpretation
+  mass `1`, which a lower bound on an expected cost needs.
 
 `BasaltExamples/` is a cookbook of worked generators, each carrying proofs of the properties that
 apply to it. `WORKFLOW.md` walks through writing a generator and proving it correct, with a recipe

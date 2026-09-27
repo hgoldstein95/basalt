@@ -45,22 +45,6 @@ example : IsExpectedCostBounded (genWeightedTree : SPMF.Cost Tree) 3 := by
   norm_num
   exact ENNReal.div_le_of_le_mul (by norm_num)
 
--- A critical generator's step is `1 + B ≤ B`, which only `⊤` satisfies.
-/--
-trace: B : ℝ≥0∞
-hB : B = ∞
-genTree : SPMF.Cost AllTwoTree.Tree
-ih : (SPMF.Cost.expectObs.spec genTree fun x n => ↑n) ≤ B
-⊢ [↑(1 + 0), 1 + B + B].sum / ↑[↑(1 + 0), 1 + B + B].length ≤ B
--/
-#guard_msgs in
-example (B : ℝ≥0∞) (hB : B = ⊤) : IsExpectedCostBounded (genTree : SPMF.Cost Tree) B := by
-  rw [IsExpectedCostBounded.iff_obs]
-  walk fixpoint
-  trace_state
-  subst hB
-  exact le_top
-
 -- A list combinator has no shape of choice, so it is bounded using only its mass: at its worst
 -- case over every value and cost, which for the cost itself is `⊤`.
 /--
@@ -95,7 +79,31 @@ example : IsExpectedCostBounded (suchThat (elements [0, 1]) (· != 0) : SPMF.Cos
   trace_state
   exact le_top
 
+-- A lower bound is had by unfolding once, with the generator's own expected cost as the fact about
+-- its recursive calls, stated by `le_expect_add` for use under `k + h`.
+/--
+trace: hm : 1 ≤ SPMF.Cost.expectObs.spec genTree fun x x_1 => 1
+⊢ (1 + SPMF.Cost.expectObs.spec genTree fun x n => ↑n) ≤
+    [↑(1 + 0),
+          (1 + SPMF.Cost.expectObs.spec genTree fun x n => ↑n) + SPMF.Cost.expectObs.spec genTree fun x n => ↑n].sum /
+      ↑[↑(1 + 0),
+            (1 + SPMF.Cost.expectObs.spec genTree fun x n => ↑n) +
+              SPMF.Cost.expectObs.spec genTree fun x n => ↑n].length
+-/
+#guard_msgs in
+example (hm : 1 ≤ SPMF.Cost.expectObs.spec (genTree : SPMF.Cost Tree) fun _ _ => 1) :
+    1 + SPMF.Cost.expectObs.spec (genTree : SPMF.Cost Tree) (fun _ n => (n : ℝ≥0∞))
+      ≤ SPMF.Cost.expectObs.spec (genTree : SPMF.Cost Tree) (fun _ n => (n : ℝ≥0∞)) := by
+  conv_rhs => rw [genTree]
+  walk [SPMF.Cost.le_expect_add (x := genTree) (h := fun _ n => (n : ℝ≥0∞)) hm le_rfl]
+  trace_state
+  generalize SPMF.Cost.expectObs.spec (genTree : SPMF.Cost Tree) (fun _ n => (n : ℝ≥0∞)) = E
+  norm_num
+  rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num)]
+  exact le_of_eq (by ring)
+
 -- The cookbook's expected-cost bounds are this walk followed by arithmetic, with the source's bound
--- passed as a fact: `Tree.genBSTByFiltering.cost` (`BST/ByFiltering.lean`).
+-- passed as a fact: `Tree.genBSTByFiltering.cost` (`BST/ByFiltering.lean`); its lower bound is
+-- `AllTwoTree.genTree.not_expected_cost_bounded` (`AllTwoTree.lean`).
 
 end ExpectedCostTest

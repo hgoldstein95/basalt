@@ -10,7 +10,8 @@ import BasaltExamples.STLC.Syntax
 # Arbitrary STLC Types
 
 `genType` generates an arbitrary `Ty`. Its two branches are a leaf and two recursive calls, so it is
-critical, like `AllTwoTree.genTree`: almost surely terminating, with infinite expected size.
+critical, like `AllTwoTree.genTree`: almost surely terminating, with no finite bound on its expected
+cost (`genType.not_expected_cost_bounded`).
 -/
 
 open RandomChoice
@@ -49,3 +50,17 @@ theorem genType.cost_bounded : IsCostBounded genType Ty.size := by
 
 theorem genType.faithful : IsFaithful genType := by
   faithful_fixpoint [genType.terminates]
+
+theorem genType.cost_faithful : IsCostFaithful genType := ⟨by walk fixpoint, by walk fixpoint⟩
+
+open scoped ENNReal in
+theorem genType.not_expected_cost_bounded {B : ℝ≥0∞} (hB : B ≠ ⊤) :
+    ¬ IsExpectedCostBounded (genType : SPMF.Cost Ty) B := by
+  have hm := genType.cost_faithful.one_le_mass genType.terminates
+  refine IsExpectedCostBounded.not_of_step one_ne_zero hB ?_
+  conv_rhs => rw [genType]
+  walk [SPMF.Cost.le_expect_add (x := genType) (h := fun _ n => (n : ℝ≥0∞)) hm le_rfl]
+  generalize SPMF.Cost.expectObs.spec (genType : SPMF.Cost Ty) (fun _ n => (n : ℝ≥0∞)) = E
+  norm_num
+  rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num)]
+  exact le_of_eq (by ring)

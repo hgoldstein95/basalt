@@ -113,22 +113,15 @@ theorem genList.cost (n : Nat) :
   exact_mod_cast (show 1 * (1 + 0) + n * (1 + 1 + (2 * n + 1)) ≤ (2 * n + 1) * (1 + (n + 0))
     from le_of_eq (by ring))
 
-@[inherit_doc genList.reject_le]
-theorem genList.reject_le_cost (n : Nat) :
-    SPMF.Cost.expectObs.spec (genList n : SPMF.Cost (List Nat))
-      (fun xs _ => if (!xs.isEmpty) = true then 0 else 1) ≤ 1 / (n + 1) := by
-  have hle : ∀ (p : List Nat → ℕ → ℝ≥0∞),
-      SPMF.Cost.expectObs.spec (genList n : SPMF.Cost (List Nat)) p ≤ ⨆ a, ⨆ k, p a k :=
-    fun _ => SPMF.Cost.expect_le_iSup
-  rw [genList]
-  walk [hle]
-  simp [add_comm]
+theorem genList.cost_faithful (n : Nat) : IsCostFaithful (genList n) :=
+  ⟨by walk fixpoint, by walk fixpoint⟩
 
 /-- At most three choices more than its source's expected cost, whatever `n`. -/
 theorem genNonEmpty.cost {n : Nat} (hn : 0 < n) :
     IsExpectedCostBounded (genNonEmpty n : SPMF.Cost (List Nat)) (2 * n + 4) := by
+  have hr := ((genList.cost_faithful n).expect_eq _).trans_le (genList.reject_le n)
   rw [IsExpectedCostBounded.iff_obs]
-  walk [(genList.cost n).obs, genList.reject_le_cost n]
+  walk [(genList.cost n).obs, hr]
   rw [zero_add]
   refine SPMF.Cost.div_one_sub_le (by finiteness) ?_
   have h3 : 1 / ((n : ℝ≥0∞) + 1) * (2 * n + 4) ≤ 3 := by

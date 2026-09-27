@@ -32,6 +32,7 @@ import Basalt.Random
 import Basalt.RandomChoice
 import Basalt.SPMF.Basic
 import Basalt.SPMF.Cost
+import Basalt.SPMF.CostErasure
 import Basalt.SPMF.Expect.Basic
 import Basalt.SPMF.Expect.Combinators
 import Basalt.SPMF.Expect.Obs
@@ -51,6 +52,7 @@ import Basalt.Walk.Average
 import Basalt.Walk.Basic
 import Basalt.Walk.Complete
 import Basalt.Walk.Cost
+import Basalt.Walk.CostErasure
 import Basalt.Walk.Entry
 import Basalt.Walk.Expect
 import Basalt.Walk.ExpectedCost

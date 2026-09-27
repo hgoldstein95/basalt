@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.SPMF.Cost
+import Basalt.SPMF.CostErasure
 import Basalt.SPMF.Expect.Obs
 import Basalt.SPMF.Termination
 
@@ -12,9 +13,9 @@ import Basalt.SPMF.Termination
 
 The basic, mostly orthogonal, correctness properties a PBT generator may have, as plain predicates
 — there is no bundle: which of them apply depends on the generator, and you prove the ones that do.
-Each but the bundle `IsSoundAndComplete` is defined in the form a reader checks, and restated by
-`<Law>.iff_obs` on an observation, the form a walk proves; `<Law>.obs` restates a fact for passing
-to one.
+Each but the bundle `IsSoundAndComplete` and `IsCostFaithful`, which relates two interpretations,
+is defined in the form a reader checks, and restated by `<Law>.iff_obs` on an observation, the form
+a walk proves; `<Law>.obs` restates a fact for passing to one.
 -/
 
 open scoped ENNReal
@@ -138,3 +139,47 @@ theorem IsExpectedCostBounded.obs {g : SPMF.Cost α} {B : ℝ≥0∞} (h : IsExp
 theorem IsExpectedCostBounded.mono {g : SPMF.Cost α} {B₁ B₂ : ℝ≥0∞}
     (h : IsExpectedCostBounded g B₁) (hB : B₁ ≤ B₂) : IsExpectedCostBounded g B₂ :=
   h.trans hB
+
+/-- No finite bound holds of a generator whose expected cost `E` is at least `a + E`, for `a > 0`:
+what one unfolding of a critical generator shows. -/
+theorem IsExpectedCostBounded.not_of_step {g : SPMF.Cost α} {a B : ℝ≥0∞} (ha : a ≠ 0)
+    (hB : B ≠ ⊤)
+    (hstep : a + SPMF.Cost.expectObs.spec g (fun _ n => (n : ℝ≥0∞))
+      ≤ SPMF.Cost.expectObs.spec g fun _ n => (n : ℝ≥0∞)) :
+    ¬ IsExpectedCostBounded g B := fun h => by
+  have hE := iff_obs.mp h
+  generalize SPMF.Cost.expectObs.spec g (fun _ n => (n : ℝ≥0∞)) = E at hstep hE
+  exact ha (nonpos_iff_eq_zero.mp (ENNReal.le_of_add_le_add_right (ne_top_of_le_ne_top hB hE)
+    (hstep.trans_eq (zero_add E).symm)))
+
+/-- `gen` at `SPMF.Cost`, its costs dropped, has its `SPMF` distribution, so a law stated at one
+interpretation can be read at the other. It is a free theorem, which Lean cannot prove once for
+every generator: each field is proved by `walk fixpoint`, with a callee's law passed by its
+fields. -/
+structure IsCostFaithful (gen : {G : Type → Type} → [Gen G] → G α) : Prop where
+  erasedLe : SPMF.Cost.ErasedLe gen gen
+  leErased : SPMF.Cost.LeErased gen gen
+
+/-- An expectation of the value alone is the same at both interpretations. -/
+theorem IsCostFaithful.expect_eq {gen : {G : Type → Type} → [Gen G] → G α}
+    (h : IsCostFaithful gen) (f : α → ℝ≥0∞) :
+    SPMF.Cost.expectObs.spec (gen (G := SPMF.Cost)) (fun a _ => f a)
+      = SPMF.expectObs.spec (gen (G := SPMF)) f :=
+  le_antisymm (h.erasedLe f) (h.leErased f)
+
+/-- A terminating generator has mass `1` at `SPMF.Cost` too: the fact a lower bound on an expected
+cost needs of it. -/
+theorem IsCostFaithful.one_le_mass {gen : {G : Type → Type} → [Gen G] → G α}
+    (h : IsCostFaithful gen) (ht : IsAlmostSurelyTerminating (gen (G := SPMF))) :
+    1 ≤ SPMF.Cost.expectObs.spec (gen (G := SPMF.Cost)) fun _ _ => 1 :=
+  (IsAlmostSurelyTerminating.obs ht).trans_eq (h.expect_eq fun _ => 1).symm
+
+/-- A cost bound `c` on each value gives a bound on the expected cost: `c`'s expectation, which is
+an expectation of the value alone and so may be computed at `SPMF`. -/
+theorem IsExpectedCostBounded.of_costBounded {gen : {G : Type → Type} → [Gen G] → G α}
+    (hf : IsCostFaithful gen) {c : α → Nat} (hc : IsCostBounded (gen (G := SPMF.Cost)) c) :
+    IsExpectedCostBounded (gen (G := SPMF.Cost))
+      (SPMF.expect (gen (G := SPMF)) fun a => (c a : ℝ≥0∞)) :=
+  (SPMF.expect_mono_support fun p hp => by
+    show (p.2 : ℝ≥0∞) ≤ c p.1; exact_mod_cast hc p hp).trans_eq
+    (hf.expect_eq fun a => (c a : ℝ≥0∞))

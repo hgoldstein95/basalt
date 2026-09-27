@@ -128,36 +128,24 @@ theorem Tree.genTree.cost {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
       exact_mod_cast (show 1 * (1 + 0) + n * (1 + 1 + 3 * (n / 2) + 1 + (3 * (n / 2) + 1))
         ≤ (3 * n + 1) * (1 + (n + 0)) by nlinarith)
 
-@[inherit_doc Tree.genTree.reject_le]
-theorem Tree.genTree.reject_le_cost {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
-    SPMF.Cost.expectObs.spec (Tree.genTree lo hi h n : SPMF.Cost (Tree Int))
-      (fun t _ => if t.isBSTb lo hi = true then 0 else 1) ≤ n / (n + 1) := by
-  have hle : ∀ m (p : Tree Int → ℕ → ℝ≥0∞),
-      SPMF.Cost.expectObs.spec (Tree.genTree lo hi h m : SPMF.Cost (Tree Int)) p ≤
-        ⨆ a, ⨆ k, p a k :=
-    fun _ _ => SPMF.Cost.expect_le_iSup
-  rw [Tree.genTree]
-  rcases Nat.eq_zero_or_pos n with rfl | hn
-  · rw [dite_eq_left rfl]; walk; simp [Tree.isBSTb]
-  · rw [dite_eq_right (by omega)]
-    walk [hle]
-    have hS := average_le (lo := lo) (hi := hi) (d := 1)
-      (F := fun x => ⨆ a, ⨆ _k : ℕ, ⨆ b, ⨆ _k' : ℕ,
-        if (Tree.node a x b).isBSTb lo hi = true then (0 : ℝ≥0∞) else 1) fun x => by
-        simp only [iSup_le_iff]; intros; split <;> simp
-    simp only [show (Tree.leaf : Tree Int).isBSTb lo hi = true from rfl, ite_true, List.map_cons,
-      List.map_nil, List.sum_cons, List.sum_nil, Nat.cast_one, one_mul, add_zero, Nat.cast_add,
-      zero_add]
-    rw [add_comm (1 : ℝ≥0∞)]
-    gcongr
-    exact mul_le_of_le_one_right' hS
+theorem Tree.genTree.cost_faithful {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
+    IsCostFaithful (Tree.genTree lo hi h n) := by
+  induction n using Nat.strong_induction_on with
+  | _ n ih =>
+    rcases Nat.eq_zero_or_pos n with rfl | hn
+    · constructor <;> (unfold Tree.genTree; simp only [↓reduceDIte]; walk)
+    · have ih := ih (n / 2) (by omega)
+      constructor
+      · unfold Tree.genTree; walk [ih.erasedLe]
+      · unfold Tree.genTree; walk [ih.leErased]
 
 /-- `n + 1` times its source's expected cost: one draw, and `n / (n + 1)` of a retry. -/
 theorem Tree.genBSTByFiltering.cost {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
     IsExpectedCostBounded (Tree.genBSTByFiltering lo hi h n : SPMF.Cost (Tree Int))
       ((n + 1) * (3 * n + 1)) := by
+  have hr := ((Tree.genTree.cost_faithful h n).expect_eq _).trans_le (Tree.genTree.reject_le h n)
   rw [IsExpectedCostBounded.iff_obs]
-  walk [(Tree.genTree.cost h n).obs, Tree.genTree.reject_le_cost h n]
+  walk [(Tree.genTree.cost h n).obs, hr]
   rw [zero_add]
   refine SPMF.Cost.div_one_sub_le (by finiteness) ?_
   rw [← mul_assoc, ENNReal.div_mul_cancel (by simp) (by simp)]

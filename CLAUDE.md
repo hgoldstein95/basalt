@@ -33,7 +33,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `IsAlmostSurelyTerminating`, `IsCostBounded`, `IsExpectedCostBounded`), each but the bundle
   restated on its observation (`iff_obs`, and `.obs` for a fact), and their introduction lemmas —
   [Basalt/Laws.lean](Basalt/Laws.lean); `IsFaithful`, which relates `IO` to `SPMF` and so has no
-  observation — [Basalt/IO/Laws.lean](Basalt/IO/Laws.lean).
+  observation — [Basalt/IO/Laws.lean](Basalt/IO/Laws.lean); `IsCostFaithful`, which relates
+  `SPMF.Cost` to `SPMF`, is in `Laws.lean` beside the others.
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
 - **Compiled choice** (`oneOf!`, `frequency!`) — the `compiled_choice` section of
   [Basalt/Combinators.lean](Basalt/Combinators.lean). Its contract (no list in the compiled code, the
@@ -63,8 +64,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/Walk/Mass.lean](Basalt/Walk/Mass.lean), pinned by
   [BasaltTest/Walk/Mass.lean](BasaltTest/Walk/Mass.lean); the `mass_fixpoint` tactic:
   [Basalt/Tactic/MassFixpoint.lean](Basalt/Tactic/MassFixpoint.lean), contract pinned by
-  [BasaltTest/Tactic/MassFixpoint.lean](BasaltTest/Tactic/MassFixpoint.lean). Ranking functions and
-  expected size: [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). The equations of `mass`:
+  [BasaltTest/Tactic/MassFixpoint.lean](BasaltTest/Tactic/MassFixpoint.lean). Ranking functions:
+  [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). The equations of `mass`:
   [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
 - **The generator walker** — one walk proves every judgment, each stated on an observation as a
   bound `O.spec g post ≤ b` or `b ≤ O.spec g post` that the walk computes from the postcondition. A
@@ -89,10 +90,13 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/Walk/](Basalt/Walk/); each bound's is pinned by its namesake in
   [BasaltTest/Walk/](BasaltTest/Walk/). [Basalt/Tactic/](Basalt/Tactic/) holds, besides the
   `support_simp` and `ennreal_to_real` helpers, the tactics that do more than walk: `mass_fixpoint`
-  (above) and `faithful_fixpoint`. Two judgments relate a generator at two monads instead of
-  bounding it, tagged `@[walk_rel]`: `src.Below` ([Basalt/Walk/Ideal.lean](Basalt/Walk/Ideal.lean))
-  and `IOModel.Approx` ([Basalt/Walk/IO.lean](Basalt/Walk/IO.lean)), for which the walk unfolds any
-  combinator with no rule; `faithful_fixpoint`
+  (above) and `faithful_fixpoint`. Some judgments relate a generator at two monads instead of
+  bounding it, tagged `@[walk_rel]`: `src.Below` ([Basalt/Walk/Ideal.lean](Basalt/Walk/Ideal.lean)),
+  `IOModel.Approx` ([Basalt/Walk/IO.lean](Basalt/Walk/IO.lean)), and the two directions of cost
+  erasure, `SPMF.Cost.ErasedLe` and `SPMF.Cost.LeErased`
+  ([Basalt/Walk/CostErasure.lean](Basalt/Walk/CostErasure.lean), pinned by
+  [BasaltTest/Walk/CostErasure.lean](BasaltTest/Walk/CostErasure.lean)), for which the walk unfolds
+  any combinator with no rule; `faithful_fixpoint`
   ([Basalt/Tactic/Faithful.lean](Basalt/Tactic/Faithful.lean), pinned by
   [BasaltTest/Tactic/Faithful.lean](BasaltTest/Tactic/Faithful.lean)) walks both. Their combinator
   rules are instances of [Basalt/GenRel.lean](Basalt/GenRel.lean).

@@ -207,6 +207,25 @@ theorem Tree.genBST.expect_size_le {lo hi : Int} :
       _ ≤ harmonic n := by
           rw [mul_comm, ENNReal.mul_div_cancel_right hn0 (by finiteness)]
 
+theorem Tree.genBST.cost_faithful : IsCostFaithful (Tree.genBST lo hi) :=
+  ⟨by walk fixpoint, by walk fixpoint⟩
+
+/-- `cost_bounded` in expectation: three choices per node of the expected size, and one more. -/
+theorem Tree.genBST.expected_cost {lo hi : Int} :
+    IsExpectedCostBounded (Tree.genBST lo hi : SPMF.Cost (Tree Int))
+      (3 * (harmonic (hi + 1 - lo).toNat / 2) + 1) := by
+  refine (IsExpectedCostBounded.of_costBounded Tree.genBST.cost_faithful
+    Tree.genBST.cost_bounded).mono ?_
+  calc SPMF.expect (Tree.genBST lo hi) (fun t => ((3 * t.size + 1 : ℕ) : ℝ≥0∞))
+      = 3 * SPMF.expect (Tree.genBST lo hi) (fun t => (t.size : ℝ≥0∞))
+          + SPMF.expect (Tree.genBST lo hi) (fun _ => 1) := by
+        push_cast
+        rw [SPMF.expect_add, SPMF.expect_mul_left]
+    _ ≤ 3 * (harmonic (hi + 1 - lo).toNat / 2) + 1 := by
+        gcongr
+        · exact Tree.genBST.expect_size_le
+        · rw [SPMF.expect_one]; exact SPMF.mass_le_one _
+
 end distribution
 
 end BST
