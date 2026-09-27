@@ -30,7 +30,7 @@ private def specSubject? (e : Expr) : Option (Expr × (Expr → Expr)) :=
   else none
 
 /-- The observation a bound `O.spec g post ≤ b` (`upper`) or `b ≤ O.spec g post` is about. -/
-private def specObs? (ty : Expr) : Option (Name × Bool) := do
+def specObs? (ty : Expr) : Option (Name × Bool) := do
   guard (ty.isAppOfArity ``LE.le 4)
   let (spec, upper) ← if (specSubject? (ty.getArg! 2)).isSome then some (ty.getArg! 2, true)
     else if (specSubject? (ty.getArg! 3)).isSome then some (ty.getArg! 3, false) else none

@@ -490,12 +490,22 @@ private def applyRule (goal : MVarId) (lem : Name) : TermElabM (List MVarId) := 
     else post
   applyExact goal (← mkExpectedTypeHint rule (nameBound (← inferType rule) names))
 
+/-- `lems`, less the rules stated for an observation other than the one `goal` bounds. Observations
+share a rule key, so a combinator with no rule for this one would otherwise report a rule for
+another failing to unify. -/
+private def rulesForObs (goal : MVarId) (lems : Array Name) : MetaM (Array Name) := do
+  let some (obs, _) := specObs? (← whnfR (← instantiateMVars (← goal.getType))) | return lems
+  lems.filterM fun lem => do
+    forallTelescope (← getConstInfo lem).type fun _ concl => do
+      return (specObs? (← whnfR concl)).all (·.1 == obs)
+
 /-- `g`'s combinator's rules for `j`, then its `@[gen_map]` lemma read into the algebra's shapes. -/
 private def tryRules (j : Judgment) (goal : MVarId) (g : Expr) (rest : WalkRest) :
     TermElabM (Option (List MVarId)) := do
   let finish (premises : List MVarId) := do
     rest (← namePremises (some g) (← goal.getType) premises)
   if let some lems := (← j.ruleHead? g).bind (rulesFor (← getEnv) j.key) then
+    let lems ← rulesForObs goal lems
     if let some gs ← firstApplying lems (applyRule goal) finish then return some gs
   let some mapLem := g.getAppFn.constName?.bind (mapFor (← getEnv)) | return none
   firstApplying (adapters j) (applyMap · mapLem goal) finish

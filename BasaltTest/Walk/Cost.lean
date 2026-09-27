@@ -242,4 +242,15 @@ example (g : Int → Int → SPMF.Cost Nat)
   walk
   omega
 
+-- An unbounded list has no worst case, and nothing else bounds this one.
+/--
+error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
+  listOf (chooseNat 0 1 ⋯)
+Pass a fact about it to `walk [_]`.
+-/
+#guard_msgs in
+example : SPMF.Cost.worstObs.spec (listOf (chooseNat 0 1) : SPMF.Cost (List Nat))
+    (fun _ n => (n : ℕ∞)) ≤ ⊤ := by
+  walk
+
 end CostBoundTest
