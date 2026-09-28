@@ -67,14 +67,11 @@ theorem Tree.genHeap.sound_complete :
     walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]
     all_goals simp_all [Tree.isHeap]
   case complete =>
-    intro t
-    induction t generalizing lo with
-    | leaf => intro _; rw [Tree.genHeap, SPMF.mem_support_iff_may]; walk
-    | node l x r ihl ihr =>
-      intro ⟨hle, hl, hr⟩
-      obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
-      rw [Tree.genHeap, SPMF.mem_support_iff_may]; walk [Nat.arbitrary.sound_complete.complete.obs]
-      exact ⟨d, l, ihl hl, r, ihr hr, rfl⟩
+    intro t h
+    fun_induction isHeap <;> rw [Tree.genHeap, SPMF.mem_support_iff_may]
+    all_goals walk [Nat.arbitrary.sound_complete.complete.obs]
+    obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le h.1
+    simp_all
 
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   mass_fixpoint [Nat.arbitrary.terminates.obs]
