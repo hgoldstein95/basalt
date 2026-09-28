@@ -169,10 +169,8 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
   lemma sets and tactics.
 - `BasaltTest/` — regression tests, named for the library module they guard when one exists.
 - `BasaltFuzz/` — the generators, properties, and buggy operations the `basalt-fuzz` executable
-  fuzzes. Two things set this directory apart, both explained in `fuzz-run/README.md`: it is linked
-  into a native executable, so it must stay Mathlib-free, and it is the only
-  SanitizerCoverage-instrumented library, which is what confines coverage feedback to the code under
-  test.
+  fuzzes. Unlike the rest of the repo it is linked into a native executable, so it must stay
+  Mathlib-free; `fuzz-run/README.md` says why and records what is instrumented for coverage.
 - `BasaltFuzzMain.lean` — the root of the opt-in `basalt-fuzz` executable: the property registry.
   Not a default build target, since only `fuzz-run/build.sh` links it.
 - `fuzz-run/` — the `basalt-fuzz` build script, its backend benchmark, and `README.md`, which owns

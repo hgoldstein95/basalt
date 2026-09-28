@@ -141,13 +141,15 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `@[basalt_backend]`.
 - **Coverage-guided fuzzing** (`FuzzGen`, the libFuzzer bridge, the opt-in `basalt-fuzz` executable)
   — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
-  the measured comparison between backends. This is the repo's only FFI and native-link config. The
-  code under test lives in the `BasaltFuzz` library, which is the only instrumented one — a generator
-  or property that wants coverage feedback belongs there and nowhere else. The default build
-  type-checks it but emits no C, so a change to the *native* half (bridge, runtime detection, link) is
-  caught only by `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow; a drift from the proved
-  `genBST` is caught by `BasaltTest/Fuzz.lean`. Anything added to the Mathlib-free link closure must
-  stay Mathlib-free: import the narrowest module, not an umbrella.
+  the measured comparison between backends. This is the repo's only FFI and native-link config. A
+  generator or property to be fuzzed goes in `BasaltFuzz/`; the SanitizerCoverage scope is set per
+  library in `lakefile.toml`, asserted by `fuzz-run/build.sh`, and fuzz-run/README.md owns the
+  measurements that say why it is what it is — it is not self-evident, and narrowing it on the
+  reasoning alone cost two of the three length benchmarks 1.5x and 2.7x of their success rate. The
+  default build type-checks these modules but emits no C, so a change to the *native* half (bridge,
+  runtime detection, link) is caught only by `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow; a
+  drift from the proved `genBST` is caught by `BasaltTest/Fuzz.lean`. Anything added to the
+  Mathlib-free link closure must stay Mathlib-free: import the narrowest module, not an umbrella.
 
 ## Gotchas (symptom → cause → pointer)
 
