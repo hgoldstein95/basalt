@@ -90,28 +90,56 @@ not re-entrant.
 Lean's default backend emits one C file per module under `.lake/build/ir/`, and SanitizerCoverage is
 a compile-time flag on that C. **Lake owns the closure and the scope.** `basalt-fuzz` is an ordinary
 `lean_exe`, so Lake derives the link closure from imports; the instrumentation scope is
-`-fsanitize=fuzzer-no-link` in the `moreLeancArgs` of the `BasaltFuzz` library and of the executable
-root (`lakefile.toml`), and nowhere else. That confines coverage feedback to the code under test —
-the generators, the properties, and the buggy operations — leaving Basalt's plumbing, the Lean
-runtime, and stdlib linked but uninstrumented; partial coverage still guides libFuzzer. Plausible's
-`Gen`/`Random` are in the same position for a second reason: they are the `--backend=plausible` PRNG
-rather than code under test, and coverage over a PRNG's mixing steps is noise in the feedback.
+`-fsanitize=fuzzer-no-link` in the `moreLeancArgs` of the `Basalt` and `BasaltFuzz` libraries and of
+the executable root (`lakefile.toml`). That is every first-party object in the closure — 14 of them as
+this is written — and nothing else: the Lean runtime and stdlib are linked uninstrumented, and so are
+Plausible's `Gen`/`Random` and SplitMix, which are the `--backend=plausible`/`io` PRNGs rather than
+code under test (coverage over a PRNG's mixing steps is noise in the feedback). Partial coverage still
+guides libFuzzer.
 
-Two modules and one executable root are a narrow scope for something as central as generator
-branching, and it works because Lean *specializes*. A generator is polymorphic in its monad, so the
-copy that actually runs is a specialization emitted into the module that instantiates it — for every
+The live generator code is not in the module a reader would look in, which is why the scope is a
+*library* setting rather than a per-module one. A generator is polymorphic in its monad, so the copy
+that actually runs is a specialization emitted into the module that instantiates it — for every
 property here, the one holding the registry, `BasaltFuzzMain`. The generic copies left behind in
-`Basalt/Combinators.lean` are dead. Instrumenting `BasaltFuzz.+` and the root therefore captures the
-live generator code by construction, and extending the flag to the `Basalt` library would add tens of
-thousands of edges the campaign never reaches. Measured on this repo: 4.5k counters here against
-17.9k when the whole first-party closure carried the flag, with no loss in the properties found.
+`Basalt/Combinators.lean` are dead. Instrumenting `BasaltFuzz.+` and the root therefore already
+captures the live per-property code; what the `Basalt` library adds is the plumbing those
+specializations *call into* — `Basalt/Fuzz/`'s buffer reads, `Combinators.lean`'s loop bodies — which
+is what tells libFuzzer that a generator got one iteration further.
 
 `build.sh` supplies what Lake's declarative config cannot — this platform's libFuzzer runtime, its C++
 runtime, the compiled C bridge, and three post-link assertions. Each assertion guards a property
 whose violation leaves a *working* fuzzer that searches badly rather than a build error: no Mathlib in
-Lake's link response file, the instrumentation scope in both directions (every `BasaltFuzz` object and
-the root references `__sanitizer_cov_8bit_counters_init`; no `Basalt` object does), and
-`LLVMFuzzerCustomMutator` still exported past `-Wl,-dead_strip`.
+Lake's link response file, the instrumentation scope in both directions (every first-party object in
+that response file references `__sanitizer_cov_8bit_counters_init`; no dependency object does), and
+`LLVMFuzzerCustomMutator` still exported past `-Wl,-dead_strip`. The response file read is Lake's own,
+so the scope check covers exactly what was linked: `.lake/build/ir/` additionally holds objects left
+behind by renamed modules, which enter no link and whose flags say nothing.
+
+### What the instrumentation scope buys
+
+Instrumenting the `Basalt` library costs 25% throughput (137k runs/s against 181k on `bst-gen`) and is
+kept because two of the three length benchmarks lose decisively without it. Both binaries built from
+one source tree, trials interleaved between the arms so drift cannot land on one of them,
+`-len_control=0 -max_len=65536`, macOS arm64 (M-series):
+
+| cell | budget | full scope | `Basalt` uninstrumented | |
+|---|---|---|---|---|
+| `long-16` | 3,000 runs | **39.7%** ±2.0 | 25.8% ±1.8 | z = +5.1, p = 3e-7 |
+| `long-32` | 30,000 | 17.3% ±1.5 | 18.5% ±1.6 | z = −0.5, p = 0.60 |
+| `long-32` | 100,000 | 34.0% ±2.4 | 36.0% ±2.4 | z = −0.6, p = 0.55 |
+| `long-64` | 120,000 | **25.0%** ±2.5 | 9.3% ±1.7 | z = +5.1, p = 4e-7 |
+| `chain-2`/`-3`/`-4` pooled | 1,000 | 51.0% ±2.0 | 53.8% ±2.0 | z = −1.0, p = 0.33 |
+
+600 trials per arm, except 300 for `long-64` and 400 for `long-32` at 100,000. Counters: 11,860 with
+the full scope against 4,493 without.
+
+`chain-n` comes out even, as its construction predicts — its guards are in `BasaltFuzz/Staged.lean`,
+instrumented either way — and that is also the control that says the `long-16`/`long-64` gaps are the
+scope rather than some other difference between the two builds. `long-32` is a dead heat at two
+budgets, so the effect is not monotone in the required length. Read the decisive rows, not a pattern
+across them: a *null* control (the same binary under two paths, `long-32` at 30,000 runs: 18.3%
+against 16.0%, z = +1.1) puts one cell's pass-to-pass spread near 1 SE, which is enough for a single
+pass at a single budget to invent a 2-SE effect.
 
 **The link closure must stay Mathlib-free.** A `#eval` runs generators in the interpreter, but a
 compiled executable links the native code of its entire import closure, and importing the `Basalt`
@@ -206,33 +234,34 @@ cold start (fresh process, so libFuzzer begins with an empty corpus). Measured o
 
 | property | fuzz | io | plausible |
 |---|---|---|---|
-| `threshold` | 27 runs | 2 | 2 |
-| `bst-buggy-insert` | 4 runs | 7 | 5 |
-| `bst-buggy-insert2` | 232 runs | 2 | 2 |
-| `bst-buggy-delete` | 667 runs | 14 | 10 |
-| `chain-2` | 587 runs | 100,364 | 24,824 |
-| `chain-3` | 561 runs | 5,902,188 (5/9 trials) | 14,718,791 (7/9) |
-| `chain-4` | 684 runs | **not found** (0/9) | **not found** (0/9) |
+| `threshold` | 13 runs | 3 | 3 |
+| `bst-buggy-insert` | 9 runs | 9 | 7 |
+| `bst-buggy-insert2` | 36 runs | 2 | 5 |
+| `bst-buggy-delete` | 260 runs | 4 | 10 |
+| `chain-2` | 497 runs | 48,235 | 70,956 |
+| `chain-3` | 1,000 runs | 6,012,768 (8/9 trials) | 12,480,941 (5/9) |
+| `chain-4` | 1,109 runs | **not found** (0/9) | **not found** (0/9) |
 
 Two things to know before reading it. A median is over the trials that *found* the bug, so it goes
 with the `found` count: where those differ, the backend that found it less often has the more
-favourably conditioned median (which is why `chain-3`'s `io` column looks better than `plausible`'s).
-And a run is a *tested* input — a discarded one is budgeted separately and does not count — which
-matters for `bst-buggy-delete`, whose precondition rejects most draws.
+favourably conditioned median — `chain-3`'s `plausible` column is the conditioned one (5/9 against
+8/9) and still the worse of the two. And a run is a *tested* input — a discarded one is budgeted
+separately and does not count — which matters for `bst-buggy-delete`, whose precondition rejects most
+draws.
 
 Read the two halves separately, because they say opposite things:
 
 - **Shallow bugs: random usually wins, and the margin is noise.** Where one unlucky draw exposes the
   bug, coverage guidance is pure overhead — libFuzzer spends its first inputs mapping coverage, and
-  its per-run cost is higher (~250k runs/s vs `io`'s ~1.3M and `plausible`'s ~480k on `bst-gen`). All
+  its per-run cost is higher (~137k runs/s vs `io`'s ~820k and `plausible`'s ~300k on `bst-gen`). All
   four BST bugs are of this kind, and every backend finds them in well under a millisecond. Do not
   read the ordering within a row: at a median of single-digit runs the trial-to-trial spread of a
-  geometric distribution swamps it, which is why `bst-buggy-insert` here has the fuzzer ahead while
-  the other three have it behind by one to two orders of magnitude.
+  geometric distribution swamps it, which is why `bst-buggy-insert` here is a three-way tie while the
+  other three have the fuzzer behind by 4x to 65x.
 - **Staged bugs: only the fuzzer arrives.** `chain-n` puts the bug behind `n` nested guards, so a
   blind sampler needs all `n` to hit at once (`256⁻ⁿ`) while the fuzzer banks one stage at a time and
   pays roughly `n·256`. The cost of a stage is therefore multiplicative for random search and
-  additive for the fuzzer: at `n=4` that is a few hundred runs versus 4.3 billion expected, and the
+  additive for the fuzzer: at `n=4` that is about a thousand runs versus 4.3 billion expected, and the
   random backends found nothing in 20M runs × 9 trials. This is the only half of the table where the
   gap is far larger than the noise.
 
@@ -310,7 +339,8 @@ survived a measurement.
 
 **Runs-to-first-counterexample cannot settle this, and that is a result in itself.** It is the natural
 metric and `MODE=median fuzz-run/compare-grow.sh` still reports it, but the distribution is heavy-tailed
-enough that repeated passes over *the same binary* disagree in sign:
+enough that repeated passes over *the same binary* disagree in sign (measured on an earlier build —
+what is reproduced here is the reversal, not the levels):
 
 | property | 15 trials (off / grow) | 61 trials (off / grow) |
 |---|---|---|
@@ -323,26 +353,27 @@ wins 1.2x and 1.6x. Any conclusion drawn from a table of this shape is a coin fl
 earlier revisions of this file drew.
 
 **So `compare-grow.sh` measures a success rate at a fixed run budget instead.** That is a binomial:
-its error bar is `sqrt(p(1-p)/n)`, and two cells are directly comparable. Budgets sit near each
-property's own median, where a shift in either direction moves the rate the most. 300 trials per cell,
-macOS arm64 (M-series), `-len_control=0 -max_len=65536` for both:
+its error bar is `sqrt(p(1-p)/n)`, and two cells are directly comparable. Budgets were chosen to sit
+near each property's own median, where a shift in either direction moves the rate the most. 300 trials
+per cell, macOS arm64 (M-series), `-len_control=0 -max_len=65536` for both:
 
-| property | budget | `--grow` off | `--grow` | repeat pass (off / grow) |
-|---|---|---|---|---|
-| `long-16` | 3,000 runs | **53.7%** ±2.9 | 41.7% ±2.8 | — |
-| `long-32` | 30,000 | **46.3%** ±2.9 | 45.3% ±2.9 | 50.0% / 44.3% |
-| `long-64` | 120,000 | 57.3% ±2.9 | 57.3% ±2.9 | 55.3% / 50.3% |
+| property | budget | `--grow` off | `--grow` |
+|---|---|---|---|
+| `long-16` | 3,000 runs | **46.7%** ±2.9 | 35.3% ±2.8 |
+| `long-32` | 30,000 | 21.3% ±2.4 | 20.0% ±2.3 |
+| `long-64` | 120,000 | 26.3% ±2.5 | **29.3%** ±2.6 |
 
-**Pooled over all 3,000 trials: 52.5% without growth against 47.8% with it — 4.7 points worse,
-z = 2.6, p ≈ 0.01.** No individual cell is decisive and two are dead heats, but all five
-property-passes fall on the same side, so the best available reading is "no benefit, and a small
-penalty".
+**Pooled over all 1,800 trials: 31.4% without growth against 28.2% with it — 3.2 points worse,
+z = 1.4, p = 0.15.** Only `long-16` is decisive on its own, and `long-64` falls the other way, so what
+the data supports is "no benefit", with the penalty attributable to `long-16` alone. The budgets are
+fixed in `compare-grow.sh` and now sit below the medians they were chosen to straddle, which costs the
+table sensitivity but not comparability: both cells of a row run the same budget.
 
-**The penalty is attributable to the zeros, not to the appending.** Filling the extension with
-mutator-chosen bytes instead of zeros erases it: in that build, `long-32` at 30,000 runs scored 50.3%
-without growth against 50.0% with — a dead heat, against the 1.0–5.7 point deficit the zero-filling
-build shows. Two things follow, and together they are the answer to "can the buffer be extended in a
-way libFuzzer benefits from":
+**What penalty there is is attributable to the zeros, not to the appending.** Filling the extension
+with mutator-chosen bytes instead of zeros erases it: in that build, `long-32` at 30,000 runs scored
+50.3% without growth against 50.0% with — a dead heat (an earlier build, whose baseline rates were the
+~50% of the median table above, so read the difference and not the level). Two things follow, and
+together they are the answer to "can the buffer be extended in a way libFuzzer benefits from":
 
 - **Zero is neutral to the fuzzer but not to the decoder.** For `propLong`, `0` *is* a terminator, so
   materializing the deficit plants a guaranteed-stopping byte at exactly the frontier position — the
@@ -547,11 +578,12 @@ it.
   first: the shared `Tree` must be monomorphic or the fuzz side must instantiate it, and `isBST` has
   to exist in both a `Prop` form for the proofs and a `Bool` form for the property (a `decide`
   bridging lemma is the tidy version).
-- **Broader instrumentation, other engines.** A target whose coverage of interest lies outside
-  `BasaltFuzz` needs the flag on another library — adding `moreLeancArgs` to that `lean_lib`, which
-  then also instruments it for every other executable. Per-target instrumentation scope would want a
-  Lean-side `lakefile.lean` and a facet override. The `RandomChoice FuzzGen` core is engine-agnostic —
-  crowbar shows the same cursor drives AFL — so an AFL or honggfuzz backend changes only the C bridge.
+- **Narrower instrumentation, other engines.** The scope is per *library*, so the choice above is
+  all-or-nothing for `Basalt`: a target that wanted its plumbing uninstrumented (for the 25% of
+  throughput) while keeping it for a length-bound generator cannot have both from `lakefile.toml`.
+  Per-target instrumentation scope would want a Lean-side `lakefile.lean` and a facet override. The
+  `RandomChoice FuzzGen` core is engine-agnostic — crowbar shows the same cursor drives AFL — so an
+  AFL or honggfuzz backend changes only the C bridge.
 
 ## Prior art
 

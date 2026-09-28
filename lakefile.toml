@@ -2,9 +2,21 @@ name = "basalt"
 version = "0.1.0"
 defaultTargets = ["Basalt", "BasaltExamples", "BasaltTest", "BasaltFuzz"]
 
+# `-fsanitize=fuzzer-no-link` here is *not* about fuzzing Basalt: it is about what libFuzzer can see
+# of a generator's progress. Where a staged benchmark writes its guards itself (`chain-n`), coverage of
+# this library adds nothing; where progress means "the generator's loop ran one more iteration"
+# (`long-n`), the edges that distinguish iteration depth are in `Fuzz/` and `Combinators.lean`, and
+# dropping the flag here costs `long-16` a third of its success rate at a fixed budget and `long-64`
+# nearly two thirds of its own (measured, fuzz-run/README.md). The cost is 25% throughput.
+#
+# Instrumenting a library is only a cost for executables that link it, and nothing but `basalt-fuzz`
+# links this one. The flag reaches only the C -> object step, which `lake build` never runs for a
+# `lean_lib`: it emits these modules' C and compiles none of it. So normal use of Basalt — imports and
+# `lake build` — resolves to the ordinary Lean build products, never to instrumented C.
 [[lean_lib]]
 name = "Basalt"
 globs = ["Basalt", "Basalt.+"]
+moreLeancArgs = ["-O1", "-fsanitize=fuzzer-no-link"]
 
 [[lean_lib]]
 name = "BasaltExamples"
@@ -14,14 +26,13 @@ globs = ["BasaltExamples.+"]
 name = "BasaltTest"
 globs = ["BasaltTest.+"]
 
-# The code `basalt-fuzz` fuzzes: generators, properties, and the buggy operations under test. This
-# is the *only* SanitizerCoverage-instrumented library, which is what confines libFuzzer's coverage
-# feedback to the code under test instead of Basalt's plumbing (fuzz-run/README.md).
+# The code `basalt-fuzz` fuzzes: generators, properties, and the buggy operations under test. Together
+# with `Basalt` above and the executable root below, this is the instrumented set — every first-party
+# module in the link closure; `fuzz-run/build.sh` asserts each object carries the sancov section.
 #
 # These modules must not be matched by any other library's globs. Lake resolves a module claimed by
-# two libraries to one of their configurations silently, and the uninstrumented one wins, leaving a
-# fuzzer that runs and finds only shallow bugs; `fuzz-run/build.sh` asserts the instrumentation is
-# present.
+# two libraries to one of their configurations silently, and an uninstrumented `BasaltFuzz` still
+# builds a fuzzer that runs and finds shallow bugs.
 #
 # A default target, which costs `lake build` only elaboration: `moreLeancArgs` applies when something
 # asks for these modules' C objects, and only the executable does. Dropping it from `defaultTargets`
@@ -33,11 +44,11 @@ moreLeancArgs = ["-O1", "-fsanitize=fuzzer-no-link"]
 
 # The opt-in fuzzing executable, never built by `lake build` and reached only through
 # `fuzz-run/build.sh`, which writes the `link.rsp` naming this platform's libFuzzer runtime. The root
-# is instrumented for the same reason the library is: Lean specializes each generator and property
-# into the module that registers them, so `BasaltFuzzMain` holds their live code. It shares the
-# library's `-O1` so both halves of the instrumented set are compiled alike — the edge granularity
-# libFuzzer sees is an artifact of inlining, so a split optimization level would make them
-# incomparable.
+# is instrumented for a reason of its own: Lean specializes each generator and property into the module
+# that registers them, so `BasaltFuzzMain` holds their live code and the generic copies left in
+# `Basalt/Combinators.lean` are dead. `-O1` matches the libraries so the whole instrumented set is
+# compiled alike — edge granularity is an artifact of inlining, so a split optimization level would
+# make its halves incomparable.
 [[lean_exe]]
 name = "basalt-fuzz"
 root = "BasaltFuzzMain"
