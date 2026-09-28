@@ -93,4 +93,20 @@ theorem le_always_permutationOf {α : Type} {xs : List α} {p : { ys // xs.Perm 
     (∀ a, p a) ≤ alwaysObs.spec (permutationOf xs) p :=
   fun h a _ => h a
 
+/-- **A generator that produces nothing is sound for every postcondition.** `Gen`'s `Inhabited`
+instance is `⊥`, whose mass is 0 everywhere, so a branch a generator cannot fill reaches no value and
+there is nothing for `p` to hold of.
+
+A generator that selects a branch on a `dite` typically writes `else default` for the branch whose
+guard fails — one per unfillable leaf. Without this rule the walk stops at each of them and asks the
+caller for a fact, and the fact has to name the postcondition, which is bespoke at every site. With
+it, `walk` closes such a leaf on its own. -/
+@[gen_rule]
+theorem le_always_default {α : Type} {p : α → Prop} :
+    (True : Prop) ≤ alwaysObs.spec (default : SPMF α) p := by
+  intro _ a ha
+  exact absurd ha (by
+    simp only [mem_support_iff, default, Bot.bot, ne_eq, Decidable.not_not]
+    rfl)
+
 end SPMF
