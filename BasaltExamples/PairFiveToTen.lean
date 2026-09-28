@@ -13,4 +13,5 @@ theorem genPairFiveToTen.sound :
     IsSoundFor genPairFiveToTen (fun (x, y) => x ≤ 20 ∧ y ≤ 20) := by
   rw [IsSoundFor.iff_obs]
   walk
-  all_goals grind
+  all_goals expose_names
+  
