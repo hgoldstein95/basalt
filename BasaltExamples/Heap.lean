@@ -67,11 +67,15 @@ theorem Tree.genHeap.sound_complete :
     walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]
     all_goals simp_all [Tree.isHeap]
   case complete =>
-    intro t h
-    fun_induction isHeap <;> rw [Tree.genHeap, SPMF.mem_support_iff_may]
-    all_goals walk [Nat.arbitrary.sound_complete.complete.obs]
-    obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le h.1
-    simp_all
+    refine IsCompleteFor.of_measure (gen := fun lo => (Tree.genHeap lo : SPMF Tree))
+      (fun _ t => t.size) (fun n ih lo t hn h => ?_) lo
+    rw [Tree.genHeap, SPMF.mem_support_iff_may]
+    walk [Nat.arbitrary.sound_complete.complete.obs, SPMF.le_may_of_measure ih]
+    cases t with
+    | leaf => simp
+    | node l x r =>
+      obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le h.1
+      grind [= size, = isHeap]
 
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   mass_fixpoint [Nat.arbitrary.terminates.obs]
