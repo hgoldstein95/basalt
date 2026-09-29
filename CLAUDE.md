@@ -7,19 +7,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Basalt is a Lean 4 library: **a foundational representation of random data generators for
 property-based testing**, plus machine-checked proofs about them. A generator is a term polymorphic
 in its monad (`def myGen [Gen G] : G α`) — the same term runs at `Plausible.Gen`/`IO` and is
-reasoned about at `SPMF`. Research code; APIs are unstable.
+reasoned about at `SPMF`. **That duality is the point of the repo:** every generator is meant to be
+both sampled for testing and proved about.
 
 `README.md` is the user-facing reference and is kept accurate — it owns the build commands, the
 repository layout, the interpretation table, and the correctness-law vocabulary. Read it before
 changing public behavior, and update it when you do.
-[Palamedes](https://github.com/hgoldstein95/palamedes-lean), the flagship client, synthesizes
-Basalt generators and proves their laws with Basalt's tactics.
 
 ## Commands
 
 Build targets and the directory layout are `README.md`'s. **There is no separate test framework.**
 Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake build`, so
 `lake build` *is* the test suite and a regression is a build failure.
+
+**To see how a generator behaves, run it.** It is executable as written: put `#genstats` in a
+scratch file that imports the generator's module, and run `lake lean <file>`. There is no need to
+re-implement a generator in Python or another language to simulate it: the copy is unchecked against
+the definition, and the definition is right here to run.
 
 ## Where things live
 
@@ -191,6 +195,11 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   display as the source form. Rewrite with `oneOfWith_eq`/`frequencyWith_eq` first, or use `simp`,
   which applies them ([Basalt/Combinators.lean](Basalt/Combinators.lean)).
 
+- **Running a scratch file that samples a generator fails with `Could not find native
+  implementation of external declaration 'SplitMix.Gen.new'`**, suggesting a `supportInterpreter`
+  change to the lakefile — the file was run with `lake env lean`, which does not load the `splitmix`
+  dependency's native code. Run it with `lake lean <file>` instead; the lakefile is fine.
+
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
   `ennreal_to_real` ([Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean)) and finish over `ℝ`.
 
@@ -232,7 +241,6 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   imports (`Lean`, `Batteries`, `Mathlib`, `Plausible`) come first, then Basalt's, each block
   alphabetical. An import whose only use is inside a macro body or a `@[gen_rule]` registry is
   load-bearing at the tactic's *use* sites, so it stays even though the module compiles without it.
-- Declaration docstrings explain design tension, not just signature — where rule 4 admits one.
 - `BasaltExamples/` files are cookbook entries: a generator plus proofs of the correctness
   properties that apply to it, nothing else — no `#eval`/`#guard_msgs`. Anything pinned or run
   for effect belongs in `BasaltTest/`; nothing built has a `sorry`.
