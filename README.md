@@ -148,6 +148,10 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
   - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean`,
     `BacktrackGen.lean` (generators whose failure is a value, and weighted retry), `Arbitrary.lean`
     (generator lookup classes), and `Laws.lean`, the properties a generator may be proved to have;
+  - *enumeration*: `Enumeration.lean` (`Choice`, nondeterministic collection) and `Graded.lean`, a
+    size-graded enumeration with value, counting and specification interpretations, whose agreement is
+    `GradedSound.lean`; `GradedRun.lean`, `GradedLazy.lean` and `GradedChunked.lean` are the carriers to
+    run it — strict, lazy and chunked levels;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
     expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
     `PlausibleGen.lean` (with `PlausibleBridge.lean`, Plausible's lookup classes from Basalt's),

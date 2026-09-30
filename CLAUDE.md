@@ -51,6 +51,12 @@ the definition, and the definition is right here to run.
   [Basalt/SPMF/Backtrack.lean](Basalt/SPMF/Backtrack.lean), pinned by
   [BasaltTest/SPMF/Backtrack.lean](BasaltTest/SPMF/Backtrack.lean); the base instances' laws —
   [Basalt/SPMF/Arbitrary.lean](Basalt/SPMF/Arbitrary.lean).
+- **Graded enumeration** — the algebra and its interpretations:
+  [Basalt/Graded.lean](Basalt/Graded.lean); that they agree:
+  [Basalt/GradedSound.lean](Basalt/GradedSound.lean); the carriers to run it, each with its transport:
+  [Basalt/GradedRun.lean](Basalt/GradedRun.lean), [Basalt/GradedLazy.lean](Basalt/GradedLazy.lean),
+  [Basalt/GradedChunked.lean](Basalt/GradedChunked.lean); all pinned by
+  [BasaltTest/Graded.lean](BasaltTest/Graded.lean).
 - **Compiled choice** (`oneOf!`, `frequency!`) — the `compiled_choice` section of
   [Basalt/Combinators.lean](Basalt/Combinators.lean). Its contract (no list in the compiled code, the
   walk its model gets) is pinned by [BasaltTest/Combinators.lean](BasaltTest/Combinators.lean), and
