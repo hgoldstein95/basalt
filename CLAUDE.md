@@ -46,7 +46,11 @@ the definition, and the definition is right here to run.
   (`Basalt.Arbitrary`, `Basalt.ArbitraryFueled`, `GenFor`, `BacktrackGenFor`) —
   [Basalt/Arbitrary.lean](Basalt/Arbitrary.lean), and their Plausible counterparts —
   [Basalt/PlausibleBridge.lean](Basalt/PlausibleBridge.lean), both pinned by
-  [BasaltTest/Arbitrary.lean](BasaltTest/Arbitrary.lean).
+  [BasaltTest/Arbitrary.lean](BasaltTest/Arbitrary.lean). What `backtrack` can produce at `SPMF`
+  (its successes, refutations, and when it cannot fail) —
+  [Basalt/SPMF/Backtrack.lean](Basalt/SPMF/Backtrack.lean), pinned by
+  [BasaltTest/SPMF/Backtrack.lean](BasaltTest/SPMF/Backtrack.lean); the base instances' laws —
+  [Basalt/SPMF/Arbitrary.lean](Basalt/SPMF/Arbitrary.lean).
 - **Compiled choice** (`oneOf!`, `frequency!`) — the `compiled_choice` section of
   [Basalt/Combinators.lean](Basalt/Combinators.lean). Its contract (no list in the compiled code, the
   walk its model gets) is pinned by [BasaltTest/Combinators.lean](BasaltTest/Combinators.lean), and

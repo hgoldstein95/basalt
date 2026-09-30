@@ -83,6 +83,12 @@ def refutedToExhausted [Monad m] (g : Producer k m α) : Producer k m α :=
     | .ok a => pure (.ok a)
     | _ => pure .exhausted⟩
 
+@[simp] theorem run_pure [Monad m] (a : α) : (pure a : Producer k m α).run = pure (.ok a) := rfl
+@[simp] theorem run_refute [Monad m] : (refute : Producer k m α).run = pure .refuted := rfl
+@[simp] theorem run_exhaust [Monad m] : (exhaust : Producer k m α).run = pure .exhausted := rfl
+@[simp] theorem run_lift [Monad m] (g : m α) :
+    (lift g : Producer k m α).run = (do let a ← g; pure (.ok a)) := rfl
+
 /-- Collapse the `Outcome`, mapping either failure to `default`. -/
 def collapse [Monad m] [Inhabited α] (g : Producer k m α) : m α := do
   match ← g.run with

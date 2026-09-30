@@ -33,6 +33,8 @@ import Basalt.PlausibleBridge
 import Basalt.PlausibleGen
 import Basalt.Random
 import Basalt.RandomChoice
+import Basalt.SPMF.Arbitrary
+import Basalt.SPMF.Backtrack
 import Basalt.SPMF.Basic
 import Basalt.SPMF.Cost
 import Basalt.SPMF.CostErasure
