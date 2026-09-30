@@ -147,6 +147,12 @@ your own induction that is stated as a law is passed as `ih.obs`. By convention 
 a generator that has only one half of the support law, as a size-bounded generator is sound and
 deliberately incomplete).
 
+**A sized generator** (`[Sized G]`) has its laws at each size: state them about
+`(<GEN> : WithSize SPMF α) n`, and `simp only [size_erasure]` before walking, which evaluates the
+generator at `n` into one that reads no size. A callee's law is then passed at the size it is
+called at, and a retry loop's at every size it might try (`fun m => (h m).obs`);
+`BasaltTest/Combinators/QuickCheck.lean` does this for each of QuickCheck's combinators.
+
 ### Unfolding: one idiom per context
 
 `partial_fixpoint` definitions unfold three ways, and picking the wrong one gives confusing errors:

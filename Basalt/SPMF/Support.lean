@@ -3,6 +3,7 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Basalt.Combinators.QuickCheck
 import Basalt.Obs.Presentation
 import Basalt.SPMF.Expect.Obs
 
@@ -496,6 +497,161 @@ theorem support_frequency_congr_weights
     obtain ⟨⟨w', g'⟩, hmem', hg⟩ := List.mem_map.mp this
     cases hg
     exact ⟨w', g', hmem', hpos _ hmem', ha⟩
+
+theorem mem_support_chooseNat_iff {lo hi k : Nat} {h : lo ≤ hi} :
+    k ∈ (chooseNat lo hi h : SPMF Nat).support ↔ lo ≤ k ∧ k ≤ hi := by
+  unfold chooseNat
+  simp only [mem_support_map_iff, mem_support_choose_iff, true_and]
+  constructor
+  · rintro ⟨⟨⟨x, hx⟩⟩, rfl⟩
+    exact hx
+  · intro hk
+    exact ⟨⟨⟨k, hk⟩⟩, rfl⟩
+
+theorem mem_support_chooseInt_iff {lo hi k : Int} {h : lo ≤ hi} :
+    k ∈ (chooseInt lo hi h : SPMF Int).support ↔ lo ≤ k ∧ k ≤ hi := by
+  unfold chooseInt
+  simp only [mem_support_bind_iff, mem_support_chooseNat_iff, mem_support_pure_iff]
+  constructor
+  · rintro ⟨j, ⟨-, hj⟩, rfl⟩
+    omega
+  · intro hk
+    exact ⟨(k - lo).toNat, ⟨Nat.zero_le _, by omega⟩, by omega⟩
+
+/-! ## QuickCheck's combinators
+
+The support laws of the combinators `QuickCheck` adds that read no size; the others are these, or
+the ones above, once a size is chosen (`size_erasure`). -/
+
+section quickCheck
+
+open QuickCheck
+
+theorem mem_support_sublistOf_iff {xs ys : List α} :
+    ys ∈ (sublistOf xs : SPMF (List α)).support ↔ ys.Sublist xs := by
+  induction xs generalizing ys with
+  | nil => simp [sublistOf]
+  | cons x xs ih =>
+    simp only [sublistOf, mem_support_bind_iff, mem_support_chooseNat_iff, mem_support_pure_iff, ih,
+      List.sublist_cons_iff]
+    constructor
+    · rintro ⟨keep, -, zs, hzs, rfl⟩
+      split
+      · exact Or.inr ⟨zs, rfl, hzs⟩
+      · exact Or.inl hzs
+    · rintro (h | ⟨r, rfl, h⟩)
+      · exact ⟨0, by omega, ys, h, by simp⟩
+      · exact ⟨1, by omega, r, h, by simp⟩
+
+theorem perm_of_mem_support_shuffle {xs ys : List α}
+    (h : ys ∈ (shuffle xs : SPMF (List α)).support) : ys.Perm xs := by
+  unfold shuffle at h
+  simp only [mem_support_bind_iff, mem_support_vectorOf_iff, mem_support_pure_iff] at h
+  obtain ⟨ks, ⟨hlen, -⟩, rfl⟩ := h
+  have := (List.mergeSort_perm (ks.zip xs) fun a b => decide (a.1 ≤ b.1)).map Prod.snd
+  rwa [List.map_snd_zip (by omega)] at this
+
+/-- Keys for `xs` that pair its entries as `zs` pairs those of `ys`, for any `zs` of that length. -/
+private theorem exists_keys_zip_perm {xs ys : List α} (h : xs.Perm ys) :
+    ∀ zs : List Int, zs.length = ys.length →
+      ∃ ks : List Int, ks.Perm zs ∧ (ks.zip xs).Perm (zs.zip ys) := by
+  induction h with
+  | nil =>
+    intro zs hz
+    exact ⟨zs, List.Perm.refl _, by simp⟩
+  | cons x _ ih =>
+    rintro (_ | ⟨z, zs⟩) hz
+    · simp at hz
+    · obtain ⟨ks, hk, hz'⟩ := ih zs (by simpa using hz)
+      exact ⟨z :: ks, hk.cons z, by simpa using hz'.cons (z, x)⟩
+  | swap x y l =>
+    rintro (_ | ⟨a, _ | ⟨b, zs⟩⟩) hz
+    · simp at hz
+    · simp at hz
+    · exact ⟨b :: a :: zs, List.Perm.swap a b zs, by simpa using List.Perm.swap (a, x) (b, y) _⟩
+  | trans h₁₂ h₂₃ ih₁ ih₂ =>
+    intro zs hz
+    obtain ⟨ks₂, hk₂, h₂⟩ := ih₂ zs hz
+    obtain ⟨ks₁, hk₁, h₁⟩ := ih₁ ks₂ (by rw [hk₂.length_eq, hz, h₂₃.length_eq])
+    exact ⟨ks₁, hk₁.trans hk₂, h₁.trans h₂⟩
+
+/-- Every permutation, for a list short enough to give each entry its own 64-bit key: past that,
+keys tie, and a stable sort keeps tied entries in order. -/
+theorem mem_support_shuffle_of_perm {xs ys : List α} (hn : xs.length ≤ 2 ^ 64)
+    (h : ys.Perm xs) : ys ∈ (shuffle xs : SPMF (List α)).support := by
+  have hn : xs.length ≤ 18446744073709551616 := by simpa using hn
+  let zs : List Int := (List.range xs.length).map fun j : Nat => (j : Int) - 9223372036854775808
+  have hzlen : zs.length = ys.length := by simp [zs, h.length_eq]
+  obtain ⟨ks, hks, hperm⟩ := exists_keys_zip_perm h.symm zs hzlen
+  unfold shuffle
+  simp only [mem_support_bind_iff, mem_support_vectorOf_iff, mem_support_chooseInt_iff,
+    mem_support_pure_iff]
+  refine ⟨ks, ⟨by simp [hks.length_eq, zs], fun k hk => ?_⟩, ?_⟩
+  · obtain ⟨j, hj, rfl⟩ := List.mem_map.mp (hks.subset hk)
+    have := List.mem_range.mp hj
+    omega
+  · have hM := (List.mergeSort_perm (ks.zip xs) fun a b => decide (a.1 ≤ b.1)).trans hperm
+    have hnodup : ((zs.zip ys).map Prod.fst).Nodup := by
+      rw [List.map_fst_zip (by omega)]
+      exact List.nodup_range.map fun a b hab => by simpa using hab
+    have hP : (zs.zip ys).Pairwise fun a b => a.1 ≤ b.1 := by
+      rw [List.pairwise_iff_getElem]
+      intro i j hi hj hij
+      simp [zs, List.getElem_zip]
+      omega
+    have hsorted := List.pairwise_mergeSort (le := fun a b : Int × α => decide (a.1 ≤ b.1))
+      (fun a b c hab hbc => by simp at *; omega) (fun a b => by simp; omega) (ks.zip xs)
+    rw [List.Perm.eq_of_pairwise (le := fun a b : Int × α => a.1 ≤ b.1)
+      (fun a b ha hb hab hba =>
+        List.inj_on_of_nodup_map hnodup (hM.subset ha) hb (le_antisymm hab hba))
+      (hsorted.imp fun h => by simpa using h) hP hM, List.map_snd_zip (by omega)]
+
+theorem mem_support_trySizes {gs : Nat → SPMF α} {f : α → Option β} {m k : Nat} {b : β}
+    (h : some b ∈ (trySizes gs f m k).support) :
+    ∃ j a, m ≤ j ∧ j < m + k ∧ a ∈ (gs j).support ∧ f a = some b := by
+  induction k generalizing m with
+  | zero => simp [trySizes] at h
+  | succ k ih =>
+    simp only [trySizes, mem_support_bind_iff] at h
+    obtain ⟨a, ha, hb⟩ := h
+    split at hb
+    · exact ⟨m, a, le_rfl, by omega, ha, (mem_support_pure_iff.mp hb).symm⟩
+    · obtain ⟨j, a', hj, hj', ha', hf⟩ := ih hb
+      exact ⟨j, a', by omega, by omega, ha', hf⟩
+
+/-- The first draw can be the one `f` accepts. -/
+theorem some_mem_support_trySizes {gs : Nat → SPMF α} {f : α → Option β} {m k : Nat} {a : α}
+    {b : β} (ha : a ∈ (gs m).support) (hf : f a = some b) :
+    some b ∈ (trySizes gs f m (k + 1)).support := by
+  simp only [trySizes, mem_support_bind_iff]
+  exact ⟨a, ha, by simp [hf]⟩
+
+theorem mem_support_suchThatFrom {gs : Nat → SPMF α} {f : α → Option β} {n : Nat} {b : β}
+    (h : b ∈ (suchThatFrom gs f n).support) :
+    ∃ j a, n ≤ j ∧ a ∈ (gs j).support ∧ f a = some b := by
+  refine suchThatFrom.fixpoint_induct gs f
+    (fun z => ∀ n b, b ∈ (z n).support → ∃ j a, n ≤ j ∧ a ∈ (gs j).support ∧ f a = some b)
+    (admissible_pi_apply
+      (fun n (x : SPMF β) => ∀ b, b ∈ x.support → ∃ j a, n ≤ j ∧ a ∈ (gs j).support ∧ f a = some b)
+      fun n c hc hall b hb => ?_) (fun z ih n b h => ?_) n b h
+  · obtain ⟨x, hx, hb⟩ := (mem_support_csup hc).mp hb
+    exact hall x hx b hb
+  · obtain ⟨o, ho, hb⟩ := mem_support_bind_iff.mp h
+    rcases o with _ | b'
+    · obtain ⟨j, a, hj, ha, hf⟩ := ih (n + 1) b hb
+      exact ⟨j, a, by omega, ha, hf⟩
+    · obtain rfl := mem_support_pure_iff.mp hb
+      obtain ⟨j, a, hj, -, ha, hf⟩ := mem_support_trySizes ho
+      exact ⟨j, a, hj, ha, hf⟩
+
+/-- The first draw, at size `n`, can be the one `f` accepts. -/
+theorem mem_support_suchThatFrom_of {gs : Nat → SPMF α} {f : α → Option β} {n : Nat} {a : α}
+    {b : β} (ha : a ∈ (gs n).support) (hf : f a = some b) :
+    b ∈ (suchThatFrom gs f n).support := by
+  rw [suchThatFrom]
+  exact mem_support_bind_iff.mpr ⟨some b, some_mem_support_trySizes ha hf, by simp⟩
+
+end quickCheck
 
 end support
 

@@ -3,6 +3,7 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Lean.Meta.Tactic.Simp.RegisterCommand
 import Basalt.Gen
 
 /-!
@@ -12,6 +13,10 @@ import Basalt.Gen
 to any generator monad `G`; `OptionT` preserves both. `MonoSized` is the side condition that lets
 `sized` and `resize` appear in the body of a `partial_fixpoint`.
 -/
+
+/-- Evaluates a `WithSize G` generator at a size, pushing the size inward until only `G` is left
+(`Basalt/Combinators/WithSize.lean`). -/
+register_simp_attr size_erasure
 
 open Lean.Order
 

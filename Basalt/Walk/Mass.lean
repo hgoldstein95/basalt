@@ -142,4 +142,79 @@ theorem le_expect_permutationOf_iInf {xs : List α} {p : { ys // xs.Perm ys } �
     ⨅ a, p a ≤ expectObs.spec (permutationOf xs) p :=
   le_expect_iInf_of_one_le (one_le_mass_permutationOf.trans_eq (expect_one _).symm)
 
+/-! QuickCheck's combinators that take no generator always return; `trySizes` makes at most its
+number of draws, each bounded as its family is at every size. The retry loop `suchThatFrom` is
+`MassFixpoint.lean`'s. -/
+
+section quickCheck
+
+open QuickCheck
+
+private theorem one_le_mass_sublistOf {xs : List α} : 1 ≤ (sublistOf xs : SPMF (List α)).mass := by
+  induction xs with
+  | nil => exact (mass_pure _).ge
+  | cons x xs ih =>
+    rw [sublistOf]
+    refine (one_mul (1 : ℝ≥0∞)).symm.le.trans
+      (mass_bind_ge_mul (mass_chooseNat _ _ _).ge fun _ => ?_)
+    exact (one_mul (1 : ℝ≥0∞)).symm.le.trans (mass_bind_ge_mul ih fun _ => (mass_pure _).ge)
+
+@[gen_rule]
+theorem le_expect_sublistOf {xs : List α} {d : ℝ≥0∞} {p : List α → ℝ≥0∞} (hp : ∀ a, p a = d) :
+    d ≤ expectObs.spec (sublistOf xs) p :=
+  le_expect_of_one_le (one_le_mass_sublistOf.trans_eq (expect_one _).symm) hp
+
+@[gen_rule, inherit_doc le_expect_vectorOf_iInf]
+theorem le_expect_sublistOf_iInf {xs : List α} {p : List α → ℝ≥0∞} :
+    ⨅ a, p a ≤ expectObs.spec (sublistOf xs) p :=
+  le_expect_iInf_of_one_le (one_le_mass_sublistOf.trans_eq (expect_one _).symm)
+
+private theorem one_le_mass_shuffle {xs : List α} : 1 ≤ (shuffle xs : SPMF (List α)).mass := by
+  unfold shuffle
+  refine (one_mul (1 : ℝ≥0∞)).symm.le.trans (mass_bind_ge_mul ?_ fun _ => (mass_pure _).ge)
+  have := pow_le_vectorOf (n := xs.length)
+    ((mass_chooseInt (-9223372036854775808) 9223372036854775807 (by decide)).ge.trans_eq
+      (expect_one _).symm)
+  rw [one_pow] at this
+  exact this.trans_eq (expect_one _)
+
+@[gen_rule]
+theorem le_expect_shuffle {xs : List α} {d : ℝ≥0∞} {p : List α → ℝ≥0∞} (hp : ∀ a, p a = d) :
+    d ≤ expectObs.spec (shuffle xs) p :=
+  le_expect_of_one_le (one_le_mass_shuffle.trans_eq (expect_one _).symm) hp
+
+@[gen_rule, inherit_doc le_expect_vectorOf_iInf]
+theorem le_expect_shuffle_iInf {xs : List α} {p : List α → ℝ≥0∞} :
+    ⨅ a, p a ≤ expectObs.spec (shuffle xs) p :=
+  le_expect_iInf_of_one_le (one_le_mass_shuffle.trans_eq (expect_one _).symm)
+
+variable {β : Type} {gs : Nat → SPMF α} {f : α → Option β} {c : ℝ≥0∞}
+
+private theorem pow_le_trySizes (hg : ∀ j, c ≤ expectObs.spec (gs j) fun _ => 1) (m k : Nat) :
+    min 1 c ^ k ≤ expectObs.spec (trySizes gs f m k : SPMF (Option β)) fun _ => 1 := by
+  refine le_of_le_of_eq ?_ (expect_one _).symm
+  induction k generalizing m with
+  | zero => exact (pow_zero _).trans_le (mass_pure _).ge
+  | succ k ih =>
+    rw [trySizes, pow_succ']
+    refine mass_bind_ge_mul ((min_le_right 1 c).trans ((hg m).trans_eq (expect_one _)))
+      fun a => ?_
+    split
+    · exact (pow_le_one₀ zero_le (min_le_left 1 c)).trans (mass_pure _).ge
+    · exact ih (m + 1)
+
+@[gen_rule]
+theorem le_expect_trySizes {m k : Nat} {d : ℝ≥0∞} {p : Option β → ℝ≥0∞}
+    (hg : ∀ j, c ≤ expectObs.spec (gs j) fun _ => 1) (hp : ∀ a, p a = d) :
+    min 1 c ^ k * d ≤ expectObs.spec (trySizes gs f m k) p :=
+  le_expect_of_le (pow_le_trySizes hg m k) hp
+
+@[gen_rule, inherit_doc le_expect_vectorOf_iInf]
+theorem le_expect_trySizes_iInf {m k : Nat} {p : Option β → ℝ≥0∞}
+    (hg : ∀ j, c ≤ expectObs.spec (gs j) fun _ => 1) :
+    min 1 c ^ k * ⨅ a, p a ≤ expectObs.spec (trySizes gs f m k) p :=
+  le_expect_iInf_of_le (pow_le_trySizes hg m k)
+
+end quickCheck
+
 end SPMF

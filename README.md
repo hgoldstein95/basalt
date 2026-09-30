@@ -37,6 +37,9 @@ A generator that branches on a size adds a `[Sized G]` constraint and reads it w
 `Sized.sized`, shrinking it for recursive calls with `Sized.resize` (plus `[MonoSized G]` when the
 generator is a `partial_fixpoint`). `WithSize G` supplies the size to any interpretation `G`: run
 the generator at `WithSize G` and close it with `.run n`. See `Basalt/Sized.lean`.
+QuickCheck's combinators, with QuickCheck's distribution at every size, are
+`Basalt/Combinators/QuickCheck.lean`. A law of a sized generator is stated at a size, and
+`simp only [size_erasure]` turns it into one about a generator that reads no size.
 
 ## Correctness Properties
 
@@ -145,8 +148,9 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
 ## Repository layout
 
 - `Basalt/` — the library, in four tiers:
-  - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean`, and
-    `Laws.lean`, the properties a generator may be proved to have;
+  - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean` (with
+    `Combinators/`: evaluation at a size, and QuickCheck's combinators), and `Laws.lean`, the
+    properties a generator may be proved to have;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
     expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
     `PlausibleGen.lean`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean`

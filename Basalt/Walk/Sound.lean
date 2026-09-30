@@ -93,4 +93,65 @@ theorem le_always_permutationOf {α : Type} {xs : List α} {p : { ys // xs.Perm 
     (∀ a, p a) ≤ alwaysObs.spec (permutationOf xs) p :=
   fun h a _ => h a
 
+/-! ## QuickCheck's combinators
+
+A size-indexed family, as `trySizes` and `suchThatFrom` take, asks for a fact at every size. -/
+
+section quickCheck
+
+open QuickCheck
+
+@[gen_rule]
+theorem le_always_sublistOf {α : Type} {xs : List α} {p : List α → Prop} :
+    (∀ ys, ys.Sublist xs → p ys) ≤ alwaysObs.spec (sublistOf xs) p :=
+  fun h ys hys => h ys (mem_support_sublistOf_iff.mp hys)
+
+@[gen_rule]
+theorem le_always_shuffle {α : Type} {xs : List α} {p : List α → Prop} :
+    (∀ ys, ys.Perm xs → p ys) ≤ alwaysObs.spec (shuffle xs) p :=
+  fun h ys hys => h ys (perm_of_mem_support_shuffle hys)
+
+variable {α β : Type} {gs : Nat → SPMF α} {f : α → Option β}
+
+/-- What `trySizes` returns, if anything, is what `f` gives of a value drawn at one of its sizes. -/
+@[gen_rule]
+theorem le_always_trySizes {m k : Nat} {R : Nat → α → Prop} {post : Option β → Prop}
+    (hg : ∀ j, alwaysObs.spec (gs j) (R j)) :
+    (∀ o, (∀ b, o = some b → ∃ j a, m ≤ j ∧ j < m + k ∧ R j a ∧ f a = some b) → post o)
+      ≤ alwaysObs.spec (trySizes gs f m k) post :=
+  fun h o ho => h o fun b hb => by
+    subst hb
+    obtain ⟨j, a, hj, hj', ha, hf⟩ := mem_support_trySizes ho
+    exact ⟨j, a, hj, hj', hg j a ha, hf⟩
+
+/-- With no fact about `gs`, what `f` accepts. -/
+@[gen_rule]
+theorem le_always_trySizes_accept {m k : Nat} {post : Option β → Prop} :
+    (∀ o, (∀ b, o = some b → ∃ a, f a = some b) → post o)
+      ≤ alwaysObs.spec (trySizes gs f m k) post :=
+  fun h o ho => h o fun b hb => by
+    subst hb
+    obtain ⟨j, a, -, -, -, hf⟩ := mem_support_trySizes ho
+    exact ⟨a, hf⟩
+
+/-- What `suchThatFrom` returns is what `f` gives of a value drawn at a size from `n` on. -/
+@[gen_rule]
+theorem le_always_suchThatFrom {n : Nat} {R : Nat → α → Prop} {post : β → Prop}
+    (hg : ∀ j, alwaysObs.spec (gs j) (R j)) :
+    (∀ b, (∃ j a, n ≤ j ∧ R j a ∧ f a = some b) → post b)
+      ≤ alwaysObs.spec (suchThatFrom gs f n) post :=
+  fun h b hb =>
+    have ⟨j, a, hj, ha, hf⟩ := mem_support_suchThatFrom hb
+    h b ⟨j, a, hj, hg j a ha, hf⟩
+
+/-- With no fact about `gs`, what `f` accepts. -/
+@[gen_rule]
+theorem le_always_suchThatFrom_accept {n : Nat} {post : β → Prop} :
+    (∀ b, (∃ a, f a = some b) → post b) ≤ alwaysObs.spec (suchThatFrom gs f n) post :=
+  fun h b hb =>
+    have ⟨_, a, _, _, hf⟩ := mem_support_suchThatFrom hb
+    h b ⟨a, hf⟩
+
+end quickCheck
+
 end SPMF

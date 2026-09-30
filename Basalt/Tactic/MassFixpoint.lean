@@ -11,8 +11,8 @@ import Basalt.Walk.Mass
 
 `mass_fixpoint` reduces a `.terminates` law to its criterion,
 `IsAlmostSurelyTerminating.of_lfpIsOne`: it builds the family over the generator's seed, unfolds one
-step, and walks it. The termination facts of the list combinators and of `suchThat` live here
-because they are proved with it.
+step, and walks it. The termination facts of the list combinators and of the retry loops
+(`suchThat`, QuickCheck's `suchThatFrom`) live here because they are proved with it.
 -/
 
 open ENNReal RandomChoice
@@ -293,6 +293,113 @@ theorem le_expect_suchThat_iInf {g : SPMF α} {p : α → Bool} {c r : ℝ≥0�
     (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r) :
     (if 1 ≤ c ∧ r < 1 then 1 else 0) * ⨅ a, post a ≤ expectObs.spec (suchThat g p) post :=
   le_expect_iInf_of_le (ite_le_suchThat hg hr)
+
+/-! ### QuickCheck's retry loop
+
+`suchThatFrom gs f n` draws from `gs` at the sizes `n`, `n + 1`, …, each round starting one size
+later, so every draw is at a size from `n` on: it terminates when each of those does and rejects
+with a chance at most `r < 1`. -/
+
+section suchThatFrom
+
+open QuickCheck
+
+variable {α β : Type} {gs : Nat → SPMF α} {f : α → Option β} {n : Nat} {r c : ℝ≥0∞}
+
+private theorem le_one_sub_add_mul (hr1 : r ≤ 1) (hc : c ≤ 1) : c ≤ (1 - r) + r * c :=
+  calc c = (1 - r) * c + r * c := by rw [← add_mul, tsub_add_cancel_of_le hr1, one_mul]
+    _ ≤ (1 - r) + r * c := by gcongr; exact mul_le_of_le_one_right' hc
+
+/-- One round of `trySizes`, each attempt from size `n` on accepted with chance at least `1 - r`:
+at least `c` in all when a round that returns nothing is worth `c`, and at least
+`(1 - r) + r * c` when it makes a draw. -/
+private theorem le_expect_trySizes_rounds
+    (hg : ∀ j, n ≤ j → IsAlmostSurelyTerminating (gs j))
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a => if (f a).isSome then 0 else 1) ≤ r)
+    (hr1 : r ≤ 1) (hc : c ≤ 1) :
+    ∀ k m, n ≤ m →
+      c ≤ expect (trySizes gs f m k) (fun o => if o.isSome then 1 else c) ∧
+      (0 < k → (1 - r) + r * c ≤ expect (trySizes gs f m k) fun o => if o.isSome then 1 else c) := by
+  intro k
+  induction k with
+  | zero =>
+    intro m _
+    refine ⟨?_, fun h => absurd h (Nat.lt_irrefl 0)⟩
+    rw [trySizes, expect_pure]
+    exact le_rfl
+  | succ k ih =>
+    intro m hm
+    have hstep : (1 - r) + r * c ≤ expect (trySizes gs f m (k + 1))
+        (fun o => if o.isSome then 1 else c) := by
+      rw [trySizes, expect_bind]
+      refine (le_expect_accept (p := fun a => (f a).isSome) (hg m hm) (hr m hm) hr1 hc).trans
+        (expect_mono fun a => ?_)
+      split
+      · simp [expect_pure, *]
+      · exact (ih (m + 1) (by omega)).1
+    exact ⟨(le_one_sub_add_mul hr1 hc).trans hstep, fun _ => hstep⟩
+
+theorem isAlmostSurelyTerminating_suchThatFrom
+    (hg : ∀ j, n ≤ j → IsAlmostSurelyTerminating (gs j))
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a => if (f a).isSome then 0 else 1) ≤ r)
+    (hr1 : r < 1) : IsAlmostSurelyTerminating (suchThatFrom gs f n) := by
+  have key := IsAlmostSurelyTerminating.of_lfpIsOne_uniform (fun s => suchThatFrom gs f (n + s))
+    (LfpIsOne.affine hr1) (fun c hc hrec s => ?_) 0
+  · simpa using key
+  show _ ≤ expect _ _
+  conv => right; rw [suchThatFrom]
+  rw [expect_bind]
+  refine ((le_expect_trySizes_rounds hg hr hr1.le hc (n + s + 1) (n + s) (by omega)).2
+    (by omega)).trans (expect_mono fun o => ?_)
+  rcases o with _ | b
+  · exact hrec (s + 1)
+  · simp
+
+private theorem ite_le_suchThatFrom
+    (hg : ∀ j, n ≤ j → c ≤ expectObs.spec (gs j) fun _ => 1)
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a => if (f a).isSome then 0 else 1) ≤ r) :
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) ≤ expectObs.spec (suchThatFrom gs f n) fun _ => 1 := by
+  split
+  · rename_i h
+    exact (isAlmostSurelyTerminating_suchThatFrom
+      (fun j hj => IsAlmostSurelyTerminating.iff_obs.mpr (h.1.trans (hg j hj))) hr h.2).obs
+  · exact zero_le
+
+/-- As for `suchThat`: a fact about how often `gs` rejects at each size from `n` on closes `hr`. -/
+@[gen_rule]
+theorem le_expect_suchThatFrom {d : ℝ≥0∞} {post : β → ℝ≥0∞}
+    (hg : ∀ j, n ≤ j → c ≤ expectObs.spec (gs j) fun _ => 1)
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a => if (f a).isSome then 0 else 1) ≤ r)
+    (hp : ∀ a, post a = d) :
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) * d ≤ expectObs.spec (suchThatFrom gs f n) post :=
+  le_expect_of_le (ite_le_suchThatFrom hg hr) hp
+
+@[gen_rule, inherit_doc le_expect_vectorOf_iInf]
+theorem le_expect_suchThatFrom_iInf {post : β → ℝ≥0∞}
+    (hg : ∀ j, n ≤ j → c ≤ expectObs.spec (gs j) fun _ => 1)
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a => if (f a).isSome then 0 else 1) ≤ r) :
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) * ⨅ a, post a ≤ expectObs.spec (suchThatFrom gs f n) post :=
+  le_expect_iInf_of_le (ite_le_suchThatFrom hg hr)
+
+/-- `QuickCheck.suchThat p`, at a size, is `suchThatFrom` of `Option.guard p`: its rejections are
+stated through `p`. -/
+@[gen_rule]
+theorem le_expect_suchThatFrom_guard {p : α → Bool} {d : ℝ≥0∞} {post : α → ℝ≥0∞}
+    (hg : ∀ j, n ≤ j → c ≤ expectObs.spec (gs j) fun _ => 1)
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a => if p a then 0 else 1) ≤ r)
+    (hp : ∀ a, post a = d) :
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) * d ≤ expectObs.spec (suchThatFrom gs (Option.guard p) n) post :=
+  le_expect_suchThatFrom hg (fun j hj => by simpa [Option.isSome_guard] using hr j hj) hp
+
+@[gen_rule, inherit_doc le_expect_suchThatFrom_guard]
+theorem le_expect_suchThatFrom_guard_iInf {p : α → Bool} {post : α → ℝ≥0∞}
+    (hg : ∀ j, n ≤ j → c ≤ expectObs.spec (gs j) fun _ => 1)
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a => if p a then 0 else 1) ≤ r) :
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) * ⨅ a, post a
+      ≤ expectObs.spec (suchThatFrom gs (Option.guard p) n) post :=
+  le_expect_suchThatFrom_iInf hg fun j hj => by simpa [Option.isSome_guard] using hr j hj
+
+end suchThatFrom
 
 end combinators
 

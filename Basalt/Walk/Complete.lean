@@ -90,6 +90,44 @@ theorem le_may_permutationOf {α : Type} {xs : List α} {p : { ys // xs.Perm ys 
     (∃ a, p a) ≤ mayObs.spec (permutationOf xs) p :=
   fun ⟨a, hp⟩ => ⟨a, mem_support_permutationOf_iff.mpr trivial, hp⟩
 
+/-! ## QuickCheck's combinators
+
+A retry loop reaches what its first draw does, at the size it starts from. -/
+
+section quickCheck
+
+open QuickCheck
+
+@[gen_rule]
+theorem le_may_sublistOf {α : Type} {xs : List α} {p : List α → Prop} :
+    (∃ ys, ys.Sublist xs ∧ p ys) ≤ mayObs.spec (sublistOf xs) p :=
+  fun ⟨ys, hys, hp⟩ => ⟨ys, mem_support_sublistOf_iff.mpr hys, hp⟩
+
+/-- Every permutation, when there are keys enough to give each entry its own. -/
+@[gen_rule]
+theorem le_may_shuffle {α : Type} {xs : List α} {p : List α → Prop} :
+    (xs.length ≤ 2 ^ 64 ∧ ∃ ys, ys.Perm xs ∧ p ys) ≤ mayObs.spec (shuffle xs) p :=
+  fun ⟨hn, ys, hys, hp⟩ => ⟨ys, mem_support_shuffle_of_perm hn hys, hp⟩
+
+variable {α β : Type} {gs : Nat → SPMF α} {f : α → Option β} {R : α → Prop}
+
+@[gen_rule]
+theorem le_may_trySizes {m k : Nat} {post : Option β → Prop}
+    (hg : ∀ a, R a → mayObs.spec (gs m) (· = a)) :
+    (∃ b, (∃ a, R a ∧ f a = some b) ∧ post (some b))
+      ≤ mayObs.spec (trySizes gs f m (k + 1)) post :=
+  fun ⟨b, ⟨a, hR, hf⟩, hp⟩ =>
+    ⟨some b, some_mem_support_trySizes (mem_support_iff_may.mpr (hg a hR)) hf, hp⟩
+
+@[gen_rule]
+theorem le_may_suchThatFrom {n : Nat} {post : β → Prop}
+    (hg : ∀ a, R a → mayObs.spec (gs n) (· = a)) :
+    (∃ b, (∃ a, R a ∧ f a = some b) ∧ post b) ≤ mayObs.spec (suchThatFrom gs f n) post :=
+  fun ⟨b, ⟨a, hR, hf⟩, hp⟩ =>
+    ⟨b, mem_support_suchThatFrom_of (mem_support_iff_may.mpr (hg a hR)) hf, hp⟩
+
+end quickCheck
+
 end SPMF
 
 namespace SPMF.Cost

@@ -171,6 +171,137 @@ theorem expect_suchThat_le {post : α → Nat → ℝ≥0∞} {k : ℝ≥0∞}
 
 end suchThat
 
+/-! ## QuickCheck's combinators
+
+`trySizes` pays for each draw it makes, at most one per size it tries. The retry loop
+`suchThatFrom` is bounded as `suchThat` is, each draw at a size from its first on: a round that
+returns nothing starts the loop over, one size later. -/
+
+section quickCheck
+
+open QuickCheck
+
+variable {α β : Type} {gs : Nat → SPMF.Cost α} {f : α → Option β} {C r : ℝ≥0∞}
+
+/-- A generator of expected cost `C` followed by continuations of expected cost at most `D`. -/
+private theorem expect_bind_le_add {x : SPMF.Cost α} {k : α → SPMF.Cost β} {D : ℝ≥0∞}
+    (hx : expectObs.spec x (fun _ n => (n : ℝ≥0∞)) ≤ C)
+    (hk : ∀ a, expectObs.spec (k a) (fun _ n => (n : ℝ≥0∞)) ≤ D) :
+    expectObs.spec (x >>= k) (fun _ n => (n : ℝ≥0∞)) ≤ C + D := by
+  have hstep : ∀ a n, expectObs.spec (k a) (fun _ n' => ((n + n' : Nat) : ℝ≥0∞)) ≤ n + D :=
+    fun a n => expect_le_add_of_le (hk a) fun _ _ => by push_cast; rfl
+  refine (congrFun (expectObs.map_bind x k) _).le.trans ((Obs.MonotoneC.spec_mono x hstep).trans ?_)
+  show SPMF.expect x (fun q => (q.2 : ℝ≥0∞) + D) ≤ C + D
+  rw [SPMF.expect_add, SPMF.expect_const]
+  exact add_le_add hx (mul_le_of_le_one_left' (SPMF.mass_le_one x))
+
+theorem expect_trySizes_cost_le (hg : ∀ j, expectObs.spec (gs j) (fun _ n => (n : ℝ≥0∞)) ≤ C)
+    (m k : Nat) : expectObs.spec (trySizes gs f m k) (fun _ n => (n : ℝ≥0∞)) ≤ k * C := by
+  induction k generalizing m with
+  | zero =>
+    rw [trySizes]
+    exact (congrFun (expectObs.map_pure _) _).le.trans (by simp [WPC.pure_apply])
+  | succ k ih =>
+    rw [trySizes]
+    refine (expect_bind_le_add (hg m) fun a => ?_).trans
+      (by rw [Nat.cast_succ, add_mul, one_mul, add_comm])
+    split
+    · exact (congrFun (expectObs.map_pure _) _).le.trans (by simp [WPC.pure_apply])
+    · exact ih (m + 1)
+
+@[gen_rule]
+theorem expect_trySizes_le {m k : Nat} {post : Option β → Nat → ℝ≥0∞} {d : ℝ≥0∞}
+    (hg : ∀ j, expectObs.spec (gs j) (fun _ n => (n : ℝ≥0∞)) ≤ C)
+    (hpost : ∀ a n, post a n = d + n) :
+    expectObs.spec (trySizes gs f m k) post ≤ d + k * C :=
+  expect_le_add_of_le (expect_trySizes_cost_le hg m k) hpost
+
+@[gen_rule] theorem expect_trySizes_le_const {m k : Nat} {p : Option β → Nat → ℝ≥0∞}
+    {d : ℝ≥0∞} (hp : ∀ a n, p a n = d) : expectObs.spec (trySizes gs f m k) p ≤ d :=
+  expect_le_of_const hp
+
+@[gen_rule] theorem expect_trySizes_le_iSup {m k : Nat} {p : Option β → Nat → ℝ≥0∞} :
+    expectObs.spec (trySizes gs f m k) p ≤ ⨆ a, ⨆ n, p a n := expect_le_iSup
+
+/-- One round of `trySizes` from size `m` on, then `cont`: at most `B` in all, when `cont` costs
+nothing after a value and at most `B` after none, and `C + r * B ≤ B`. -/
+private theorem expect_trySizes_bind_le {n : Nat} {B : ℝ≥0∞}
+    (hg : ∀ j, n ≤ j → expectObs.spec (gs j) (fun _ n => (n : ℝ≥0∞)) ≤ C)
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a _ => if (f a).isSome then 0 else 1) ≤ r)
+    (hB : C + r * B ≤ B) {cont : Option β → SPMF.Cost β}
+    (hsome : ∀ b, cont (some b) = Pure.pure b)
+    (hnone : expectObs.spec (cont none) (fun _ n => (n : ℝ≥0∞)) ≤ B) :
+    ∀ k m, n ≤ m → expectObs.spec (trySizes gs f m k >>= cont) (fun _ n => (n : ℝ≥0∞)) ≤ B := by
+  intro k
+  induction k with
+  | zero =>
+    intro m _
+    rw [trySizes, LawfulMonad.pure_bind]
+    exact hnone
+  | succ k ih =>
+    intro m hm
+    rw [trySizes, LawfulMonad.bind_assoc]
+    have hstep : ∀ a n, expectObs.spec
+        ((if (f a).isSome then Pure.pure (f a) else trySizes gs f (m + 1) k) >>= cont)
+        (fun _ n' => ((n + n' : Nat) : ℝ≥0∞)) ≤ if (f a).isSome then (n : ℝ≥0∞) else n + B := by
+      intro a n
+      split
+      · rename_i h
+        obtain ⟨b, hb⟩ := Option.isSome_iff_exists.mp h
+        rw [hb, LawfulMonad.pure_bind, hsome]
+        exact (congrFun (expectObs.map_pure _) _).le.trans (by simp [WPC.pure_apply])
+      · exact expect_le_add_of_le (ih (m + 1) (by omega)) fun _ _ => by push_cast; rfl
+    exact (congrFun (expectObs.map_bind _ _) _).le.trans ((Obs.MonotoneC.spec_mono _ hstep).trans
+      ((expect_retry_le (p := fun a => (f a).isSome) (hg m hm) (hr m hm) B).trans hB))
+
+theorem expect_suchThatFrom_cost_le {n : Nat}
+    (hg : ∀ j, n ≤ j → expectObs.spec (gs j) (fun _ n => (n : ℝ≥0∞)) ≤ C)
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a _ => if (f a).isSome then 0 else 1) ≤ r) :
+    expectObs.spec (suchThatFrom gs f n) (fun _ n => (n : ℝ≥0∞)) ≤ C / (1 - r) := by
+  refine suchThatFrom.fixpoint_induct gs f
+    (fun z => ∀ k, n ≤ k → expectObs.spec (z k) (fun _ n => (n : ℝ≥0∞)) ≤ C / (1 - r))
+    (Lean.Order.admissible_pi_apply
+      (fun k (x : SPMF.Cost β) => n ≤ k → expectObs.spec x (fun _ n => (n : ℝ≥0∞)) ≤ C / (1 - r))
+      fun k c hc h hk => expectObs.admissible_le _ _ c hc fun x hx => h x hx hk)
+    (fun z ih k hk => ?_) n le_rfl
+  exact expect_trySizes_bind_le hg hr (add_mul_div_one_sub_le C r) (fun _ => rfl)
+    (ih (k + 1) (by omega)) (k + 1) k hk
+
+@[gen_rule]
+theorem expect_suchThatFrom_le {n : Nat} {post : β → Nat → ℝ≥0∞} {d : ℝ≥0∞}
+    (hg : ∀ j, n ≤ j → expectObs.spec (gs j) (fun _ n => (n : ℝ≥0∞)) ≤ C)
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a _ => if (f a).isSome then 0 else 1) ≤ r)
+    (hpost : ∀ a n, post a n = d + n) :
+    expectObs.spec (suchThatFrom gs f n) post ≤ d + C / (1 - r) :=
+  expect_le_add_of_le (expect_suchThatFrom_cost_le hg hr) hpost
+
+/-- `QuickCheck.suchThat p`, at a size, is `suchThatFrom` of `Option.guard p`: its rejections are
+stated through `p`. -/
+@[gen_rule]
+theorem expect_suchThatFrom_guard_le {n : Nat} {p : α → Bool} {post : α → Nat → ℝ≥0∞} {d : ℝ≥0∞}
+    {gs : Nat → SPMF.Cost α}
+    (hg : ∀ j, n ≤ j → expectObs.spec (gs j) (fun _ n => (n : ℝ≥0∞)) ≤ C)
+    (hr : ∀ j, n ≤ j → expectObs.spec (gs j) (fun a _ => if p a then 0 else 1) ≤ r)
+    (hpost : ∀ a n, post a n = d + n) :
+    expectObs.spec (suchThatFrom gs (Option.guard p) n) post ≤ d + C / (1 - r) :=
+  expect_suchThatFrom_le hg (fun j hj => by simpa [Option.isSome_guard] using hr j hj) hpost
+
+@[gen_rule] theorem expect_sublistOf_le_const {xs : List α} {p : List α → Nat → ℝ≥0∞}
+    {d : ℝ≥0∞} (hp : ∀ a n, p a n = d) : expectObs.spec (sublistOf xs) p ≤ d :=
+  expect_le_of_const hp
+
+@[gen_rule] theorem expect_sublistOf_le_iSup {xs : List α} {p : List α → Nat → ℝ≥0∞} :
+    expectObs.spec (sublistOf xs) p ≤ ⨆ a, ⨆ n, p a n := expect_le_iSup
+
+@[gen_rule] theorem expect_shuffle_le_const {xs : List α} {p : List α → Nat → ℝ≥0∞}
+    {d : ℝ≥0∞} (hp : ∀ a n, p a n = d) : expectObs.spec (shuffle xs) p ≤ d :=
+  expect_le_of_const hp
+
+@[gen_rule] theorem expect_shuffle_le_iSup {xs : List α} {p : List α → Nat → ℝ≥0∞} :
+    expectObs.spec (shuffle xs) p ≤ ⨆ a, ⨆ n, p a n := expect_le_iSup
+
+end quickCheck
+
 @[gen_rule] theorem expect_permutationOf_le_const {xs : List α}
     {p : { ys // xs.Perm ys } → Nat → ℝ≥0∞} {d : ℝ≥0∞} (hp : ∀ a n, p a n = d) :
     expectObs.spec (permutationOf xs) p ≤ d := expect_le_of_const hp

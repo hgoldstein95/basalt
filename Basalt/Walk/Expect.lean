@@ -3,6 +3,7 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Basalt.Combinators.QuickCheck
 import Basalt.Walk.Average
 
 /-!
@@ -94,5 +95,39 @@ end listCombinators
 @[gen_rule] theorem expect_permutationOf_le_iSup {xs : List α}
     {p : { ys // xs.Perm ys } → ℝ≥0∞} : expectObs.spec (permutationOf xs) p ≤ ⨆ a, p a :=
   expect_le_iSup
+
+section quickCheck
+
+open QuickCheck
+
+variable {α β : Type} {d : ℝ≥0∞}
+
+@[gen_rule] theorem expect_sublistOf_le_const {xs : List α} {p : List α → ℝ≥0∞}
+    (hp : ∀ a, p a = d) : expectObs.spec (sublistOf xs) p ≤ d := expect_le_of_const hp
+
+@[gen_rule] theorem expect_sublistOf_le_iSup {xs : List α} {p : List α → ℝ≥0∞} :
+    expectObs.spec (sublistOf xs) p ≤ ⨆ a, p a := expect_le_iSup
+
+@[gen_rule] theorem expect_shuffle_le_const {xs : List α} {p : List α → ℝ≥0∞}
+    (hp : ∀ a, p a = d) : expectObs.spec (shuffle xs) p ≤ d := expect_le_of_const hp
+
+@[gen_rule] theorem expect_shuffle_le_iSup {xs : List α} {p : List α → ℝ≥0∞} :
+    expectObs.spec (shuffle xs) p ≤ ⨆ a, p a := expect_le_iSup
+
+variable {gs : Nat → SPMF α} {f : α → Option β}
+
+@[gen_rule] theorem expect_trySizes_le_const {m k : Nat} {p : Option β → ℝ≥0∞}
+    (hp : ∀ a, p a = d) : expectObs.spec (trySizes gs f m k) p ≤ d := expect_le_of_const hp
+
+@[gen_rule] theorem expect_trySizes_le_iSup {m k : Nat} {p : Option β → ℝ≥0∞} :
+    expectObs.spec (trySizes gs f m k) p ≤ ⨆ a, p a := expect_le_iSup
+
+@[gen_rule] theorem expect_suchThatFrom_le_const {n : Nat} {p : β → ℝ≥0∞}
+    (hp : ∀ a, p a = d) : expectObs.spec (suchThatFrom gs f n) p ≤ d := expect_le_of_const hp
+
+@[gen_rule] theorem expect_suchThatFrom_le_iSup {n : Nat} {p : β → ℝ≥0∞} :
+    expectObs.spec (suchThatFrom gs f n) p ≤ ⨆ a, p a := expect_le_iSup
+
+end quickCheck
 
 end SPMF

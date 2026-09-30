@@ -4,6 +4,8 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Combinators
+import Basalt.Combinators.QuickCheck
+import Basalt.Combinators.WithSize
 import Basalt.Gen
 import Basalt.GenRel
 import Basalt.GenStats.Basic

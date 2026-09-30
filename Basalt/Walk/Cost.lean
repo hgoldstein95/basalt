@@ -328,3 +328,78 @@ theorem worst_permutationOf_le {xs : List α} {p : { ys // xs.Perm ys } → Nat 
   worst_le_add_of_always always_permutationOf hp
 
 end SPMF.Cost
+
+/-! ## QuickCheck's combinators
+
+`sublistOf` and `shuffle` draw once per entry. `trySizes` makes at most one draw per size it tries,
+each bounded as its family is at that size. The retry loop `suchThatFrom` has no worst case; its
+expected cost is `ExpectedCost.lean`'s. -/
+
+namespace SPMF.Cost
+
+open QuickCheck
+
+variable {α β : Type} {k : ℕ∞}
+
+theorem always_sublistOf {xs : List α} :
+    alwaysObs.spec (sublistOf xs : SPMF.Cost (List α)) fun _ n => n ≤ xs.length := by
+  induction xs with
+  | nil => rw [sublistOf]; walk; simp
+  | cons x xs ih => rw [sublistOf]; walk [ih]; simp; omega
+
+@[gen_rule]
+theorem le_always_sublistOf {xs : List α} {p : List α → Nat → Prop} :
+    (∀ a n, n ≤ xs.length → p a n) ≤ alwaysObs.spec (sublistOf xs) p :=
+  le_always_of_always always_sublistOf
+
+@[gen_rule]
+theorem worst_sublistOf_le {xs : List α} {p : List α → Nat → ℕ∞}
+    (hp : ∀ a m, p a m = k + (m : ℕ∞)) : worstObs.spec (sublistOf xs) p ≤ k + xs.length :=
+  worst_le_add_of_always always_sublistOf hp
+
+theorem always_shuffle {xs : List α} :
+    alwaysObs.spec (shuffle xs : SPMF.Cost (List α)) fun _ n => n ≤ xs.length := by
+  have hv := always_vectorOf (n := xs.length) (k := 1)
+    (g := chooseInt (-9223372036854775808) 9223372036854775807 (by decide)) (by walk; omega)
+  unfold shuffle
+  generalize (vectorOf _ _ : SPMF.Cost (List Int)) = v at hv ⊢
+  walk
+  omega
+
+@[gen_rule]
+theorem le_always_shuffle {xs : List α} {p : List α → Nat → Prop} :
+    (∀ a n, n ≤ xs.length → p a n) ≤ alwaysObs.spec (shuffle xs) p :=
+  le_always_of_always always_shuffle
+
+@[gen_rule]
+theorem worst_shuffle_le {xs : List α} {p : List α → Nat → ℕ∞}
+    (hp : ∀ a m, p a m = k + (m : ℕ∞)) : worstObs.spec (shuffle xs) p ≤ k + xs.length :=
+  worst_le_add_of_always always_shuffle hp
+
+variable {gs : Nat → SPMF.Cost α} {f : α → Option β} {K : Nat → Nat}
+
+theorem always_trySizes (hg : ∀ j, alwaysObs.spec (gs j) fun _ n => n ≤ K j) (m k : Nat) :
+    alwaysObs.spec (trySizes gs f m k) fun _ n => n ≤ ∑ i ∈ Finset.range k, K (m + i) := by
+  induction k generalizing m with
+  | zero => rw [trySizes]; walk; simp
+  | succ k ih =>
+    rw [trySizes]
+    walk [hg m, ih (m + 1)]
+    all_goals
+      rw [Finset.sum_range_succ']
+      simp only [Nat.add_zero, ← Nat.add_assoc, Nat.add_right_comm m _ 1] at *
+      omega
+
+@[gen_rule]
+theorem le_always_trySizes {m k : Nat} {p : Option β → Nat → Prop}
+    (hg : ∀ j, alwaysObs.spec (gs j) fun _ n => n ≤ K j) :
+    (∀ a n, n ≤ ∑ i ∈ Finset.range k, K (m + i) → p a n) ≤ alwaysObs.spec (trySizes gs f m k) p :=
+  le_always_of_always (always_trySizes hg m k)
+
+@[gen_rule]
+theorem worst_trySizes_le {m n : Nat} {p : Option β → Nat → ℕ∞}
+    (hg : ∀ j, alwaysObs.spec (gs j) fun _ n => n ≤ K j) (hp : ∀ a m, p a m = k + (m : ℕ∞)) :
+    worstObs.spec (trySizes gs f m n) p ≤ k + (∑ i ∈ Finset.range n, K (m + i) : Nat) :=
+  worst_le_add_of_always (always_trySizes hg m n) hp
+
+end SPMF.Cost
