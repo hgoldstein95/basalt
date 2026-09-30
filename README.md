@@ -145,11 +145,13 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
 ## Repository layout
 
 - `Basalt/` — the library, in four tiers:
-  - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean`, and
-    `Laws.lean`, the properties a generator may be proved to have;
+  - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean`,
+    `BacktrackGen.lean` (generators whose failure is a value, and weighted retry), `Arbitrary.lean`
+    (generator lookup classes), and `Laws.lean`, the properties a generator may be proved to have;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
     expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
-    `PlausibleGen.lean`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean`
+    `PlausibleGen.lean` (with `PlausibleBridge.lean`, Plausible's lookup classes from Basalt's),
+    `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean`
     holding the facts about core's `randNat` that the PRNG-backed ones share;
   - *the proof machinery*: `Obs/`, the layer every per-combinator lemma is derived from — a
     judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a

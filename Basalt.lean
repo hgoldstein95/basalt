@@ -3,6 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+import Basalt.Arbitrary
+import Basalt.BacktrackGen
 import Basalt.Combinators
 import Basalt.Gen
 import Basalt.GenRel
@@ -27,6 +29,7 @@ import Basalt.PBT.Backend
 import Basalt.PBT.Campaign
 import Basalt.PBT.Driver
 import Basalt.PBT.Property
+import Basalt.PlausibleBridge
 import Basalt.PlausibleGen
 import Basalt.Random
 import Basalt.RandomChoice
@@ -84,6 +87,7 @@ usable from the `basalt-fuzz` executable (`fuzz-run/README.md`).
 - `RandomChoice` — A type class capturing random choices.
 - `Gen` — A type class capturing all of the operations necessary for PBT generators.
 - `Sized` / `WithSize` — An ambient size parameter for generators, and a monad that supplies one.
+- `BacktrackGen` / `BacktrackGen.backtrack` — Generators whose failure is a value, and weighted retry.
 - `Basalt.Laws` - Correctness properties that a `Gen` may be proved to have.
 
 For information about how Basalt's generator representation relates to QuickCheck, QuickChick, and

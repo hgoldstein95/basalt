@@ -40,6 +40,13 @@ the definition, and the definition is right here to run.
   observation — [Basalt/IO/Laws.lean](Basalt/IO/Laws.lean); `IsCostFaithful`, which relates
   `SPMF.Cost` to `SPMF`, is in `Laws.lean` beside the others.
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
+- **Generators that can fail** (`Outcome`, `BacktrackGen`, `BacktrackGen.backtrack`) —
+  [Basalt/BacktrackGen.lean](Basalt/BacktrackGen.lean), pinned by
+  [BasaltTest/BacktrackGen.lean](BasaltTest/BacktrackGen.lean); the lookup classes
+  (`Basalt.Arbitrary`, `Basalt.ArbitraryFueled`, `GenFor`, `BacktrackGenFor`) —
+  [Basalt/Arbitrary.lean](Basalt/Arbitrary.lean), and their Plausible counterparts —
+  [Basalt/PlausibleBridge.lean](Basalt/PlausibleBridge.lean), both pinned by
+  [BasaltTest/Arbitrary.lean](BasaltTest/Arbitrary.lean).
 - **Compiled choice** (`oneOf!`, `frequency!`) — the `compiled_choice` section of
   [Basalt/Combinators.lean](Basalt/Combinators.lean). Its contract (no list in the compiled code, the
   walk its model gets) is pinned by [BasaltTest/Combinators.lean](BasaltTest/Combinators.lean), and
