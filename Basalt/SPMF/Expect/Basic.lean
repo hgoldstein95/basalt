@@ -166,6 +166,16 @@ theorem prob_le_mass (p : SPMF α) (E : Set α) : prob p E ≤ p.mass := by
   refine expect_mono fun a => ?_
   by_cases h : a ∈ E <;> simp [Set.indicator, h]
 
+theorem prob_le_one (p : SPMF α) (E : Set α) : prob p E ≤ 1 :=
+  (prob_le_mass p E).trans (mass_le_one p)
+
+/-- Full probability is a support statement, dually to `prob_eq_zero_iff`. -/
+theorem prob_eq_mass_of_support {p : SPMF α} {E : Set α} (h : ∀ a ∈ p.support, a ∈ E) :
+    prob p E = p.mass := by
+  unfold prob
+  rw [← expect_one]
+  exact expect_congr_support fun a ha => by simp [Set.indicator, h a ha]
+
 theorem prob_mono {p : SPMF α} {E F : Set α} (h : E ⊆ F) : prob p E ≤ prob p F := by
   refine expect_mono fun a => ?_
   by_cases ha : a ∈ E

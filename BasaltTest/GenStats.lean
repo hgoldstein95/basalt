@@ -7,6 +7,7 @@ import Basalt
 import BasaltExamples.AllTwoTree
 import BasaltExamples.BST
 import BasaltExamples.BST.Weighted
+import BasaltExamples.STLC.GenTermSized
 
 /-!
 # `#genstats` Examples
@@ -105,6 +106,65 @@ info: AllTwoTree.genWeightedTree — 200 draws (seed 0, fuel 10000)
 -/
 #guard_msgs in
 #genstats (draws := 200) (size := fun t => 2 * t.size + 1) AllTwoTree.genWeightedTree
+
+/-
+The two STLC generators: `Bool`'s share of each head-constructor split below is the probability
+of a literal that `genTerm.prob_trivial_bool` and `genTermSized.prob_trivial_bool`
+(`STLC/Distribution.lean`) state, and `genTermSized.cost_bounded` is the bound on its choices.
+-/
+/--
+info: genTerm [] Ty.Bool — 1000 draws (seed 0, fuel 10000)
+
+  outcomes    ok 979 (97.9%)   fuel-exhausted 21 (2.1%)
+  size        mean 7.9   p50 1   p95 38   max 207
+  choices     mean 140.1   p50 2   p95 477   max 9329
+  distinct    261 / 979
+
+  head constructor
+    Bool    65.7%  (643)
+    App     34.3%  (336)
+
+  most common
+     34.1%  (334)  false
+     31.6%  (309)  true
+      1.7%   (17)  (λ:Bool. false) true
+      1.7%   (17)  (λ:Bool. true) true
+      1.3%   (13)  (λ:Bool. true) false
+
+  samples
+    false
+    false
+    true
+-/
+#guard_msgs in
+#genstats genTerm [] Ty.Bool
+
+/--
+info: genTermSized 5 [] Ty.Bool — 1000 draws (seed 0, fuel 10000)
+
+  outcomes    ok 1000 (100.0%)
+  size        mean 35.0   p50 38   p95 71   max 89
+  choices     mean 32.1   p50 36   p95 59   max 68
+  distinct    789 / 1000
+
+  head constructor
+    App     79.5%  (795)
+    Bool    20.5%  (205)
+
+  most common
+     11.2%  (112)  false
+      9.3%   (93)  true
+      0.6%    (6)  (λ:Bool. #0) true
+      0.3%    (3)  (λ:Bool. #0) false
+      0.2%    (2)  (λ:Bool. true) false
+
+  samples
+    (λ:Bool. (λ:Bool. false) #0) ((λ:Bool. #0) true)
+    false
+    (λ:(Bool → Bool) → Bool. false) ((λ:Bool. λ:Bool → Bool. λ:Bool → Bool. λ:Bool → Bool. #3…
+-/
+#guard_msgs in
+#genstats genTermSized 5 [] Ty.Bool
 
 def genDiverge [Gen G] : G Nat := do
   let _ ← choose 0 1 (by omega)

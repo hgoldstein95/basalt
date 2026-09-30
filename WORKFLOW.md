@@ -259,7 +259,8 @@ call: a two-branch `oneOf` with one recursive branch has `m = 1/2`;
 quadratic, `a = 2/3`, `d = 1/3`; a two-branch `oneOf` between a leaf and two calls is the quadratic
 `a = d = 1/2`. **A critical generator
 (`m = 1`) terminates but has no finite `IsExpectedCostBounded`**
-(`AllTwoTree.genTree.not_expected_cost_bounded`) — reweight it if you can. The side conditions of a
+(`AllTwoTree.genTree.not_expected_cost_bounded`) — reweight it if you can, or bound its recursion by
+a size (`genTermSized`, `STLC/GenTermSized.lean`). The side conditions of a
 certificate are closed numerals: `by norm_num`, or `by ennreal_to_real; norm_num`.
 
 **`mass_fixpoint`** applies the criterion to the family over the generator's seed, unfolds one
@@ -440,6 +441,12 @@ A **list combinator** has no shape of choice, so it is bounded by a rule rather 
 only its mass is used: a constant postexpectation exactly, and otherwise its worst case over every
 value (`⨆`), which for an unbounded quantity is `⊤`. When that is
 too coarse, prove the bound separately and pass it: `walk [h]`.
+
+**An event's exact probability** is one unfolding, not a walk: `SPMF.prob_frequency` (or
+`prob_oneOf`) splits it over the branches, and each branch is `0` by its support
+(`SPMF.prob_eq_zero_iff`), its mass by its support (`SPMF.prob_eq_mass_of_support`), or a recursive
+occurrence's probability, bounded by a lemma of its own. `genTermSized.prob_trivial_le`
+(`STLC/Distribution.lean`) is the worked instance.
 
 ### Recipe 5: Running at `IO`
 
