@@ -9,9 +9,13 @@ import Basalt.Sized
 /-!
 # Combinators at a Size
 
-A `WithSize G` generator evaluated at a size is a `G` generator: evaluation commutes with the host
-constructs and with every combinator that does not read the size. These equations are the
-`size_erasure` simp set, after which a law of a sized generator at a size is one about `G`.
+Lemmas to show how a combinator using a generator `WithSize G` unfolds to a `G` when evaluated at a
+size.
+
+TODO: Similar to my comment in `QuickCheck.lean`, I wish we could do this with more generic theory.
+(Especially because most of these are `rfl`.) Also, I don't like that these are separated from the
+theorems about the core QuickCheck combinators, although maybe that's unavoidable until we integrate
+them better into the library.
 -/
 
 namespace WithSize

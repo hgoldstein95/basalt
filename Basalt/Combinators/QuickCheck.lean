@@ -8,11 +8,10 @@ import Basalt.Combinators.WithSize
 /-!
 # QuickCheck's Combinators
 
-The combinators of QuickCheck 2.15's `Test.QuickCheck.Gen`, each with its QuickCheck distribution at
-every size. Those whose distribution Basalt's own already has — `elements`, `oneOf`, `frequency`,
-`vectorOf`, `chooseNat`, `chooseInt` — are not redefined; `listOf` and `suchThat` are `protected`,
-since Basalt's own are different generators. Evaluated at a size, each is a combinator that reads no
-size (`size_erasure`), which is what its laws are proved about.
+The combinators of QuickCheck 2.15's `Test.QuickCheck.Gen`, translated as faithfully as possible.
+Some are already represented faithfully in Basalt (`elements`, `oneOf`, `frequency`, `vectorOf`,
+`chooseNat`, and `chooseInt`) and are not redefined. Two combinators (listOf` and `suchThat`) are
+`protected`, since Basalt has an implementation but the names clash.
 -/
 
 open Lean.Order
@@ -25,7 +24,7 @@ section combinators
 
 variable {G : Type → Type} {α β : Type}
 
-/-- `g` at the size `f n`, where `n` is the ambient size. -/
+/-- Resize by some scale function `f`. -/
 def scale [Sized G] (f : Nat → Nat) (g : G α) : G α :=
   sized fun n => resize (f n) g
 
@@ -48,7 +47,10 @@ def sublistOf [Gen G] : List α → G (List α)
     pure (if keep = 1 then x :: ys else ys)
 
 /-- `xs` sorted, stably, by a uniform 64-bit key drawn for each entry. Keys that tie keep their
-entries in order, so this is not exactly uniform; `permutationOf` is. -/
+entries in order, so this is not exactly uniform; `permutationOf` is.
+
+TODO: This does match QuickCheck's implementation, but I suspect it'll be fairly slow. I think using
+`chooseNat` and a range that is guaranteed to be on SplitMix's fast path will be more efficient. -/
 def shuffle [Gen G] (xs : List α) : G (List α) := do
   let ks ← vectorOf xs.length (chooseInt (-9223372036854775808) 9223372036854775807 (by decide))
   pure (((ks.zip xs).mergeSort fun a b => decide (a.1 ≤ b.1)).map Prod.snd)
@@ -186,7 +188,10 @@ end recursive_combinators
 
 /-! ## At a size
 
-Each combinator evaluated at a size, as one that reads no size. -/
+Each combinator evaluated at a size, as one that reads no size.
+
+TODO: Can we do this with a type class or something? Or is there better size-aware theory that we
+should apply? It just seems like overkill to have a whole registry for this. -/
 
 section size_erasure
 
