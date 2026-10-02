@@ -10,10 +10,10 @@ import BasaltExamples.STLC.GenTermSized
 /-!
 # Comparing `genTerm` and `genTermSized`
 
-The two STLC generators' distributions, compared on two events a test suite wants rare: a *trivial*
-term (a literal under abstractions) and a *vacuous* abstraction (one that ignores its argument).
-Each bound holds at every size, context, and type it quantifies over; `genTerm.not_cost_bounded`
-sets `genTermSized.cost_bounded` against the absence of any worst-case bound on `genTerm`.
+We want to ensure that our generators avoid terms that are uninteresting. Two such categories of
+uninteresting terms are ones that are *trivial* (a literal under abstractions) and ones that are
+*useless* (ones that do not use the variables they create).  This file compares `genTerm` and
+`genTermSized` along these lines.
 -/
 
 open RandomChoice
@@ -188,7 +188,7 @@ theorem genTermSized.prob_trivial_le :
       norm_num
       linarith
 
-/-! ## Vacuous abstractions -/
+/-! ## Useless abstractions -/
 
 /-- Whether de Bruijn variable `i` occurs free in a term. -/
 def Term.Mentions : Term → Nat → Prop
@@ -198,12 +198,12 @@ def Term.Mentions : Term → Nat → Prop
   | .Abs _ e, i => e.Mentions (i + 1)
 
 /-- An abstraction whose body never refers to its argument. -/
-def Term.IsVacuousAbs : Term → Prop
+def Term.IsUselessAbs : Term → Prop
   | .Abs _ e => ¬ e.Mentions 0
   | _ => False
 
-/-- The event that a generated term is a vacuous abstraction. -/
-def vacuousAbs : Set Term := {e | e.IsVacuousAbs}
+/-- The event that a generated term is a useless abstraction. -/
+def uselessAbs : Set Term := {e | e.IsUselessAbs}
 
 theorem Term.IsTrivial.not_mentions {e : Term} (h : e.IsTrivial) (i : Nat) : ¬ e.Mentions i := by
   induction e generalizing i with
@@ -211,24 +211,24 @@ theorem Term.IsTrivial.not_mentions {e : Term} (h : e.IsTrivial) (i : Nat) : ¬ 
   | Abs _ e ih => exact ih h (i + 1)
   | Var | App => exact h.elim
 
-theorem prob_vacuous_abs (x : SPMF Term) (τ : Ty) :
-    SPMF.prob (x >>= fun e => pure (Term.Abs τ e)) vacuousAbs
+theorem prob_useless_abs (x : SPMF Term) (τ : Ty) :
+    SPMF.prob (x >>= fun e => pure (Term.Abs τ e)) uselessAbs
       = SPMF.prob x {e | ¬ e.Mentions 0} := by
   rw [SPMF.prob_bind]
   unfold SPMF.prob
   congr 1
   ext e
   rw [SPMF.expect_pure]
-  by_cases h : e.Mentions 0 <;> simp [vacuousAbs, Set.indicator, Term.IsVacuousAbs, h]
+  by_cases h : e.Mentions 0 <;> simp [uselessAbs, Set.indicator, Term.IsUselessAbs, h]
 
-theorem prob_vacuous_app (x : SPMF Ty) (f g : Ty → SPMF Term) :
+theorem prob_useless_app (x : SPMF Ty) (f g : Ty → SPMF Term) :
     SPMF.prob (x >>= fun a => f a >>= fun e1 => g a >>= fun e2 => pure (Term.App e1 e2))
-      vacuousAbs = 0 := by
+      uselessAbs = 0 := by
   rw [SPMF.prob_eq_zero_iff]
   intro e he
   support_simp at he
   obtain ⟨_, _, _, _, _, _, rfl⟩ := he
-  simp [vacuousAbs, Term.IsVacuousAbs]
+  simp [uselessAbs, Term.IsUselessAbs]
 
 theorem prob_le_prob_not_mentions (x : SPMF Term) :
     SPMF.prob x trivialTerms ≤ SPMF.prob x {e | ¬ e.Mentions 0} :=
@@ -236,8 +236,8 @@ theorem prob_le_prob_not_mentions (x : SPMF Term) :
 
 /-- At least half of `genTerm`'s closed functions on `Bool` are abstractions that ignore their
 argument. -/
-theorem genTerm.half_le_prob_vacuous :
-    1 / 2 ≤ SPMF.prob (genTerm [] (.Fun .Bool .Bool)) vacuousAbs := by
+theorem genTerm.half_le_prob_useless :
+    1 / 2 ≤ SPMF.prob (genTerm [] (.Fun .Bool .Bool)) uselessAbs := by
   have hzero : 1 ≤ SPMF.prob (genZero [.Bool] .Bool) {e | ¬ e.Mentions 0} :=
     genZero.prob_trivial.symm.le.trans (prob_le_prob_not_mentions _)
   have hbody : 1 / 2 ≤ SPMF.prob (genTerm [.Bool] .Bool) {e | ¬ e.Mentions 0} :=
@@ -247,7 +247,7 @@ theorem genTerm.half_le_prob_vacuous :
     ↓reduceDIte, oneOfWith_eq]
   rw [SPMF.prob_oneOf, genZero]
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
-    List.length_nil, prob_vacuous_app, prob_vacuous_abs, zero_add, add_zero]
+    List.length_nil, prob_useless_app, prob_useless_abs, zero_add, add_zero]
   rw [show ((0 + 1 + 1 + 1 : ℕ) : ℝ≥0∞) = 3 by norm_num]
   calc (1 : ℝ≥0∞) / 2 = (1 + 1 / 2) / 3 := by ennreal_to_real; norm_num
     _ ≤ _ := by gcongr
@@ -270,16 +270,18 @@ theorem genTermSized.prob_not_mentions_le :
     _ = 5 / 7 := by norm_num
 
 /-- At most `5/21` of `genTermSized`'s closed functions on `Bool` ignore their argument, against at
-least half of `genTerm`'s (`genTerm.half_le_prob_vacuous`). -/
-theorem genTermSized.prob_vacuous_le :
-    SPMF.prob (genTermSized (n + 2) [] (.Fun .Bool .Bool)) vacuousAbs ≤ 5 / 21 := by
+least half of `genTerm`'s (`genTerm.half_le_prob_useless`).
+
+TODO: Why are we fixing a type? -/
+theorem genTermSized.prob_useless_le :
+    SPMF.prob (genTermSized (n + 2) [] (.Fun .Bool .Bool)) uselessAbs ≤ 5 / 21 := by
   have hbody := genTermSized.prob_not_mentions_le (n := n)
   rw [genTermSized]
   simp only [varsWithType, List.zipIdx_nil, List.filterMap_nil, ne_eq, not_true_eq_false,
     ↓reduceDIte, frequencyWith_eq]
   rw [SPMF.prob_frequency]
-  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, prob_vacuous_app,
-    prob_vacuous_abs]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, prob_useless_app,
+    prob_useless_abs]
   calc _ ≤ ((4 : ℕ) * 0 + ((2 : ℕ) * (5 / 7) + 0)) / ((4 + (2 + 0) : ℕ) : ℝ≥0∞) := by gcongr
     _ = 5 / 21 := by ennreal_to_real; norm_num
 

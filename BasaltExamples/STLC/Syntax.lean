@@ -8,6 +8,8 @@ Authors: Harrison Goldstein & Ernest Ng
 
 Syntax, contexts, and the typing judgement for the simply-typed lambda calculus extended with
 Bools, along with lemmas relating the `lookup` judgement to `List` indexing.
+
+TODO: Rename constructors to lowercase (following Lean convention).
 -/
 
 /-- Types are just Bool or function types -/

@@ -22,7 +22,6 @@ def Ty.depth : Ty → Nat
   | .Fun τ1 τ2 => 1 + max τ1.depth τ2.depth
 
 /-- Generates a type of depth at most `size`, with `Bool` twice as likely as an arrow. -/
-@[tunable (depth := size)]
 def genTypeSized [Gen G] (size : Nat) : G Ty :=
   match size with
   | 0 => pure .Bool
@@ -46,17 +45,16 @@ def genLeaf [Gen G] (Γ : Ctx) (τ : Ty) : G Term :=
       let e ← genLeaf (τ1 :: Γ) τ2
       return .Abs τ1 e
 
-/-- Generates a well-typed term at type `τ` in context `Γ`. At size `0` it is a `genLeaf`; above, it
-chooses between a variable when `Γ` has one of type `τ`, an application at an argument type of depth
-at most half the remaining size, and the introduction form of `τ`, weighted separately at `Bool`
-(where that form is a literal) and at an arrow (where it is an abstraction). -/
-@[tunable (depth := size)]
+/-- Generates a well-typed term at type `τ` in context `Γ`. -/
 def genTermSized [Gen G] (size : Nat) (Γ : Ctx) (τ : Ty) : G Term :=
   match size with
   | 0 => genLeaf Γ τ
   | n + 1 =>
     match τ with
     | .Bool =>
+      -- NOTE: This would be a good place to use a more powerful versoin of the `frequency!` macro
+      -- that can do conditionals. Alternatively (or in addition) we could just lift the
+      -- sub-generators up.
       if hne : varsWithType Γ .Bool ≠ [] then
         frequency! [
           (2, fun _ => elements (varsWithType Γ .Bool) hne),
@@ -274,7 +272,10 @@ theorem genTermSized.expected_cost :
     genTermSized.cost_bounded).mono ?_
   exact SPMF.expect_le_of_support fun _ _ => le_rfl
 
-/-- Every well-typed term is generated at every size from some size on. -/
+/-- Every well-typed term is generated at every size from some size on.
+
+TODO: I don't like that we're not using a law here. This is a good argument that we should
+standardize on some size-quantified laws. -/
 theorem genTermSized.complete (h : Typing Γ e τ) :
     ∃ N, ∀ n ≥ N, e ∈ SPMF.support (genTermSized n Γ τ) := by
   induction h with
