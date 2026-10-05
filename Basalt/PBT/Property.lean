@@ -14,7 +14,7 @@ makes some assumptions that discard invalid data, and then checks a predicate.
 
 ```lean
 def prop [Gen G] : Property := do
-  let xs ← generate (listOf (chooseNat 0 99))
+  let xs ← generate (geometricListOf (chooseNat 0 99))
   let k ← generate (chooseNat 0 99)
   assume !xs.isEmpty                          -- a precondition
   check (xs.take k ++ xs.drop k == xs) s!"xs={xs}, k={k}"

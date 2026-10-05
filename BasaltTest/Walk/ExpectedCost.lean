@@ -51,7 +51,7 @@ example : IsExpectedCostBounded (genWeightedTree : SPMF.Cost Tree) 3 := by
 trace: ⊢ ⨆ a, ⨆ n, ↑n ≤ ∞
 -/
 #guard_msgs in
-example : IsExpectedCostBounded (listOf (chooseNat 0 1) : SPMF.Cost (List Nat)) ⊤ := by
+example : IsExpectedCostBounded (geometricListOf (chooseNat 0 1) : SPMF.Cost (List Nat)) ⊤ := by
   rw [IsExpectedCostBounded.iff_obs]
   walk
   trace_state
@@ -67,13 +67,13 @@ example (g : SPMF.Cost Nat) : IsExpectedCostBounded (g >>= fun n => Pure.pure n)
   rw [IsExpectedCostBounded.iff_obs]
   walk
 
--- `suchThat` is bounded by its generator's expected cost `C` over its chance of acceptance,
+-- `rejectUntil` is bounded by its generator's expected cost `C` over its chance of acceptance,
 -- `1 - r`: here `1` and the average of the rejection indicator.
 /--
 trace: ⊢ 0 + ↑1 / (1 - (List.map (fun a => if (a != 0) = true then 0 else 1) [0, 1]).sum / ↑[0, 1].length) ≤ ∞
 -/
 #guard_msgs in
-example : IsExpectedCostBounded (suchThat (elements [0, 1]) (· != 0) : SPMF.Cost Nat) ⊤ := by
+example : IsExpectedCostBounded (rejectUntil (elements [0, 1]) (· != 0) : SPMF.Cost Nat) ⊤ := by
   rw [IsExpectedCostBounded.iff_obs]
   walk
   trace_state

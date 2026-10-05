@@ -8,8 +8,8 @@ import Basalt.SPMF.Mass
 /-!
 # Expectations of the List Combinators
 
-Event probabilities and expected lengths for `vectorOf` and `listOf`, by induction or fixpoint
-induction over the equations of `Basalt/SPMF/Expect/Obs.lean`.
+Event probabilities and expected lengths for `vectorOf` and `geometricListOf`, by induction or
+fixpoint induction over the equations of `Basalt/SPMF/Expect/Obs.lean`.
 -/
 
 open RandomChoice NNReal ENNReal
@@ -58,15 +58,15 @@ theorem prob_vectorOf_all {g : SPMF α} (E : Set α) (n : Nat) :
       _ = prob g E ^ n * expect g (E.indicator 1) := expect_mul_left _ _ _
       _ = prob g E ^ (n + 1) := (pow_succ _ _).symm
 
-/-- The length of a `listOf` draw is geometrically distributed. -/
-theorem prob_listOf_length (g : SPMF α) (hg : g.mass = 1) (k : Nat) :
-    prob (listOf g) {xs | xs.length = k} = (1/2 : ℝ≥0∞) ^ (k + 1) := by
+/-- The length of a `geometricListOf` draw is geometrically distributed. -/
+theorem prob_geometricListOf_length (g : SPMF α) (hg : g.mass = 1) (k : Nat) :
+    prob (geometricListOf g) {xs | xs.length = k} = (1/2 : ℝ≥0∞) ^ (k + 1) := by
   induction k with
   | zero =>
-    rw [listOf, oneOfWith_eq, prob_oneOf]
+    rw [geometricListOf, oneOfWith_eq, prob_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, prob_pure, Set.mem_ofPred_eq]
-    have hz : prob (g >>= fun x => listOf g >>= fun xs => Pure.pure (x :: xs))
+    have hz : prob (g >>= fun x => geometricListOf g >>= fun xs => Pure.pure (x :: xs))
         {xs | xs.length = 0} = 0 := by
       rw [prob_eq_zero_iff]
       intro a ha
@@ -76,15 +76,15 @@ theorem prob_listOf_length (g : SPMF α) (hg : g.mass = 1) (k : Nat) :
     rw [hz]
     norm_num
   | succ k ih =>
-    rw [listOf, oneOfWith_eq, prob_oneOf]
+    rw [geometricListOf, oneOfWith_eq, prob_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, prob_pure, Set.mem_ofPred_eq]
     rw [ite_eq_right (by omega)]
-    have hstep : prob (g >>= fun x => listOf g >>= fun xs => Pure.pure (x :: xs))
+    have hstep : prob (g >>= fun x => geometricListOf g >>= fun xs => Pure.pure (x :: xs))
         {xs | xs.length = k + 1} = (1/2 : ℝ≥0∞) ^ (k + 1) := by
       rw [prob_bind]
       have hinner : ∀ x : α,
-          prob (listOf g >>= fun xs => Pure.pure (x :: xs)) {xs | xs.length = k + 1}
+          prob (geometricListOf g >>= fun xs => Pure.pure (x :: xs)) {xs | xs.length = k + 1}
             = (1/2 : ℝ≥0∞) ^ (k + 1) := by
         intro x
         rw [prob_bind]
@@ -97,13 +97,13 @@ theorem prob_listOf_length (g : SPMF α) (hg : g.mass = 1) (k : Nat) :
           · simp [Set.indicator, h]
           · rw [ite_eq_right (by simp; omega)]
             simp [Set.indicator, h]
-        calc expect (listOf g)
+        calc expect (geometricListOf g)
               (fun xs => prob (Pure.pure (x :: xs) : SPMF (List α)) {xs | xs.length = k + 1})
-            = expect (listOf g) (({xs : List α | xs.length = k}).indicator 1) :=
+            = expect (geometricListOf g) (({xs : List α | xs.length = k}).indicator 1) :=
               expect_congr_support fun xs _ => hpt xs
           _ = (1/2 : ℝ≥0∞) ^ (k + 1) := ih
       calc expect g (fun x =>
-              prob (listOf g >>= fun xs => Pure.pure (x :: xs)) {xs | xs.length = k + 1})
+              prob (geometricListOf g >>= fun xs => Pure.pure (x :: xs)) {xs | xs.length = k + 1})
           = expect g (fun _ => (1/2 : ℝ≥0∞) ^ (k + 1)) :=
             expect_congr_support fun x _ => hinner x
         _ = g.mass * (1/2 : ℝ≥0∞) ^ (k + 1) := expect_const _ _
@@ -113,34 +113,34 @@ theorem prob_listOf_length (g : SPMF α) (hg : g.mass = 1) (k : Nat) :
     norm_num [pow_succ, div_eq_mul_inv, one_div]
 
 /-- No mass hypothesis: missing mass only lowers the expectation. -/
-theorem expect_listOf_length_le (g : SPMF α) :
-    expect (listOf g) (fun xs => (xs.length : ℝ≥0∞)) ≤ 1 := by
-  delta listOf
+theorem expect_geometricListOf_length_le (g : SPMF α) :
+    expect (geometricListOf g) (fun xs => (xs.length : ℝ≥0∞)) ≤ 1 := by
+  delta geometricListOf
   apply Lean.Order.fix_induct
     (motive := fun (p : SPMF (List α)) => expect p (fun xs => (xs.length : ℝ≥0∞)) ≤ 1)
     _ ?admissible ?step
   case admissible => exact admissible_expect_le _ _
   case step =>
-    intro listOf_rec ih
+    intro geometricListOf_rec ih
     rw [oneOfWith_eq, expect_oneOf]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, expect_pure, Nat.cast_zero, add_zero, zero_add]
     rw [ENNReal.div_eq_inv_mul, ← one_div]
     have hinner : ∀ x : α,
-        expect (listOf_rec >>= fun xs => Pure.pure (x :: xs))
+        expect (geometricListOf_rec >>= fun xs => Pure.pure (x :: xs))
           (fun xs => (xs.length : ℝ≥0∞)) ≤ 2 := by
       intro x
       rw [expect_bind]
-      calc expect listOf_rec
+      calc expect geometricListOf_rec
             (fun xs => expect (Pure.pure (x :: xs) : SPMF (List α))
               (fun xs => (xs.length : ℝ≥0∞)))
-          = expect listOf_rec (fun xs => (xs.length : ℝ≥0∞) + 1) := by
+          = expect geometricListOf_rec (fun xs => (xs.length : ℝ≥0∞) + 1) := by
             refine expect_congr_support fun xs _ => ?_
             rw [expect_pure]
             push_cast [List.length_cons]
             ring
-        _ = expect listOf_rec (fun xs => (xs.length : ℝ≥0∞))
-              + expect listOf_rec (fun _ => 1) := expect_add _ _ _
+        _ = expect geometricListOf_rec (fun xs => (xs.length : ℝ≥0∞))
+              + expect geometricListOf_rec (fun _ => 1) := expect_add _ _ _
         _ ≤ 1 + 1 := add_le_add ih (by rw [expect_one]; exact mass_le_one _)
         _ = 2 := by norm_num
     have half : ∀ E : ℝ≥0∞, E ≤ 2 → (1/2 : ℝ≥0∞) * E ≤ 1 := by

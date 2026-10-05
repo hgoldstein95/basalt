@@ -37,9 +37,12 @@ A generator that branches on a size adds a `[Sized G]` constraint and reads it w
 `Sized.sized`, shrinking it for recursive calls with `Sized.resize` (plus `[MonoSized G]` when the
 generator is a `partial_fixpoint`). `WithSize G` supplies the size to any interpretation `G`: run
 the generator at `WithSize G` and close it with `.run n`. See `Basalt/Sized.lean`.
-QuickCheck's combinators, with QuickCheck's distribution at every size, are
-`Basalt/Combinators/QuickCheck.lean`. A law of a sized generator is stated at a size, and
-`simp only [size_erasure]` turns it into one about a generator that reads no size.
+QuickCheck's combinators are in `Basalt/Combinators.lean` under QuickCheck's names (`listOf`,
+`suchThat`, …), with its distribution at every size, and their laws in
+`Basalt/Combinators/Laws.lean`. A law of a sized generator is stated at a size, `gen.run n`, and
+`simp only [size_erasure]` turns it into one about a generator that reads no size. Two combinators
+that read no size sit beside them: `geometricListOf`, a list of unbounded length, and `rejectUntil`,
+plain rejection sampling.
 
 ## Correctness Properties
 
@@ -85,7 +88,7 @@ dependent ones, need no special combinator:
 
 ```lean
 def prop_takeDrop [Gen G] : PropM G Unit := do
-  let xs ← generate (listOf (chooseNat 0 99))
+  let xs ← generate (geometricListOf (chooseNat 0 99))
   let k ← generate (chooseNat 0 99)
   assume !xs.isEmpty                              -- a precondition; discards this input
   check (xs.take k ++ xs.drop k == xs) s!"xs={xs}, k={k}"
@@ -149,8 +152,8 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
 
 - `Basalt/` — the library, in four tiers:
   - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean` (with
-    `Combinators/`: evaluation at a size, and QuickCheck's combinators), and `Laws.lean`, the
-    properties a generator may be proved to have;
+    `Combinators/`: the laws of the ones QuickCheck has), and `Laws.lean`, the properties a
+    generator may be proved to have;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
     expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
     `PlausibleGen.lean`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean`
@@ -161,7 +164,8 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
     saying that every observation commutes with it — `Walk/`, the judgment-agnostic walk over
     observations that every proof obligation is discharged by, its `walk` tactic, and one file per
     judgment of what the walk knows about it, and `GenRel.lean`, each combinator related to itself
-    at two monads, for the judgments that relate interpretations;
+    at two monads, for the judgments that relate interpretations — and, through `GenHom.lean`, for
+    a homomorphism between them, of which running at a size (`SizeErasure.lean`) is one;
   - *what a proof calls*: `walk`, and `Tactic/`, the tactics that do more than walk
     (`mass_fixpoint`, `faithful_fixpoint`) plus the support and `ℝ≥0∞` helpers; and `PBT/` and
     `Tuning/`, the front ends above.

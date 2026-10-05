@@ -12,7 +12,7 @@ import Basalt.Walk.Mass
 `mass_fixpoint` reduces a `.terminates` law to its criterion,
 `IsAlmostSurelyTerminating.of_lfpIsOne`: it builds the family over the generator's seed, unfolds one
 step, and walks it. The termination facts of the list combinators and of the retry loops
-(`suchThat`, QuickCheck's `suchThatFrom`) live here because they are proved with it.
+(`rejectUntil`, QuickCheck's `suchThatFrom`) live here because they are proved with it.
 -/
 
 open ENNReal RandomChoice
@@ -187,8 +187,8 @@ section combinators
 
 variable {α : Type*}
 
-theorem isAlmostSurelyTerminating_listOf {g : SPMF α} (hg : IsAlmostSurelyTerminating g) :
-    IsAlmostSurelyTerminating (listOf g) := by
+theorem isAlmostSurelyTerminating_geometricListOf {g : SPMF α} (hg : IsAlmostSurelyTerminating g) :
+    IsAlmostSurelyTerminating (geometricListOf g) := by
   mass_fixpoint [hg.obs] using LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp [ENNReal.one_sub_inv_two, div_eq_mul_inv, add_mul, mul_comm]
 
@@ -197,10 +197,11 @@ theorem isAlmostSurelyTerminating_nonEmptyListOf {g : SPMF α} (hg : IsAlmostSur
   mass_fixpoint [hg.obs] using LfpIsOne.affine (m := 1 / 2) (by norm_num)
   simp [ENNReal.one_sub_inv_two, div_eq_mul_inv, add_mul, mul_comm]
 
-private theorem ite_le_listOf {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ expectObs.spec g fun _ => 1) :
-    (if 1 ≤ c then 1 else 0) ≤ expectObs.spec (listOf g) fun _ => 1 := by
+private theorem ite_le_geometricListOf {g : SPMF α} {c : ℝ≥0∞}
+    (hg : c ≤ expectObs.spec g fun _ => 1) :
+    (if 1 ≤ c then 1 else 0) ≤ expectObs.spec (geometricListOf g) fun _ => 1 := by
   split
-  · exact (isAlmostSurelyTerminating_listOf
+  · exact (isAlmostSurelyTerminating_geometricListOf
       (IsAlmostSurelyTerminating.iff_obs.mpr (‹1 ≤ c›.trans hg))).obs
   · exact zero_le
 
@@ -215,18 +216,18 @@ private theorem ite_le_nonEmptyListOf {g : SPMF α} {c : ℝ≥0∞}
 /-- An unbounded-length list only passes termination through: its bound is `1` exactly when its
 element generator's is, which is the shape that still chains when that generator is a bind. -/
 @[gen_rule]
-theorem le_expect_listOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
+theorem le_expect_geometricListOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
-    (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (listOf g) p :=
-  le_expect_of_le (ite_le_listOf hg) hp
+    (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (geometricListOf g) p :=
+  le_expect_of_le (ite_le_geometricListOf hg) hp
 
 @[gen_rule, inherit_doc le_expect_vectorOf_iInf]
-theorem le_expect_listOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
+theorem le_expect_geometricListOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) :
-    (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (listOf g) p :=
-  le_expect_iInf_of_le (ite_le_listOf hg)
+    (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (geometricListOf g) p :=
+  le_expect_iInf_of_le (ite_le_geometricListOf hg)
 
-@[gen_rule, inherit_doc le_expect_listOf]
+@[gen_rule, inherit_doc le_expect_geometricListOf]
 theorem le_expect_nonEmptyListOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
     (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (nonEmptyListOf g) p :=
@@ -262,37 +263,37 @@ private theorem le_expect_accept {g : SPMF α} {p : α → Bool} {r c : ℝ≥0�
     _ = _ := hsum.symm
     _ ≤ _ := by gcongr
 
-theorem isAlmostSurelyTerminating_suchThat {g : SPMF α} {p : α → Bool} {r : ℝ≥0∞}
+theorem isAlmostSurelyTerminating_rejectUntil {g : SPMF α} {p : α → Bool} {r : ℝ≥0∞}
     (hg : IsAlmostSurelyTerminating g) (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r)
-    (hr1 : r < 1) : IsAlmostSurelyTerminating (suchThat g p) := by
+    (hr1 : r < 1) : IsAlmostSurelyTerminating (rejectUntil g p) := by
   mass_fixpoint [le_expect_accept hg hr hr1.le hc1] using LfpIsOne.affine (m := r) hr1
   exact le_rfl
 
-private theorem ite_le_suchThat {g : SPMF α} {p : α → Bool} {c r : ℝ≥0∞}
+private theorem ite_le_rejectUntil {g : SPMF α} {p : α → Bool} {c r : ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1)
     (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r) :
-    (if 1 ≤ c ∧ r < 1 then 1 else 0) ≤ expectObs.spec (suchThat g p) fun _ => 1 := by
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) ≤ expectObs.spec (rejectUntil g p) fun _ => 1 := by
   split
   · rename_i h
-    exact (isAlmostSurelyTerminating_suchThat
+    exact (isAlmostSurelyTerminating_rejectUntil
       (IsAlmostSurelyTerminating.iff_obs.mpr (h.1.trans hg)) hr h.2).obs
   · exact zero_le
 
 /-- Rejection sampling terminates when `g` does and rejects with a chance `r < 1`, which the bound
 asks of the arithmetic: a fact about how often `g` rejects closes `hr`. -/
 @[gen_rule]
-theorem le_expect_suchThat {g : SPMF α} {p : α → Bool} {c r d : ℝ≥0∞} {post : α → ℝ≥0∞}
+theorem le_expect_rejectUntil {g : SPMF α} {p : α → Bool} {c r d : ℝ≥0∞} {post : α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1)
     (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r) (hp : ∀ a, post a = d) :
-    (if 1 ≤ c ∧ r < 1 then 1 else 0) * d ≤ expectObs.spec (suchThat g p) post :=
-  le_expect_of_le (ite_le_suchThat hg hr) hp
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) * d ≤ expectObs.spec (rejectUntil g p) post :=
+  le_expect_of_le (ite_le_rejectUntil hg hr) hp
 
 @[gen_rule, inherit_doc le_expect_vectorOf_iInf]
-theorem le_expect_suchThat_iInf {g : SPMF α} {p : α → Bool} {c r : ℝ≥0∞} {post : α → ℝ≥0∞}
+theorem le_expect_rejectUntil_iInf {g : SPMF α} {p : α → Bool} {c r : ℝ≥0∞} {post : α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1)
     (hr : expectObs.spec g (fun a => if p a then 0 else 1) ≤ r) :
-    (if 1 ≤ c ∧ r < 1 then 1 else 0) * ⨅ a, post a ≤ expectObs.spec (suchThat g p) post :=
-  le_expect_iInf_of_le (ite_le_suchThat hg hr)
+    (if 1 ≤ c ∧ r < 1 then 1 else 0) * ⨅ a, post a ≤ expectObs.spec (rejectUntil g p) post :=
+  le_expect_iInf_of_le (ite_le_rejectUntil hg hr)
 
 /-! ### QuickCheck's retry loop
 
@@ -302,7 +303,6 @@ with a chance at most `r < 1`. -/
 
 section suchThatFrom
 
-open QuickCheck
 
 variable {α β : Type} {gs : Nat → SPMF α} {f : α → Option β} {n : Nat} {r c : ℝ≥0∞}
 
@@ -365,7 +365,8 @@ private theorem ite_le_suchThatFrom
       (fun j hj => IsAlmostSurelyTerminating.iff_obs.mpr (h.1.trans (hg j hj))) hr h.2).obs
   · exact zero_le
 
-/-- As for `suchThat`: a fact about how often `gs` rejects at each size from `n` on closes `hr`. -/
+/-- As for `rejectUntil`: a fact about how often `gs` rejects at each size from `n` on closes
+`hr`. -/
 @[gen_rule]
 theorem le_expect_suchThatFrom {d : ℝ≥0∞} {post : β → ℝ≥0∞}
     (hg : ∀ j, n ≤ j → c ≤ expectObs.spec (gs j) fun _ => 1)
@@ -381,7 +382,7 @@ theorem le_expect_suchThatFrom_iInf {post : β → ℝ≥0∞}
     (if 1 ≤ c ∧ r < 1 then 1 else 0) * ⨅ a, post a ≤ expectObs.spec (suchThatFrom gs f n) post :=
   le_expect_iInf_of_le (ite_le_suchThatFrom hg hr)
 
-/-- `QuickCheck.suchThat p`, at a size, is `suchThatFrom` of `Option.guard p`: its rejections are
+/-- `suchThat p`, at a size, is `suchThatFrom` of `Option.guard p`: its rejections are
 stated through `p`. -/
 @[gen_rule]
 theorem le_expect_suchThatFrom_guard {p : α → Bool} {d : ℝ≥0∞} {post : α → ℝ≥0∞}

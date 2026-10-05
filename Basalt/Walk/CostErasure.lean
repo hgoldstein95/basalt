@@ -22,16 +22,16 @@ variable {α : Type}
 theorem genRel_erasedLe : GenRel SPMF.Cost SPMF @ErasedLe where
   pure := erasedLe_pure
   bind := erasedLe_bind
-  map := erasedLe_map
-  default := erasedLe_default
+  mapChoose lo hi h f := erasedLe_map f (erasedLe_choose lo hi h)
+  default := erasedLe_default _
   choose := erasedLe_choose
   admissible := ErasedLe.admissible
 
 theorem genRel_leErased : GenRel SPMF SPMF.Cost @LeErased where
   pure := leErased_pure
   bind := leErased_bind
-  map := leErased_map
-  default := leErased_default
+  mapChoose lo hi h f := leErased_map f (leErased_choose lo hi h)
+  default := leErased_default _
   choose := leErased_choose
   admissible := LeErased.admissible
 
@@ -48,9 +48,9 @@ theorem erasedLe_vectorOf {g' : SPMF.Cost α} {g : SPMF α} (n : Nat) (hg : Eras
   genRel_erasedLe.vectorOf n hg
 
 @[gen_rule]
-theorem erasedLe_listOf {g' : SPMF.Cost α} {g : SPMF α} (hg : ErasedLe g' g) :
-    ErasedLe (listOf g') (listOf g) :=
-  genRel_erasedLe.listOf hg
+theorem erasedLe_geometricListOf {g' : SPMF.Cost α} {g : SPMF α} (hg : ErasedLe g' g) :
+    ErasedLe (geometricListOf g') (geometricListOf g) :=
+  genRel_erasedLe.geometricListOf hg
 
 @[gen_rule]
 theorem erasedLe_nonEmptyListOf {g' : SPMF.Cost α} {g : SPMF α} (hg : ErasedLe g' g) :
@@ -58,9 +58,9 @@ theorem erasedLe_nonEmptyListOf {g' : SPMF.Cost α} {g : SPMF α} (hg : ErasedLe
   genRel_erasedLe.nonEmptyListOf hg
 
 @[gen_rule]
-theorem erasedLe_suchThat {g' : SPMF.Cost α} {g : SPMF α} (p : α → Bool) (hg : ErasedLe g' g) :
-    ErasedLe (suchThat g' p) (suchThat g p) :=
-  genRel_erasedLe.suchThat p hg
+theorem erasedLe_rejectUntil {g' : SPMF.Cost α} {g : SPMF α} (p : α → Bool) (hg : ErasedLe g' g) :
+    ErasedLe (rejectUntil g' p) (rejectUntil g p) :=
+  genRel_erasedLe.rejectUntil p hg
 
 @[gen_rule]
 theorem erasedLe_permutationOf (xs : List α) : ErasedLe (permutationOf xs) (permutationOf xs) :=
@@ -95,9 +95,9 @@ theorem leErased_vectorOf {g' : SPMF α} {g : SPMF.Cost α} (n : Nat) (hg : LeEr
   genRel_leErased.vectorOf n hg
 
 @[gen_rule]
-theorem leErased_listOf {g' : SPMF α} {g : SPMF.Cost α} (hg : LeErased g' g) :
-    LeErased (listOf g') (listOf g) :=
-  genRel_leErased.listOf hg
+theorem leErased_geometricListOf {g' : SPMF α} {g : SPMF.Cost α} (hg : LeErased g' g) :
+    LeErased (geometricListOf g') (geometricListOf g) :=
+  genRel_leErased.geometricListOf hg
 
 @[gen_rule]
 theorem leErased_nonEmptyListOf {g' : SPMF α} {g : SPMF.Cost α} (hg : LeErased g' g) :
@@ -105,9 +105,9 @@ theorem leErased_nonEmptyListOf {g' : SPMF α} {g : SPMF.Cost α} (hg : LeErased
   genRel_leErased.nonEmptyListOf hg
 
 @[gen_rule]
-theorem leErased_suchThat {g' : SPMF α} {g : SPMF.Cost α} (p : α → Bool) (hg : LeErased g' g) :
-    LeErased (suchThat g' p) (suchThat g p) :=
-  genRel_leErased.suchThat p hg
+theorem leErased_rejectUntil {g' : SPMF α} {g : SPMF.Cost α} (p : α → Bool) (hg : LeErased g' g) :
+    LeErased (rejectUntil g' p) (rejectUntil g p) :=
+  genRel_leErased.rejectUntil p hg
 
 @[gen_rule]
 theorem leErased_permutationOf (xs : List α) : LeErased (permutationOf xs) (permutationOf xs) :=

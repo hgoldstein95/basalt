@@ -3,7 +3,7 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Combinators.QuickCheck
+import Basalt.Combinators
 import Basalt.Obs.Presentation
 import Basalt.SPMF.Expect.Obs
 
@@ -243,10 +243,11 @@ theorem mem_support_listOfMaxLength_iff
     xs ∈ (listOfMaxLength n g).support ↔ xs.length ≤ n ∧ ∀ x ∈ xs, x ∈ g.support := by
   simp [support_listOfMaxLength]
 
-/-- The support of `listOf g` is the set of all lists where each element is in `g`'s support -/
-theorem support_listOf
+/-- The support of `geometricListOf g` is the set of all lists where each element is in `g`'s
+support -/
+theorem support_geometricListOf
     {g : SPMF α} :
-    support (listOf g) = { xs | ∀ x ∈ xs, x ∈ g.support } := by
+    support (geometricListOf g) = { xs | ∀ x ∈ xs, x ∈ g.support } := by
   ext xs
   induction xs with
   | nil =>
@@ -255,7 +256,7 @@ theorem support_listOf
     . intro h x hvacuous
       contradiction
     . intro h
-      unfold listOf
+      unfold geometricListOf
       simp [support_oneOf]
   | cons x xs' IH =>
     constructor
@@ -263,13 +264,13 @@ theorem support_listOf
       intro h y hy
       cases hy with
       | head =>
-        unfold listOf at h
+        unfold geometricListOf at h
         simp [support_oneOf] at h
         obtain ⟨h1, _⟩ := h
         assumption
       | tail =>
         rename_i hy
-        unfold listOf at h
+        unfold geometricListOf at h
         simp [support_oneOf] at h
         obtain ⟨_, h2⟩ := h
         rw [IH] at h2
@@ -277,7 +278,7 @@ theorem support_listOf
         assumption
     . intro h
       rw [Set.mem_ofPred_eq] at h
-      unfold listOf
+      unfold geometricListOf
       simp [support_oneOf]
       constructor
       . apply h
@@ -350,11 +351,11 @@ theorem support_nonEmptyListOf
 
 
 @[simp]
-theorem mem_support_listOf
+theorem mem_support_geometricListOf
     {xs : List α}
     {g : SPMF α} :
-    xs ∈ (listOf g).support ↔ xs ∈ {xs | ∀ x ∈ xs, x ∈ g.support} := by
-  simp [support_listOf]
+    xs ∈ (geometricListOf g).support ↔ xs ∈ {xs | ∀ x ∈ xs, x ∈ g.support} := by
+  simp [support_geometricListOf]
 
 @[simp]
 theorem mem_support_nonEmptylistOf
@@ -438,12 +439,12 @@ theorem mem_support_csup {c : SPMF α → Prop} (hc : chain c) {a : α} :
     a ∈ (CCPO.csup hc).support ↔ ∃ f, c f ∧ a ∈ f.support := by
   simp only [mem_support_iff_prob_pos, prob, expect_csup, lt_iSup_iff, exists_prop]
 
-/-- A value is reachable by `suchThat g p` exactly when `g` reaches it and `p` accepts it, whatever
-the chance of acceptance: the first draw can be that value. -/
-theorem mem_support_suchThat {g : SPMF α} {p : α → Bool} {a : α} :
-    a ∈ (suchThat g p).support ↔ a ∈ g.support ∧ p a = true := by
-  have key : ∀ a ∈ (suchThat g p).support, a ∈ g.support ∧ p a = true := by
-    refine suchThat.fixpoint_induct g p (fun x => ∀ a ∈ x.support, a ∈ g.support ∧ p a = true)
+/-- A value is reachable by `rejectUntil g p` exactly when `g` reaches it and `p` accepts it,
+whatever the chance of acceptance: the first draw can be that value. -/
+theorem mem_support_rejectUntil {g : SPMF α} {p : α → Bool} {a : α} :
+    a ∈ (rejectUntil g p).support ↔ a ∈ g.support ∧ p a = true := by
+  have key : ∀ a ∈ (rejectUntil g p).support, a ∈ g.support ∧ p a = true := by
+    refine rejectUntil.fixpoint_induct g p (fun x => ∀ a ∈ x.support, a ∈ g.support ∧ p a = true)
       (fun c hc ih a ha => ?_) (fun z ih a ha => ?_)
     · obtain ⟨x, hxc, hxa⟩ := (mem_support_csup hc).mp ha
       exact ih x hxc a hxa
@@ -452,7 +453,7 @@ theorem mem_support_suchThat {g : SPMF α} {p : α → Bool} {a : α} :
       · exact (mem_support_pure_iff.mp hab) ▸ ⟨hb, ‹_›⟩
       · exact ih a hab
   refine ⟨key a, fun ⟨ha, hp⟩ => ?_⟩
-  rw [suchThat]
+  rw [rejectUntil]
   exact mem_support_bind_iff.mpr ⟨a, ha, by simp only [hp, ↓reduceIte, mem_support_pure_iff]⟩
 
 /-- Reweighting a uniform choice preserves its support. Replacing `oneOf gs` by a `frequency`
@@ -525,7 +526,6 @@ the ones above, once a size is chosen (`size_erasure`). -/
 
 section quickCheck
 
-open QuickCheck
 
 theorem mem_support_sublistOf_iff {xs ys : List α} :
     ys ∈ (sublistOf xs : SPMF (List α)).support ↔ ys.Sublist xs := by
@@ -553,8 +553,8 @@ theorem perm_of_mem_support_shuffle {xs ys : List α}
 
 /-- Keys for `xs` that pair its entries as `zs` pairs those of `ys`, for any `zs` of that length. -/
 private theorem exists_keys_zip_perm {xs ys : List α} (h : xs.Perm ys) :
-    ∀ zs : List Int, zs.length = ys.length →
-      ∃ ks : List Int, ks.Perm zs ∧ (ks.zip xs).Perm (zs.zip ys) := by
+    ∀ zs : List Nat, zs.length = ys.length →
+      ∃ ks : List Nat, ks.Perm zs ∧ (ks.zip xs).Perm (zs.zip ys) := by
   induction h with
   | nil =>
     intro zs hz
@@ -575,33 +575,32 @@ private theorem exists_keys_zip_perm {xs ys : List α} (h : xs.Perm ys) :
     obtain ⟨ks₁, hk₁, h₁⟩ := ih₁ ks₂ (by rw [hk₂.length_eq, hz, h₂₃.length_eq])
     exact ⟨ks₁, hk₁.trans hk₂, h₁.trans h₂⟩
 
-/-- Every permutation, for a list short enough to give each entry its own 64-bit key: past that,
-keys tie, and a stable sort keeps tied entries in order. -/
-theorem mem_support_shuffle_of_perm {xs ys : List α} (hn : xs.length ≤ 2 ^ 64)
+/-- Every permutation, for a list short enough to give each entry its own key: past that, keys
+tie, and a stable sort keeps tied entries in order. -/
+theorem mem_support_shuffle_of_perm {xs ys : List α} (hn : xs.length ≤ 2 ^ 63)
     (h : ys.Perm xs) : ys ∈ (shuffle xs : SPMF (List α)).support := by
-  have hn : xs.length ≤ 18446744073709551616 := by simpa using hn
-  let zs : List Int := (List.range xs.length).map fun j : Nat => (j : Int) - 9223372036854775808
+  have hn : xs.length ≤ 9223372036854775808 := by simpa using hn
+  let zs : List Nat := List.range xs.length
   have hzlen : zs.length = ys.length := by simp [zs, h.length_eq]
   obtain ⟨ks, hks, hperm⟩ := exists_keys_zip_perm h.symm zs hzlen
   unfold shuffle
-  simp only [mem_support_bind_iff, mem_support_vectorOf_iff, mem_support_chooseInt_iff,
+  simp only [mem_support_bind_iff, mem_support_vectorOf_iff, mem_support_chooseNat_iff,
     mem_support_pure_iff]
   refine ⟨ks, ⟨by simp [hks.length_eq, zs], fun k hk => ?_⟩, ?_⟩
-  · obtain ⟨j, hj, rfl⟩ := List.mem_map.mp (hks.subset hk)
-    have := List.mem_range.mp hj
+  · have := List.mem_range.mp (hks.subset hk)
     omega
   · have hM := (List.mergeSort_perm (ks.zip xs) fun a b => decide (a.1 ≤ b.1)).trans hperm
     have hnodup : ((zs.zip ys).map Prod.fst).Nodup := by
       rw [List.map_fst_zip (by omega)]
-      exact List.nodup_range.map fun a b hab => by simpa using hab
+      exact List.nodup_range
     have hP : (zs.zip ys).Pairwise fun a b => a.1 ≤ b.1 := by
       rw [List.pairwise_iff_getElem]
       intro i j hi hj hij
       simp [zs, List.getElem_zip]
       omega
-    have hsorted := List.pairwise_mergeSort (le := fun a b : Int × α => decide (a.1 ≤ b.1))
+    have hsorted := List.pairwise_mergeSort (le := fun a b : Nat × α => decide (a.1 ≤ b.1))
       (fun a b c hab hbc => by simp at *; omega) (fun a b => by simp; omega) (ks.zip xs)
-    rw [List.Perm.eq_of_pairwise (le := fun a b : Int × α => a.1 ≤ b.1)
+    rw [List.Perm.eq_of_pairwise (le := fun a b : Nat × α => a.1 ≤ b.1)
       (fun a b ha hb hab hba =>
         List.inj_on_of_nodup_map hnodup (hM.subset ha) hb (le_antisymm hab hba))
       (hsorted.imp fun h => by simpa using h) hP hM, List.map_snd_zip (by omega)]

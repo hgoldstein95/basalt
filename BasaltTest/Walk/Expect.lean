@@ -77,7 +77,7 @@ example : SPMF.expect (vectorOf 2 Nat.arbitrary) (fun l => (l.length : ℝ≥0�
 trace: ⊢ 7 ≤ 7
 -/
 #guard_msgs in
-example : SPMF.expect (listOf Nat.arbitrary >>= fun _ => Pure.pure 0)
+example : SPMF.expect (geometricListOf Nat.arbitrary >>= fun _ => Pure.pure 0)
     (fun _ => (7 : ℝ≥0∞)) ≤ 7 := by
   rw [SPMF.expect_eq_obs]
   walk

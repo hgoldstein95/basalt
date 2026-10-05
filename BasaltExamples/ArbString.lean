@@ -67,8 +67,8 @@ theorem String.arbitrary.faithful : IsFaithful String.arbitrary := by
 theorem NonEmptyString.arbitrary.faithful : IsFaithful NonEmptyString.arbitrary := by
   faithful_fixpoint [NonEmptyString.arbitrary.terminates]
 
-/-- `listOf`'s bound with `Char.arbitrary`'s per-element cost of `1`: one `oneOf` and one character
-per element, plus the `oneOf` that ends the list. -/
+/-- `geometricListOf`'s bound with `Char.arbitrary`'s per-element cost of `1`: one `oneOf` and one
+character per element, plus the `oneOf` that ends the list. -/
 theorem String.arbitrary_cost :
     IsCostBounded String.arbitrary (fun s => 2 * s.length + 1) := by
   rw [IsCostBounded.iff_obs]

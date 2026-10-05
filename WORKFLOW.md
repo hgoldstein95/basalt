@@ -148,10 +148,12 @@ a generator that has only one half of the support law, as a size-bounded generat
 deliberately incomplete).
 
 **A sized generator** (`[Sized G]`) has its laws at each size: state them about
-`(<GEN> : WithSize SPMF α) n`, and `simp only [size_erasure]` before walking, which evaluates the
-generator at `n` into one that reads no size. A callee's law is then passed at the size it is
+`(<GEN> : WithSize SPMF α).run n`, and `simp only [size_erasure]` before walking, which evaluates
+the generator at `n` into one that reads no size. A callee's law is then passed at the size it is
 called at, and a retry loop's at every size it might try (`fun m => (h m).obs`);
-`BasaltTest/Combinators/QuickCheck.lean` does this for each of QuickCheck's combinators.
+`Basalt/Combinators/Laws.lean` does this for each of QuickCheck's combinators. A
+recursive one is by induction on the size, as `boundedList.sound` in `BasaltTest/SizeErasure.lean`:
+unfold it once with `rw`, and the recursive call comes out at the size it was resized to.
 
 ### Unfolding: one idiom per context
 
@@ -218,8 +220,8 @@ expect of it:
 
 Notes:
 
-- **A combinator that takes a generator** (`listOf`, `vectorOf`, …) asks for that generator's
-  always or may observation, for a predicate of the argument's own, and states the list's in terms
+- **A combinator that takes a generator** (`geometricListOf`, `vectorOf`, …) asks for that
+  generator's always or may observation, for a predicate of the argument's own, and states the list's in terms
   of it. A callee's law supplies it. A combinator term in that position has no law: prove its two
   halves, each by `walk`, and pass them (`Tree.genBSTByInsertion.sound_complete`,
   `BST/ByInsertion.lean`).
@@ -286,7 +288,7 @@ generator that uses every combinator). Of the generator, only its callees' laws 
   `mass_fixpoint [Nat.arbitrary.terminates.obs] using …`.
 - a **helper with no law**, or a derived combinator (`optionGen`, `BasaltTest/OptionGen.lean`), is
   unfolded and walked through when it is not recursive.
-- a **`suchThat g p`** asks for `g`'s termination law and a bound `r` on how often `p` rejects,
+- a **`rejectUntil g p`** asks for `g`'s termination law and a bound `r` on how often `p` rejects,
   `SPMF.expectObs.spec g (fun a => if p a then 0 else 1) ≤ r`, and leaves `r < 1` to the
   arithmetic (`NonEmptyList.genNonEmpty.terminates`, `NonEmptyList.lean`).
 - an **`if`/`dite`** is no different from any other combinator: the bound is the same conditional
@@ -358,8 +360,8 @@ goals `genHeap` and `genBST` leave. Of the generator, only its callees' laws are
 - a **callee** is bounded by its `<callee>.cost_bounded` law, passed with any other cost bound:
   `walk fixpoint [h₁.obs, h₂.obs]`. A non-recursive helper with no law is unfolded and walked
   through instead.
-- a **combinator that takes a generator** (`listOf`, `vectorOf`, …) asks for that generator's cost
-  law the same way, and the goal states the combinator's bound in terms of it —
+- a **combinator that takes a generator** (`geometricListOf`, `vectorOf`, …) asks for that
+  generator's cost law the same way, and the goal states the combinator's bound in terms of it —
   `String.arbitrary_cost` (`ArbString.lean`). A combinator term in that position, which has no law,
   is bounded by its worst case: the most choices any of its runs makes.
 
@@ -390,8 +392,8 @@ as `h.obs`. A generator recursive by `termination_by` is induction on its decrea
 above (`Tree.genTree.cost`, `BST/ByFiltering.lean`). `BasaltTest/Walk/ExpectedCost.lean` pins the
 goals.
 
-**Rejection sampling** is `suchThat g p`. Its rule takes `g`'s expected cost `C` and a bound `r` on
-how often `p` rejects, `SPMF.Cost.expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r`, and
+**Rejection sampling** is `rejectUntil g p`. Its rule takes `g`'s expected cost `C` and a bound `r`
+on how often `p` rejects, `SPMF.Cost.expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r`, and
 bounds the loop by `C / (1 - r)`; `SPMF.Cost.div_one_sub_le` turns the arithmetic into one step of
 the loop, `C + r * B ≤ B`. The rejection bound is the one fact about `g` a filter needs, and it is
 the termination proof's, read at `SPMF.Cost` through `g`'s `IsCostFaithful` law
@@ -474,8 +476,8 @@ or `IOModel.Approx (<GEN> …) (<GEN> …)` (`Basalt/Walk/IO.lean`), inducts on 
 recursive. A generator defined by structural recursion is induction on the argument it recurses
 on, `unfold`, and `walk` in each case (`genZero`, `BasaltExamples/STLC/Faithful.lean`). A
 recursive combinator of your own needs a `@[gen_rule]` relating it at each pair of monads: prove it
-once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`) and instantiate it
-(`IdealSource.below_listOf`, `IOModel.approx_listOf`).
+once for any relation that is a `GenRel` (`GenRel.geometricListOf`, `Basalt/GenRel.lean`) and
+instantiate it (`IdealSource.below_geometricListOf`, `IOModel.approx_geometricListOf`).
 
 ## When Stuck
 
@@ -514,10 +516,10 @@ once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`)
   passed, or the generator argument of a combinator that has no law of its own and no worst
   case (it recurses, or draws from something that does); pass a bound for it:
   `walk fixpoint [h.obs]`. A recursive combinator of your own gets the same message: it needs a law
-  and a bridge from it (`SPMF.Cost.le_always_listOf`, `Basalt/Walk/Cost.lean`).
+  and a bridge from it (`SPMF.Cost.le_always_geometricListOf`, `Basalt/Walk/Cost.lean`).
 - **A mass walk says nothing bounds a sub-generator** → it is a recursive combinator of your own
-  (bridge its law, as `SPMF.le_expect_listOf` does in `Basalt/Tactic/MassFixpoint.lean`), a callee
-  whose termination law was not passed (`mass_fixpoint [h.obs]`), or a recursive occurrence whose
+  (bridge its law, as `SPMF.le_expect_geometricListOf` does in `Basalt/Tactic/MassFixpoint.lean`),
+  a callee whose termination law was not passed (`mass_fixpoint [h.obs]`), or a recursive occurrence whose
   fact needs a premise that neither unification nor a hypothesis supplies (`m < n` for a size
   computed from a draw). Pass that fact instantiated; the drawn values are in scope under the
   generator's names (`walk [ih _ (… k₁ …)]`).

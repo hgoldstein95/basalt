@@ -99,10 +99,10 @@ theorem le_always_listOfMaxLength_worst {k K : Nat} {b : ℕ∞}
     (∀ a n, n ≤ 1 + (a.map fun _ => K).sum → p a n) ≤ alwaysObs.spec (listOfMaxLength k g) p :=
   le_always_listOfMaxLength (always_of_worst hg hb)
 
-private theorem always_listOf (hg : alwaysObs.spec g fun a n => n ≤ c a) :
-    alwaysObs.spec (listOf g : SPMF.Cost (List α)) fun a n =>
+private theorem always_geometricListOf (hg : alwaysObs.spec g fun a n => n ≤ c a) :
+    alwaysObs.spec (geometricListOf g : SPMF.Cost (List α)) fun a n =>
       n ≤ a.length + (a.map c).sum + 1 := by
-  refine listOf.fixpoint_induct g _ (alwaysObs.admissible _) (fun listOf ih => ?_)
+  refine geometricListOf.fixpoint_induct g _ (alwaysObs.admissible _) (fun geometricListOf ih => ?_)
   walk
   all_goals simp only [List.length_cons, List.map_cons, List.sum_cons, List.length_nil,
     List.map_nil, List.sum_nil]; omega
@@ -117,15 +117,16 @@ private theorem always_nonEmptyListOf (hg : alwaysObs.spec g fun a n => n ≤ c 
     List.map_nil, List.sum_nil]; omega
 
 @[gen_rule]
-theorem le_always_listOf (hg : alwaysObs.spec g fun a n => n ≤ c a) :
-    (∀ a n, n ≤ a.length + (a.map c).sum + 1 → p a n) ≤ alwaysObs.spec (listOf g) p :=
-  le_always_of_always (always_listOf hg)
+theorem le_always_geometricListOf (hg : alwaysObs.spec g fun a n => n ≤ c a) :
+    (∀ a n, n ≤ a.length + (a.map c).sum + 1 → p a n) ≤ alwaysObs.spec (geometricListOf g) p :=
+  le_always_of_always (always_geometricListOf hg)
 
 @[gen_rule]
-theorem le_always_listOf_worst {K : Nat} {b : ℕ∞}
+theorem le_always_geometricListOf_worst {K : Nat} {b : ℕ∞}
     (hg : worstObs.spec g (fun _ n => (n : ℕ∞)) ≤ b) (hb : b = (K : ℕ∞)) :
-    (∀ a n, n ≤ a.length + (a.map fun _ => K).sum + 1 → p a n) ≤ alwaysObs.spec (listOf g) p :=
-  le_always_listOf (always_of_worst hg hb)
+    (∀ a n, n ≤ a.length + (a.map fun _ => K).sum + 1 → p a n)
+      ≤ alwaysObs.spec (geometricListOf g) p :=
+  le_always_geometricListOf (always_of_worst hg hb)
 
 @[gen_rule]
 theorem le_always_nonEmptyListOf (hg : alwaysObs.spec g fun a n => n ≤ c a) :
@@ -337,7 +338,6 @@ expected cost is `ExpectedCost.lean`'s. -/
 
 namespace SPMF.Cost
 
-open QuickCheck
 
 variable {α β : Type} {k : ℕ∞}
 
@@ -360,9 +360,9 @@ theorem worst_sublistOf_le {xs : List α} {p : List α → Nat → ℕ∞}
 theorem always_shuffle {xs : List α} :
     alwaysObs.spec (shuffle xs : SPMF.Cost (List α)) fun _ n => n ≤ xs.length := by
   have hv := always_vectorOf (n := xs.length) (k := 1)
-    (g := chooseInt (-9223372036854775808) 9223372036854775807 (by decide)) (by walk; omega)
+    (g := chooseNat 0 9223372036854775807 (Nat.zero_le _)) (by walk; omega)
   unfold shuffle
-  generalize (vectorOf _ _ : SPMF.Cost (List Int)) = v at hv ⊢
+  generalize (vectorOf _ _ : SPMF.Cost (List Nat)) = v at hv ⊢
   walk
   omega
 

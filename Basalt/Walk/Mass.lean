@@ -66,9 +66,9 @@ namespace SPMF
 
 They take a bound on their element generator's mass, and their own is used at the postexpectation
 the walk arrives with: exactly when that is constant, and otherwise at its worst case over every
-list, as `le_expect_iInf_of_le` does for a leaf. The unbounded-length ones (`le_expect_listOf`,
-`le_expect_nonEmptyListOf`, in `MassFixpoint.lean`) only turn a terminating element generator into a
-terminating list generator. -/
+list, as `le_expect_iInf_of_le` does for a leaf. The unbounded-length ones
+(`le_expect_geometricListOf`, `le_expect_nonEmptyListOf`, in `MassFixpoint.lean`) only turn a
+terminating element generator into a terminating list generator. -/
 
 private theorem pow_le_vectorOf {n : Nat} {g : SPMF α} {c : ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) :
@@ -148,7 +148,6 @@ number of draws, each bounded as its family is at every size. The retry loop `su
 
 section quickCheck
 
-open QuickCheck
 
 private theorem one_le_mass_sublistOf {xs : List α} : 1 ≤ (sublistOf xs : SPMF (List α)).mass := by
   induction xs with
@@ -173,7 +172,7 @@ private theorem one_le_mass_shuffle {xs : List α} : 1 ≤ (shuffle xs : SPMF (L
   unfold shuffle
   refine (one_mul (1 : ℝ≥0∞)).symm.le.trans (mass_bind_ge_mul ?_ fun _ => (mass_pure _).ge)
   have := pow_le_vectorOf (n := xs.length)
-    ((mass_chooseInt (-9223372036854775808) 9223372036854775807 (by decide)).ge.trans_eq
+    ((mass_chooseNat 0 9223372036854775807 (Nat.zero_le _)).ge.trans_eq
       (expect_one _).symm)
   rw [one_pow] at this
   exact this.trans_eq (expect_one _)

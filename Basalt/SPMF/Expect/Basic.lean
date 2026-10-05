@@ -244,7 +244,7 @@ theorem expect_csup {c : SPMF α → Prop} (hc : chain c) (f : α → ℝ≥0∞
 
 /-- Only *upper* bounds on expectations are admissible: the fixpoint iteration starts at `⊥`,
 where every expectation is `0`, so a lower bound cannot ride `fix_induct` — prove exact laws by
-inducting on an index of the event instead (`prob_listOf_length`). -/
+inducting on an index of the event instead (`prob_geometricListOf_length`). -/
 theorem admissible_expect_le (f : α → ℝ≥0∞) (B : ℝ≥0∞) :
     admissible (fun (p : SPMF α) => expect p f ≤ B) := by
   intro c hc ih

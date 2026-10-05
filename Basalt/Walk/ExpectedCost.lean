@@ -12,7 +12,7 @@ import Basalt.Walk.Average
 What the walk needs of a bound on `SPMF.Cost.expectObs.spec g f`, on which
 `IsExpectedCostBounded g B` is the upper bound at `f = fun _ n => n`: how a fact about a
 sub-generator closes a leaf in either direction, the rules of the list combinators and of
-`suchThat`, and the admissibility `walk fixpoint` inducts with for an upper bound.
+`rejectUntil`, and the admissibility `walk fixpoint` inducts with for an upper bound.
 -/
 
 open ENNReal RandomChoice
@@ -93,10 +93,11 @@ variable {α : Type} {g : SPMF.Cost α} {p : List α → Nat → ℝ≥0∞} {d 
 @[gen_rule] theorem expect_listOfMaxLength_le_iSup {n : Nat} :
     expectObs.spec (listOfMaxLength n g) p ≤ ⨆ a, ⨆ n, p a n := expect_le_iSup
 
-@[gen_rule] theorem expect_listOf_le_const (hp : ∀ a n, p a n = d) :
-    expectObs.spec (listOf g) p ≤ d := expect_le_of_const hp
+@[gen_rule] theorem expect_geometricListOf_le_const (hp : ∀ a n, p a n = d) :
+    expectObs.spec (geometricListOf g) p ≤ d := expect_le_of_const hp
 
-@[gen_rule] theorem expect_listOf_le_iSup : expectObs.spec (listOf g) p ≤ ⨆ a, ⨆ n, p a n :=
+@[gen_rule] theorem expect_geometricListOf_le_iSup :
+    expectObs.spec (geometricListOf g) p ≤ ⨆ a, ⨆ n, p a n :=
   expect_le_iSup
 
 @[gen_rule] theorem expect_nonEmptyListOf_le_const (hp : ∀ a n, p a n = d) :
@@ -109,11 +110,11 @@ end listCombinators
 
 /-! ## Rejection sampling
 
-`suchThat g p` is bounded exactly, from `g`'s expected cost `C` and a bound `r` on how often it
+`rejectUntil g p` is bounded exactly, from `g`'s expected cost `C` and a bound `r` on how often it
 rejects: each draw pays its own cost, and a rejected one pays for starting over, so the expected
 cost `B` satisfies `B ≤ C + r * B`, whose least solution is `C / (1 - r)`. -/
 
-section suchThat
+section rejectUntil
 
 variable {α : Type} {g : SPMF.Cost α} {p : α → Bool} {C r : ℝ≥0∞}
 
@@ -139,10 +140,10 @@ private theorem add_mul_div_one_sub_le (C r : ℝ≥0∞) : C + r * (C / (1 - r)
     · simp
     · rw [ENNReal.div_zero hC]; exact le_top
 
-theorem expect_suchThat_cost_le (hg : expectObs.spec g (fun _ n => (n : ℝ≥0∞)) ≤ C)
+theorem expect_rejectUntil_cost_le (hg : expectObs.spec g (fun _ n => (n : ℝ≥0∞)) ≤ C)
     (hr : expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r) :
-    expectObs.spec (suchThat g p) (fun _ n => (n : ℝ≥0∞)) ≤ C / (1 - r) := by
-  refine suchThat.fixpoint_induct g p
+    expectObs.spec (rejectUntil g p) (fun _ n => (n : ℝ≥0∞)) ≤ C / (1 - r) := by
+  refine rejectUntil.fixpoint_induct g p
     (fun x => expectObs.spec x (fun _ n => (n : ℝ≥0∞)) ≤ C / (1 - r))
     (expectObs.admissible_le _ _) fun z ih => ?_
   have hstep : ∀ a n, expectObs.spec (if p a then Pure.pure a else z)
@@ -155,31 +156,30 @@ theorem expect_suchThat_cost_le (hg : expectObs.spec g (fun _ n => (n : ℝ≥0�
     ((expect_retry_le hg hr _).trans (add_mul_div_one_sub_le C r)))
 
 /-- A bound `B` on `C / (1 - r)` from one step of the loop, the form the arithmetic of a
-`suchThat` bound is easiest in. -/
+`rejectUntil` bound is easiest in. -/
 theorem div_one_sub_le {B : ℝ≥0∞} (hB : B ≠ ⊤) (h : C + r * B ≤ B) : C / (1 - r) ≤ B := by
   refine ENNReal.div_le_of_le_mul' ?_
   rw [ENNReal.sub_mul fun _ _ => hB, one_mul]
   exact ENNReal.le_sub_of_add_le_right (ne_top_of_le_ne_top hB (le_add_self.trans h)) h
 
 @[gen_rule]
-theorem expect_suchThat_le {post : α → Nat → ℝ≥0∞} {k : ℝ≥0∞}
+theorem expect_rejectUntil_le {post : α → Nat → ℝ≥0∞} {k : ℝ≥0∞}
     (hg : expectObs.spec g (fun _ n => (n : ℝ≥0∞)) ≤ C)
     (hr : expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r)
     (hpost : ∀ a n, post a n = k + n) :
-    expectObs.spec (suchThat g p) post ≤ k + C / (1 - r) :=
-  expect_le_add_of_le (expect_suchThat_cost_le hg hr) hpost
+    expectObs.spec (rejectUntil g p) post ≤ k + C / (1 - r) :=
+  expect_le_add_of_le (expect_rejectUntil_cost_le hg hr) hpost
 
-end suchThat
+end rejectUntil
 
 /-! ## QuickCheck's combinators
 
 `trySizes` pays for each draw it makes, at most one per size it tries. The retry loop
-`suchThatFrom` is bounded as `suchThat` is, each draw at a size from its first on: a round that
+`suchThatFrom` is bounded as `rejectUntil` is, each draw at a size from its first on: a round that
 returns nothing starts the loop over, one size later. -/
 
 section quickCheck
 
-open QuickCheck
 
 variable {α β : Type} {gs : Nat → SPMF.Cost α} {f : α → Option β} {C r : ℝ≥0∞}
 
@@ -275,7 +275,7 @@ theorem expect_suchThatFrom_le {n : Nat} {post : β → Nat → ℝ≥0∞} {d :
     expectObs.spec (suchThatFrom gs f n) post ≤ d + C / (1 - r) :=
   expect_le_add_of_le (expect_suchThatFrom_cost_le hg hr) hpost
 
-/-- `QuickCheck.suchThat p`, at a size, is `suchThatFrom` of `Option.guard p`: its rejections are
+/-- `suchThat p`, at a size, is `suchThatFrom` of `Option.guard p`: its rejections are
 stated through `p`. -/
 @[gen_rule]
 theorem expect_suchThatFrom_guard_le {n : Nat} {p : α → Bool} {post : α → Nat → ℝ≥0∞} {d : ℝ≥0∞}

@@ -4,9 +4,9 @@ Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
 import Basalt.Combinators
-import Basalt.Combinators.QuickCheck
-import Basalt.Combinators.WithSize
+import Basalt.Combinators.Laws
 import Basalt.Gen
+import Basalt.GenHom
 import Basalt.GenRel
 import Basalt.GenStats.Basic
 import Basalt.GenStats.Command
@@ -42,6 +42,7 @@ import Basalt.SPMF.Mass
 import Basalt.SPMF.Ranking
 import Basalt.SPMF.Support
 import Basalt.SPMF.Termination
+import Basalt.SizeErasure
 import Basalt.Sized
 import Basalt.Tactic.ENNReal
 import Basalt.Tactic.Faithful

@@ -49,7 +49,7 @@ decreasing_by all_goals omega
 /-- Draws from `Tree.genTree` until the tree drawn is a search tree. -/
 def Tree.genBSTByFiltering [Gen G] (lo hi : Int) (h : lo ≤ hi := by gen_side_condition)
     (n : Nat) : G (Tree Int) :=
-  suchThat (Tree.genTree lo hi h n) (·.isBSTb lo hi)
+  rejectUntil (Tree.genTree lo hi h n) (·.isBSTb lo hi)
 
 /-! ## Support -/
 

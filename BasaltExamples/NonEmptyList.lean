@@ -33,7 +33,7 @@ partial_fixpoint
 
 /-- Draws from `genList` until the list drawn is not empty. -/
 def genNonEmpty [Gen G] (n : Nat) : G (List Nat) :=
-  suchThat (genList n) (!·.isEmpty)
+  rejectUntil (genList n) (!·.isEmpty)
 
 /-! ## Support -/
 

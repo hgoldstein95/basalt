@@ -14,8 +14,8 @@ to any generator monad `G`; `OptionT` preserves both. `MonoSized` is the side co
 `sized` and `resize` appear in the body of a `partial_fixpoint`.
 -/
 
-/-- Evaluates a `WithSize G` generator at a size, pushing the size inward until only `G` is left
-(`Basalt/Combinators/WithSize.lean`). -/
+/-- Evaluates a `WithSize G` generator run at a size, pushing the run inward until only `G` is left
+(`Basalt/SizeErasure.lean`). -/
 register_simp_attr size_erasure
 
 open Lean.Order

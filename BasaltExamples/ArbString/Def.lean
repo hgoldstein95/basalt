@@ -22,7 +22,7 @@ namespace ArbString
 
 /-- Generates a random (possibly empty) alphanumeric string -/
 def String.arbitrary [Gen G] : G String :=
-  String.ofList <$> listOf Char.arbitrary
+  String.ofList <$> geometricListOf Char.arbitrary
 
 /-- Generates a random, non-empty alphanumeric string -/
 def NonEmptyString.arbitrary [Gen G] : G String :=

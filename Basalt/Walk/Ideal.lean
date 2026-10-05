@@ -22,8 +22,8 @@ variable {σ : Type} [WordSource σ] (src : IdealSource σ)
 theorem genRel : GenRel SPMF (WordModel σ) (@IdealSource.Below σ _ src) where
   pure := src.below_pure
   bind := src.below_bind
-  map := src.below_map
-  default := src.below_default
+  mapChoose lo hi h f := src.below_map f (src.below_choose lo hi h)
+  default := src.below_default _
   choose := src.below_choose
   admissible := IdealSource.Below.admissible src
 
@@ -38,9 +38,9 @@ theorem below_vectorOf {g' : SPMF α} {g : WordModel σ α} (n : Nat) (hg : src.
   src.genRel.vectorOf n hg
 
 @[gen_rule]
-theorem below_listOf {g' : SPMF α} {g : WordModel σ α} (hg : src.Below g' g) :
-    src.Below (listOf g') (listOf g) :=
-  src.genRel.listOf hg
+theorem below_geometricListOf {g' : SPMF α} {g : WordModel σ α} (hg : src.Below g' g) :
+    src.Below (geometricListOf g') (geometricListOf g) :=
+  src.genRel.geometricListOf hg
 
 @[gen_rule]
 theorem below_nonEmptyListOf {g' : SPMF α} {g : WordModel σ α} (hg : src.Below g' g) :
@@ -48,9 +48,9 @@ theorem below_nonEmptyListOf {g' : SPMF α} {g : WordModel σ α} (hg : src.Belo
   src.genRel.nonEmptyListOf hg
 
 @[gen_rule]
-theorem below_suchThat {g' : SPMF α} {g : WordModel σ α} (p : α → Bool) (hg : src.Below g' g) :
-    src.Below (suchThat g' p) (suchThat g p) :=
-  src.genRel.suchThat p hg
+theorem below_rejectUntil {g' : SPMF α} {g : WordModel σ α} (p : α → Bool) (hg : src.Below g' g) :
+    src.Below (rejectUntil g' p) (rejectUntil g p) :=
+  src.genRel.rejectUntil p hg
 
 @[gen_rule]
 theorem below_permutationOf (xs : List α) : src.Below (permutationOf xs) (permutationOf xs) :=

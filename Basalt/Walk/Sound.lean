@@ -10,8 +10,8 @@ import Basalt.Walk.Attr
 # Walking Soundness
 
 What the walk needs of `SPMF.alwaysObs`, on which `IsSoundFor g P` is `alwaysObs.spec g P`: how a
-fact about a sub-generator closes a leaf, the rules of the list combinators and of `suchThat`, and
-the admissibility `walk fixpoint` inducts with.
+fact about a sub-generator closes a leaf, the rules of the list combinators and of `rejectUntil`,
+and the admissibility `walk fixpoint` inducts with.
 -/
 
 open RandomChoice
@@ -58,9 +58,9 @@ theorem le_always_listOfMaxLength {n : Nat} (hg : alwaysObs.spec g R) :
     h xs ⟨hxs.1, fun x hx => hg x (hxs.2 x hx)⟩
 
 @[gen_rule]
-theorem le_always_listOf (hg : alwaysObs.spec g R) :
-    (∀ xs, (∀ x ∈ xs, R x) → p xs) ≤ alwaysObs.spec (listOf g) p :=
-  fun h xs hxs => h xs fun x hx => hg x (mem_support_listOf.mp hxs x hx)
+theorem le_always_geometricListOf (hg : alwaysObs.spec g R) :
+    (∀ xs, (∀ x ∈ xs, R x) → p xs) ≤ alwaysObs.spec (geometricListOf g) p :=
+  fun h xs hxs => h xs fun x hx => hg x (mem_support_geometricListOf.mp hxs x hx)
 
 @[gen_rule]
 theorem le_always_nonEmptyListOf (hg : alwaysObs.spec g R) :
@@ -71,20 +71,20 @@ theorem le_always_nonEmptyListOf (hg : alwaysObs.spec g R) :
 
 end generatorArgument
 
-/-- A value `suchThat` returns is one `g` produces, and `p` accepts it. -/
+/-- A value `rejectUntil` returns is one `g` produces, and `p` accepts it. -/
 @[gen_rule]
-theorem le_always_suchThat {α : Type} {g : SPMF α} {p : α → Bool} {R post : α → Prop}
+theorem le_always_rejectUntil {α : Type} {g : SPMF α} {p : α → Bool} {R post : α → Prop}
     (hg : alwaysObs.spec g R) :
-    (∀ a, (R a ∧ p a = true) → post a) ≤ alwaysObs.spec (suchThat g p) post :=
+    (∀ a, (R a ∧ p a = true) → post a) ≤ alwaysObs.spec (rejectUntil g p) post :=
   fun h a ha =>
-    have ha := mem_support_suchThat.mp ha
+    have ha := mem_support_rejectUntil.mp ha
     h a ⟨hg a ha.1, ha.2⟩
 
 /-- With no fact about `g`, what `p` accepts. -/
 @[gen_rule]
-theorem le_always_suchThat_accept {α : Type} {g : SPMF α} {p : α → Bool} {post : α → Prop} :
-    (∀ a, p a = true → post a) ≤ alwaysObs.spec (suchThat g p) post :=
-  fun h a ha => h a (mem_support_suchThat.mp ha).2
+theorem le_always_rejectUntil_accept {α : Type} {g : SPMF α} {p : α → Bool} {post : α → Prop} :
+    (∀ a, p a = true → post a) ≤ alwaysObs.spec (rejectUntil g p) post :=
+  fun h a ha => h a (mem_support_rejectUntil.mp ha).2
 
 /-- `permutationOf` produces every permutation of its list, and its subtype says so: there is no
 support law to bridge. -/
@@ -99,7 +99,6 @@ A size-indexed family, as `trySizes` and `suchThatFrom` take, asks for a fact at
 
 section quickCheck
 
-open QuickCheck
 
 @[gen_rule]
 theorem le_always_sublistOf {α : Type} {xs : List α} {p : List α → Prop} :

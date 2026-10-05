@@ -185,7 +185,7 @@ info: [basalt] starting Plausible.Gen campaign (runs=3)
 discard count depends on the draw. -/
 
 private def prop_takeDrop [Gen G] : PropM G Unit := do
-  let xs ← generate (listOf (chooseNat 0 99))
+  let xs ← generate (geometricListOf (chooseNat 0 99))
   let k ← generate (chooseNat 0 99)
   assume !xs.isEmpty
   check (xs.take k ++ xs.drop k == xs) s!"xs={xs}, k={k}"

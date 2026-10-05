@@ -248,22 +248,22 @@ with no rule for this observation is left as itself, like any generator nothing 
 trace: lo hi : ℤ
 h : lo ≤ hi
 k : ℕ
-ih : (List.replicate k lo, 2 * k + 1) ∈ SPMF.support (listOf (chooseInt lo hi h))
+ih : (List.replicate k lo, 2 * k + 1) ∈ SPMF.support (geometricListOf (chooseInt lo hi h))
 ⊢ [] = List.replicate (k + 1) lo ∧ 1 + 0 = 2 * (k + 1) + 1 ∨
     ∃ x,
       (lo ≤ x ∧ x ≤ hi) ∧
         ∃ xs n_xs,
-          (xs, n_xs) ∈ SPMF.support (listOf (chooseInt lo hi h)) ∧
+          (xs, n_xs) ∈ SPMF.support (geometricListOf (chooseInt lo hi h)) ∧
             x :: xs = List.replicate (k + 1) lo ∧ 1 + (1 + n_xs) = 2 * (k + 1) + 1
 -/
 #guard_msgs in
 example {lo hi : Int} (h : lo ≤ hi) (k : Nat) :
     (List.replicate k lo, 2 * k + 1) ∈
-      SPMF.support (listOf (chooseInt lo hi h) : SPMF.Cost (List Int)) := by
+      SPMF.support (geometricListOf (chooseInt lo hi h) : SPMF.Cost (List Int)) := by
   induction k with
-  | zero => rw [listOf, SPMF.Cost.mem_support_iff_may]; walk; exact .inl rfl
+  | zero => rw [geometricListOf, SPMF.Cost.mem_support_iff_may]; walk; exact .inl rfl
   | succ k ih =>
-    rw [listOf, SPMF.Cost.mem_support_iff_may]; walk
+    rw [geometricListOf, SPMF.Cost.mem_support_iff_may]; walk
     trace_state
     exact .inr ⟨lo, ⟨le_rfl, h⟩, _, _, ih, by simp [List.replicate_succ], by omega⟩
 

@@ -23,7 +23,7 @@ theorem natFaithful : IsCostFaithful Nat.arbitrary := ⟨by walk fixpoint, by wa
 
 example : IsCostFaithful (Tree.genBST lo hi) := ⟨by walk fixpoint, by walk fixpoint⟩
 
-example : IsCostFaithful (suchThat Nat.arbitrary (· != 0)) :=
+example : IsCostFaithful (rejectUntil Nat.arbitrary (· != 0)) :=
   ⟨by walk [natFaithful.erasedLe], by walk [natFaithful.leErased]⟩
 
 -- A callee's law is passed by the field the walk is proving.

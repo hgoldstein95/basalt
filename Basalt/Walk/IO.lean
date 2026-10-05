@@ -20,8 +20,8 @@ namespace IOModel
 theorem genRel : GenRel IOModel IO @Approx where
   pure := approx_pure
   bind := approx_bind
-  map := approx_map
-  default := approx_default
+  mapChoose lo hi h f := approx_map f (approx_choose lo hi h)
+  default := approx_default _
   choose := approx_choose
   admissible := Approx.admissible
 
@@ -36,9 +36,9 @@ theorem approx_vectorOf {g' : IOModel α} {g : IO α} (n : Nat) (hg : Approx g' 
   genRel.vectorOf n hg
 
 @[gen_rule]
-theorem approx_listOf {g' : IOModel α} {g : IO α} (hg : Approx g' g) :
-    Approx (listOf g') (listOf g) :=
-  genRel.listOf hg
+theorem approx_geometricListOf {g' : IOModel α} {g : IO α} (hg : Approx g' g) :
+    Approx (geometricListOf g') (geometricListOf g) :=
+  genRel.geometricListOf hg
 
 @[gen_rule]
 theorem approx_nonEmptyListOf {g' : IOModel α} {g : IO α} (hg : Approx g' g) :
@@ -46,9 +46,9 @@ theorem approx_nonEmptyListOf {g' : IOModel α} {g : IO α} (hg : Approx g' g) :
   genRel.nonEmptyListOf hg
 
 @[gen_rule]
-theorem approx_suchThat {g' : IOModel α} {g : IO α} (p : α → Bool) (hg : Approx g' g) :
-    Approx (suchThat g' p) (suchThat g p) :=
-  genRel.suchThat p hg
+theorem approx_rejectUntil {g' : IOModel α} {g : IO α} (p : α → Bool) (hg : Approx g' g) :
+    Approx (rejectUntil g' p) (rejectUntil g p) :=
+  genRel.rejectUntil p hg
 
 @[gen_rule]
 theorem approx_permutationOf (xs : List α) : Approx (permutationOf xs) (permutationOf xs) :=

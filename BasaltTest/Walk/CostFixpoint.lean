@@ -135,10 +135,11 @@ example : IsCostBounded SortedList.List.genSortedBySorting (fun ys => 2 * ys.len
   omega
 
 /--
-error: walk fixpoint: `listOf` is a combinator, not a generator definition; prove a bound on a combinator term with `walk`
+error: walk fixpoint: `geometricListOf` is a combinator, not a generator definition; prove a bound on a combinator term with `walk`
 -/
 #guard_msgs in
-example : IsCostBounded (listOf Nat.arbitrary) (fun xs => xs.length + (xs.map (· + 1)).sum + 1) := by
+example : IsCostBounded (geometricListOf Nat.arbitrary)
+    (fun xs => xs.length + (xs.map (· + 1)).sum + 1) := by
   rw [IsCostBounded.iff_obs]
   walk fixpoint
 

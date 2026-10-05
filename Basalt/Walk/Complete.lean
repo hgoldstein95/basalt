@@ -11,7 +11,7 @@ import Basalt.Walk.Attr
 
 What the walk needs of `SPMF.mayObs`, on which `a ∈ SPMF.support g` is `mayObs.spec g (· = a)`:
 how a fact about a sub-generator closes a leaf, and the rules of the list combinators and of
-`suchThat`. A lower bound on a least fixed point needs a ranking, which is the user's induction
+`rejectUntil`. A lower bound on a least fixed point needs a ranking, which is the user's induction
 (`IsCompleteFor.of_measure`), so there is no admissibility here, and a recursive occurrence is left
 in the precondition as itself.
 -/
@@ -65,9 +65,10 @@ theorem le_may_listOfMaxLength {n : Nat} (hg : ∀ a, R a → mayObs.spec g (· 
     ⟨xs, mem_support_listOfMaxLength_iff.mpr ⟨hn, fun x hx => mem_of_may hg x (hR x hx)⟩, hp⟩
 
 @[gen_rule]
-theorem le_may_listOf (hg : ∀ a, R a → mayObs.spec g (· = a)) :
-    (∃ xs, (∀ x ∈ xs, R x) ∧ p xs) ≤ mayObs.spec (listOf g) p :=
-  fun ⟨xs, hR, hp⟩ => ⟨xs, mem_support_listOf.mpr fun x hx => mem_of_may hg x (hR x hx), hp⟩
+theorem le_may_geometricListOf (hg : ∀ a, R a → mayObs.spec g (· = a)) :
+    (∃ xs, (∀ x ∈ xs, R x) ∧ p xs) ≤ mayObs.spec (geometricListOf g) p :=
+  fun ⟨xs, hR, hp⟩ =>
+    ⟨xs, mem_support_geometricListOf.mpr fun x hx => mem_of_may hg x (hR x hx), hp⟩
 
 @[gen_rule]
 theorem le_may_nonEmptyListOf (hg : ∀ a, R a → mayObs.spec g (· = a)) :
@@ -77,13 +78,13 @@ theorem le_may_nonEmptyListOf (hg : ∀ a, R a → mayObs.spec g (· = a)) :
 
 end generatorArgument
 
-/-- `suchThat` reaches what `g` reaches and `p` accepts, however rarely `p` accepts. -/
+/-- `rejectUntil` reaches what `g` reaches and `p` accepts, however rarely `p` accepts. -/
 @[gen_rule]
-theorem le_may_suchThat {α : Type} {g : SPMF α} {p : α → Bool} {R post : α → Prop}
+theorem le_may_rejectUntil {α : Type} {g : SPMF α} {p : α → Bool} {R post : α → Prop}
     (hg : ∀ a, R a → mayObs.spec g (· = a)) :
-    (∃ a, (R a ∧ p a = true) ∧ post a) ≤ mayObs.spec (suchThat g p) post :=
+    (∃ a, (R a ∧ p a = true) ∧ post a) ≤ mayObs.spec (rejectUntil g p) post :=
   fun ⟨a, ⟨hR, hp⟩, hpost⟩ =>
-    ⟨a, mem_support_suchThat.mpr ⟨mem_support_iff_may.mpr (hg a hR), hp⟩, hpost⟩
+    ⟨a, mem_support_rejectUntil.mpr ⟨mem_support_iff_may.mpr (hg a hR), hp⟩, hpost⟩
 
 @[gen_rule]
 theorem le_may_permutationOf {α : Type} {xs : List α} {p : { ys // xs.Perm ys } → Prop} :
@@ -96,7 +97,6 @@ A retry loop reaches what its first draw does, at the size it starts from. -/
 
 section quickCheck
 
-open QuickCheck
 
 @[gen_rule]
 theorem le_may_sublistOf {α : Type} {xs : List α} {p : List α → Prop} :
@@ -106,7 +106,7 @@ theorem le_may_sublistOf {α : Type} {xs : List α} {p : List α → Prop} :
 /-- Every permutation, when there are keys enough to give each entry its own. -/
 @[gen_rule]
 theorem le_may_shuffle {α : Type} {xs : List α} {p : List α → Prop} :
-    (xs.length ≤ 2 ^ 64 ∧ ∃ ys, ys.Perm xs ∧ p ys) ≤ mayObs.spec (shuffle xs) p :=
+    (xs.length ≤ 2 ^ 63 ∧ ∃ ys, ys.Perm xs ∧ p ys) ≤ mayObs.spec (shuffle xs) p :=
   fun ⟨hn, ys, hys, hp⟩ => ⟨ys, mem_support_shuffle_of_perm hn hys, hp⟩
 
 variable {α β : Type} {gs : Nat → SPMF α} {f : α → Option β} {R : α → Prop}

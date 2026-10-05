@@ -41,13 +41,18 @@ the definition, and the definition is right here to run.
   `SPMF.Cost` to `SPMF`, is in `Laws.lean` beside the others.
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
 - **Sizes and QuickCheck's combinators** — a sized generator's law is stated at a size,
-  `(gen : WithSize SPMF α) n`, and `simp only [size_erasure]` evaluates it there, leaving a term
-  the walk proves as any other: the host constructs' and Basalt's combinators' equations are
-  [Basalt/Combinators/WithSize.lean](Basalt/Combinators/WithSize.lean), QuickCheck's are with them
-  in [Basalt/Combinators/QuickCheck.lean](Basalt/Combinators/QuickCheck.lean). Its retry loops
-  evaluate to the size-agnostic cores `trySizes` and `suchThatFrom`, whose rules sit with the other
-  combinators' in each judgment's file; [BasaltTest/Combinators/QuickCheck.lean](BasaltTest/Combinators/QuickCheck.lean)
-  proves every law of every combinator this way.
+  `(gen : WithSize SPMF α).run n`, and `simp only [size_erasure]` evaluates it there, leaving a
+  term the walk proves as any other. Running at a size is a homomorphism of generator monads
+  ([Basalt/SizeErasure.lean](Basalt/SizeErasure.lean)), and every combinator is natural in one
+  ([Basalt/GenHom.lean](Basalt/GenHom.lean)), which is its `GenRel` lemma read in both directions:
+  a new combinator needs its `GenRel` lemma and its `GenHom.map_` lemma, and nothing per size.
+  [BasaltTest/SizeErasure.lean](BasaltTest/SizeErasure.lean) pins both, combinator by combinator.
+  QuickCheck's combinators are in [Basalt/Combinators.lean](Basalt/Combinators.lean) under its
+  names: one that reads the size unfolds under `size_erasure`, the retry loops to the size-agnostic
+  cores `trySizes` and `suchThatFrom`, whose rules sit with the other combinators' in each
+  judgment's file. [Basalt/Combinators/Laws.lean](Basalt/Combinators/Laws.lean) has every law of
+  each, proved this way. `geometricListOf` and `rejectUntil` are the unbounded list and the plain
+  rejection loop, which read no size and keep rules of their own.
 - **Compiled choice** (`oneOf!`, `frequency!`) — the `compiled_choice` section of
   [Basalt/Combinators.lean](Basalt/Combinators.lean). Its contract (no list in the compiled code, the
   walk its model gets) is pinned by [BasaltTest/Combinators.lean](BasaltTest/Combinators.lean), and
@@ -200,8 +205,8 @@ the definition, and the definition is right here to run.
 
 - **A walk on a sized generator says a combinator's `@[gen_map]` lemma does not apply**
   (`` `Obs.map_elements` does not apply to alwaysObs.spec (elements … n) ``) — the generator is
-  still at `WithSize`, applied to its size, where no rule matches. `simp only [size_erasure]` first
-  ([Basalt/Combinators/WithSize.lean](Basalt/Combinators/WithSize.lean)).
+  still at `WithSize`, run at its size, where no rule matches. `simp only [size_erasure]` first
+  ([Basalt/SizeErasure.lean](Basalt/SizeErasure.lean)).
 
 - **`rw [support_oneOf]` (or `prob_frequency`, …) finds no occurrence in a goal that shows
   `oneOf! [...]`** — `oneOf!`/`frequency!` elaborate to `oneOfWith`/`frequencyWith`, which only

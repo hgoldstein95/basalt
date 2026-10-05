@@ -39,7 +39,7 @@ def Tree.insert (t : Tree Int) (x : Int) : Tree Int :=
 after another into the empty tree. -/
 def Tree.genBSTByInsertion [Gen G] (lo hi : Int) (h : lo ≤ hi := by gen_side_condition) :
     G (Tree Int) := do
-  let xs ← listOf (chooseInt lo hi h)
+  let xs ← geometricListOf (chooseInt lo hi h)
   return xs.foldl Tree.insert Tree.leaf
 
 /-! ## Support -/
@@ -165,23 +165,23 @@ theorem Tree.foldl_insert_replicate (lo : Int) (k : Nat) :
   | zero => rfl
   | succ k ih => simpa [List.replicate_succ, Tree.insert] using ih
 
-/-- `listOf` reaches `k` copies of `lo` in `2 * k + 1` choices. Unlike a `cost_bounded` law this is
-a *lower* bound — an exhibited run — which is what disproving a bound needs. -/
+/-- `geometricListOf` reaches `k` copies of `lo` in `2 * k + 1` choices. Unlike a `cost_bounded` law
+this is a *lower* bound — an exhibited run — which is what disproving a bound needs. -/
 private theorem cost_mem_replicate {lo hi : Int} (h : lo ≤ hi) (k : Nat) :
     (List.replicate k lo, 2 * k + 1) ∈
-      SPMF.support (listOf (chooseInt lo hi h) : SPMF.Cost (List Int)) := by
+      SPMF.support (geometricListOf (chooseInt lo hi h) : SPMF.Cost (List Int)) := by
   induction k with
-  | zero => rw [listOf, SPMF.Cost.mem_support_iff_may]; walk; exact .inl rfl
+  | zero => rw [geometricListOf, SPMF.Cost.mem_support_iff_may]; walk; exact .inl rfl
   | succ k ih =>
-    rw [listOf, SPMF.Cost.mem_support_iff_may]; walk
+    rw [geometricListOf, SPMF.Cost.mem_support_iff_may]; walk
     exact .inr ⟨lo, ⟨le_rfl, h⟩, _, _, ih, by simp [List.replicate_succ], by omega⟩
 
 /-- **There is no cost bound.** `IsCostBounded` charges a run to the value it produced, and this
 generator can spend any number of choices to produce `node leaf lo leaf` — drawing `lo` again is
 always possible and always absorbed. Bounding the *keys* with `chooseInt` does not help: what is
 unbounded is the number of insertions, not the size of each one. A bound does exist on the drawn
-list (`SPMF.Cost.le_always_listOf`), and insertion discards exactly the information it is stated
-in. -/
+list (`SPMF.Cost.le_always_geometricListOf`), and insertion discards exactly the information it is
+stated in. -/
 theorem Tree.genBSTByInsertion.not_cost_bounded {lo hi : Int} (h : lo ≤ hi) (c : Tree Int → Nat) :
     ¬ IsCostBounded (Tree.genBSTByInsertion lo hi h) c := by
   intro hb

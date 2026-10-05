@@ -61,7 +61,7 @@ h_xs✝ : n_xs✝ ≤ xs✝.length + (List.map (fun a => a + 1) xs✝).sum + 1
 ⊢ n_xs✝ + 0 ≤ xs✝.length + (List.map (fun x => x + 1) xs✝).sum + 1
 -/
 #guard_msgs in
-example : IsCostBounded (listOf Nat.arbitrary >>= fun xs => pure xs)
+example : IsCostBounded (geometricListOf Nat.arbitrary >>= fun xs => pure xs)
     (fun xs => xs.length + (xs.map (· + 1)).sum + 1) := by
   rw [IsCostBounded.iff_obs]
   walk [Nat.arbitrary.cost_bounded.obs]
@@ -162,7 +162,7 @@ error: no hypothesis or fact gives
 of a combinator's generator argument. Prove one and pass it to `walk [h.obs]`.
 -/
 #guard_msgs in
-example (g : SPMF.Cost Nat) : IsCostBounded (listOf g) (fun _ => 1) := by
+example (g : SPMF.Cost Nat) : IsCostBounded (geometricListOf g) (fun _ => 1) := by
   rw [IsCostBounded.iff_obs]
   walk
 
@@ -209,14 +209,14 @@ example : IsCostBounded
 
 /-- A cost bound the caller supplies for a combinator term is used when its rule fails, passed as a
 fact or stated on the observation in the context. -/
-example (g : SPMF.Cost Nat) (h : IsCostBounded (listOf g) fun _ => 5) :
-    IsCostBounded (listOf g >>= fun xs => pure xs) (fun _ => 5) := by
+example (g : SPMF.Cost Nat) (h : IsCostBounded (geometricListOf g) fun _ => 5) :
+    IsCostBounded (geometricListOf g >>= fun xs => pure xs) (fun _ => 5) := by
   rw [IsCostBounded.iff_obs]
   walk [h.obs]
   omega
 
-example (g : SPMF.Cost Nat) (h : SPMF.Cost.alwaysObs.spec (listOf g) fun _ n => n ≤ 5) :
-    IsCostBounded (listOf g) (fun _ => 5) := by
+example (g : SPMF.Cost Nat) (h : SPMF.Cost.alwaysObs.spec (geometricListOf g) fun _ n => n ≤ 5) :
+    IsCostBounded (geometricListOf g) (fun _ => 5) := by
   rw [IsCostBounded.iff_obs]
   walk
   omega
@@ -245,11 +245,11 @@ example (g : Int → Int → SPMF.Cost Nat)
 -- An unbounded list has no worst case, and nothing else bounds this one.
 /--
 error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
-  listOf (chooseNat 0 1 ⋯)
+  geometricListOf (chooseNat 0 1 ⋯)
 Pass a fact about it to `walk [_]`.
 -/
 #guard_msgs in
-example : SPMF.Cost.worstObs.spec (listOf (chooseNat 0 1) : SPMF.Cost (List Nat))
+example : SPMF.Cost.worstObs.spec (geometricListOf (chooseNat 0 1) : SPMF.Cost (List Nat))
     (fun _ n => (n : ℕ∞)) ≤ ⊤ := by
   walk
 
@@ -257,11 +257,11 @@ example : SPMF.Cost.worstObs.spec (listOf (chooseNat 0 1) : SPMF.Cost (List Nat)
 -- expected cost bounds it (`BasaltTest/Walk/ExpectedCost.lean`).
 /--
 error: no rule, `@[gen_map]` lemma, hypothesis, or fact bounds
-  suchThat (elements [0, 1] ⋯) fun x => x != 0
+  rejectUntil (elements [0, 1] ⋯) fun x => x != 0
 Pass a fact about it to `walk [_]`.
 -/
 #guard_msgs in
-example : IsCostBounded (suchThat (elements [0, 1]) (· != 0) : SPMF.Cost Nat) (fun _ => 1) := by
+example : IsCostBounded (rejectUntil (elements [0, 1]) (· != 0) : SPMF.Cost Nat) (fun _ => 1) := by
   rw [IsCostBounded.iff_obs]
   walk
 
