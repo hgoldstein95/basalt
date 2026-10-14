@@ -24,7 +24,7 @@ example : Outcome.ok 3 ∈ (backtrack pool).run.support :=
   mem_support_backtrack_of_branch pool (1, fun _ => pure 3) (by simp [pool]) (by decide) 3 (by simp)
 
 example (a : Nat) (h : Outcome.ok a ∈ (backtrack pool).run.support) : a = 3 ∨ a = 5 := by
-  obtain ⟨p, hp, hpa⟩ := mem_support_backtrack_ok pool a h
+  obtain ⟨p, hp, -, hpa⟩ := mem_support_backtrack_ok pool a h
   simp only [pool, List.mem_cons, List.not_mem_nil, or_false] at hp
   rcases hp with rfl | rfl | rfl <;> simp at hpa <;> omega
 
@@ -53,7 +53,7 @@ example : Outcome.refuted ∉ (refutedToExhausted (backtrack pool)).run.support 
 example {α : Type} (P : α → Prop) (gs : List (Nat × (Unit → BacktrackGen SPMF α)))
     (hbranch : ∀ p ∈ gs, ∀ a, Outcome.ok a ∈ (p.2 ()).run.support → P a) :
     ∀ a, Outcome.ok a ∈ (backtrack gs).run.support → P a := fun a h =>
-  let ⟨p, hp, hpa⟩ := mem_support_backtrack_ok gs a h
+  let ⟨p, hp, _, hpa⟩ := mem_support_backtrack_ok gs a h
   hbranch p hp a hpa
 
 -- The base instances reach every value.

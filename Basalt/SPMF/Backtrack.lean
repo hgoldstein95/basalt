@@ -42,15 +42,18 @@ theorem pickDrop_cons_ge (k : Nat) (g : β) (rest : List (Nat × β)) {n : Nat} 
          (k, g) :: (pickDrop rest (n - k)).2.2) := by
   simp [pickDrop, hk]
 
-/-- The selected entry is a member, or `default` when `n` overshoots the total weight. -/
+/-- The selected entry is a positive-weight member, or `default` when `n` overshoots the total
+weight: an entry is only ever selected because `n` fell strictly below its weight. -/
 theorem pickDrop_mem_or_default : ∀ (gs : List (Nat × β)) (n : Nat),
-    ((pickDrop gs n).1, (pickDrop gs n).2.1) ∈ gs ∨ (pickDrop gs n).2.1 = default
+    (((pickDrop gs n).1, (pickDrop gs n).2.1) ∈ gs ∧ 0 < (pickDrop gs n).1)
+      ∨ (pickDrop gs n).2.1 = default
   | [], _ => Or.inr rfl
   | (k, g) :: rest, n => by
     by_cases hk : n < k
-    · exact Or.inl (by simp [pickDrop, hk])
-    · rcases pickDrop_mem_or_default rest (n - k) with h | h
-      · exact Or.inl (by rw [pickDrop_cons_ge k g rest hk]; exact List.mem_cons_of_mem _ h)
+    · exact Or.inl ⟨by simp [pickDrop, hk], by simpa [pickDrop, hk] using Nat.lt_of_le_of_lt (Nat.zero_le n) hk⟩
+    · rcases pickDrop_mem_or_default rest (n - k) with ⟨h, h0⟩ | h
+      · exact Or.inl ⟨by rw [pickDrop_cons_ge k g rest hk]; exact List.mem_cons_of_mem _ h,
+          by rw [pickDrop_cons_ge k g rest hk]; exact h0⟩
       · exact Or.inr (by rw [pickDrop_cons_ge k g rest hk]; exact h)
 
 /-- Every positive-weight entry is selected by some offset inside the total weight. -/
@@ -137,7 +140,7 @@ theorem not_mem_support_default_run {a : α} :
 
 theorem mem_support_go_ok : ∀ (fuel total : Nat) (gs : List (Nat × (Unit → BacktrackGen SPMF α)))
     (flag : Bool) (a : α), Outcome.ok a ∈ (backtrack.go fuel total gs flag).support →
-      ∃ p ∈ gs, Outcome.ok a ∈ (p.2 ()).run.support
+      ∃ p ∈ gs, 0 < p.1 ∧ Outcome.ok a ∈ (p.2 ()).run.support
   | _, _, [], flag, a, h => by cases flag <;> simp [backtrack.go] at h
   | 0, _, _ :: _, _, a, h => by simp [backtrack.go] at h
   | fuel + 1, total, p :: rest, flag, a, h => by
@@ -146,19 +149,21 @@ theorem mem_support_go_ok : ∀ (fuel total : Nat) (gs : List (Nat × (Unit → 
     cases o with
     | ok a' =>
       obtain rfl : a = a' := by simpa using hres
-      rcases pickDrop_mem_or_default (p :: rest) n.down.val with hmem | hdef
-      · exact ⟨_, hmem, ho⟩
+      rcases pickDrop_mem_or_default (p :: rest) n.down.val with ⟨hmem, hpos⟩ | hdef
+      · exact ⟨_, hmem, hpos, ho⟩
       · exact absurd (hdef ▸ ho) not_mem_support_default_run
     | refuted =>
-      obtain ⟨q, hq, hqa⟩ := mem_support_go_ok fuel _ _ _ a hres
-      exact ⟨q, pickDrop_rest_subset _ _ _ hq, hqa⟩
+      obtain ⟨q, hq, hq0, hqa⟩ := mem_support_go_ok fuel _ _ _ a hres
+      exact ⟨q, pickDrop_rest_subset _ _ _ hq, hq0, hqa⟩
     | exhausted =>
-      obtain ⟨q, hq, hqa⟩ := mem_support_go_ok fuel _ _ _ a hres
-      exact ⟨q, pickDrop_rest_subset _ _ _ hq, hqa⟩
+      obtain ⟨q, hq, hq0, hqa⟩ := mem_support_go_ok fuel _ _ _ a hres
+      exact ⟨q, pickDrop_rest_subset _ _ _ hq, hq0, hqa⟩
 
-/-- **Soundness.** A success of `backtrack` is a success of one of its branches. -/
+/-- **Soundness.** A success of `backtrack` is a success of one of its *positive-weight* branches:
+`pickDrop` only ever selects an entry `n` fell strictly below, so the witness is live. -/
 theorem mem_support_backtrack_ok (gs : List (Nat × (Unit → BacktrackGen SPMF α))) (a : α)
-    (h : Outcome.ok a ∈ (backtrack gs).run.support) : ∃ p ∈ gs, Outcome.ok a ∈ (p.2 ()).run.support :=
+    (h : Outcome.ok a ∈ (backtrack gs).run.support) :
+    ∃ p ∈ gs, 0 < p.1 ∧ Outcome.ok a ∈ (p.2 ()).run.support :=
   mem_support_go_ok gs.length (sumWeights gs) gs false a h
 
 /-- **Completeness**, for positive-weight branches: a zero-weight branch is never drawn. -/
@@ -176,7 +181,8 @@ theorem mem_support_backtrack_of_branch (gs : List (Nat × (Unit → BacktrackGe
 theorem mem_support_backtrack_ok_iff (gs : List (Nat × (Unit → BacktrackGen SPMF α))) (a : α)
     (hpos : ∀ p ∈ gs, 0 < p.1) :
     Outcome.ok a ∈ (backtrack gs).run.support ↔ ∃ p ∈ gs, Outcome.ok a ∈ (p.2 ()).run.support :=
-  ⟨mem_support_backtrack_ok gs a, fun ⟨p, hp, h⟩ => mem_support_backtrack_of_branch gs p hp (hpos p hp) a h⟩
+  ⟨fun h => (mem_support_backtrack_ok gs a h).imp fun _ ⟨hp, _, hx⟩ => ⟨hp, hx⟩,
+   fun ⟨p, hp, h⟩ => mem_support_backtrack_of_branch gs p hp (hpos p hp) a h⟩
 
 /-! ## Refutations -/
 
