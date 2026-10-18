@@ -3,7 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Basic
+module
+
+import Basalt.Order
+public import Basalt.SPMF.Basic
 
 /-!
 # Expected Values and Event Probabilities
@@ -12,6 +15,8 @@ import Basalt.SPMF.Basic
 (the probability of an event): their monad equations, their order and support properties, and
 continuity of `expect` along a chain. Every other fact about a distribution is read off these.
 -/
+
+@[expose] public section
 
 open Lean.Order RandomChoice NNReal ENNReal
 
@@ -247,7 +252,7 @@ where every expectation is `0`, so a lower bound cannot ride `fix_induct` — pr
 inducting on an index of the event instead (`prob_listOf_length`). -/
 theorem admissible_expect_le (f : α → ℝ≥0∞) (B : ℝ≥0∞) :
     admissible (fun (p : SPMF α) => expect p f ≤ B) := by
-  intro c hc ih
+  refine admissible_iff.2 fun c hc ih => ?_
   rw [expect_csup]
   exact iSup₂_le ih
 

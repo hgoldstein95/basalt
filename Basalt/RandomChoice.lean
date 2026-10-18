@@ -3,11 +3,16 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+module
+
+
 /-!
 # Abstracting Over Random Choices
 
 This file defines a type class and associated operations for random choices.
 -/
+
+@[expose] public section
 
 class RandomChoice (m : Type u → Type v) where
   /-- An inclusive choice over a nonempty range of natural numbers. -/

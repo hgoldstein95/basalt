@@ -3,16 +3,22 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.AllTwoTree
-import BasaltExamples.BST
-import BasaltExamples.BST.Weighted
+module
+
+public import Basalt
+public import BasaltExamples.AllTwoTree
+meta import BasaltExamples.AllTwoTree
+public import BasaltExamples.BST
+public import BasaltExamples.BST.Weighted
+meta import BasaltExamples.BST.Weighted
 
 /-!
 # `#genstats` Examples
 
 `#genstats` draws from a generator and summarizes its distribution
 -/
+
+@[expose] public section
 
 open RandomChoice
 

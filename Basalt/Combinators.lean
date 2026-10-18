@@ -3,9 +3,12 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import Lean.Elab.ElabRules
-import Basalt.Gen
-import Basalt.RandomChoice
+module
+
+public meta import Lean.Elab.ElabRules
+public import Basalt.Gen
+import Basalt.Order
+public import Basalt.RandomChoice
 
 /-!
 # Generator Combinators
@@ -14,6 +17,8 @@ Derived combinators (`chooseNat`, `elements`, `oneOf`, `frequency`, `listOf`, �
 `RandomChoice.choose`, and `oneOf!`/`frequency!`, which run a literal choice as a chain of tests
 while every proof sees the combinator.
 -/
+
+@[expose] public section
 
 open Lean.Order
 
@@ -233,7 +238,7 @@ open Lean Meta in
 (`oneOf_eq_chain` or `frequency_eq_chain`) at the draw's bound `hi`, with the continuation's body
 replaced by `chain` of the drawn `Nat`. The draw is the model's own term, so the chain starts with the
 model's bind. -/
-private def mkChainImpl (eqChain : Name) (model hi : Expr) (chain : Expr → MetaM Expr) :
+private meta def mkChainImpl (eqChain : Name) (model hi : Expr) (chain : Expr → MetaM Expr) :
     MetaM (Expr × Expr) := do
   let hEq := mkAppN (mkConst eqChain model.getAppFn.constLevels!)
     (model.getAppArgs.extract 0 5 ++ #[hi, ← mkEqRefl hi])
@@ -250,20 +255,20 @@ private def mkChainImpl (eqChain : Name) (model hi : Expr) (chain : Expr → Met
 open Lean in
 /-- `e` with the `let`s along its list spine substituted: a list literal of eight or more entries
 elaborates to one, its tails `let`-bound. -/
-private partial def zetaSpine : Expr → Expr
+private meta partial def zetaSpine : Expr → Expr
   | .letE _ _ v b _ => zetaSpine (b.instantiate1 v)
   | e => if e.isAppOfArity ``List.cons 3 then mkApp e.appFn! (zetaSpine e.appArg!) else e
 
 open Lean Meta in
 /-- `e`, a `c` of five arguments, with its list argument's spine free of `let`s. -/
-private def literalModel? (c : Name) (e : Expr) : MetaM (Option Expr) := do
+private meta def literalModel? (c : Name) (e : Expr) : MetaM (Option Expr) := do
   let e ← instantiateMVars e
   unless e.isAppOfArity c 5 do return none
   return some (mkAppN e.getAppFn (e.getAppArgs.modify 3 zetaSpine))
 
 open Lean Meta in
 /-- `oneOf gs hne` for a literal `gs`, as `oneOfWith gs hne impl h`; `none` for any other term. -/
-def mkOneOfWith? (e : Expr) : MetaM (Option Expr) := do
+meta def mkOneOfWith? (e : Expr) : MetaM (Option Expr) := do
   let some e ← literalModel? ``oneOf e | return none
   let some (_, gs) := e.appFn!.appArg!.listLit? | return none
   let some last := gs.getLast? | return none
@@ -281,7 +286,7 @@ open Lean Meta in
 Literal weights give literal running totals; any other weight is summed as `frequencyChain`
 unfolds it, `0 + w₀ + w₁ + …`, which is all that makes the chain an instance of
 `frequency_eq_chain` when the weights are not closed. -/
-def mkFrequencyWith? (e : Expr) : MetaM (Option Expr) := do
+meta def mkFrequencyWith? (e : Expr) : MetaM (Option Expr) := do
   let some e ← literalModel? ``frequency e | return none
   let some (_, ps) := e.appFn!.appArg!.listLit? | return none
   let mut branches : Array (Expr × Expr) := #[]
@@ -314,7 +319,7 @@ syntax (name := frequencyBang) "frequency! " "[" term,+ "]" (ppSpace colGt term:
 
 open Lean Elab Term in
 @[term_elab oneOfBang]
-def elabOneOfBang : TermElab := fun stx ty? => do
+meta def elabOneOfBang : TermElab := fun stx ty? => do
   let `(oneOf! [$gs,*]) := stx | throwUnsupportedSyntax
   let e ← elabTermEnsuringType (← `(oneOf [$gs,*] (List.cons_ne_nil _ _))) ty?
   let some e' ← mkOneOfWith? e | throwError "oneOf!: expected a `oneOf` of a literal list"
@@ -322,7 +327,7 @@ def elabOneOfBang : TermElab := fun stx ty? => do
 
 open Lean Elab Term in
 @[term_elab frequencyBang]
-def elabFrequencyBang : TermElab := fun stx ty? => do
+meta def elabFrequencyBang : TermElab := fun stx ty? => do
   let `(frequency! [$ps,*] $[$h]?) := stx | throwUnsupportedSyntax
   let model ← match h with
     | some h => `(frequency [$ps,*] $h)
@@ -333,12 +338,12 @@ def elabFrequencyBang : TermElab := fun stx ty? => do
   return e'
 
 @[app_unexpander oneOfWith]
-def unexpandOneOfWith : Lean.PrettyPrinter.Unexpander
+meta def unexpandOneOfWith : Lean.PrettyPrinter.Unexpander
   | `($_ [$gs,*] $_ $_ $_) => `(oneOf! [$gs,*])
   | _ => throw ()
 
 @[app_unexpander frequencyWith]
-def unexpandFrequencyWith : Lean.PrettyPrinter.Unexpander
+meta def unexpandFrequencyWith : Lean.PrettyPrinter.Unexpander
   | `($_ [$ps,*] $_ $_ $_) => `(frequency! [$ps,*])
   | _ => throw ()
 
@@ -349,7 +354,7 @@ section monotonicity
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
 - `l1.length = l2.length`
 - `l1[i] ⊑ l2[i]` for all list elements (here we are comparing them using the `PartialOrder` on `α`) -/
-private instance List.instPartialOrderPointwise {α : Type u} [PartialOrder α] :
+local instance List.instPartialOrderPointwise {α : Type u} [PartialOrder α] :
     PartialOrder (List α) where
   rel l1 l2 :=
     l1.length = l2.length ∧
@@ -385,7 +390,7 @@ private instance List.instPartialOrderPointwise {α : Type u} [PartialOrder α] 
 `w1 = w2 ∧ g1 ⊑ g2`. The weights must be *equal*, not `≤` — raising one branch's weight lowers every
 other branch's probability, so under `w1 ≤ w2` the `frequency` combinator would not be monotone in
 `⊑` on `SPMF`. -/
-private instance instPartialOrderConstFst {α : Type u} [PartialOrder α] : PartialOrder (Nat × α) where
+local instance instPartialOrderConstFst {α : Type u} [PartialOrder α] : PartialOrder (Nat × α) where
   rel p q := p.1 = q.1 ∧ p.2 ⊑ q.2
   rel_refl := by
     intro p
@@ -661,8 +666,7 @@ theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
   generalize hw : listOf (g y) = w
   delta listOf
   apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
-  · intro c hc hall
-    apply Lean.Order.csup_le <;> assumption
+  · exact Lean.Order.admissible_iff.2 fun _ hc hall => Lean.Order.csup_le hc hall
   · intro z hz
     subst hw
     unfold listOf
@@ -689,8 +693,7 @@ theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
   generalize hw : nonEmptyListOf (g y) = w
   delta nonEmptyListOf
   apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
-  · intro c hc hall
-    apply Lean.Order.csup_le <;> assumption
+  · exact Lean.Order.admissible_iff.2 fun _ hc hall => Lean.Order.csup_le hc hall
   · intro z hz
     subst hw
     unfold nonEmptyListOf
@@ -728,8 +731,7 @@ theorem monotone_suchThat [Gen G] {γ : Sort w} [PartialOrder γ]
   generalize hw : suchThat (g y) p = w
   delta suchThat
   apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
-  · intro c hc hall
-    apply Lean.Order.csup_le <;> assumption
+  · exact Lean.Order.admissible_iff.2 fun _ hc hall => Lean.Order.csup_le hc hall
   · intro z hz
     subst hw
     unfold suchThat

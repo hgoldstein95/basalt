@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbNat
+module
+
+public import Basalt
+public import BasaltExamples.ArbNat
 
 /-!
 # Min-Heaps
@@ -16,6 +18,8 @@ recursing on *two* children makes the mean offspring exactly `1`, so this is a *
 generator: almost surely terminating, with no finite bound on its expected cost
 (`Tree.genHeap.not_expected_cost_bounded`).
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 

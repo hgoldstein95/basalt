@@ -3,12 +3,16 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import Basalt.Combinators
+module
+
+public import Basalt
+public import Basalt.Combinators
 
 /-!
 # Binary Search Trees
 -/
+
+@[expose] public section
 
 open RandomChoice
 

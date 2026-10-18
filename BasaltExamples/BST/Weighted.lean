@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
+module
+
+public import Basalt
+public import BasaltExamples.BST
 
 /-!
 # Weighted Binary Search Trees
@@ -19,6 +21,8 @@ applies. Termination instead goes through a ranking function on the seed `(lo, h
 fact that the interval genuinely shrinks. The machinery (`bstLevel`, `bstRank`) lives here since it
 is used nowhere else, instantiated at recursion weight `w = 5/6` and drift `ε = 1/6`.
 -/
+
+@[expose] public section
 
 open RandomChoice
 open SPMF

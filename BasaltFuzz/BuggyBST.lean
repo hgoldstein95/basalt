@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Combinators
-import Basalt.PBT.Property
+module
+
+public import Basalt.Combinators
+public import Basalt.PBT.Property
 
 /-!
 # A worked fuzzing target: binary search trees with buggy operations
@@ -19,6 +21,8 @@ everything it imports, and that module imports the `Basalt` umbrella for its pro
 Mathlib (`fuzz-run/README.md`). `genBST` is the one declaration held identical to the original, and
 `BasaltTest/Fuzz.lean` pins that.
 -/
+
+@[expose] public section
 
 namespace BuggyBST
 

@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Combinators
-import BasaltExamples.ArbNat
+module
+
+public import Basalt.Combinators
+public import BasaltExamples.ArbNat
 
 /-!
 # Leftist Heaps
@@ -15,6 +17,8 @@ generator builds both children independently and then puts the higher-rank one o
 `if` is the only difference from `genHeap` — including in the termination proof, which is
 **critical** in the same way and the same text.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 

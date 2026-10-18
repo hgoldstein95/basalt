@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+public import Basalt
 
 /-!
 # One Lemma per Combinator
@@ -12,6 +14,8 @@ Pins the contract of `Basalt/Obs/`: a combinator the library knows nothing about
 lemma, and each judgment about it, at either interpretation, is that lemma read through an
 observation and a presentation of its choice.
 -/
+
+@[expose] public section
 
 open RandomChoice SPMF ENNReal
 

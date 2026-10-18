@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.IO.Ideal
-import Basalt.Walk.Expect
-import Basalt.Tactic.MassFixpoint
+module
+
+public import Basalt.IO.Ideal
+public import Basalt.Walk.Expect
+public import Basalt.Tactic.MassFixpoint
 
 /-!
 # Uniform Words Make a Uniform Choice
@@ -13,6 +15,8 @@ import Basalt.Tactic.MassFixpoint
 SplitMix's range reduction on uniform words is `SPMF`'s `choose` (`chooseVia_uniformWord`): the
 step that carries the ideal law from one word to a whole draw (`IdealSource.below_choose`).
 -/
+
+public section
 
 open RandomChoice ENNReal
 
@@ -109,7 +113,7 @@ section rejection
 variable {N R : Nat}
 
 /-- `{x // x ≤ R}` as the `Fin` it is. -/
-private def finEquivLe (R : Nat) : Fin (R + 1) ≃ {x // x ≤ R} where
+def finEquivLe (R : Nat) : Fin (R + 1) ≃ {x // x ≤ R} where
   toFun i := ⟨i.val, Nat.lt_succ_iff.mp i.isLt⟩
   invFun x := ⟨x.val, Nat.lt_succ_of_le x.property⟩
   left_inv _ := rfl

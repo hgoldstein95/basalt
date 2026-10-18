@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Data.ENat.Lattice
-import Basalt.RandomChoice
-import Basalt.SPMF.Support
+module
+
+public import Mathlib.Data.ENat.Lattice
+public import Basalt.RandomChoice
+public import Basalt.SPMF.Support
 
 /-!
 # Cost-Tracking SPMF
@@ -14,6 +16,8 @@ import Basalt.SPMF.Support
 Its observations land in `WPC`, whose `bind` and `choose` do the cost accounting, so a combinator's
 lemma is its `Obs.map_*` read through one of them.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

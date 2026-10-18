@@ -3,11 +3,14 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.GenRel
-import Basalt.IO.SplitMix
-import Basalt.SPMF.Expect.Obs
-import Basalt.SPMF.Mass
-import Basalt.Walk.Attr
+module
+
+public import Basalt.GenRel
+public import Basalt.IO.SplitMix
+import Basalt.Order
+public import Basalt.SPMF.Expect.Obs
+public import Basalt.SPMF.Mass
+public import Basalt.Walk.Attr
 
 /-!
 # The Ideal PRNG
@@ -16,6 +19,8 @@ import Basalt.Walk.Attr
 `y` at `SPMF` expects no more of any continuation than `x` at `WordModel σ` delivers on it; for a
 terminating `y` that makes `x`'s distribution `y`'s (`dist_eq`).
 -/
+
+public section
 
 open RandomChoice ENNReal
 
@@ -120,6 +125,7 @@ theorem below_word : src.Below uniformWord fun s => some (WordSource.next s) := 
 /-- Fixpoint induction on the `SPMF` side needs nothing of `E`: `expect` is continuous. -/
 theorem Below.admissible (x : WordModel σ α) :
     Lean.Order.admissible fun y : SPMF α => src.Below y x := by
+  rw [Lean.Order.admissible_iff]
   intro c hc ih G
   show expect _ _ ≤ _
   rw [expect_csup]

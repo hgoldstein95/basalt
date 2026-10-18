@@ -3,15 +3,19 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks, Harrison Goldstein
 -/
-import Basalt.IO
-import Basalt.PBT.Property
-import Basalt.PlausibleGen
+module
+
+public import Basalt.IO
+public import Basalt.PBT.Property
+public import Basalt.PlausibleGen
 
 /-!
 # Running a Campaign
 
 A campaign runs a property until it fails or a run budget is exhausted.
 -/
+
+public section
 
 namespace Basalt.PBT
 

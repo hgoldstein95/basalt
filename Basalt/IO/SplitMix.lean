@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.RandomChoice
-import SplitMix.Native
+module
+
+public import Basalt.RandomChoice
+public import SplitMix.Native
 
 /-!
 # SplitMix's Range Reduction
@@ -14,6 +16,8 @@ import SplitMix.Native
 terminates is `randNatRef`'s (`WordModel.choose_run_splitMix`, `Basalt/IO/Approx.lean`), and on
 uniform ones it is `SPMF`'s (`Basalt/IO/Choose.lean`).
 -/
+
+@[expose] public section
 
 section via
 

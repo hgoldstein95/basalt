@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Fuzz.Basic
-import Basalt.PBT.Driver
+module
+
+public import Basalt.Fuzz.Basic
+public import Basalt.PBT.Driver
 
 /-!
 # Running a property under libFuzzer
@@ -14,6 +16,8 @@ closure, and libFuzzer calls back into `runOneIO` once per mutated input. A fail
 through `Basalt.PBT`'s shared failure contract and then crashes the process, which is how libFuzzer
 saves the input as an artifact; `replay` consumes one.
 -/
+
+public section
 
 namespace Basalt.Fuzz
 

@@ -3,12 +3,17 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
+module
+
+
 /-!
 # STLC Syntax and Typing
 
 Syntax, contexts, and the typing judgement for the simply-typed lambda calculus extended with
 Bools, along with lemmas relating the `lookup` judgement to `List` indexing.
 -/
+
+@[expose] public section
 
 /-- Types are just Bool or function types -/
 inductive Ty where
@@ -24,7 +29,7 @@ instance : LawfulBEq Ty := by infer_instance
 /-- Pretty-prints a `Ty`. Arrows are right-associative, so a function type on the
     left of an arrow gets parenthesized but one on the right does not
     (`(Bool → Bool) → Bool` vs. `Bool → Bool → Bool`). -/
-private def Ty.reprPrec (τ : Ty) (prec : Nat) : Std.Format :=
+def Ty.reprPrec (τ : Ty) (prec : Nat) : Std.Format :=
   match τ with
   | .Bool => "Bool"
   | .Fun τ1 τ2 =>
@@ -53,7 +58,7 @@ inductive Term where
       printed at the atomic level while the function (left child) stays at the
       application level;
     * variables and Boolean literals (`2`) are atomic and never parenthesized. -/
-private def Term.reprPrec (t : Term) (prec : Nat) : Std.Format :=
+def Term.reprPrec (t : Term) (prec : Nat) : Std.Format :=
   match t with
   | .Bool b => if b then "true" else "false"
   | .Var n => "#" ++ repr n

@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Obs.Ordered
-import Basalt.SPMF.Expect.Obs
+module
+
+public import Basalt.Obs.Ordered
+public import Basalt.SPMF.Expect.Obs
 
 /-!
 # Bounding an Average
@@ -13,6 +15,8 @@ The walker's rules for the shapes of choice in `Mix.average`, in both directions
 bounds bounds the average. They are shared by every judgment about an expectation, at either
 interpretation.
 -/
+
+@[expose] public section
 
 open ENNReal
 

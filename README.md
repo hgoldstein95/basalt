@@ -117,6 +117,15 @@ lake build BasaltExamples # the cookbook
 lake build BasaltTest     # regression tests
 ```
 
+### Using Basalt from a module
+
+Basalt is written in Lean's module system; a file that is not a `module` imports it as before. In a
+`module`:
+
+- A generator proved about from another module must be exposed (`@[expose]`).
+- Running a generator at elaboration time (`#eval`, `#genstats`) needs a `meta import` of each module
+  whose code runs.
+
 ### Coverage-guided fuzzing (opt-in)
 
 `basalt-fuzz` drives generators from libFuzzer instead of a PRNG. It links native code, so building

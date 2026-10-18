@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.IO.Approx
-import Basalt.IO.Ideal
-import Basalt.Laws
+module
+
+public import Basalt.IO.Approx
+public import Basalt.IO.Ideal
+public import Basalt.Laws
 
 /-!
 # The Law Relating `IO` to `SPMF`
@@ -13,6 +15,8 @@ import Basalt.Laws
 `IsFaithful`, the one law that relates two interpretations of a generator rather than constraining
 one. The others are `Basalt/Laws.lean`'s.
 -/
+
+@[expose] public section
 
 /-- A generator `gen` `IsFaithful` if, run on any ideal source of words, it has its `SPMF`
 distribution (`IsFaithful.dist`), and at `IO` it does what it does at `IOModel` wherever that

@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+public import Basalt
 
 /-!
 # Non-Empty Lists by Filtering
@@ -13,6 +15,8 @@ only a `1 / (n + 1)` share of its draws, so the retries add a constant to its ex
 (`genNonEmpty.cost`); compare `BST/ByFiltering.lean`, whose source is only known to accept its
 leaves.
 -/
+
+@[expose] public section
 
 open RandomChoice
 open scoped ENNReal

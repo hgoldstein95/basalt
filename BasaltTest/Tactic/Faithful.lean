@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
+module
+
+public import Basalt
+public import BasaltExamples.BST
 
 /-!
 # The `faithful_fixpoint` Contract
@@ -12,6 +14,8 @@ import BasaltExamples.BST
 Pins how `faithful_fixpoint` takes a callee's `IsFaithful` law: whole, whether its arguments are
 implicit or quantified explicitly.
 -/
+
+@[expose] public section
 
 namespace FaithfulFixpointTest
 

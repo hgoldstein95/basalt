@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Lean.Elab.Command
-import Lean.Elab.SyntheticMVars
-import Basalt.GenStats.Basic
+module
+
+public meta import Lean.Elab.Command
+public meta import Lean.Elab.SyntheticMVars
+public import Basalt.GenStats.Basic
 
 /-!
 # The `#genstats` Command
@@ -14,6 +16,8 @@ import Basalt.GenStats.Basic
 outcomes, size and choice-count distributions, diversity, and samples. The options are documented on
 `genStatsCmd`.
 -/
+
+public meta section
 
 open Lean Elab Command Meta
 

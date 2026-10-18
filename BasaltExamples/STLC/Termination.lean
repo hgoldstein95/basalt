@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import Basalt
-import BasaltExamples.STLC.GenTerm
+module
+
+public import Basalt
+public import BasaltExamples.STLC.GenTerm
 
 /-!
 # Almost-Sure Termination for `genTerm`
@@ -14,6 +16,8 @@ application (two recursive calls), and an abstraction (one), so its mean offspri
 terminates almost surely; its expected cost has no finite bound
 (`genTerm.not_expected_cost_bounded`, `STLC/Cost.lean`).
 -/
+
+@[expose] public section
 
 theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by
   induction τ generalizing Γ with

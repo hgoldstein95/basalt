@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
+module
+
+public import Basalt
+public import BasaltExamples.BST
 
 /-!
 # Binary Search Trees by Insertion
@@ -19,6 +21,8 @@ inherent rather than an artifact of a loose bound: the draw has no length limit,
 collapse arbitrarily long draws onto the same tree, so no cost function of the output tree can exist
 (`Tree.genBSTByInsertion.not_cost_bounded`).
 -/
+
+@[expose] public section
 
 open RandomChoice
 

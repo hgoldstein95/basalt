@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Combinators
-import Basalt.Gen
+module
+
+public import Basalt.Combinators
+public import Basalt.Gen
 
 /-!
 # Arbitrary Characters (definitions)
@@ -13,6 +15,8 @@ The generator definition for `ArbChar`, split from its proofs (`BasaltExamples/A
 that `ArbString` can depend on just the definition. `Char.arbitrary` draws a uniformly random
 alphanumeric character with the `elements` combinator.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import Basalt
-import BasaltExamples.STLC.GenTerm
-import BasaltExamples.STLC.Termination
-import BasaltExamples.STLC.TypeCheck
+module
+
+public import Basalt
+public import BasaltExamples.STLC.GenTerm
+public import BasaltExamples.STLC.Termination
+public import BasaltExamples.STLC.TypeCheck
 
 /-!
 # Cost Bounds for `genTerm`
@@ -15,6 +17,8 @@ import BasaltExamples.STLC.TypeCheck
 context, and the proof carries well-typedness alongside the cost. Yet no finite bound holds of its
 expected cost (`genTerm.not_expected_cost_bounded`).
 -/
+
+@[expose] public section
 
 /-- The choices `genTerm Γ` makes to produce a term: one `oneOf` per node, one more for a literal or
 a variable, and `argTy.size` for the argument type an application draws.

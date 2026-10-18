@@ -3,10 +3,13 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import Basalt.Combinators
-import BasaltExamples.BST
-import BasaltExamples.BST.Weighted
+module
+
+public import Basalt
+public import Basalt.Combinators
+public import BasaltExamples.BST
+public import BasaltExamples.BST.Weighted
+meta import BasaltExamples.BST.Weighted
 
 /-!
 # `@[tunable]` Examples
@@ -27,6 +30,8 @@ alongside it. This file exercises the whole contract:
 
 `genWeightedBST` is written with `frequency!`; section 9 has the other recursion forms.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

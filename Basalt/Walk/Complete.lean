@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Cost
-import Basalt.Walk.Attr
+module
+
+public import Basalt.SPMF.Cost
+public import Basalt.Walk.Attr
 
 /-!
 # Walking Completeness
@@ -15,6 +17,8 @@ how a fact about a sub-generator closes a leaf, and the rules of the list combin
 (`IsCompleteFor.of_measure`), so there is no admissibility here, and a recursive occurrence is left
 in the precondition as itself.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

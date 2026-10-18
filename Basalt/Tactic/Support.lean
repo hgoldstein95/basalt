@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Cost
+module
+
+public import Basalt.SPMF.Cost
 
 /-!
 # Proof-Recipe Tactics
@@ -12,6 +14,8 @@ Packaged `simp only` sets for support inversion: `support_simp` at the `SPMF` in
 `cost_support_simp` at `SPMF.Cost`. Both accept extra simp lemmas and an optional location,
 like `simp only`.
 -/
+
+@[expose] public section
 
 open Lean.Parser.Tactic
 

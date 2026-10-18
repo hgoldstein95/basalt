@@ -3,63 +3,65 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Combinators
-import Basalt.Gen
-import Basalt.GenRel
-import Basalt.GenStats.Basic
-import Basalt.GenStats.Command
-import Basalt.IO
-import Basalt.IO.Approx
-import Basalt.IO.Choose
-import Basalt.IO.Faithful
-import Basalt.IO.Ideal
-import Basalt.IO.Laws
-import Basalt.IO.SplitMix
-import Basalt.IO.Stream
-import Basalt.Laws
-import Basalt.Obs.Basic
-import Basalt.Obs.Combinators
-import Basalt.Obs.Ordered
-import Basalt.Obs.Presentation
-import Basalt.Obs.Spec
-import Basalt.OptionT
-import Basalt.PBT.Backend
-import Basalt.PBT.Campaign
-import Basalt.PBT.Driver
-import Basalt.PBT.Property
-import Basalt.PlausibleGen
-import Basalt.Random
-import Basalt.RandomChoice
-import Basalt.SPMF.Basic
-import Basalt.SPMF.Cost
-import Basalt.SPMF.CostErasure
-import Basalt.SPMF.Expect.Basic
-import Basalt.SPMF.Expect.Combinators
-import Basalt.SPMF.Expect.Obs
-import Basalt.SPMF.Mass
-import Basalt.SPMF.Ranking
-import Basalt.SPMF.Support
-import Basalt.SPMF.Termination
-import Basalt.Sized
-import Basalt.Tactic.ENNReal
-import Basalt.Tactic.Faithful
-import Basalt.Tactic.MassFixpoint
-import Basalt.Tactic.Support
-import Basalt.Tuning.Attr
-import Basalt.Tuning.Basic
-import Basalt.Walk.Attr
-import Basalt.Walk.Average
-import Basalt.Walk.Basic
-import Basalt.Walk.Complete
-import Basalt.Walk.Cost
-import Basalt.Walk.CostErasure
-import Basalt.Walk.Entry
-import Basalt.Walk.Expect
-import Basalt.Walk.ExpectedCost
-import Basalt.Walk.IO
-import Basalt.Walk.Ideal
-import Basalt.Walk.Mass
-import Basalt.Walk.Sound
+module
+
+public import Basalt.Combinators
+public import Basalt.Gen
+public import Basalt.GenRel
+public import Basalt.GenStats.Basic
+public import Basalt.GenStats.Command
+public import Basalt.IO
+public import Basalt.IO.Approx
+public import Basalt.IO.Choose
+public import Basalt.IO.Faithful
+public import Basalt.IO.Ideal
+public import Basalt.IO.Laws
+public import Basalt.IO.SplitMix
+public import Basalt.IO.Stream
+public import Basalt.Laws
+public import Basalt.Obs.Basic
+public import Basalt.Obs.Combinators
+public import Basalt.Obs.Ordered
+public import Basalt.Obs.Presentation
+public import Basalt.Obs.Spec
+public import Basalt.OptionT
+public import Basalt.PBT.Backend
+public import Basalt.PBT.Campaign
+public import Basalt.PBT.Driver
+public import Basalt.PBT.Property
+public import Basalt.PlausibleGen
+public import Basalt.Random
+public import Basalt.RandomChoice
+public import Basalt.SPMF.Basic
+public import Basalt.SPMF.Cost
+public import Basalt.SPMF.CostErasure
+public import Basalt.SPMF.Expect.Basic
+public import Basalt.SPMF.Expect.Combinators
+public import Basalt.SPMF.Expect.Obs
+public import Basalt.SPMF.Mass
+public import Basalt.SPMF.Ranking
+public import Basalt.SPMF.Support
+public import Basalt.SPMF.Termination
+public import Basalt.Sized
+public import Basalt.Tactic.ENNReal
+public import Basalt.Tactic.Faithful
+public import Basalt.Tactic.MassFixpoint
+public import Basalt.Tactic.Support
+public import Basalt.Tuning.Attr
+public import Basalt.Tuning.Basic
+public import Basalt.Walk.Attr
+public import Basalt.Walk.Average
+public import Basalt.Walk.Basic
+public import Basalt.Walk.Complete
+public import Basalt.Walk.Cost
+public import Basalt.Walk.CostErasure
+public import Basalt.Walk.Entry
+public import Basalt.Walk.Expect
+public import Basalt.Walk.ExpectedCost
+public import Basalt.Walk.IO
+public import Basalt.Walk.Ideal
+public import Basalt.Walk.Mass
+public import Basalt.Walk.Sound
 
 /-!
 # Basalt

@@ -3,11 +3,13 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Lean.Meta.Match.MatcherApp.Transform
-import Lean.Meta.Tactic.Assumption
-import Lean.Elab.Tactic.Simproc
-import Lean.Meta.Tactic.Simp.Main
-import Basalt.Walk.Attr
+module
+
+public meta import Lean.Meta.Match.MatcherApp.Transform
+public meta import Lean.Meta.Tactic.Assumption
+public meta import Lean.Elab.Tactic.Simproc
+public meta import Lean.Meta.Tactic.Simp.Main
+public meta import Basalt.Walk.Attr
 
 /-!
 # Entering a `match`
@@ -16,6 +18,8 @@ A `match` is walked by one lemma per matcher, `m.walk_congr`, which relates two 
 the matcher alternative by alternative. On a bound, the bound is made the same `match` over a fresh
 bound per alternative, as `spec_ite_le` makes it an `if`.
 -/
+
+public meta section
 
 open Lean Meta
 

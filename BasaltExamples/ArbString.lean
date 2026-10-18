@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Batteries.Data.Char
-import Basalt
-import BasaltExamples.ArbChar
-import BasaltExamples.ArbString.Def
+module
+
+public import Batteries.Data.Char
+public import Basalt
+public import BasaltExamples.ArbChar
+public import BasaltExamples.ArbString.Def
 
 /-!
 # Arbitrary Strings
@@ -16,6 +18,8 @@ alphanumeric string. Each property is proved first for the underlying `genCharLi
 transported across `String.ofList`. The `genCharList` proofs mirror `List.arbitrary`'s, with
 `Char.arbitrary` in place of `Nat.arbitrary`.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbChar
 

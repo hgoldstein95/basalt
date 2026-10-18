@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Combinators
-import Basalt.PBT.Property
+module
+
+public import Basalt.Combinators
+public import Basalt.PBT.Property
 
 /-!
 # A microbenchmark that separates the backends
@@ -22,6 +24,8 @@ Do not add an import that reaches Mathlib (the `Basalt` umbrella does): the `bas
 links this module, and the failure is a native link error from `fuzz-run/build.sh`, not from
 `lake build`.
 -/
+
+@[expose] public section
 
 namespace Staged
 

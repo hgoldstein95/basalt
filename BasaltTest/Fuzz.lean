@@ -3,10 +3,14 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Combinators
-import Basalt.Fuzz.Runner
-import BasaltExamples.BST
-import BasaltFuzz.BuggyBST
+module
+
+public import Basalt.Combinators
+public import Basalt.Fuzz.Runner
+meta import Basalt.Fuzz.Runner
+public import BasaltExamples.BST
+meta import BasaltExamples.BST
+public import BasaltFuzz.BuggyBST
 
 /-!
 # `FuzzGen` regression tests
@@ -14,6 +18,8 @@ import BasaltFuzz.BuggyBST
 Deterministic checks of the byte → choice mapping, run purely (no fuzzer): `runOne` on fixed byte
 arrays must produce fixed outcomes. Pins the contract that a corpus byte maps to a specific choice.
 -/
+
+@[expose] public section
 
 open Basalt.Fuzz Basalt.PBT RandomChoice
 

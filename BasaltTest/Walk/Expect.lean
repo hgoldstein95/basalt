@@ -3,15 +3,19 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbNat
-import BasaltExamples.BST
+module
+
+public import Basalt
+public import BasaltExamples.ArbNat
+public import BasaltExamples.BST
 
 /-!
 # The Expectation Walk Contract
 
 Pins the arithmetic goal `walk` leaves on an upper bound `SPMF.expectObs.spec g f ≤ B`.
 -/
+
+@[expose] public section
 
 open RandomChoice ENNReal ArbNat BST
 

@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
-import BasaltExamples.Heap
-import BasaltExamples.SortedList
+module
+
+public import Basalt
+public import BasaltExamples.BST
+public import BasaltExamples.Heap
+public import BasaltExamples.SortedList
 
 /-!
 # The Completeness Walk Contract
@@ -15,6 +17,8 @@ Pins the precondition `walk` leaves on `SPMF.mayObs.spec`: an `∃` per draw und
 names, the refuted branches pruned and the surviving ones not chosen between, and a recursive
 occurrence left as itself.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 

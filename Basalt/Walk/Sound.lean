@@ -3,8 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Support
-import Basalt.Walk.Attr
+module
+
+import Basalt.Order
+public import Basalt.SPMF.Support
+public import Basalt.Walk.Attr
 
 /-!
 # Walking Soundness
@@ -14,12 +17,15 @@ fact about a sub-generator closes a leaf, the rules of the list combinators and 
 the admissibility `walk fixpoint` inducts with.
 -/
 
+@[expose] public section
+
 open RandomChoice
 
 namespace SPMF
 
 open Lean.Order in
 theorem alwaysObs.admissible (P : α → Prop) : admissible fun x : SPMF α => alwaysObs.spec x P := by
+  rw [Lean.Order.admissible_iff]
   intro c hc ih a ha
   rw [mem_support_csup hc] at ha
   obtain ⟨x, hxc, hxa⟩ := ha

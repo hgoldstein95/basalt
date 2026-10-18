@@ -3,6 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+module
+
+
 /-!
 # Exactly Uniform Draws from `StdGen`
 
@@ -10,6 +13,8 @@ Authors: Harrison Goldstein
 rejection instead of core's `randNat` modulo, so every value in range is equally likely given the
 generator.
 -/
+
+public section
 
 /-- The number of distinct values one `stdNext` returns. -/
 private def stdSpan : Nat := stdRange.2 - stdRange.1 + 1

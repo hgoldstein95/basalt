@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbList
-import BasaltExamples.BST
+module
+
+public import Basalt
+public import BasaltExamples.ArbList
+public import BasaltExamples.BST
 
 /-!
 # The Cost-Erasure Walk Contract
@@ -13,6 +15,8 @@ import BasaltExamples.BST
 Pins how `walk fixpoint` proves the two fields of `IsCostFaithful`, `SPMF.Cost.ErasedLe` and
 `SPMF.Cost.LeErased`: construct by construct, with a callee's law passed by its fields.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat ArbList BST
 
