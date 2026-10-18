@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.IO.Laws
-import Basalt.Walk.IO
-import Basalt.Walk.Ideal
-import Basalt.Walk.Entry
+module
+
+public import Basalt.IO.Laws
+public import Basalt.Walk.IO
+public import Basalt.Walk.Ideal
+public import Basalt.Walk.Entry
 
 /-!
 # Proving a Generator Faithful
@@ -14,6 +16,8 @@ import Basalt.Walk.Entry
 `faithful_fixpoint` proves `IsFaithful (gen …)` field by field: termination by a fact passed to it,
 and the two relations by `walk fixpoint`.
 -/
+
+@[expose] public section
 
 open Lean Meta Elab Tactic Basalt.Walk
 

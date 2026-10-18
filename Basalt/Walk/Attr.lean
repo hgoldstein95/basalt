@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Lean.Elab.InfoTree.Main
-import Lean.Meta.Basic
-import Lean.Meta.Tactic.Simp.Attr
-import Basalt.Obs.Basic
+module
+
+public meta import Lean.Elab.InfoTree.Main
+public meta import Lean.Meta.Basic
+public meta import Lean.Meta.Tactic.Simp.Attr
+public import Basalt.Obs.Basic
 
 /-!
 # The Walker's Judgments and Registries
@@ -18,6 +20,9 @@ lemmas, keyed by combinator; the `@[obs_leaf]` lemmas, keyed by observation; the
 simp set; and the `@[gen_branches]` relations. Each attribute reads its key off the statement it
 tags, and fails on one it cannot.
 -/
+
+public meta section
+
 open Lean Meta
 
 namespace Basalt.Walk

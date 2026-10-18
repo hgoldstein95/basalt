@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Order.Basic
-import Basalt.Obs.Combinators
+module
+
+public import Mathlib.Order.Basic
+public import Basalt.Obs.Combinators
 
 /-!
 # Observations into an Ordered Algebra
@@ -12,6 +14,8 @@ import Basalt.Obs.Combinators
 Rules for a bound `O.spec g post ≤ b` or `b ≤ O.spec g post` A combinator with a `@[gen_map]` lemma
 needs no rule here; its bound is its shape's, in the algebra.
 -/
+
+@[expose] public section
 
 /-- Branch-wise bounds for a weighted choice, each paired with its weight, so that the bound computed
 from them is free of the branches themselves (which under a `dite` carry the branch's proof). `r`

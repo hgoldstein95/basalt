@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.MeasureTheory.Measure.Dirac.Basic
-import Mathlib.Topology.Instances.ENNReal.Lemmas
-import Basalt.RandomChoice
+module
+
+public import Mathlib.MeasureTheory.Measure.Dirac.Basic
+public import Mathlib.Topology.Instances.ENNReal.Lemmas
+public import Basalt.RandomChoice
 
 /-!
 # Sub-Probability Mass Functions
@@ -14,6 +16,8 @@ This file defines a type of sub-probability mass functions, similar to `PMF` fro
 `support` (the values with nonzero mass) and its `mass` (the total probability of producing a value,
 as opposed to diverging — always ≤ 1).
 -/
+
+@[expose] public section
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 

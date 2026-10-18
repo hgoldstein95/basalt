@@ -3,9 +3,13 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Batteries.Data.Char
-import Basalt
-import BasaltExamples.ArbChar.Def
+module
+
+public import Batteries.Data.Char
+meta import Batteries.Data.Char.Basic
+public import Basalt
+public import BasaltExamples.ArbChar.Def
+meta import BasaltExamples.ArbChar.Def
 
 /-!
 # Arbitrary Characters
@@ -14,6 +18,8 @@ Correctness proofs for `Char.arbitrary` (defined in `BasaltExamples/ArbChar.Def`
 uniformly random alphanumeric character. Because it is a single `elements` draw over a fixed list,
 it is not recursive: it always terminates and costs exactly one choice.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

@@ -3,6 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+module
+
 
 /-!
 # Tuning: runtime-addressable generator weights
@@ -20,6 +22,8 @@ be exploratory near the root and subcritical deep in the recursion.
 `Tuning.weight` clamps every branch to a weight of at least 1, so a runtime `θ` can never zero one
 out. To prune a branch, the user must remove it from the `frequency`.
 -/
+
+@[expose] public section
 
 /-- A weight schedule per branch: entry `(aⱼ, bⱼ)` denotes the depth-indexed weight
 `wⱼ(d) = max aⱼ 1 + bⱼ · d`; a constant weight is `(a, 0)`. The schedules of all sites of one

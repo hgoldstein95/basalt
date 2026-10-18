@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.RandomChoice
+module
+
+public import Basalt.RandomChoice
 
 /-!
 # Observations
@@ -11,6 +13,8 @@ import Basalt.RandomChoice
 An `Obs G W` is a `choose`-preserving monad morphism from a generator monad `G` into a specification
 monad `W`.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

@@ -3,9 +3,14 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.GenRel
-import Basalt.IO
-import Basalt.Walk.Attr
+module
+
+import all Init.Internal.Order.Basic
+import all Init.System.IO
+import all Init.System.ST
+public import Basalt.GenRel
+public import Basalt.IO
+public import Basalt.Walk.Attr
 
 /-!
 # `IO` Runs `IOModel`
@@ -15,6 +20,8 @@ wherever `m` terminates the `IO` action `x` does what `m` does run against `ioGe
 generator's `IsFaithful.approx` is this relation between it at `IOModel` and at `IO`, which
 `walk fixpoint` proves.
 -/
+
+@[expose] public section
 
 open Lean.Order
 

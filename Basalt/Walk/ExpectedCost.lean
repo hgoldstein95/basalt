@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Cost
-import Basalt.Walk.Average
+module
+
+public import Basalt.SPMF.Cost
+public import Basalt.Walk.Average
 
 /-!
 # Walking Expected-Cost Bounds
@@ -14,6 +16,8 @@ What the walk needs of a bound on `SPMF.Cost.expectObs.spec g f`, on which
 sub-generator closes a leaf in either direction, the rules of the list combinators and of
 `suchThat`, and the admissibility `walk fixpoint` inducts with for an upper bound.
 -/
+
+@[expose] public section
 
 open ENNReal RandomChoice
 

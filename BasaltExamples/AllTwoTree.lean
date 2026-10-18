@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+public import Basalt
 
 /-!
 # Trees of All Twos
@@ -17,6 +19,8 @@ the *same* shape:
 - `genWeightedTree` uses `frequency` to make the leaf branch twice as likely (mean offspring `2/3`),
   making it **subcritical**, with expected cost at most `3` (`genWeightedTree.cost`).
 -/
+
+@[expose] public section
 
 open RandomChoice
 

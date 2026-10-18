@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbList
-import BasaltExamples.SortedList
+module
+
+public import Basalt
+public import BasaltExamples.ArbList
+public import BasaltExamples.SortedList
 
 /-!
 # Sorted Lists by Sorting
@@ -17,6 +19,8 @@ import BasaltExamples.SortedList
 post-processing step over a generator whose laws are already proved, none of its three proofs needs
 `fix_induct` or an induction on the generated value.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

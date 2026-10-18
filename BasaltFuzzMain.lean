@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Combinators
-import Basalt.Fuzz.Runner
-import BasaltFuzz.BuggyBST
-import BasaltFuzz.Staged
+module
+
+public import Basalt.Combinators
+public import Basalt.Fuzz.Runner
+public import BasaltFuzz.BuggyBST
+public import BasaltFuzz.Staged
 
 /-!
 # `basalt-fuzz` executable entry point
@@ -15,6 +17,8 @@ Lean owns `main`: `PBT.dispatch` selects a named property and a backend and runs
 module and everything it imports must stay Mathlib-free, since the executable links whatever it
 imports; it is built by `fuzz-run/build.sh`, never by the default `lake build`.
 -/
+
+@[expose] public section
 
 open Basalt.Fuzz Basalt.PBT RandomChoice
 

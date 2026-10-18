@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.GenRel
-import Basalt.IO.Choose
-import Basalt.IO.Ideal
-import Basalt.Walk.Attr
+module
+
+public import Basalt.GenRel
+public import Basalt.IO.Choose
+public import Basalt.IO.Ideal
+public import Basalt.Walk.Attr
 
 /-!
 # Walking the Ideal Source
@@ -14,6 +16,8 @@ import Basalt.Walk.Attr
 The rules by which `walk` relates a generator at `SPMF` to the same generator at `WordModel σ`,
 `src.Below (gen …) (gen …)`: each combinator's is `GenRel`'s.
 -/
+
+@[expose] public section
 
 namespace IdealSource
 

@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Data.List.Forall2
-import Basalt.GenRel
-import Basalt.IO.Approx
-import Basalt.Walk.Attr
+module
+
+public import Mathlib.Data.List.Forall2
+public import Basalt.GenRel
+public import Basalt.IO.Approx
+public import Basalt.Walk.Attr
 
 /-!
 # Walking `IO` Against `IOModel`
@@ -14,6 +16,8 @@ import Basalt.Walk.Attr
 The rules by which `walk` relates a generator at `IOModel` to the same generator at `IO`,
 `IOModel.Approx (gen …) (gen …)`: each combinator's is `GenRel`'s.
 -/
+
+@[expose] public section
 
 namespace IOModel
 

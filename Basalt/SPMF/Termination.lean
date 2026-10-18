@@ -3,14 +3,18 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Mass
-import Basalt.Tactic.ENNReal
+module
+
+public import Basalt.SPMF.Mass
+public import Basalt.Tactic.ENNReal
 
 /-!
 # Almost-Sure Termination
 
 Tools for proving almost-sure termination of Basalt generators.
 -/
+
+@[expose] public section
 
 open ENNReal RandomChoice
 

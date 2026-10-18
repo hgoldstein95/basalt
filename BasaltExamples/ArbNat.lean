@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+public import Basalt
 
 /-!
 # Arbitrary Natural Numbers
@@ -12,6 +14,8 @@ import Basalt
 whether to increment. It is the simplest recursive generator in the cookbook and a building block
 for several others (`ArbList`, `SortedList`, `Heap`).
 -/
+
+@[expose] public section
 
 open RandomChoice
 

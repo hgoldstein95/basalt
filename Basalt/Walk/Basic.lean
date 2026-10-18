@@ -3,31 +3,35 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Lean.Elab.SyntheticMVars
-import Lean.Elab.Tactic.Basic
-import Lean.Elab.Tactic.NormCast
-import Lean.Meta.CtorRecognizer
-import Lean.Meta.Match.MatcherApp.Basic
-import Lean.Meta.RecExt
-import Lean.Meta.Tactic.AC.Main
-import Lean.Meta.Tactic.Assumption
-import Lean.Meta.Tactic.NormCast
-import Lean.Meta.Tactic.Replace
-import Lean.Meta.Transform
-import Batteries.Data.List.Basic
-import Mathlib.Algebra.Group.Monoid
-import Mathlib.Data.Nat.Cast.Defs
-import Mathlib.Order.Defs.PartialOrder
-import Basalt.Obs.Ordered
-import Basalt.Walk.Attr
-import Basalt.Walk.Match
-import Basalt.Walk.Names
+module
+
+public meta import Lean.Elab.SyntheticMVars
+public meta import Lean.Elab.Tactic.Basic
+public meta import Lean.Elab.Tactic.NormCast
+public meta import Lean.Meta.CtorRecognizer
+public meta import Lean.Meta.Match.MatcherApp.Basic
+public meta import Lean.Meta.RecExt
+public meta import Lean.Meta.Tactic.AC.Main
+public meta import Lean.Meta.Tactic.Assumption
+public meta import Lean.Meta.Tactic.NormCast
+public meta import Lean.Meta.Tactic.Replace
+public meta import Lean.Meta.Transform
+public import Batteries.Data.List.Basic
+public import Mathlib.Algebra.Group.Monoid
+public import Mathlib.Data.Nat.Cast.Defs
+public import Mathlib.Order.Defs.PartialOrder
+public import Basalt.Obs.Ordered
+public meta import Basalt.Walk.Attr
+public meta import Basalt.Walk.Match
+public meta import Basalt.Walk.Names
 
 /-!
 # The Generator Walker
 
 Proves a judgment about a generator by structural recursion on its syntax.
 -/
+
+public meta section
 
 open Lean Meta Elab Tactic
 
@@ -356,6 +360,11 @@ def fixpointSeed? (gen : Name) : MetaM (Option (Name × Array Nat)) := do
   let (_, _, concl) ← forallMetaTelescope (← inferType (← mkConstWithFreshMVarLevels ind))
   let F := concl.appArg!
   return some (ind, ← forallTelescope (← whnf (← inferType F)) fun ys _ => do
+    if ← ys.anyM fun y => return (← y.fvarId!.getDecl).binderInfo.isInstImplicit then
+      throwError "`{gen}`'s fixpoint abstracts its instance arguments, so its induction ranges \
+        over every interpretation at once: a `by` proof in its body names a recursive call, and a \
+        module abstracts such a proof out of an exposed definition. Set \
+        `backward.proofsInPublic true` where `{gen}` is defined, or give the proof as a term."
     let body := (mkAppN F ys).headBeta
     ys.mapM fun y => do
       let some k := body.getAppArgs.findIdx? (· == y)

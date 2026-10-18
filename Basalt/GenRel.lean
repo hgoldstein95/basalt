@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Data.List.Forall2
-import Basalt.Combinators
-import Basalt.Walk.Attr
+module
+
+public import Mathlib.Data.List.Forall2
+public import Basalt.Combinators
+public import Basalt.Walk.Attr
 
 /-!
 # One Generator at Two Monads
@@ -15,6 +17,8 @@ constructs, a draw, `default` on the `M` side, and fixpoint induction on it. Eve
 relates itself at the two monads (`GenRel.listOf`, …), proved once for every such `R`: a relational
 judgment's rules are instances of these.
 -/
+
+@[expose] public section
 
 open Lean.Order
 

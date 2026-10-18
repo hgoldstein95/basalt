@@ -3,9 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Data.ENat.Lattice
-import Basalt.SPMF.Cost
-import Basalt.Walk.Entry
+module
+
+public import Mathlib.Data.ENat.Lattice
+import Basalt.Order
+public import Basalt.SPMF.Cost
+public import Basalt.Walk.Entry
 
 /-!
 # Walking Cost Bounds
@@ -17,6 +20,8 @@ term, which a list combinator falls back on when no fact bounds its argument, is
 `SPMF.Cost.worstObs` in the `sup` algebra.
 -/
 
+@[expose] public section
+
 open RandomChoice
 
 namespace SPMF.Cost
@@ -24,6 +29,7 @@ namespace SPMF.Cost
 open Lean.Order in
 theorem alwaysObs.admissible (Q : α → Nat → Prop) :
     admissible fun x : SPMF.Cost α => alwaysObs.spec x Q := by
+  rw [Lean.Order.admissible_iff]
   intro c hc ih p hp
   rw [SPMF.mem_support_csup hc] at hp
   obtain ⟨x, hxc, hxp⟩ := hp

@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import Basalt
-import BasaltExamples.STLC.Syntax
+module
+
+public import Basalt
+public import BasaltExamples.STLC.Syntax
 
 /-!
 # Arbitrary STLC Types
@@ -13,6 +15,8 @@ import BasaltExamples.STLC.Syntax
 critical, like `AllTwoTree.genTree`: almost surely terminating, with no finite bound on its expected
 cost (`genType.not_expected_cost_bounded`).
 -/
+
+@[expose] public section
 
 open RandomChoice
 

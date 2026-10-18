@@ -3,8 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Obs.Presentation
-import Basalt.SPMF.Expect.Obs
+module
+
+public import Basalt.Obs.Presentation
+import Basalt.Order
+public import Basalt.SPMF.Expect.Obs
 
 /-!
 # SPMF Support
@@ -14,6 +17,8 @@ on monad notation, which is what do-notation elaborates to; the may and always o
 from them; and the support laws of the list combinators, which the walker's rules bridge. A
 combinator's support is otherwise not a lemma: it is what `walk` computes from its `Obs.map_*`.
 -/
+
+@[expose] public section
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
@@ -443,7 +448,7 @@ theorem mem_support_suchThat {g : SPMF α} {p : α → Bool} {a : α} :
     a ∈ (suchThat g p).support ↔ a ∈ g.support ∧ p a = true := by
   have key : ∀ a ∈ (suchThat g p).support, a ∈ g.support ∧ p a = true := by
     refine suchThat.fixpoint_induct g p (fun x => ∀ a ∈ x.support, a ∈ g.support ∧ p a = true)
-      (fun c hc ih a ha => ?_) (fun z ih a ha => ?_)
+      (admissible_iff.2 fun c hc ih a ha => ?_) (fun z ih a ha => ?_)
     · obtain ⟨x, hxc, hxa⟩ := (mem_support_csup hc).mp ha
       exact ih x hxc a hxa
     · obtain ⟨b, hb, hab⟩ := mem_support_bind_iff.mp ha

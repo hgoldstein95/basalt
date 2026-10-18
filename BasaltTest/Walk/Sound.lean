@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
-import BasaltExamples.Heap
-import BasaltExamples.LeftistHeap
+module
+
+public import Basalt
+public import BasaltExamples.BST
+public import BasaltExamples.Heap
+public import BasaltExamples.LeftistHeap
 
 /-!
 # The Soundness Walk Contract
@@ -15,6 +17,8 @@ Pins the step `walk fixpoint` leaves on `SPMF.alwaysObs.spec`: the recursive fun
 the generator, `ih` over the arguments its recursive calls change, and one goal per path, stated on
 the value the path built under the generator's own names.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

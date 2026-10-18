@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.GenRel
-import Basalt.SPMF.CostErasure
-import Basalt.Walk.Attr
+module
+
+public import Basalt.GenRel
+public import Basalt.SPMF.CostErasure
+public import Basalt.Walk.Attr
 
 /-!
 # Walking Cost Erasure
@@ -14,6 +16,8 @@ The rules by which `walk` relates a generator at `SPMF.Cost` to the same generat
 each direction, `ErasedLe (gen …) (gen …)` and `LeErased (gen …) (gen …)`: each combinator's is
 `GenRel`'s.
 -/
+
+@[expose] public section
 
 namespace SPMF.Cost
 

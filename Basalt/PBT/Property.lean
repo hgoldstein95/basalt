@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks, Harrison Goldstein
 -/
-import Basalt.Gen
+module
+
+public import Basalt.Gen
 
 /-!
 # Properties
@@ -20,6 +22,8 @@ def prop [Gen G] : Property := do
   check (xs.take k ++ xs.drop k == xs) s!"xs={xs}, k={k}"
 ```
 -/
+
+@[expose] public section
 
 namespace Basalt.PBT
 
@@ -70,7 +74,7 @@ def implies [Gen G] (c : Bool) (p : PropM G Unit) : PropM G Unit := do
 @[inherit_doc] scoped infixr:55 " ==> " => implies
 
 /-- Prefix `outer` to `inner`, which may be the empty message a bare `check` leaves. -/
-private def joinDetail (outer inner : String) : String :=
+def joinDetail (outer inner : String) : String :=
   if inner.isEmpty then outer else s!"{outer}, {inner}"
 
 /-- Draw from `gen` and check `p` of the result, naming the drawn value in the counterexample. -/

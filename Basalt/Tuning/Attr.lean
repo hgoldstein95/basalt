@@ -3,10 +3,14 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Lean.Elab.Command
-import Lean.Elab.Tactic.Monotonicity
-import Basalt.Combinators
-import Basalt.Tuning.Basic
+module
+
+public meta import Lean.Elab.Command
+public meta import Lean.Elab.Tactic.Monotonicity
+public import Basalt.Combinators
+public meta import Basalt.Combinators
+public import Basalt.Tuning.Basic
+public meta import Basalt.Tuning.Basic
 
 /-!
 # The `@[tunable]` attribute
@@ -51,6 +55,8 @@ the attribute emits:
 - **`partial_fixpoint` bodies**: the attribute rebuilds `Lean.Order.fix`'s monotonicity proof for
   the tuned body, so a combinator used there still needs its `@[partial_fixpoint_monotone]` lemma.
 -/
+
+public meta section
 
 open Lean Meta Elab
 

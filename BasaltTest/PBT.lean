@@ -3,9 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Combinators
-import Basalt.PBT.Driver
-import BasaltExamples.BST.ByInsertion
+module
+
+public import Basalt.Combinators
+public import Basalt.PBT.Driver
+public import BasaltExamples.BST.ByInsertion
+meta import BasaltExamples.BST.ByInsertion
 
 /-!
 # Property-testing regression tests
@@ -13,6 +16,8 @@ import BasaltExamples.BST.ByInsertion
 Campaigns whose outcome cannot depend on the random draw — the properties below either ignore their
 input or draw from a singleton range — so the report is pinned at every backend.
 -/
+
+@[expose] public section
 
 open Basalt.PBT RandomChoice
 

@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Support
+module
+
+public import Basalt.SPMF.Support
 
 /-!
 # SPMF Mass
@@ -11,6 +13,8 @@ import Basalt.SPMF.Support
 The equations of `SPMF.mass` for each combinator, each the combinator's expectation equation at the
 postcondition `1`.
 -/
+
+@[expose] public section
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 

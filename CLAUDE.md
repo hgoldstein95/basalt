@@ -21,7 +21,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 `lake build` *is* the test suite and a regression is a build failure.
 
 **To see how a generator behaves, run it.** It is executable as written: put `#genstats` in a
-scratch file that imports the generator's module, and run `lake lean <file>`. There is no need to
+scratch file that imports the generator's module, and run `lake lean <file>`. A scratch file that is
+itself a `module` also needs a `meta import` of that module. There is no need to
 re-implement a generator in Python or another language to simulate it: the copy is unchecked against
 the definition, and the definition is right here to run.
 
@@ -202,6 +203,15 @@ the definition, and the definition is right here to run.
   change to the lakefile — the file was run with `lake env lean`, which does not load the `splitmix`
   dependency's native code. Run it with `lake lean <file>` instead; the lakefile is fine.
 
+- **`#eval` in a `module` aborts Lean** (`libc++abi: terminating`, with `IR of declaration … not
+  available` or `Could not find native implementation of external declaration …`) — the evaluated
+  code reaches a module that was imported without `meta`. Add a `meta import` of each module whose
+  code runs, as the `BasaltTest/` files that `#eval` do.
+
+- **`intro` on a `Lean.Order.admissible` goal fails with "no additional binders"** — core does not
+  expose `admissible`, so a module cannot see that it is a `∀`. `rw [Lean.Order.admissible_iff]`
+  first ([Basalt/Order.lean](Basalt/Order.lean)).
+
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
   `ennreal_to_real` ([Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean)) and finish over `ℝ`.
 
@@ -236,12 +246,19 @@ the definition, and the definition is right here to run.
 
 ## Conventions
 
-- Every module opens with the MIT copyright header and a `/-! # … -/` module docstring, sized and
-  scoped per the documentation rules above.
+- Every file is a `module`: the MIT copyright header, `module`, the imports, a `/-! # … -/` module
+  docstring sized and scoped per the documentation rules above, then its section. That is
+  `@[expose] public section` where proofs unfold the module's definitions (generators,
+  interpretations, combinators, laws), `public section` for runtime plumbing whose bodies no proof
+  reads, and `public meta section` for a pure metaprogram; a metaprogram's helpers in an ordinary
+  module are marked `meta`.
 - Imports: the narrowest module that supplies what the file names, never an umbrella — `Basalt.lean`
   is the only wholesale import of the library and nothing inside the library may import it. Upstream
   imports (`Lean`, `Batteries`, `Mathlib`, `Plausible`) come first, then Basalt's, each block
-  alphabetical. An import whose only use is inside a macro body or a `@[gen_rule]` registry is
+  alphabetical. An import is `public` when the module's statements name it, plain when only its
+  proofs do, and `meta` when its code runs at elaboration time (`#eval`, `native_decide`, a
+  tactic); `import all` is only for a core module whose hidden definitions a proof must see. An
+  import whose only use is inside a macro body or a `@[gen_rule]` registry is
   load-bearing at the tactic's *use* sites, so it stays even though the module compiles without it.
 - `BasaltExamples/` files are cookbook entries: a generator plus proofs of the correctness
   properties that apply to it, nothing else — no `#eval`/`#guard_msgs`. Anything pinned or run

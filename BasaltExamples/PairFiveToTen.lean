@@ -1,4 +1,10 @@
-import Basalt
+
+module
+
+public import Basalt
+
+
+@[expose] public section
 
 open RandomChoice
 

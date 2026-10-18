@@ -3,11 +3,13 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Basic.ENNReal.Inv
-import Mathlib.Basic.ENNReal.Real
-import Mathlib.Tactic.Bound
-import Mathlib.Tactic.Finiteness
-import Mathlib.Tactic.Positivity
+module
+
+public import Mathlib.Basic.ENNReal.Inv
+public import Mathlib.Basic.ENNReal.Real
+public import Mathlib.Tactic.Bound
+public import Mathlib.Tactic.Finiteness
+public import Mathlib.Tactic.Positivity
 
 /-!
 # ENNReal proof automation
@@ -20,6 +22,8 @@ import Mathlib.Tactic.Positivity
    with side conditions discharged by the extended `finiteness`. Finish with
    `norm_num` / `linarith` / `nlinarith` / `field_simp`.
 -/
+
+@[expose] public section
 
 open scoped ENNReal NNReal
 

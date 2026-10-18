@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Combinators
-import Basalt.Gen
-import BasaltExamples.ArbChar.Def
+module
+
+public import Basalt.Combinators
+public import Basalt.Gen
+public import BasaltExamples.ArbChar.Def
 
 /-!
 # Arbitrary Strings (definitions)
@@ -15,6 +17,8 @@ The generator definitions for `ArbString`, split from their proofs
 recursive generator of alphanumeric character lists with the same subcritical shape as
 `List.arbitrary`.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbChar
 

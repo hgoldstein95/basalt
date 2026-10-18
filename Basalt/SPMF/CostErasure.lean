@@ -3,9 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.GenRel
-import Basalt.SPMF.Cost
-import Basalt.Walk.Attr
+module
+
+public import Basalt.GenRel
+import Basalt.Order
+public import Basalt.SPMF.Cost
+public import Basalt.Walk.Attr
 
 /-!
 # Erasing Costs
@@ -14,6 +17,8 @@ A generator run at `SPMF.Cost` and at `SPMF` should have one distribution once i
 dropped. That is a free theorem, so it is proved per generator, as the two inequalities fixpoint
 induction can prove: `ErasedLe` by induction at `SPMF.Cost`, `LeErased` at `SPMF`.
 -/
+
+@[expose] public section
 
 open RandomChoice ENNReal
 
@@ -97,6 +102,7 @@ theorem erasedLe_choose (lo hi : Nat) (h : lo ≤ hi) :
 /-- Fixpoint induction on the `SPMF.Cost` side: `expect` is continuous. -/
 theorem ErasedLe.admissible (x : SPMF α) :
     Lean.Order.admissible fun y : SPMF.Cost α => ErasedLe y x := by
+  rw [Lean.Order.admissible_iff]
   intro c hc ih f
   show SPMF.expect _ _ ≤ _
   rw [SPMF.expect_csup]
@@ -148,6 +154,7 @@ theorem leErased_choose (lo hi : Nat) (h : lo ≤ hi) :
 /-- Fixpoint induction on the `SPMF` side: `expect` is continuous. -/
 theorem LeErased.admissible (y : SPMF.Cost α) :
     Lean.Order.admissible fun x : SPMF α => LeErased x y := by
+  rw [Lean.Order.admissible_iff]
   intro c hc ih f
   show SPMF.expect _ _ ≤ _
   rw [SPMF.expect_csup]

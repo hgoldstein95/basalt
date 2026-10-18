@@ -3,13 +3,17 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import BasaltExamples.STLC.Syntax
+module
+
+public import BasaltExamples.STLC.Syntax
 
 /-!
 # STLC typechecker
 
 A STLC typechecker, proved sound and complete with respect to the `Typing` judgement.
 -/
+
+@[expose] public section
 
 /-- Typechecks a term `e` in context `Γ`, return a type if typechecking succeeds.
     Adapted from the STLC typechecker in Software Foundations: https://softwarefoundations.cis.upenn.edu/plf-current/Typechecking.html -/

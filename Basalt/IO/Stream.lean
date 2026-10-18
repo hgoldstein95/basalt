@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Probability.ProductMeasure
-import Basalt.IO.Ideal
-import Basalt.IO.Laws
+module
+
+public import Mathlib.Probability.ProductMeasure
+public import Basalt.IO.Ideal
+public import Basalt.IO.Laws
 
 /-!
 # Streams of Uniform Words
@@ -14,6 +16,8 @@ An infinite stream of independent uniform words is an `IdealSource` (`WordStream
 `IsFaithful`, which quantifies over ideal sources, is not vacuous (`IsFaithful.wordStream`). `E` is
 the lower Lebesgue integral, which has what `IdealSource` asks of every function, measurable or not.
 -/
+
+public section
 
 open MeasureTheory ENNReal
 

@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Plausible.Gen
-import Basalt.Gen
+module
+
+public import Plausible.Gen
+public import Basalt.Gen
 
 /-!
 # Plausible Gen as a Basalt Generator
@@ -17,6 +19,8 @@ Plausible's `Gen` for executable property-based testing.
 
 - `Gen Plausible.Gen` — The `Gen` instance for Plausible's `Gen` monad.
 -/
+
+@[expose] public section
 
 open Lean.Order
 

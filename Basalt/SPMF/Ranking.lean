@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Termination
+module
+
+public import Basalt.SPMF.Termination
 
 /-!
 # Ranking-Function Termination
@@ -13,6 +15,8 @@ whose expected value drops by `ε` under a level operator `SPMF.LevelOp` forces 
 bound's least fixed point to `1`. The union bounds that discharge its deficit condition live here
 too.
 -/
+
+@[expose] public section
 
 open ENNReal
 

@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Batteries.Data.List.Basic
-import Basalt.Obs.Ordered
+module
+
+public import Batteries.Data.List.Basic
+public import Basalt.Obs.Ordered
 
 /-!
 # Presentations of a Choice in `Prop`
@@ -15,6 +17,8 @@ index, a weighted selection), demonically (`Mix.demonic`, a `∀`) and angelical
 splits the choice pointwise instead (`Mix.le_demonic_threshold`) has no demonic presentation. These
 are facts about quantifiers over a range, not about combinators.
 -/
+
+@[expose] public section
 
 namespace Mix
 

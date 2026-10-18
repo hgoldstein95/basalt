@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+public import Basalt
 
 /-!
 # A Derived Combinator With No Law
@@ -12,6 +14,8 @@ import Basalt
 lemma and no law, so a walk has to unfold and traverse their bodies. `BasaltTest/Walk/Mass.lean`
 and `BasaltTest/Walk/Cost.lean` pin that path.
 -/
+
+@[expose] public section
 
 open Lean.Order RandomChoice
 

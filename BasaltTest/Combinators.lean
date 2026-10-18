@@ -3,7 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+public import Basalt
+meta import Basalt
 
 /-!
 # Facts about the combinators
@@ -13,6 +16,8 @@ pinned here as regression tests, a check that `oneOf`, and the deprecated `pick`
 under `partial_fixpoint`, and the contract of `oneOf!`/`frequency!`: no list in the compiled code,
 and nothing a proof can tell apart from `oneOf`/`frequency`.
 -/
+
+@[expose] public section
 
 open NNReal ENNReal
 

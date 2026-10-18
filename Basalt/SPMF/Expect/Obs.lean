@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Obs.Combinators
-import Basalt.Obs.Ordered
-import Basalt.Obs.Spec
-import Basalt.SPMF.Expect.Basic
+module
+
+public import Basalt.Obs.Combinators
+public import Basalt.Obs.Ordered
+public import Basalt.Obs.Spec
+public import Basalt.SPMF.Expect.Basic
 
 /-!
 # The Expectation Observation
@@ -15,6 +17,8 @@ import Basalt.SPMF.Expect.Basic
 the expectation equation of each combinator, which is its `Obs.map_*` lemma read through one of
 those presentations.
 -/
+
+@[expose] public section
 
 open RandomChoice NNReal ENNReal
 

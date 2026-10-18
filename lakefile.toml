@@ -1,6 +1,7 @@
 name = "basalt"
 version = "0.1.0"
 defaultTargets = ["Basalt", "BasaltExamples", "BasaltTest", "BasaltFuzz"]
+leanOptions = { backward.proofsInPublic = true }
 
 # `-fsanitize=fuzzer-no-link` here is *not* about fuzzing Basalt: it is about what libFuzzer can see
 # of a generator's progress. Where a staged benchmark writes its guards itself (`chain-n`), coverage of
@@ -63,4 +64,4 @@ rev = "v4.34.0"
 [[require]]
 name = "splitmix"
 git = "https://github.com/hgoldstein95/splitmix"
-rev = "splitmix-0.1.0"
+rev = "splitmix-0.2.0"

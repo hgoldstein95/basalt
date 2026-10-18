@@ -3,14 +3,18 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Lean.Meta.Tactic.Replace
-import Basalt.Obs.Basic
+module
+
+public meta import Lean.Meta.Tactic.Replace
+public import Basalt.Obs.Basic
 
 /-!
 # The Walker's Names
 
 This machinery ensures that the walk does not mangle intermediate value names.
 -/
+
+public meta section
 
 open Lean Meta
 

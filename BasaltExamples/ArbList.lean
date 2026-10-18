@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbNat
+module
+
+public import Basalt
+public import BasaltExamples.ArbNat
 
 /-!
 # Arbitrary Lists
@@ -15,6 +17,8 @@ a coin to stop, otherwise draw a `Nat.arbitrary` head and recurse for the tail. 
 then fill it); it is exercised in `BasaltTest/IO.lean`, but the laws below are all stated about
 `List.arbitrary`.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 

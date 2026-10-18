@@ -3,13 +3,17 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks, Harrison Goldstein
 -/
-import Basalt.PBT.Backend
+module
+
+public import Basalt.PBT.Backend
 
 /-!
 # A Command-Line Front End
 
 Infrastructure for running Basalt properties from the command line.
 -/
+
+public section
 
 namespace Basalt.PBT
 

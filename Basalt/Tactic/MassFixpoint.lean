@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Laws
-import Basalt.Walk.Mass
+module
+
+public import Basalt.Laws
+public import Basalt.Walk.Mass
 
 /-!
 # The `mass_fixpoint` Tactic
@@ -15,6 +17,8 @@ step, and walks it. The termination facts of the list combinators and of `suchTh
 because they are proved with it.
 -/
 
+@[expose] public section
+
 open ENNReal RandomChoice
 
 namespace Basalt.MassFixpoint
@@ -22,12 +26,12 @@ namespace Basalt.MassFixpoint
 open Lean Meta Elab Tactic Basalt.Walk
 
 /-- Right-nested tuple of `es` (`Unit` when empty), with its type. -/
-private def mkTuple (es : Array Expr) : MetaM Expr := do
+private meta def mkTuple (es : Array Expr) : MetaM Expr := do
   let some last := es.back? | return mkConst ``Unit.unit
   es.pop.foldrM (fun e acc => mkAppM ``Prod.mk #[e, acc]) last
 
 /-- The components of a right-nested tuple `s` of `n` values. -/
-private def untuple (s : Expr) : Nat → MetaM (Array Expr)
+private meta def untuple (s : Expr) : Nat → MetaM (Array Expr)
   | 0 => return #[]
   | 1 => return #[s]
   | n + 1 => do

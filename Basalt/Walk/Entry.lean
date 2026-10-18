@@ -3,11 +3,13 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Lean.Meta.Tactic.Split
-import Mathlib.Data.Int.Cast.Basic
-import Mathlib.Order.PropInstances
-import Basalt.Obs.Presentation
-import Basalt.Walk.Basic
+module
+
+public meta import Lean.Meta.Tactic.Split
+public import Mathlib.Data.Int.Cast.Basic
+public import Mathlib.Order.PropInstances
+public import Basalt.Obs.Presentation
+public meta import Basalt.Walk.Basic
 
 /-!
 # The Walker's Entry Points
@@ -19,6 +21,9 @@ angelic one, and `arithBound` gives one inequality to close by arithmetic. `walk
 takes one induction step with `fixpointStep`. A relational judgment, one generator at two monads,
 walks with `walkRel`, and takes its step with `relFixpoint`.
 -/
+
+public meta section
+
 open Lean Meta Elab Tactic Lean.Order
 
 namespace Basalt.Walk

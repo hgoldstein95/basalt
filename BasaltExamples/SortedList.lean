@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbNat
+module
+
+public import Basalt
+public import BasaltExamples.ArbNat
 
 /-!
 # Sorted Lists
@@ -15,6 +17,8 @@ one plus a `Nat.arbitrary` gap, threading the running lower bound `m` through th
 *re-indexes the seed* (`genSortedGt x` for a new `x`), so `m` is the seed of its termination proof.
 The public `genSorted` and its laws are the `m = 0` specializations.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 
