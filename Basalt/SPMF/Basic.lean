@@ -45,11 +45,6 @@ theorem tsum_coe_ne_top (p : SPMF α) : ∑' a, p a ≠ ∞ := by
   have := p.tsum_coe
   grind only
 
-theorem tsum_coe_indicator_ne_top (p : SPMF α) (s : Set α) : ∑' a, s.indicator p a ≠ ∞ :=
-  ne_of_lt (lt_of_le_of_lt
-    (ENNReal.tsum_le_tsum (fun _ => Set.indicator_apply_le fun _ => le_rfl))
-    (lt_of_le_of_ne le_top p.tsum_coe_ne_top))
-
 theorem coe_le_one (p : SPMF α) (a : α) : p a ≤ 1 := by
   have h₁ := p.tsum_coe
   have h₂ := ENNReal.le_tsum (f := p) a
@@ -57,9 +52,6 @@ theorem coe_le_one (p : SPMF α) (a : α) : p a ≤ 1 := by
 
 theorem apply_ne_top (p : SPMF α) (a : α) : p a ≠ ∞ :=
   ne_of_lt (lt_of_le_of_lt (p.coe_le_one a) ENNReal.one_lt_top)
-
-theorem apply_lt_top (p : SPMF α) (a : α) : p a < ∞ :=
-  lt_of_le_of_ne le_top (p.apply_ne_top a)
 
 instance : Lean.Order.PartialOrder (SPMF α) where
   rel p q := ∀ a, p a ≤ q a

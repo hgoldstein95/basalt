@@ -284,20 +284,6 @@ theorem support_frequency
   · rintro ⟨w, g, hmem, hw, ha⟩
     exact ⟨_, List.mem_map.mpr ⟨(w, g), hmem, rfl⟩, hw, mem_support_iff_may.mp ha⟩
 
-theorem bind_congr_support
-    {x : SPMF α}
-    (h : ∀ a ∈ x.support, f a = g a) :
-    bind x f = bind x g := by
-  simp only [bind]
-  ext a
-  simp only [DFunLike.coe]
-  congr
-  funext v
-  by_cases hsupport : v ∈ x.support
-  · rwa [h]
-  · simp only [support, Function.notMem_support] at hsupport
-    simp_all [DFunLike.coe]
-
 theorem mem_support_csup {c : SPMF α → Prop} (hc : chain c) {a : α} :
     a ∈ (CCPO.csup hc).support ↔ ∃ f, c f ∧ a ∈ f.support := by
   simp only [mem_support_iff_prob_pos, prob, expect_csup, lt_iSup_iff, exists_prop]

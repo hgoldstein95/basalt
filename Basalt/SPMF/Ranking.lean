@@ -141,13 +141,6 @@ end SPMF
 
 namespace ENNReal
 
-private theorem list_prod_le_one {xs : List ℝ≥0∞} (h : ∀ x ∈ xs, x ≤ 1) : xs.prod ≤ 1 := by
-  induction xs with
-  | nil => simp
-  | cons x xs ih =>
-    rw [List.prod_cons]
-    exact mul_le_one' (h x List.mem_cons_self) (ih fun y hy => h y (List.mem_cons_of_mem x hy))
-
 /-- **The union bound**: the chance that some element of a product falls short of 1 is at most the
 sum of the individual shortfalls. Applied to generator masses: the chance that some child diverges
 is at most the sum of the chances that each does. This is the only probabilistic idea in the
