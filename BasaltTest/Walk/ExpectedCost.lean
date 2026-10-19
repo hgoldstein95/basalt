@@ -107,7 +107,7 @@ example (hm : 1 ≤ SPMF.Cost.expectObs.spec (genTree : SPMF.Cost Tree) fun _ _ 
   exact le_of_eq (by ring)
 
 -- The cookbook's expected-cost bounds are this walk followed by arithmetic, with the source's bound
--- passed as a fact: `Tree.genBSTByFiltering.cost` (`BST/ByFiltering.lean`); its lower bound is
--- `AllTwoTree.genTree.not_expected_cost_bounded` (`AllTwoTree.lean`).
+-- passed as a fact: `Tree.genBSTByFiltering.expected_cost_bounded` (`BST/ByFiltering.lean`); its
+-- lower bound is `AllTwoTree.genTree.not_expected_cost_bounded` (`AllTwoTree.lean`).
 
 end ExpectedCostTest

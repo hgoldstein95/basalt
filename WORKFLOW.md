@@ -161,8 +161,8 @@ deliberately incomplete).
 Worked instances: `Tree.genHeap.sound_complete` (`Heap.lean`) is the recipe verbatim;
 `Tree.genBST.sound_complete` (`BST.lean`) has a `dite`, a `frequency`, and a pivot;
 `Tree.genLeftistOfRank.sound_complete` (`LeftistHeap.lean`) is defined by `match` and draws a value
-its predicate must solve for; `String.arbitrary_support` (`ArbString.lean`) goes through a list
-combinator.
+its predicate must solve for; `String.arbitrary.sound_complete` (`ArbString.lean`) goes through a
+list combinator.
 
 ```lean
 theorem <GEN>.sound_complete : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) := by
@@ -354,8 +354,8 @@ goals `genHeap` and `genBST` leave. Of the generator, only its callees' laws are
   through instead.
 - a **combinator that takes a generator** (`listOf`, `vectorOf`, …) asks for that generator's cost
   law the same way, and the goal states the combinator's bound in terms of it —
-  `String.arbitrary_cost` (`ArbString.lean`). A combinator term in that position, which has no law,
-  is bounded by its worst case: the most choices any of its runs makes.
+  `String.arbitrary.cost_bounded` (`ArbString.lean`). A combinator term in that position, which has
+  no law, is bounded by its worst case: the most choices any of its runs makes.
 
 **The arithmetic** is the only content. Unfold the cost function one constructor and finish with
 `omega`; when the cost function is a named `def`, unfold it `at *` so the hypotheses about
@@ -372,26 +372,26 @@ duplicate — has no `<COST>`: any number of choices can end in the same value
 average instead, by `B`, a function of the arguments:
 
 ```lean
-theorem <GEN>.cost : IsExpectedCostBounded (<GEN> <ARGS>) <B> := by
+theorem <GEN>.expected_cost_bounded : IsExpectedCostBounded (<GEN> <ARGS>) <B> := by
   rw [IsExpectedCostBounded.iff_obs]
   walk fixpoint [<CALLEES>]
   <arithmetic>          -- `<computed bound> ≤ <B>`, in `ℝ≥0∞`, with `ih` in context
 ```
 
-The walk is Recipe 4's, over `SPMF.Cost.expectObs`, with each draw adding its choice to the cost:
-a recursive occurrence is bounded by `ih`, and a callee by its `IsExpectedCostBounded` law, passed
-as `h.obs`. A generator recursive by `termination_by` is induction on its decreasing argument, as
-above (`Tree.genTree.cost`, `BST/ByFiltering.lean`). `BasaltTest/Walk/ExpectedCost.lean` pins the
-goals.
+The walk is Recipe 4's, over `SPMF.Cost.expectObs`, with each draw adding its choice to the cost: a
+recursive occurrence is bounded by `ih`, and a callee by its `IsExpectedCostBounded` law, passed as
+`h.obs`. A generator recursive by `termination_by` is induction on its decreasing argument, as above
+(`Tree.genTree.expected_cost_bounded`, `BST/ByFiltering.lean`). `BasaltTest/Walk/ExpectedCost.lean`
+pins the goals.
 
 **Rejection sampling** is `suchThat g p`. Its rule takes `g`'s expected cost `C` and a bound `r` on
 how often `p` rejects, `SPMF.Cost.expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r`, and
 bounds the loop by `C / (1 - r)`; `SPMF.Cost.div_one_sub_le` turns the arithmetic into one step of
 the loop, `C + r * B ≤ B`. The rejection bound is the one fact about `g` a filter needs, and it is
 the termination proof's, read at `SPMF.Cost` through `g`'s `IsCostFaithful` law
-(`IsCostFaithful.expect_eq`; `Tree.genBSTByFiltering.cost`, `BST/ByFiltering.lean`).
-`NonEmptyList.genNonEmpty.cost` (`NonEmptyList.lean`) is the same proof for a source that rarely
-rejects.
+(`IsCostFaithful.expect_eq`; `Tree.genBSTByFiltering.expected_cost_bounded`,
+`BST/ByFiltering.lean`). `NonEmptyList.genNonEmpty.expected_cost_bounded` (`NonEmptyList.lean`) is
+the same proof for a source that rarely rejects.
 
 **`IsCostFaithful gen`** is `walk fixpoint` on each field, `⟨by walk fixpoint, by walk fixpoint⟩`,
 passing a callee's law by the field being proved (`h.erasedLe`, `h.leErased`); a generator
@@ -400,7 +400,7 @@ recursive by `termination_by` is induction, `unfold`, and `walk`, as for `IsFait
 
 **From a cost bound.** A generator with an `IsCostBounded` law and an `IsCostFaithful` one has its
 expected cost bounded by the `SPMF` expectation of its cost function,
-`IsExpectedCostBounded.of_costBounded`, which is Recipe 4's (`Tree.genBST.expected_cost`,
+`IsExpectedCostBounded.of_costBounded`, which is Recipe 4's (`Tree.genBST.expected_cost_bounded`,
 `BST.lean`).
 
 **A lower bound** on an expected cost cannot be had by fixpoint induction: the generator that never
@@ -456,7 +456,7 @@ theorem <GEN>.faithful : IsFaithful (<GEN> <ARGS>) := by
 you pass. `below`, a relation on ideal words, is what the walk proves and composes; it
 bounds the distribution from one side only, and `terminates` gives the other. `approx` is that `IO`
 runs `IOModel` wherever that terminates. A generator with no `.terminates` law states the two
-relations alone, as `<GEN>.ideal` and `<GEN>.io` (`Tree.genLeftistOfRank`,
+relations alone, as `<GEN>.below` and `<GEN>.approx` (`Tree.genLeftistOfRank`,
 `BasaltExamples/LeftistHeap.lean`), which a caller passes in place of `.faithful`.
 
 **`walk fixpoint`** on either relation, `src.Below (<GEN> …) (<GEN> …)` (`Basalt/Walk/Ideal.lean`)

@@ -29,7 +29,7 @@ macro_rules
     `(tactic| simp only [SPMF.mem_support_bind_iff,
         SPMF.mem_support_pure_iff, SPMF.mem_support_map_iff, SPMF.mem_support_choose_iff,
         SPMF.mem_support_ite_iff, SPMF.mem_support_dite_iff, SPMF.mem_support_vectorOf_iff,
-        SPMF.mem_support_listOfMaxLength_iff, SPMF.mem_support_listOf,
+        SPMF.mem_support_listOfMaxLength_iff, SPMF.mem_support_listOf_iff,
         SPMF.mem_support_permutationOf_iff, Set.mem_ofPred_eq,
         $args,*] $[$loc]?)
 

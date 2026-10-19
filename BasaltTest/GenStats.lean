@@ -94,9 +94,9 @@ info: AllTwoTree.genTree — 1000 draws (seed 0, fuel 10000)
 
 /-
 The subcritical variant (`m = 2/3`) makes at most `3` choices on average, one per constructor
-(`AllTwoTree.genWeightedTree.cost`), and the measured mean below is 2.9 — against `genTree`'s fueled
-mean of 75.4 with a 9851-node maximum above. The size function counts constructors
-(`2 * size + 1` for a binary tree).
+(`AllTwoTree.genWeightedTree.expected_cost_bounded`), and the measured mean below is 2.9 — against
+`genTree`'s fueled mean of 75.4 with a 9851-node maximum above. The size function counts
+constructors (`2 * size + 1` for a binary tree).
 -/
 /--
 info: AllTwoTree.genWeightedTree — 200 draws (seed 0, fuel 10000)

@@ -120,11 +120,11 @@ theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist 
 theorem Tree.genLeftist.faithful : IsFaithful (Tree.genLeftist lo) := by
   faithful_fixpoint [Tree.genLeftist.terminates, Nat.arbitrary.faithful]
 
-theorem Tree.genLeftistOfRank.ideal [WordSource σ] (src : IdealSource σ) :
+theorem Tree.genLeftistOfRank.below [WordSource σ] (src : IdealSource σ) :
     src.Below (Tree.genLeftistOfRank lo k) (Tree.genLeftistOfRank lo k) := by
   walk fixpoint [Nat.arbitrary.faithful.below]
 
-theorem Tree.genLeftistOfRank.io :
+theorem Tree.genLeftistOfRank.approx :
     IOModel.Approx (Tree.genLeftistOfRank lo k) (Tree.genLeftistOfRank lo k) := by
   walk fixpoint [Nat.arbitrary.faithful.approx]
 

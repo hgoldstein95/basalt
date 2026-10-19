@@ -26,7 +26,7 @@ open RandomChoice ArbChar
 namespace ArbString
 
 /-- `String.arbitrary`'s support is exactly the set of alphanumeric strings -/
-theorem String.arbitrary_support :
+theorem String.arbitrary.sound_complete :
     IsSoundAndComplete String.arbitrary (fun s => ∀ c ∈ s.toList, c.isAlphanum = true) := by
   refine .intro ?sound ?complete
   case sound =>
@@ -41,7 +41,7 @@ theorem String.arbitrary_support :
 
 /-- `NonEmptyString.arbitrary`'s support is exactly the set of
     *non-empty* alphanumeric strings -/
-theorem NonEmptyString.arbitrary_support :
+theorem NonEmptyString.arbitrary.sound_complete :
     IsSoundAndComplete NonEmptyString.arbitrary (fun s => !s.isEmpty ∧ ∀ c ∈ s.toList, c.isAlphanum = true) := by
   refine .intro ?sound ?complete
   case sound =>
@@ -73,7 +73,7 @@ theorem NonEmptyString.arbitrary.faithful : IsFaithful NonEmptyString.arbitrary 
 
 /-- `listOf`'s bound with `Char.arbitrary`'s per-element cost of `1`: one `oneOf` and one character
 per element, plus the `oneOf` that ends the list. -/
-theorem String.arbitrary_cost :
+theorem String.arbitrary.cost_bounded :
     IsCostBounded String.arbitrary (fun s => 2 * s.length + 1) := by
   rw [IsCostBounded.iff_obs]
   walk fixpoint
@@ -82,7 +82,7 @@ theorem String.arbitrary_cost :
 
 /-- `String.arbitrary`'s bound less the final `oneOf`: `nonEmptyListOf` draws its last element
 directly. -/
-theorem NonEmptyString.arbitrary_cost :
+theorem NonEmptyString.arbitrary.cost_bounded :
     IsCostBounded NonEmptyString.arbitrary (fun s => 2 * s.length) := by
   rw [IsCostBounded.iff_obs]
   walk fixpoint

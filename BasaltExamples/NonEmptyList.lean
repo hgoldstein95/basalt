@@ -12,8 +12,8 @@ public import Basalt
 
 `genNonEmpty` draws a list sized by `n` and retries until the list is not empty. Its source rejects
 only a `1 / (n + 1)` share of its draws, so the retries add a constant to its expected cost
-(`genNonEmpty.cost`); compare `BST/ByFiltering.lean`, whose source is only known to accept its
-leaves.
+(`genNonEmpty.expected_cost_bounded`); compare `BST/ByFiltering.lean`, whose source is only known to
+accept its leaves.
 -/
 
 @[expose] public section
@@ -108,7 +108,7 @@ theorem genNonEmpty.terminates {n : Nat} (hn : 0 < n) :
 
 /-! ## Cost -/
 
-theorem genList.cost (n : Nat) :
+theorem genList.expected_cost_bounded (n : Nat) :
     IsExpectedCostBounded (genList n : SPMF.Cost (List Nat)) (2 * n + 1) := by
   rw [IsExpectedCostBounded.iff_obs]
   walk fixpoint
@@ -121,11 +121,11 @@ theorem genList.cost_faithful (n : Nat) : IsCostFaithful (genList n) :=
   ⟨by walk fixpoint, by walk fixpoint⟩
 
 /-- At most three choices more than its source's expected cost, whatever `n`. -/
-theorem genNonEmpty.cost {n : Nat} (hn : 0 < n) :
+theorem genNonEmpty.expected_cost_bounded {n : Nat} (hn : 0 < n) :
     IsExpectedCostBounded (genNonEmpty n : SPMF.Cost (List Nat)) (2 * n + 4) := by
   have hr := ((genList.cost_faithful n).expect_eq _).trans_le (genList.reject_le n)
   rw [IsExpectedCostBounded.iff_obs]
-  walk [(genList.cost n).obs, hr]
+  walk [(genList.expected_cost_bounded n).obs, hr]
   rw [zero_add]
   refine SPMF.Cost.div_one_sub_le (by finiteness) ?_
   have h3 : 1 / ((n : ℝ≥0∞) + 1) * (2 * n + 4) ≤ 3 := by

@@ -214,17 +214,17 @@ theorem support_nonEmptyListOf
 
 
 @[simp]
-theorem mem_support_listOf
+theorem mem_support_listOf_iff
     {xs : List α}
     {g : SPMF α} :
-    xs ∈ (listOf g).support ↔ xs ∈ {xs | ∀ x ∈ xs, x ∈ g.support} := by
+    xs ∈ (listOf g).support ↔ ∀ x ∈ xs, x ∈ g.support := by
   simp [support_listOf]
 
 @[simp]
-theorem mem_support_nonEmptylistOf
+theorem mem_support_nonEmptyListOf_iff
     {xs : List α}
     {g : SPMF α} :
-    xs ∈ (nonEmptyListOf g).support ↔ xs ∈ {xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support} := by
+    xs ∈ (nonEmptyListOf g).support ↔ xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support := by
   simp [support_nonEmptyListOf]
 
 /-- The support of `permutationOf xs` is the set of all values of the subtype `{ys // xs ~ ys}`,
@@ -284,18 +284,18 @@ theorem support_frequency
   · rintro ⟨w, g, hmem, hw, ha⟩
     exact ⟨_, List.mem_map.mpr ⟨(w, g), hmem, rfl⟩, hw, mem_support_iff_may.mp ha⟩
 
-theorem mem_support_csup {c : SPMF α → Prop} (hc : chain c) {a : α} :
+theorem mem_support_csup_iff {c : SPMF α → Prop} (hc : chain c) {a : α} :
     a ∈ (CCPO.csup hc).support ↔ ∃ f, c f ∧ a ∈ f.support := by
   simp only [mem_support_iff_prob_pos, prob, expect_csup, lt_iSup_iff, exists_prop]
 
 theorem alwaysObs.admissible (P : α → Prop) : admissible fun x : SPMF α => alwaysObs.spec x P :=
   admissible_iff.2 fun _ hc ih a ha =>
-    let ⟨x, hxc, hxa⟩ := (mem_support_csup hc).mp ha
+    let ⟨x, hxc, hxa⟩ := (mem_support_csup_iff hc).mp ha
     ih x hxc a hxa
 
 /-- A value is reachable by `suchThat g p` exactly when `g` reaches it and `p` accepts it, whatever
 the chance of acceptance: the first draw can be that value. -/
-theorem mem_support_suchThat {g : SPMF α} {p : α → Bool} {a : α} :
+theorem mem_support_suchThat_iff {g : SPMF α} {p : α → Bool} {a : α} :
     a ∈ (suchThat g p).support ↔ a ∈ g.support ∧ p a = true := by
   have key : ∀ a ∈ (suchThat g p).support, a ∈ g.support ∧ p a = true := by
     refine suchThat.fixpoint_induct g p (fun x => ∀ a ∈ x.support, a ∈ g.support ∧ p a = true)

@@ -14,7 +14,8 @@ public import BasaltExamples.BST
 `Tree.genBSTByFiltering` draws a tree sized by `n` with keys in `[lo, hi]`, and retries until it
 draws a search tree. Its source is only known to accept its leaves, a `1 / (n + 1)` share of its
 draws, so the bound on its expected cost is its source's times `n + 1`
-(`Tree.genBSTByFiltering.cost`); compare `NonEmptyList.lean`, whose source rarely rejects.
+(`Tree.genBSTByFiltering.expected_cost_bounded`); compare `NonEmptyList.lean`, whose source rarely
+rejects.
 -/
 
 @[expose] public section
@@ -117,7 +118,7 @@ theorem Tree.genBSTByFiltering.terminates {lo hi : Int} (h : lo ≤ hi) (n : Nat
 
 /-! ## Cost -/
 
-theorem Tree.genTree.cost {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
+theorem Tree.genTree.expected_cost_bounded {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
     IsExpectedCostBounded (Tree.genTree lo hi h n : SPMF.Cost (Tree Int)) (3 * n + 1) := by
   induction n using Nat.strong_induction_on with
   | _ n ih =>
@@ -144,12 +145,12 @@ theorem Tree.genTree.cost_faithful {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
       · unfold Tree.genTree; walk [ih.leErased]
 
 /-- `n + 1` times its source's expected cost: one draw, and `n / (n + 1)` of a retry. -/
-theorem Tree.genBSTByFiltering.cost {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
+theorem Tree.genBSTByFiltering.expected_cost_bounded {lo hi : Int} (h : lo ≤ hi) (n : Nat) :
     IsExpectedCostBounded (Tree.genBSTByFiltering lo hi h n : SPMF.Cost (Tree Int))
       ((n + 1) * (3 * n + 1)) := by
   have hr := ((Tree.genTree.cost_faithful h n).expect_eq _).trans_le (Tree.genTree.reject_le h n)
   rw [IsExpectedCostBounded.iff_obs]
-  walk [(Tree.genTree.cost h n).obs, hr]
+  walk [(Tree.genTree.expected_cost_bounded h n).obs, hr]
   rw [zero_add]
   refine SPMF.Cost.div_one_sub_le (by finiteness) ?_
   rw [← mul_assoc, ENNReal.div_mul_cancel (by simp) (by simp)]

@@ -71,13 +71,13 @@ theorem le_may_listOfMaxLength {n : Nat} (hg : ∀ a, R a → mayObs.spec g (· 
 @[gen_rule]
 theorem le_may_listOf (hg : ∀ a, R a → mayObs.spec g (· = a)) :
     (∃ xs, (∀ x ∈ xs, R x) ∧ p xs) ≤ mayObs.spec (listOf g) p :=
-  fun ⟨xs, hR, hp⟩ => ⟨xs, mem_support_listOf.mpr fun x hx => mem_of_may hg x (hR x hx), hp⟩
+  fun ⟨xs, hR, hp⟩ => ⟨xs, mem_support_listOf_iff.mpr fun x hx => mem_of_may hg x (hR x hx), hp⟩
 
 @[gen_rule]
 theorem le_may_nonEmptyListOf (hg : ∀ a, R a → mayObs.spec g (· = a)) :
     (∃ xs, (xs ≠ [] ∧ ∀ x ∈ xs, R x) ∧ p xs) ≤ mayObs.spec (nonEmptyListOf g) p :=
   fun ⟨xs, ⟨hne, hR⟩, hp⟩ =>
-    ⟨xs, mem_support_nonEmptylistOf.mpr ⟨hne, fun x hx => mem_of_may hg x (hR x hx)⟩, hp⟩
+    ⟨xs, mem_support_nonEmptyListOf_iff.mpr ⟨hne, fun x hx => mem_of_may hg x (hR x hx)⟩, hp⟩
 
 end generatorArgument
 
@@ -87,7 +87,7 @@ theorem le_may_suchThat {α : Type} {g : SPMF α} {p : α → Bool} {R post : α
     (hg : ∀ a, R a → mayObs.spec g (· = a)) :
     (∃ a, (R a ∧ p a = true) ∧ post a) ≤ mayObs.spec (suchThat g p) post :=
   fun ⟨a, ⟨hR, hp⟩, hpost⟩ =>
-    ⟨a, mem_support_suchThat.mpr ⟨mem_support_iff_may.mpr (hg a hR), hp⟩, hpost⟩
+    ⟨a, mem_support_suchThat_iff.mpr ⟨mem_support_iff_may.mpr (hg a hR), hp⟩, hpost⟩
 
 @[gen_rule]
 theorem le_may_permutationOf {α : Type} {xs : List α} {p : { ys // xs.Perm ys } → Prop} :
