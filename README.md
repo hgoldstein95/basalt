@@ -102,9 +102,10 @@ A campaign runs a property at a chosen interpretation, stopping at the first cou
 Because the property never named an interpretation, the same term is testable at each of them: a
 `Property` is the property held polymorphically, and `dispatch` wraps a list of named properties in a
 command line (`--backend=io|plausible`, `-runs=N`, `-discard_ratio=N`) over every `Backend` tagged
-`@[basalt_backend]`, so an interpretation defined outside Basalt is offered there too. Every backend
-shares one failure contract — counterexample on stderr, exit `77` — so campaigns are comparable
-across them.
+`@[basalt_backend]` that the caller imports. `Basalt/PBT/` names no interpretation: each backend
+lives with its own (`Basalt/IO/Backend.lean`, `Basalt/PlausibleGen/Backend.lean`), so an
+interpretation defined outside Basalt is offered the same way. Every backend shares one failure
+contract — counterexample on stderr, exit `77` — so campaigns are comparable across them.
 
 ## Build
 
@@ -159,8 +160,9 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
     `Laws.lean`, the properties a generator may be proved to have;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
     expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
-    `PlausibleGen.lean`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean`
-    holding `stdChoose`, the exactly uniform draw from core's `StdGen` that `GenStats/` makes;
+    `PlausibleGen.lean` and `PlausibleGen/`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`,
+    with `Random.lean` holding `stdChoose`, the exactly uniform draw from core's `StdGen` that
+    `GenStats/` makes;
   - *the proof machinery*: `Obs/`, the layer every per-combinator lemma is derived from — a
     judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
     `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma

@@ -139,9 +139,12 @@ the definition, and the definition is right here to run.
   [Basalt/IO/Choose.lean](Basalt/IO/Choose.lean) and an ideal source in
   [Basalt/IO/Stream.lean](Basalt/IO/Stream.lean). WORKFLOW.md's Recipe 5 is the practical entry.
 - **Stating and running a property** — [Basalt/PBT/](Basalt/PBT/), guarded by
-  [BasaltTest/PBT.lean](BasaltTest/PBT.lean), which is the tour. Nothing there may name an
-  interpretation: a runner that needs one belongs with that interpretation and tags itself
-  `@[basalt_backend]`.
+  [BasaltTest/PBT.lean](BasaltTest/PBT.lean), which is the tour and fails the build when a
+  `Basalt.PBT` module imports an interpretation. A runner that needs one belongs with that
+  interpretation and tags itself `@[basalt_backend]`:
+  [Basalt/IO/Backend.lean](Basalt/IO/Backend.lean),
+  [Basalt/PlausibleGen/Backend.lean](Basalt/PlausibleGen/Backend.lean), and
+  [Basalt/Fuzz/Runner.lean](Basalt/Fuzz/Runner.lean).
 - **Coverage-guided fuzzing** (`FuzzGen`, the libFuzzer bridge, the opt-in `basalt-fuzz` executable)
   — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
   the measured comparison between backends. This is the repo's only FFI and native-link config. A

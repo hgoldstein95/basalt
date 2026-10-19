@@ -220,8 +220,8 @@ guided fuzzer or under a plain random sampler; `--backend=` picks the interpreta
 | `plausible` | `Plausible.Gen` | Plausible's `StdGen` |
 
 All three come from one registry of `Basalt.PBT.Property` and share `Basalt.PBT`'s failure contract,
-so their campaigns are directly comparable. `fuzzBackend` is a `@[basalt_backend]`, so `dispatch`
-offers it alongside Basalt's own two without `BasaltFuzzMain` listing them. Adding the two random backends needed no new instance and
+so their campaigns are directly comparable. Each backend is a `@[basalt_backend]` defined beside its
+interpretation, so `dispatch` offers every one `BasaltFuzzMain` imports without listing them. Adding the two random backends needed no new instance and
 no change to any property or generator: `Gen IO` and `Gen Plausible.Gen` already followed by
 `inferInstance`, and what it took was a registry type that keeps the monad open. `replay` is
 fuzz-only, because a saved artifact *is* a `FuzzGen` byte buffer and has no meaning as a PRNG state.

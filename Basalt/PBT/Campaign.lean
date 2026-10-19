@@ -5,9 +5,7 @@ Authors: Michael Hicks, Harrison Goldstein
 -/
 module
 
-public import Basalt.IO
 public import Basalt.PBT.Property
-public import Basalt.PlausibleGen
 
 /-!
 # Running a Campaign
@@ -82,16 +80,5 @@ def campaign (label : String) (step : IO TestOutcome) (runs : Nat)
   let r ← runCampaign step runs maxDiscardRatio
   r.report label
   r.exitOnFailure
-
-/-- Test `T` at the default `IO` interpretation, where choices come from SplitMix via `ioGen`. -/
-def ioCampaign (T : Property) (runs : Nat) (maxDiscardRatio : Nat := 10) : IO Unit :=
-  campaign "IO" (runProp (T IO)) runs maxDiscardRatio
-
-/-- Test `T` at `Plausible.Gen`, where choices come from Plausible's `StdGen`.
-
-The `size` handed to `Plausible.Gen.run` is inert: Basalt generators bound their own recursion (via
-`partial_fixpoint`) and no combinator reads Plausible's size parameter. -/
-def plausibleCampaign (T : Property) (runs : Nat) (maxDiscardRatio : Nat := 10) : IO Unit :=
-  campaign "Plausible.Gen" (Plausible.Gen.run (runProp (T Plausible.Gen)) 0) runs maxDiscardRatio
 
 end Basalt.PBT

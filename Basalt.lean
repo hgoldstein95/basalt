@@ -12,6 +12,7 @@ public import Basalt.GenStats.Basic
 public import Basalt.GenStats.Command
 public import Basalt.IO
 public import Basalt.IO.Approx
+public import Basalt.IO.Backend
 public import Basalt.IO.Choose
 public import Basalt.IO.Faithful
 public import Basalt.IO.Ideal
@@ -31,6 +32,7 @@ public import Basalt.PBT.Campaign
 public import Basalt.PBT.Driver
 public import Basalt.PBT.Property
 public import Basalt.PlausibleGen
+public import Basalt.PlausibleGen.Backend
 public import Basalt.Random
 public import Basalt.RandomChoice
 public import Basalt.SPMF.Basic

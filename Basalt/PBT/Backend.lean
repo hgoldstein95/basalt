@@ -13,7 +13,8 @@ public import Basalt.PBT.Campaign
 # Backends Registry
 
 A `Backend` is a way of running a `Property`.  `@[basalt_backend]` adds one to a global registry, so
-an interpretation defined downstream of the front end can still be reached from the command line.
+an interpretation's backend lives with the interpretation, downstream of the front end, and is still
+reached from the command line.
 -/
 
 public section
