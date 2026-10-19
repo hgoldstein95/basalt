@@ -39,16 +39,14 @@ def runCampaign (step : IO TestOutcome) (runs : Nat) (maxDiscardRatio : Nat := 1
     IO CampaignReport := do
   let discardBudget := maxDiscardRatio * runs
   let mut report : CampaignReport := { runs := 0, discards := 0, counterexample? := none }
-  for _ in [0:runs + discardBudget] do
-    if report.runs ≥ runs || report.discards ≥ discardBudget
-        || report.counterexample?.isSome then break
+  while report.runs < runs && report.counterexample?.isNone do
     match ← step with
     | Except.ok () => report := { report with runs := report.runs + 1 }
-    | Except.error .discard => report := { report with discards := report.discards + 1 }
+    | Except.error .discard =>
+      if report.discards ≥ discardBudget then return { report with gaveUp := true }
+      report := { report with discards := report.discards + 1 }
     | Except.error (.fail msg) =>
       report := { report with runs := report.runs + 1, counterexample? := some msg }
-  if report.counterexample?.isNone && report.runs < runs then
-    report := { report with gaveUp := true }
   return report
 
 private def padTo (width : Nat) (s : String) : String :=

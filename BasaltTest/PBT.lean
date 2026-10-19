@@ -121,6 +121,10 @@ exhausting it is a give-up, not a pass. -/
 /-- info: runs=0 discards=30 counterexample=none gaveUp=true -/
 #guard_msgs in #eval do IO.println (summary (← runCampaign (propDiscard : PropM IO Unit) 10 (maxDiscardRatio := 3)))
 
+/- A discard budget of zero still runs every input that is not discarded. -/
+/-- info: runs=25 discards=0 counterexample=none gaveUp=false -/
+#guard_msgs in #eval do IO.println (summary (← runCampaign (propPass : PropM IO Unit) 25 (maxDiscardRatio := 0)))
+
 /- A property that rejects only *some* inputs still gets every run it asked for. -/
 private def propHalfDiscard [Gen G] : PropM G Unit := do
   let n ← generate (chooseNat 0 9)
