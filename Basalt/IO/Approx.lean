@@ -91,8 +91,7 @@ operation on `ioGen` is opaque C, so Lean fixes no world and decides none of the
 `idealized_faithful` (`Basalt/IO/Faithful.lean`) takes them as a premise. The reading is exact for
 what the premise is applied to: a generator's `IO` term reaches the world only through
 `ioGen.randNat`, so projecting the world onto `ioGen`'s state loses nothing the term can observe.
-It fails when another thread uses `ioGen` between two operations, and it is checked against the
-compiled C by `BasaltTest/IO.lean`. -/
+-/
 structure IOGenLaws : Prop where
   /-- Reading the state and writing it back does nothing: the C `get` copies the state out, and
   `set` copies it back in. -/

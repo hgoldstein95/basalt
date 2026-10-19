@@ -19,7 +19,8 @@ meta import BasaltExamples.BST.Weighted
 public import BasaltExamples.Heap
 meta import BasaltExamples.Heap
 
-/-! # Exercising `IO` Interpretations
+/-!
+# Exercising `IO` Interpretations
 
 Samples from `IO` generators, just to make sure that the interpretations are relatively reasonable.
 -/

@@ -52,10 +52,8 @@ depends on the generator, and you prove the ones that do:
   generator that sometimes retries is allowed. With `IsAlmostSurelyTerminating` and a finite `B`,
   it says that `g` terminates positively almost surely.
 
-Each but the bundle `IsSoundAndComplete`, which a proof splits into its halves, is defined in the
-form a reader checks, and restated by `<Law>.iff_obs` on the observation a proof walks:
-`IsSoundFor g P ↔ SPMF.alwaysObs.spec g P`. A proof rewrites its goal with `iff_obs` and runs
-`walk`, and passes a callee's law to it as `h.obs`.
+A proof restates a law on an observation with its `iff_obs` lemma and runs `walk`
+(`Basalt/Laws.lean`, `WORKFLOW.md`).
 
 Two more relate two interpretations rather than constraining one, so they take the polymorphic
 generator:
@@ -70,7 +68,7 @@ generator:
 
 `BasaltExamples/` is a cookbook of worked generators, each carrying proofs of the properties that
 apply to it. `WORKFLOW.md` walks through writing a generator and proving it correct, with a recipe
-for each obligation, and one for bounding an expected value (`SPMF.expect`, such as the expected
+for each law, and one for bounding an expected value (`SPMF.expect`, such as the expected
 size of what is generated).
 
 ## Running Properties
@@ -130,10 +128,8 @@ Basalt is written in Lean's module system; a file that is not a `module` imports
 
 ### Coverage-guided fuzzing (opt-in)
 
-`basalt-fuzz` drives generators from libFuzzer instead of a PRNG. It links native code, so building
-the *executable* is deliberately outside `lake build` and has its own script — which needs no
-arguments on the platforms `fuzz-run/README.md` lists, detecting the toolchain's fuzzing runtime and
-driver entry point itself:
+`basalt-fuzz` drives generators from libFuzzer instead of a PRNG. It links native code, so it has
+its own build script, `fuzz-run/build.sh`, and `lake build` does not build it:
 
 ```sh
 fuzz-run/build.sh                                   # build the executable
@@ -141,17 +137,9 @@ fuzz-run/basalt-fuzz <property> [libFuzzer args...]  # run a campaign
 fuzz-run/basalt-fuzz replay <property> <file>        # reproduce a saved crash input
 ```
 
-Where no libFuzzer runtime ships with the toolchain (macOS), the build vendors one from
-compiler-rt source on first use. Per-machine toolchain overrides go in `fuzz-run/env.sh`
-(see `fuzz-run/env.example.sh`). `fuzz-run/README.md` is the whole story: the design, the demo
-properties, the failure model, and the supported platforms.
-
-Because a property is polymorphic in its monad, the same executable also runs it under the random
-interpretations — `--backend=io` or `--backend=plausible` instead of the default coverage-guided
-`fuzz` — from one shared property registry. Which backend finds a bug faster is a property of the
-bug: blind random sampling wins on shallow bugs (fewer runs, ~2–5× the throughput), while a bug
-behind several nested guards is reachable only by coverage guidance. `fuzz-run/compare-backends.sh` measures it and
-`fuzz-run/README.md` records the numbers.
+The same executable also runs a property under the random interpretations (`--backend=io` or
+`--backend=plausible`). `fuzz-run/README.md` is the whole story: the design, the demo properties,
+the failure model, the supported platforms, and how fast each backend finds a bug.
 
 ## Repository layout
 
@@ -163,13 +151,16 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
     `PlausibleGen.lean` and `PlausibleGen/`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`,
     with `Random.lean` holding `stdChoose`, the exactly uniform draw from core's `StdGen` that
     `GenStats/` makes;
-  - *the proof machinery*: `Obs/`, the layer every per-combinator lemma is derived from — a
-    judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
-    `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
-    saying that every observation commutes with it — `Walk/`, the judgment-agnostic walk over
-    observations that every proof obligation is discharged by, its `walk` tactic, and one file per
-    judgment of what the walk knows about it, and `GenRel.lean`, each combinator related to itself
-    at two monads, for the judgments that relate interpretations;
+  - *the proof machinery*:
+    - `Obs/`, the layer every per-combinator lemma is derived from. A judgment about a generator
+      (its support, an expectation, a cost bound) is an *observation*: a `choose`-preserving monad
+      morphism into a specification monad. Each combinator has one lemma saying that every
+      observation commutes with it.
+    - `Walk/`, the walk over observations that discharges every proof obligation: its `walk`
+      tactic, and one file per judgment of what the walk knows about it.
+    - `GenRel.lean`, each combinator related to itself at two monads, for the judgments that relate
+      interpretations.
+    - `Order.lean`, the definition of admissibility that fixpoint-induction proofs unfold;
   - *what a proof calls*: `walk`, and `Tactic/`, the tactics that do more than walk
     (`mass_fixpoint`, `faithful_fixpoint`) plus `support_simp` and `cost_support_simp`; and `PBT/`
     and `Tuning/`, the front ends above.
@@ -181,12 +172,13 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
   lemma sets and tactics.
 - `BasaltTest/` — regression tests, named for the library module they guard when one exists.
 - `BasaltFuzz/` — the generators, properties, and buggy operations the `basalt-fuzz` executable
-  fuzzes. Unlike the rest of the repo it is linked into a native executable, so it must stay
-  Mathlib-free; `fuzz-run/README.md` says why and records what is instrumented for coverage.
+  fuzzes. It is linked into a native executable; `fuzz-run/README.md` owns what that requires.
 - `BasaltFuzzMain.lean` — the root of the opt-in `basalt-fuzz` executable: the property registry.
   Not a default build target, since only `fuzz-run/build.sh` links it.
 - `fuzz-run/` — the `basalt-fuzz` build script, its backend benchmark, and `README.md`, which owns
   the fuzzing design and the per-platform build contract.
+- `docs/` — the project's web page (`index.html`) and `representation.md`, the background on
+  generator representations and how Basalt's relates to them.
 
 ## License
 

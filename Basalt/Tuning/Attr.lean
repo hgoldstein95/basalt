@@ -44,14 +44,13 @@ the attribute emits:
 
 - **Weights must be positive `Nat` literals.**  A literal `0` is rejected: a zero weight removes its
   branch from the generator's support, breaking `IsSoundAndComplete` (see `Basalt.Tuning.Basic`).  A zero
-  entry in a *runtime* `θ` cannot do the same damage — `Tuning.weight` clamps to `1`.
+  entry in a *runtime* `θ` cannot do the same damage (`Tuning.weight`).
 - **Site names** are `<defName>.site<i>`, numbered outside-in in traversal order.
 - **Depth**: if a `Nat` binder named `depth` is in scope at a site, that site reads its weights at
   that depth; otherwise at depth `0`.  Use `@[tunable (depth := lvl)]` when the binder is named
   something else — a name given explicitly must be found, and a site that cannot see it is an error.
-  Because the search is over the local context at the site, it finds the binder wherever the
-  recursion form happens to put it — including inside a `partial_fixpoint` functional, where it is
-  not one of the declaration's own lambda binders at all.
+  The binder is found in the site's local context, including inside a `partial_fixpoint`
+  functional.
 - **`partial_fixpoint` bodies**: the attribute rebuilds `Lean.Order.fix`'s monotonicity proof for
   the tuned body, so a combinator used there still needs its `@[partial_fixpoint_monotone]` lemma.
 -/

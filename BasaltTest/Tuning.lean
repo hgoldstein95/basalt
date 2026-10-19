@@ -14,21 +14,9 @@ meta import BasaltExamples.BST.Weighted
 /-!
 # `@[tunable]` Examples
 
-`Tree.genWeightedBST` (`BasaltExamples/BST/Weighted.lean`) is tagged `@[tunable]`,
-so the attribute emitted `Tree.genWeightedBST.tuned/.defaults/.sites/.tuned_defaults`
-alongside it. This file exercises the whole contract:
-
-1. `genWeightedBST.tuned genWeightedBST.defaults` and `genWeightedBST` are
-   interchangeable — `tuned_defaults` is definitional, and `BST.lean`'s
-   existing proofs compile unchanged.
-2. `sites` reports each site's offset, arity, and per-branch recursive calls.
-3. Two `Tuning`s can be compared in the same file with no recompilation
-   between them, and the distributions differ.
-4. A schedule with a nonzero depth coefficient produces a depth-varying
-   distribution.
-5. A literal `0` weight is rejected at elaboration.
-
-`genWeightedBST` is written with `frequency!`; section 6 has the other recursion forms.
+The whole `@[tunable]` contract (`Basalt/Tuning/Attr.lean`), one section per clause, exercised on
+`Tree.genWeightedBST` (`BasaltExamples/BST/Weighted.lean`), which is written with `frequency!`.
+Section 6 covers the other recursion forms.
 -/
 
 @[expose] public section
@@ -127,12 +115,11 @@ info: Tree.genWeightedBST.tuned ⟨#[(5, 0), (1, 0)]⟩ 0 10 — 200 draws (seed
 
 /-! ## 4. Depth-indexed schedules
 
-A generator with an explicit `depth` binder reads each site's weights at that
-depth, so a nonzero growth coefficient `b` makes the distribution
-depth-varying. Decay is expressed as base-weight *growth*: the leaf branch's
-weight grows with depth (`w(d) = 1 + 8·d`), the
-node branch's stays constant, so recursion is likely at the root and is forced
-closed a few levels down — never forbidden, so the support is unchanged. -/
+A generator with an explicit `depth` binder reads each site's weights at that depth, so a nonzero
+growth coefficient `b` makes the distribution depth-varying. Decay is expressed as base-weight
+*growth*: the leaf branch's weight grows with depth (`w(d) = 1 + 8·d`), the node branch's stays
+constant, so recursion is likely at the root and is forced closed a few levels down — never
+forbidden, so the support is unchanged. -/
 
 @[tunable]
 def genTree [Gen G] (depth : Nat) : G (BST.Tree Nat) :=
@@ -227,8 +214,8 @@ def genZero [Gen G] : G Nat := do
     (1, fun _ => pure 1)
   ] (by simp)
 
-/-! Zero entries in a *runtime* `θ` cannot break support either: they read as
-weight `1` (`Tuning.weight` clamps), so the generator is total in `θ`. -/
+/-! Zero entries in a *runtime* `θ` cannot break support either (`Tuning.weight`), so the generator
+is total in `θ`. -/
 
 /-- A `θ` of all zeros reads as all-ones (uniform), not as an empty support:
     same distribution as `⟨#[(1, 0), (1, 0)]⟩`. -/

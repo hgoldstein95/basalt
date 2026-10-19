@@ -97,12 +97,7 @@ def splitFlags (argv : Array String) : Bool × Array String :=
   -- the property, decides how far growth gets.
   let rest := if grow && !rest.any (·.startsWith "-max_len=") then rest.push "-max_len=65536"
               else rest
-  -- Linking a custom mutator makes libFuzzer disable its `-len_control` length ramp, which is what
-  -- growth wants: the mutator, not the ramp, decides how long an input needs to be. With `--grow`
-  -- off there is no mutator decision to make, so restore libFuzzer's own default and leave the
-  -- campaign as it was before growth existed. Only an *absent* flag is defaulted — passing
-  -- `-len_control=N` explicitly (including `0`) wins, which is how the two modes are compared under
-  -- one length regime.
+  -- With `--grow` off, restore libFuzzer's default `-len_control`; an explicit flag wins.
   let rest := if !grow && !rest.any (·.startsWith "-len_control=") then rest.push "-len_control=100"
               else rest
   (grow, rest)

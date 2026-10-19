@@ -70,28 +70,8 @@ public import Basalt.Walk.Sound
 /-!
 # Basalt
 
-This library provides comprehensive infrastructure for ergonomically representing PBT generators and
-proving them correct.
-
-If you want to make sure that a generator is correct, or if you plan to automate the production of
-generators (e.g., via classical program synthesis or LLM automation), this library provides a
-foundation.
-
-Generator writers should look at the `Gen` module to see the operations available in generators. For
-proving generators correct, look at `Basalt.Laws` and the examples in `BasaltExamples/`.
-
-This is the library root, and the only module that imports the library wholesale: it lists every
-module except `Basalt.Fuzz.*`, the opt-in coverage-guided fuzzing bridge, whose backend is only
-usable from the `basalt-fuzz` executable (`fuzz-run/README.md`).
-
-## Main Definitions
-
-- `SPMF` — A type of sub-probability mass functions.
-- `RandomChoice` — A type class capturing random choices.
-- `Gen` — A type class capturing all of the operations necessary for PBT generators.
-- `Sized` / `WithSize` — An ambient size parameter for generators, and a monad that supplies one.
-- `Basalt.Laws` - Correctness properties that a `Gen` may be proved to have.
-
-For information about how Basalt's generator representation relates to QuickCheck, QuickChick, and
-free generators, see `docs/representation.md`.
+The library root, and the only module that imports the library wholesale: it lists every module
+except `Basalt.Fuzz.*`, the opt-in coverage-guided fuzzing bridge, whose backend is only usable from
+the `basalt-fuzz` executable (`fuzz-run/README.md`). `docs/representation.md` relates Basalt's
+generator representation to QuickCheck, QuickChick, and free generators.
 -/

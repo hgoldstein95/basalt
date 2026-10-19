@@ -14,13 +14,9 @@ public meta import Basalt.Walk.Basic
 /-!
 # The Walker's Entry Points
 
-The `walk` tactic, and the pieces a specialized tactic builds on. A statement on an observation is
-walked with `computeBound`, and the result turned into goals for the user by the observation's
-algebra: `preconditionBound` gives one goal per path of a demonic precondition (`splitPaths`) or
-simplifies an angelic one (`prunePaths`), and `arithBound` gives one inequality to close by
-arithmetic. `walk fixpoint` first
-takes one induction step with `fixpointStep`. A relational judgment, one generator at two monads,
-walks with `walkRel`, and takes its step with `relFixpoint`.
+The `walk` tactic, and the pieces a specialized tactic builds on. `computeBound` walks a statement
+on an observation, and `walkRel` a relation between one generator at two monads; the observation's
+algebra turns the result into goals (`preconditionBound`, `arithBound`).
 -/
 
 public meta section
