@@ -459,15 +459,15 @@ distribution from one side only, and `terminates` gives the other. `approx` is t
 alone, as `<GEN>.below` and `<GEN>.approx` (`Tree.genLeftistOfRank`,
 `BasaltExamples/LeftistHeap.lean`), which a caller passes in place of `.faithful`.
 
-**`walk fixpoint`** on either relation, `src.Below (<GEN> …) (<GEN> …)` (`Basalt/Walk/Ideal.lean`)
-or `IOModel.Approx (<GEN> …) (<GEN> …)` (`Basalt/Walk/IO.lean`), inducts on one side (`SPMF`,
+**`walk fixpoint`** on either relation, `src.Below (<GEN> …) (<GEN> …)` (`Basalt/IO/Ideal.lean`)
+or `IOModel.Approx (<GEN> …) (<GEN> …)` (`Basalt/IO/Approx.lean`), inducts on one side (`SPMF`,
 `IOModel`), unfolds the other side one step, and walks the two together; `faithful_fixpoint`
 (`Basalt/Tactic/Faithful.lean`) runs both, passing a callee's `.faithful` law as its `below` and
 `approx`. A recursive occurrence is closed by `ih`, a callee by the fact you pass (`h.below`,
 `h.approx`), and a combinator with no rule is unfolded on both sides, as is a helper that is not
-recursive. A recursive combinator of your own needs a `@[gen_rule]` relating it at each pair of
-monads: prove it once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`)
-and instantiate it (`IdealSource.below_listOf`, `IOModel.approx_listOf`).
+recursive. A recursive combinator of your own needs a `@[gen_rel_rule]` relating it at the two
+monads, proved once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`);
+each relation applies it through its `@[walk_rel]` proof that it is one (`IOModel.genRel`).
 
 ## When Stuck
 

@@ -5,11 +5,9 @@ Authors: Harrison Goldstein
 -/
 module
 
-public import Basalt.GenRel
 public import Basalt.IO.SplitMix
 public import Basalt.SPMF.Expect.Obs
 public import Basalt.SPMF.Mass
-public import Basalt.Walk.Attr
 
 /-!
 # The Ideal PRNG
@@ -73,17 +71,14 @@ theorem mono {f g : σ → ℝ≥0∞} (h : ∀ s, f s ≤ g s) : src.E f ≤ sr
     _ = src.E g := congrArg src.E (funext fun s => add_tsub_cancel_of_le (h s))
 
 /-- `y` expects no more of any continuation than `x` delivers on the ideal source. -/
-@[walk_rel]
 def Below (y : SPMF α) (x : WordModel σ α) : Prop :=
   ∀ G : α → σ → ℝ≥0∞, expectObs.spec y (fun a => src.E (G a)) ≤ src.E (x.runE G)
 
-@[gen_rule]
 theorem below_pure (a : α) : src.Below (Pure.pure a) (Pure.pure a) := fun G => by
   show expect _ _ ≤ _
   rw [expect_pure]
   rfl
 
-@[gen_rule]
 theorem below_bind {y : SPMF α} {x : WordModel σ α} {k' : α → SPMF β} {k : α → WordModel σ β}
     (hk : ∀ a, src.Below (k' a) (k a)) (hx : src.Below y x) : src.Below (y >>= k') (x >>= k) :=
   fun G => by
@@ -95,26 +90,11 @@ theorem below_bind {y : SPMF α} {x : WordModel σ α} {k' : α → SPMF β} {k 
     simp only [WordModel.runE, StateT.run_bind]
     cases x.run s <;> rfl
 
-@[gen_rule]
 theorem below_map {y : SPMF α} {x : WordModel σ α} (f : α → β) (hx : src.Below y x) :
     src.Below (f <$> y) (f <$> x) := by
   rw [← bind_pure_comp, ← bind_pure_comp]
   exact src.below_bind (fun a => src.below_pure (f a)) hx
 
-@[gen_rule]
-theorem below_ite {p : Prop} [Decidable p] {y₁ y₂ : SPMF α} {x₁ x₂ : WordModel σ α}
-    (h₁ : p → src.Below y₁ x₁) (h₂ : ¬p → src.Below y₂ x₂) :
-    src.Below (if p then y₁ else y₂) (if p then x₁ else x₂) :=
-  GenRel.ite h₁ h₂
-
-@[gen_rule]
-theorem below_dite {p : Prop} [Decidable p] {y₁ : p → SPMF α} {y₂ : ¬p → SPMF α}
-    {x₁ : p → WordModel σ α} {x₂ : ¬p → WordModel σ α}
-    (h₁ : ∀ h, src.Below (y₁ h) (x₁ h)) (h₂ : ∀ h, src.Below (y₂ h) (x₂ h)) :
-    src.Below (if h : p then y₁ h else y₂ h) (if h : p then x₁ h else x₂ h) :=
-  GenRel.dite h₁ h₂
-
-@[gen_rule]
 theorem below_default (x : WordModel σ α) : src.Below default x := fun G => by
   simp [expectObs, expect, default_apply]
 

@@ -9,6 +9,7 @@ public meta import Lean.Meta.Tactic.Split
 public import Mathlib.Data.Int.Cast.Basic
 public import Mathlib.Order.PropInstances
 public import Basalt.Obs.Presentation
+import Basalt.GenRel.Basic
 public meta import Basalt.Walk.Basic
 
 /-!
@@ -78,14 +79,16 @@ private partial def mkAdmissible (gTy : Expr) (leaf : Array Expr → MetaM Expr)
   | _ => leaf ys
 
 /-- The generator definition that `x` applies, and its `fixpointSeed?`: `none` when it is not
-recursive. `tac` is the caller, `combinatorHint` how to prove the statement about a combinator term,
-and `recursiveHint` how to prove it about a recursive generator that is not a `partial_fixpoint`
-once inducted on, for the errors. -/
-def fixpointGen (tac combinatorHint recursiveHint : String) (x : Expr) :
-    MetaM (Name × Option (Name × Array Nat)) := do
+recursive. The statement to prove about `x` is of judgment `j`, on the observation `obs?` for a
+bound, which must not already know `x`'s head (`Judgment.knows`). `tac` is the caller,
+`combinatorHint` how to prove the statement about a combinator term, and `recursiveHint` how to
+prove it about a recursive generator that is not a `partial_fixpoint` once inducted on, for the
+errors. -/
+def fixpointGen (tac combinatorHint recursiveHint : String) (j : Judgment) (obs? : Option Name)
+    (x : Expr) : MetaM (Name × Option (Name × Array Nat)) := do
   let some gen := x.getAppFn.constName?
     | throwError "{tac}: expected a generator applied to its arguments, got{indentExpr x}"
-  if isCombinator (← getEnv) gen then
+  if ← j.knows obs? x then
     throwError "{tac}: `{gen}` is a combinator, not a generator definition; prove {combinatorHint}"
   let seed? ← fixpointSeed? gen
   if seed?.isNone && (← isRecursiveDefinition gen) then
@@ -93,17 +96,18 @@ def fixpointGen (tac combinatorHint recursiveHint : String) (x : Expr) :
       argument, {recursiveHint}"
   return (gen, seed?)
 
-/-- One step of `gen.fixpoint_induct` on `goal`, a statement `P (gen a₁ … aₙ)` about the generator
-application `x`: the induction is over the arguments some recursive call of `gen` changes, and the
-goal returned has the recursive function (named after `gen`), `ih`, and those arguments introduced.
-`adm` proves `admissible P`; the motive is read off it, generalized over the changing arguments. A
-`gen` that is not recursive is unfolded instead, which the `Bool` returned says. `tac` is the
-caller, and `boundTac` the tactic it runs on the goal returned, for the errors. -/
-def fixpointStep (tac boundTac : String) (x adm : Expr) (goal : MVarId) :
-    TermElabM (MVarId × Bool) := goal.withContext do
+/-- One step of `gen.fixpoint_induct` on `goal`, a statement `P (gen a₁ … aₙ)` of judgment `j`
+(on the observation `obs?`, for a bound) about the generator application `x`: the induction is over
+the arguments some recursive call of `gen` changes, and the goal returned has the recursive function
+(named after `gen`), `ih`, and those arguments introduced. `adm` proves `admissible P`; the motive is
+read off it, generalized over the changing arguments. A `gen` that is not recursive is unfolded
+instead, which the `Bool` returned says. `tac` is the caller, and `boundTac` the tactic it runs on
+the goal returned, for the errors. -/
+def fixpointStep (tac boundTac : String) (j : Judgment) (obs? : Option Name) (x adm : Expr)
+    (goal : MVarId) : TermElabM (MVarId × Bool) := goal.withContext do
   let ty ← instantiateMVars (← goal.getType)
   let (gen, seed?) ← fixpointGen tac s!"a bound on a combinator term with `{boundTac}`"
-    s!"unfold it, and apply `{boundTac}`" x
+    s!"unfold it, and apply `{boundTac}`" j obs? x
   let some (indName, seed) := seed?
     | let [goal] ← Lean.Elab.Tactic.run goal (evalTactic (← `(tactic| unfold $(mkIdent gen))))
         | throwError "{tac}: could not unfold `{gen}`"
@@ -184,16 +188,34 @@ def walkRel (tac : String) (rel : Name) (extras : Array Term) (goal : MVarId) :
   let lctx := (← goal.getDecl).lctx
   (← walk extras goal).mapM fun g => tidy lctx g
 
+/-- The `admissible` field of `genRel`, the proof that `rel` is a `GenRel`, instantiated to the
+motive `fun y => rel … y x` of the goal `rel … y x` whose arguments are `args`. `tac` is the caller,
+for the error. -/
+private def relAdmissible (tac : String) (rel genRel : Name) (args : Array Expr) : MetaM Expr := do
+  let w ← mkConstWithFreshMVarLevels genRel
+  let (xs, bis, _) ← forallMetaTelescope (← inferType w)
+  let adm ← applyBridge ``GenRel.admissible (mkAppN w xs)
+  let (ys, _, concl) ← forallMetaTelescope (← inferType adm)
+  let i := args.size - 2
+  let P ← withLocalDeclD `y (← inferType args[i]!) fun y => do
+    mkLambdaFVars #[y] (← mkAppOptM rel ((args.set! i y).map some))
+  unless ← isDefEq concl.appArg! P do
+    throwError "{tac}: `{.ofConstName genRel}` does not prove{indentExpr P}\nadmissible"
+  synthInstMVars xs bis
+  instantiateMVars (mkAppN adm ys)
+
 /-- `rel … (gen a₁ … aₙ) (gen a₁ … aₙ)`: one step of `gen.fixpoint_induct` on `y`'s side, admissible
-by `adm` of the goal's arguments, `x`'s side unfolded one step, and the two walked together
-(`walkRel`). A `gen` that is not recursive is unfolded on both sides and walked. -/
-def relFixpoint (tac boundTac : String) (rel : Name) (adm : Array Expr → MetaM Expr)
-    (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) := goal.withContext do
+by the `admissible` field of `genRel`, the proof that `rel` is a `GenRel`, `x`'s side unfolded one
+step, and the two walked together (`walkRel`). A `gen` that is not recursive is unfolded on both
+sides and walked. -/
+def relFixpoint (tac boundTac : String) (rel genRel : Name) (extras : Array Term)
+    (goal : MVarId) : TermElabM (List MVarId) := goal.withContext do
   let args ← parseRel tac rel goal
   let y := args[args.size - 2]!
   let some gen := y.getAppFn.constName?
     | throwError "{tac}: expected a generator applied to its arguments, got{indentExpr y}"
-  let (step, inducted) ← fixpointStep tac boundTac y (← adm args) goal
+  let (step, inducted) ← fixpointStep tac boundTac (.rel rel genRel) none y
+    (← relAdmissible tac rel genRel args) goal
   -- `eq_def`, not the equation lemmas: a generator defined by cases has one per case.
   let step ← if inducted then
       match ← Lean.Elab.Tactic.run step
@@ -360,8 +382,8 @@ private def notASpec (ty : Expr) : MetaM MessageData := do
       else pure m!""
     | none => pure m!""
   return m!"walk: expected a statement on an observation, `O.spec (gen …) post`, \
-    `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation tagged `@[walk_rel]`, \
-    got{indentExpr ty}{hint}"
+    `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation registered by \
+    `@[walk_rel]`, got{indentExpr ty}{hint}"
 
 /-- `e` with its leading lambda binders renamed `ns`, in order. -/
 private def nameLambdas : Expr → List Name → Expr
@@ -386,7 +408,7 @@ partial def walkGoal (extras : Array Term) (goal : MVarId) : TermElabM (List MVa
   goal.withContext do
   let ty ← goalStatement goal
   if let some rel := ty.getAppFn.constName? then
-    if isWalkRel (← getEnv) rel then return ← walkRel "walk" rel extras goal
+    if (relJudgment? (← getEnv) rel).isSome then return ← walkRel "walk" rel extras goal
   let some sg := specGoal? ty | throwError (← notASpec ty)
   let goal ← goal.replaceTargetDefEq ty
   match sg.bound with
@@ -397,22 +419,6 @@ partial def walkGoal (extras : Array Term) (goal : MVarId) : TermElabM (List MVa
     else
       preconditionBound (fun lctx g => do (← splitPaths g).mapM (tidy lctx ·)) extras sg.obs sg.g
         post goal
-
-/-- `rel.admissible`, instantiated to the motive `fun y => rel … y x` of the goal `rel … y x` whose
-arguments are `args`. -/
-private def relAdmissible (rel : Name) (args : Array Expr) : MetaM Expr := do
-  let lemName := rel ++ `admissible
-  unless (← getEnv).contains lemName do
-    throwError "walk fixpoint: no `{.ofConstName lemName}` to induct on `{.ofConstName rel}` with"
-  let lem ← mkConstWithFreshMVarLevels lemName
-  let (xs, bis, concl) ← forallMetaTelescope (← inferType lem)
-  let i := args.size - 2
-  let P ← withLocalDeclD `y (← inferType args[i]!) fun y => do
-    mkLambdaFVars #[y] (← mkAppOptM rel ((args.set! i y).map some))
-  unless ← isDefEq concl.appArg! P do
-    throwError "walk fixpoint: `{.ofConstName lemName}` does not prove{indentExpr P}\nadmissible"
-  synthInstMVars xs bis
-  instantiateMVars (mkAppN lem xs)
 
 /-- The admissibility of `sg`'s statement, for fixpoint induction on its generator: `O.admissible`
 for an observation into `Prop`, `O.admissible_le` for an upper bound. -/
@@ -438,11 +444,14 @@ def walkFixpoint (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
   goal.withContext do
   let ty ← goalStatement goal
   if let some rel := ty.getAppFn.constName? then
-    if isWalkRel (← getEnv) rel then
-      return ← relFixpoint "walk fixpoint" "walk" rel (relAdmissible rel) extras goal
+    if let some (.rel _ genRel) := relJudgment? (← getEnv) rel then
+      return ← relFixpoint "walk fixpoint" "walk" rel genRel extras goal
   let some sg := specGoal? ty | throwError (← notASpec ty)
   let goal ← goal.replaceTargetDefEq ty
-  walkGoal extras (← fixpointStep "walk fixpoint" "walk" sg.g (← specAdmissible sg) goal).1
+  -- A statement by itself is walked as a lower bound (`preconditionBound`).
+  let j := .spec (sg.bound.any fun (_, lower) => !lower)
+  walkGoal extras
+    (← fixpointStep "walk fixpoint" "walk" j sg.obs sg.g (← specAdmissible sg) goal).1
 
 /-- The error for a fact passed in the form a reader checks: `h : L …` when `L.obs` exists. -/
 def checkFact (t : Term) : TermElabM Unit := do
@@ -462,7 +471,7 @@ the callees' laws. What is left depends on the goal:
   with the branches that cannot satisfy `P` pruned;
 * `b ≤ O.spec (gen …) f` or `O.spec (gen …) f ≤ b` (mass, expectation): one inequality between `b`
   and the bound the walk computed;
-* a `@[walk_rel]` relation (`IsFaithful`'s fields): whatever relates the two sides.
+* a relation registered by `@[walk_rel]` (`IsFaithful`'s fields): whatever relates the two sides.
 
 A value drawn by `let x ← …` is `x✝` in what is left, with what is known of it as `h_x✝` (and its
 cost as `n_x✝`); name them with `next x h_x =>`.

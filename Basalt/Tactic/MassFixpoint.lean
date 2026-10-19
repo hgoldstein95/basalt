@@ -59,9 +59,10 @@ elab_rules : tactic
       | throwError "mass_fixpoint: expected a goal `IsAlmostSurelyTerminating (gen …)`, \
           got{indentExpr ty}"
     let restate := "`rw [IsAlmostSurelyTerminating.iff_obs]`"
+    -- The step is walked as a lower bound on `expectObs`.
     let (gen, seed?) ← fixpointGen "mass_fixpoint"
       s!"the termination of a combinator term with {restate} and `walk`"
-      s!"{restate}, unfold it, and `walk`" x
+      s!"{restate}, unfold it, and `walk`" (.spec false) ``SPMF.expectObs x
     let args := x.getAppArgs
     let seed := (seed?.map (·.2)).getD #[]
     unless seed.all (· < args.size) do

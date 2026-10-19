@@ -376,17 +376,45 @@ def fixpointSeed? (gen : Name) : MetaM (Option (Name × Array Nat)) := do
         | throwError "`{gen}`'s fixpoint abstracts something other than an argument"
       return k)
 
+/-! ## What a judgment knows -/
+
+/-- `lems`, less the rules stated for an observation other than `obs?`. Observations share a rule
+key, so a combinator with no rule for this one would otherwise report a rule for another failing to
+unify. -/
+private def rulesForObs (obs? : Option Name) (lems : Array Name) : MetaM (Array Name) := do
+  let some obs := obs? | return lems
+  lems.filterM fun lem => do
+    forallTelescope (← getConstInfo lem).type fun _ concl => do
+      return (specObs? (← whnfR concl)).all (·.1 == obs)
+
+/-- `j`'s own rules about `g`'s combinator, less those for an observation other than `obs?`. -/
+private def ownRules (j : Judgment) (obs? : Option Name) (g : Expr) : MetaM (Array Name) := do
+  let some head ← j.ruleHead? g | return #[]
+  rulesForObs obs? ((rulesFor (← getEnv) j.key head).getD #[])
+
+/-- Whether the walk proves a statement of judgment `j` about `g`, on the observation `obs?` for a
+bound, without unfolding `g`'s head: `j` has a rule for it, or, on a relation, a `@[gen_rel_rule]`,
+or, on an observation, a `@[gen_map]` lemma. -/
+def Judgment.knows (j : Judgment) (obs? : Option Name) (g : Expr) : MetaM Bool := do
+  unless (← ownRules j obs? g).isEmpty do return true
+  let env ← getEnv
+  let some head := g.getAppFn.constName? | return false
+  return match j with
+    | .rel .. => !(genRelRulesFor env head).isEmpty
+    | .spec _ => (mapFor env head).isSome
+    | .mix _ => false
+
 /-! ## Unfolding a definition -/
 
-/-- `g` with its head unfolded one step, when the head is a non-recursive definition with no rule:
-a derived combinator or a helper, which is walked through rather than taught to the walker. A
-combinator with a rule (unless `combinators`), a recursive definition, a matcher, a projection, and
-an instance are not unfolded. Returns the head's name with the body. -/
-def unfold? (g : Expr) (combinators := false) : MetaM (Option (Name × Expr)) := do
+/-- `g` with its head unfolded one step, when the head is a non-recursive definition that `j` does
+not know (`Judgment.knows`): a derived combinator or a helper, which is walked through rather than
+taught to the walker. A recursive definition, a matcher, a projection, and an instance are not
+unfolded. Returns the head's name with the body. -/
+def unfold? (j : Judgment) (obs? : Option Name) (g : Expr) : MetaM (Option (Name × Expr)) := do
   let .const c us := g.getAppFn | return none
   let env ← getEnv
-  if (!combinators && isCombinator env c) || isMatcherCore env c || env.isProjectionFn c then
-    return none
+  if isMatcherCore env c || env.isProjectionFn c then return none
+  if ← j.knows obs? g then return none
   if ← isInstance c then return none
   let some (.defnInfo info) := env.find? c | return none
   if ← isRecursiveDefinition c then return none
@@ -492,33 +520,39 @@ def adapters : Judgment → Array Name
 abbrev WalkRest := List MVarId → TermElabM (List MVarId)
 
 /-- `lem` applied to `goal`, the binders of the bound it computes named after the value the goal's
-postcondition binds or, on the shape of a draw, after the value drawn. -/
-private def applyRule (goal : MVarId) (lem : Name) : TermElabM (List MVarId) := do
-  let rule ← mkConstWithFreshMVarLevels lem
+postcondition binds or, on the shape of a draw, after the value drawn. A `@[gen_rel_rule]` is first
+applied to `genRel?`, the relation's proof that it is a `GenRel`. -/
+private def applyRule (goal : MVarId) (lem : Name) (genRel? : Option Name := none) :
+    TermElabM (List MVarId) := do
+  let mut rule ← mkConstWithFreshMVarLevels lem
+  if let some w := genRel? then
+    let w ← mkConstWithFreshMVarLevels w
+    let (xs, _, _) ← forallMetaTelescope (← inferType w)
+    let w := mkAppN w xs
+    try rule ← applyBridge lem w
+    catch _ => throwError "walk: `{lem}` does not apply to{indentExpr (← inferType w)}"
   let tag ← goal.getTag
   let post := postNames (← instantiateMVars (← goal.getType))
   let names := if drawTag.isPrefixOf tag then some (tag.replacePrefix drawTag .anonymous, none)
     else post
   applyExact goal (← mkExpectedTypeHint rule (nameBound (← inferType rule) names))
 
-/-- `lems`, less the rules stated for an observation other than the one `goal` bounds. Observations
-share a rule key, so a combinator with no rule for this one would otherwise report a rule for
-another failing to unify. -/
-private def rulesForObs (goal : MVarId) (lems : Array Name) : MetaM (Array Name) := do
-  let some (obs, _) := specObs? (← whnfR (← instantiateMVars (← goal.getType))) | return lems
-  lems.filterM fun lem => do
-    forallTelescope (← getConstInfo lem).type fun _ concl => do
-      return (specObs? (← whnfR concl)).all (·.1 == obs)
-
-/-- `g`'s combinator's rules for `j`, then its `@[gen_map]` lemma read into the algebra's shapes. -/
-private def tryRules (j : Judgment) (goal : MVarId) (g : Expr) (rest : WalkRest) :
-    TermElabM (Option (List MVarId)) := do
+/-- `g`'s combinator's rules for `j`, on the observation `obs?` for a bound, then, on a relation,
+its `@[gen_rel_rule]`s through the relation's proof that it is a `GenRel`, then its `@[gen_map]`
+lemma read into the algebra's shapes. -/
+private def tryRules (j : Judgment) (obs? : Option Name) (goal : MVarId) (g : Expr)
+    (rest : WalkRest) : TermElabM (Option (List MVarId)) := do
   let finish (premises : List MVarId) := do
     rest (← namePremises (some g) (← goal.getType) premises)
-  if let some lems := (← j.ruleHead? g).bind (rulesFor (← getEnv) j.key) then
-    let lems ← rulesForObs goal lems
-    if let some gs ← firstApplying lems (applyRule goal) finish then return some gs
-  let some mapLem := g.getAppFn.constName?.bind (mapFor (← getEnv)) | return none
+  let env ← getEnv
+  let own ← ownRules j obs? g
+  let viaGenRel := match j, g.getAppFn.constName? with
+    | .rel _ w, some head => (genRelRulesFor env head).map (·, some w)
+    | _, _ => #[]
+  let lems := own.map (·, none) ++ viaGenRel
+  if let some gs ← firstApplying lems (fun (lem, w) => applyRule goal lem w) finish then
+    return some gs
+  let some mapLem := g.getAppFn.constName?.bind (mapFor env) | return none
   firstApplying (adapters j) (applyMap · mapLem goal) finish
 
 /-- `t`, a fact a caller passed, elaborated with its metavariables instantiated: an error is thrown,
@@ -641,8 +675,9 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
   let goal ← if g' == g then pure goal else goal.change (restate g')
   let g := g'
   let rest := walkAll extras
+  let obs? := (specObs? (← whnfR (← instantiateMVars (← goal.getType)))).map (·.1)
   -- Rules that all fail leave a fact to try, and their error is reported only if none applies.
-  let rules ← attempt (tryRules j goal g rest)
+  let rules ← attempt (tryRules j obs? goal g rest)
   if let .ok (some gs) := rules then return gs
   if let some gs ← tryFacts leaves extras goal g rest then return gs
   -- Where the generator may be left in the bound as itself, a combinator none of whose rules is
@@ -650,7 +685,7 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
   if leaves.self.isEmpty then
     if let .error ex := rules then throw ex
   -- Unfolding comes after the facts, so that a caller's fact stays an abstraction boundary.
-  if let some (c, body) ← unfold? g j.unfoldsCombinators then
+  if let some (c, body) ← unfold? j obs? g then
     let goal ← goal.change (restate body)
     try return ← walk extras goal
     catch ex => throwError "{ex.toMessageData}\n(in the unfolding of `{c}`)"

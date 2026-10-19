@@ -167,11 +167,11 @@ def matchCongr? (j : Judgment) (goal : MVarId) (restate : Expr → Expr) (g : Ex
   let ty ← instantiateMVars (restate g)
   let some i := (match j with
       | .spec upper => some (if upper then 3 else 2)
-      | .rel _ => some (ty.getAppNumArgs - 1)
+      | .rel .. => some (ty.getAppNumArgs - 1)
       | .mix _ => none) | return none
   let other ← instantiateMVars (ty.getArg! i)
   let some (β, uβ, cs) ← (match j with
-    | .rel _ => do
+    | .rel .. => do
       let some mb ← matchMatcherApp? other | return none
       unless mb.matcherName == ma.matcherName && mb.remaining.isEmpty do return none
       let (xs, ys) := (ma.params ++ ma.discrs, mb.params ++ mb.discrs)

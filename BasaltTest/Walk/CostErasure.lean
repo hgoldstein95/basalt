@@ -37,7 +37,7 @@ example : IsCostFaithful List.arbitrary :=
 /--
 error: no rule, hypothesis, or fact relates
   Nat.arbitrary
-to its counterpart. Pass a fact about it to `walk [_]`; a recursive combinator needs a `SPMF.Cost.ErasedLe` rule of its own.
+to its counterpart. Pass a fact about it to `walk [_]`; a recursive combinator needs a `@[gen_rel_rule]` relating it under every `GenRel` (as `GenRel.listOf` does) or a `@[gen_rule]` relating it under `SPMF.Cost.ErasedLe` alone.
 (in the unfolding of `oneOfWith`)
 -/
 #guard_msgs in

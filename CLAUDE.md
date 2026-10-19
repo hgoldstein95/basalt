@@ -84,13 +84,15 @@ definition, and the definition is right here to run.
     judgment in [Basalt/Walk/](Basalt/Walk/), each pinned by its namesake in
     [BasaltTest/Walk/](BasaltTest/Walk/). The admissibility `walk fixpoint` needs sits beside the
     observation or relation it is about.
-  - Judgments that relate a generator at two monads (`@[walk_rel]`): `src.Below` —
-    [Basalt/Walk/Ideal.lean](Basalt/Walk/Ideal.lean); `IOModel.Approx` —
-    [Basalt/Walk/IO.lean](Basalt/Walk/IO.lean); cost erasure, `SPMF.Cost.ErasedLe` and
-    `SPMF.Cost.LeErased` — defined in [Basalt/SPMF/CostErasure.lean](Basalt/SPMF/CostErasure.lean),
-    walked in [Basalt/Walk/CostErasure.lean](Basalt/Walk/CostErasure.lean), pinned by
-    [BasaltTest/Walk/CostErasure.lean](BasaltTest/Walk/CostErasure.lean). Their combinator rules
-    are instances of [Basalt/GenRel.lean](Basalt/GenRel.lean).
+  - Judgments that relate a generator at two monads, each registered by a `@[walk_rel]` proof that
+    it is a `GenRel` ([Basalt/GenRel/Basic.lean](Basalt/GenRel/Basic.lean)): `IOModel.Approx` —
+    [Basalt/IO/Approx.lean](Basalt/IO/Approx.lean); `src.Below` — defined in
+    [Basalt/IO/Ideal.lean](Basalt/IO/Ideal.lean), registered in
+    [Basalt/IO/Choose.lean](Basalt/IO/Choose.lean) beside the draw it needs; cost erasure,
+    `SPMF.Cost.ErasedLe` and `SPMF.Cost.LeErased` —
+    [Basalt/SPMF/CostErasure.lean](Basalt/SPMF/CostErasure.lean), pinned by
+    [BasaltTest/Walk/CostErasure.lean](BasaltTest/Walk/CostErasure.lean). Their rules are the
+    `@[gen_rel_rule]`s of [Basalt/GenRel.lean](Basalt/GenRel.lean), applied to that proof.
   - The tactics that do more than walk — [Basalt/Tactic/](Basalt/Tactic/): `support_simp`,
     `mass_fixpoint` (above), and `faithful_fixpoint`
     ([Basalt/Tactic/Faithful.lean](Basalt/Tactic/Faithful.lean), pinned by

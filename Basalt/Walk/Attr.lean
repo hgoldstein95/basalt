@@ -8,17 +8,19 @@ module
 public meta import Lean.Elab.InfoTree.Main
 public meta import Lean.Meta.Basic
 public meta import Lean.Meta.Tactic.Simp.Attr
+import Basalt.GenRel.Basic
 public import Basalt.Obs.Basic
 
 /-!
 # The Walker's Judgments and Registries
 
 The judgments the generator walker (`Basalt/Walk/Basic.lean`) proves, and its registries: the
-relations a file registers (`@[walk_rel]`), the shapes of choice (`@[mix_shape]`), the `@[gen_rule]`
-rules, keyed by judgment and by the head constant of what the rule is about; the `@[gen_map]`
-lemmas, keyed by combinator; the `@[obs_leaf]` lemmas, keyed by observation; the `@[spec_apply]`
-simp set; and the `@[gen_branches]` relations. Each attribute reads its key off the statement it
-tags, and fails on one it cannot.
+relations a file registers by their proofs that they are `GenRel`s (`@[walk_rel]`), the shapes of
+choice (`@[mix_shape]`), the `@[gen_rule]` rules, keyed by judgment and by the head constant of
+what the rule is about; the `@[gen_rel_rule]` rules for every `GenRel` and the `@[gen_map]` lemmas,
+keyed by combinator; the `@[obs_leaf]` lemmas, keyed by observation; the `@[spec_apply]` simp set;
+and the `@[gen_branches]` relations. Each attribute reads its key off the statement it tags, and
+fails on one it cannot.
 -/
 
 public meta section
@@ -100,9 +102,10 @@ inductive Judgment where
   bounds on what its outcomes mean. The "generator" is the shape, so a rule is keyed by it. -/
   | mix (upper : Bool)
   /-- `rel … y x`: one generator at two monads, related construct by construct, `y` the side the
-  induction is on and the one a rule is keyed by. A combinator with no rule is unfolded on both
-  sides, which stay in step because they are one term; a leaf is a hypothesis or a fact. -/
-  | rel (rel : Name)
+  induction is on and the one a rule is keyed by. `genRel` proves `rel` a `GenRel`, and the
+  `@[gen_rel_rule]`s apply to it. A combinator with no rule is unfolded on both sides, which stay
+  in step because they are one term; a leaf is a hypothesis or a fact. -/
+  | rel (rel genRel : Name)
 
 namespace Judgment
 
@@ -113,7 +116,7 @@ private def side (upper : Bool) : Nat := if upper then 2 else 3
 def key : Judgment → Name
   | spec upper => if upper then ``Obs.spec else ``Obs.spec ++ `ge
   | mix upper => if upper then `mix else `mix ++ `ge
-  | rel r => r
+  | rel r _ => r
 
 /-- On a statement already in `whnfR`: the subject it is about, and how to restate it about a
 subject that is definitionally equal. -/
@@ -128,7 +131,7 @@ def subject? (env : Environment) (j : Judgment) (ty : Expr) : Option (Expr × (E
     let shape := ty.getArg! (side upper)
     guard (isMixShape env shape)
     return (shape, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! (side upper) g))
-  | rel r => do
+  | rel r _ => do
     guard (ty.isAppOf r && 2 ≤ ty.getAppNumArgs)
     let i := ty.getAppNumArgs - 2
     return (ty.getArg! i, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! i g))
@@ -145,13 +148,10 @@ def noLeaf (j : Judgment) (g : Expr) : MessageData :=
   | spec _ => m!"no rule, `@[gen_map]` lemma, hypothesis, or fact bounds{indentExpr g}\n\
       Pass a fact about it to `walk [_]`."
   | mix _ => m!"no rule bounds the choice{indentExpr g}"
-  | rel r => m!"no rule, hypothesis, or fact relates{indentExpr g}\nto its counterpart. Pass a \
-      fact about it to `walk [_]`; a recursive combinator needs a `{r}` rule of its own."
-
-/-- Whether a combinator with no rule is unfolded rather than being an error. -/
-def unfoldsCombinators : Judgment → Bool
-  | rel .. => true
-  | _ => false
+  | rel r _ => m!"no rule, hypothesis, or fact relates{indentExpr g}\nto its counterpart. Pass a \
+      fact about it to `walk [_]`; a recursive combinator needs a `@[gen_rel_rule]` relating it \
+      under every `GenRel` (as `GenRel.listOf` does) or a `@[gen_rule]` relating it under `{r}` \
+      alone."
 
 end Judgment
 
@@ -167,22 +167,33 @@ observation and on a choice. -/
 def judgments (env : Environment) : Array Judgment :=
   judgmentExt.getState env ++ #[.spec true, .mix true, .spec false, .mix false]
 
-/-- `@[walk_rel]` on a relation `rel … y x` between one generator at two monads — the walker's
-judgment relating them construct by construct. `walk fixpoint` inducts on `y` with
-`rel.admissible`. -/
+/-- The judgment of the relation `rel`, when a `@[walk_rel]` proof registers it. -/
+def relJudgment? (env : Environment) (rel : Name) : Option Judgment :=
+  (judgmentExt.getState env).find? fun | .rel r _ => r == rel | _ => false
+
+/-- `@[walk_rel]` on a proof of `GenRel M N R`, for a relation `R … y x` between one generator at
+two monads — the walker's judgment relating them construct by construct: by `R`'s own
+`@[gen_rule]`s, then by the `@[gen_rel_rule]`s applied to this proof. `walk fixpoint` inducts on `y`
+with the proof's `admissible`. -/
 syntax (name := walkRelAttr) "walk_rel" : attr
 
 initialize registerBuiltinAttribute {
   name := `walkRelAttr
-  descr := "a relation between one generator at two monads, proved by the generator walker"
+  descr := "a proof that a relation between one generator at two monads is a `GenRel`, by which \
+    the generator walker proves it"
   add := fun declName _ kind => do
     unless kind == .global do throwError "walk_rel: must be a global attribute"
-    modifyEnv (judgmentExt.addEntry · (.rel declName))
+    let rel ← MetaM.run' <| forallTelescope (← getConstInfo declName).type fun _ concl => do
+      unless concl.isAppOfArity ``GenRel 5 do
+        throwError "walk_rel: `{declName}` must conclude `GenRel M N R`"
+      let some rel := concl.appArg!.eta.getAppFn.constName?
+        | throwError "walk_rel: the relation of `{declName}` must be a constant applied to \
+            arguments"
+      return rel
+    if let some (.rel _ w) := relJudgment? (← getEnv) rel then
+      throwError "walk_rel: `{rel}` is already registered by `{w}`"
+    modifyEnv (judgmentExt.addEntry · (.rel rel declName))
 }
-
-/-- Whether `head` is a relation tagged `@[walk_rel]`. -/
-def isWalkRel (env : Environment) (head : Name) : Bool :=
-  (judgmentExt.getState env).any fun | .rel r => r == head | _ => false
 
 /-! ## Leaves of a bound on an observation -/
 
@@ -267,12 +278,6 @@ initialize genMapExt : SimplePersistentEnvExtension (Name × Name) (NameMap Name
 def mapFor (env : Environment) (head : Name) : Option Name :=
   (genMapExt.getState env).find? head
 
-/-- Whether `head` is a combinator: some judgment has a rule for it, or it has a `@[gen_map]`
-lemma. -/
-def isCombinator (env : Environment) (head : Name) : Bool :=
-  ((genRuleExt.getState env).any fun _ byHead => byHead.contains head)
-    || (genMapExt.getState env).contains head
-
 /-- The judgment a rule concludes and the combinator it is about. -/
 def ruleKey (declName : Name) (type : Expr) : MetaM (Name × Name) :=
   forallTelescope type fun _ concl => do
@@ -284,6 +289,47 @@ def ruleKey (declName : Name) (type : Expr) : MetaM (Name × Name) :=
           return (j.key, head)
     throwError "gen_rule: `{declName}` must conclude a judgment about a combinator application \
       (one of {js.map (·.key)}), not{indentExpr concl}"
+
+/-- Combinator head constant ↦ its `@[gen_rel_rule]` rules, in declaration order. -/
+initialize genRelRuleExt : SimplePersistentEnvExtension (Name × Name) (NameMap (Array Name)) ←
+  let add (m : NameMap (Array Name)) : Name × Name → NameMap (Array Name)
+    | (k, v) => m.insert k (((m.find? k).getD #[]).push v)
+  registerSimplePersistentEnvExtension {
+    addEntryFn := add
+    addImportedFn := fun ess => ess.foldl (fun m es => es.foldl add m) {}
+  }
+
+/-- The `@[gen_rel_rule]` rules about generators headed by `head`. -/
+def genRelRulesFor (env : Environment) (head : Name) : Array Name :=
+  ((genRelRuleExt.getState env).find? head).getD #[]
+
+/-- `@[gen_rel_rule]` — teach the generator walker one combinator's rule for every relation that is
+a `GenRel`: a lemma whose first explicit argument is `h : GenRel M N R` and that concludes
+`R (<combinator> …) x`. The walker applies it to a relation's `@[walk_rel]` proof, after the
+relation's own `@[gen_rule]`s. -/
+syntax (name := genRelRuleAttr) "gen_rel_rule" : attr
+
+initialize registerBuiltinAttribute {
+  name := `genRelRuleAttr
+  descr := "a rule for one generator combinator, under every relation that is a `GenRel`"
+  add := fun declName _ kind => do
+    unless kind == .global do throwError "gen_rel_rule: must be a global attribute"
+    let head ← MetaM.run' <| forallTelescope (← getConstInfo declName).type fun xs concl => do
+      let explicit ← xs.filterM fun x => return (← x.fvarId!.getBinderInfo).isExplicit
+      let some h := explicit[0]? | throwError "gen_rel_rule: `{declName}` takes no explicit argument"
+      let hTy ← inferType h
+      unless hTy.isAppOfArity ``GenRel 5 do
+        throwError "gen_rel_rule: the first explicit argument of `{declName}` must be a proof of \
+          `GenRel M N R`, not{indentExpr hTy}"
+      let concl ← whnfR concl
+      unless concl.getAppFn == hTy.appArg!.eta && 2 ≤ concl.getAppNumArgs do
+        throwError "gen_rel_rule: `{declName}` must conclude `R (<combinator> …) x` for the \
+          relation `R` of its `GenRel` argument, not{indentExpr concl}"
+      let some head := (concl.getArg! (concl.getAppNumArgs - 2)).getAppFn.constName?
+        | throwError "gen_rel_rule: `{declName}` must be about a combinator application"
+      return head
+    modifyEnv (genRelRuleExt.addEntry · (head, declName))
+}
 
 /-- The relations a rule premise may use to collect a list combinator's branches. -/
 initialize genBranchesExt : SimplePersistentEnvExtension Name NameSet ←
@@ -311,8 +357,8 @@ initialize registerBuiltinAttribute {
     modifyEnv (genBranchesExt.addEntry · declName)
 }
 
-/-- `@[gen_rule]` — teach the generator walker one combinator's rule for one judgment. Later rules
-for the same pair are fallbacks. -/
+/-- `@[gen_rule]` — teach the generator walker one combinator's rule for one judgment. Later rules for
+the same pair are fallbacks. -/
 syntax (name := genRuleAttr) "gen_rule" : attr
 
 initialize registerBuiltinAttribute {

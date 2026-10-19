@@ -5,15 +5,19 @@ Authors: Harrison Goldstein
 -/
 module
 
+public import Basalt.GenRel
 public import Basalt.IO.Ideal
 public import Basalt.Tactic.MassFixpoint
+public import Basalt.Walk.Attr
 public import Basalt.Walk.Expect
 
 /-!
 # Uniform Words Make a Uniform Choice
 
 SplitMix's range reduction on uniform words is `SPMF`'s `choose` (`chooseVia_uniformWord`): the
-step that carries the ideal law from one word to a whole draw (`IdealSource.below_choose`).
+step that carries the ideal law from one word to a whole draw (`IdealSource.below_choose`). That
+step completes `IdealSource.genRel`, by which `walk` relates a generator at `SPMF` to the same
+generator at `WordModel σ`.
 -/
 
 public section
@@ -263,10 +267,12 @@ theorem below_rejectVia {cand' : SPMF Nat} {cand : WordModel σ Nat} (hc : src.B
   refine rejectVia.fixpoint_induct (m := SPMF) cand' range
     (fun y => src.Below y (rejectVia cand range)) (Below.admissible src _) (fun z ih => ?_)
   rw [rejectVia]
-  exact src.below_bind (fun _ => src.below_dite (fun h => src.below_pure _) fun _ => ih) hc
+  refine src.below_bind (fun _ => ?_) hc
+  split
+  · exact src.below_pure _
+  · exact ih
 
 /-- The ideal law for one word is the ideal law for a choice. -/
-@[gen_rule]
 theorem below_choose (lo hi : Nat) (h : lo ≤ hi) :
     src.Below (RandomChoice.choose lo hi h) (RandomChoice.choose lo hi h) := by
   rw [show (RandomChoice.choose lo hi h : SPMF _) = chooseVia uniformWord lo hi h from
@@ -274,8 +280,18 @@ theorem below_choose (lo hi : Nat) (h : lo ≤ hi) :
   show src.Below (chooseVia uniformWord lo hi h)
     (chooseVia (fun s => some (WordSource.next s)) lo hi h)
   unfold chooseVia drawDigitsVia
-  exact src.below_ite (fun _ => src.below_map _ (src.below_rejectVia
-    (src.below_bind (fun _ => src.below_go src.below_word _ _) src.below_word) _))
-    fun _ => src.below_pure _
+  split
+  · exact src.below_map _ (src.below_rejectVia
+      (src.below_bind (fun _ => src.below_go src.below_word _ _) src.below_word) _)
+  · exact src.below_pure _
+
+@[walk_rel]
+theorem genRel : GenRel SPMF (WordModel σ) (@IdealSource.Below σ _ src) where
+  pure := src.below_pure
+  bind := src.below_bind
+  map := src.below_map
+  default := src.below_default
+  choose := src.below_choose
+  admissible := IdealSource.Below.admissible src
 
 end IdealSource

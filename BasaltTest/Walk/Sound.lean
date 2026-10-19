@@ -272,7 +272,7 @@ example (xs : List Nat) : IsSoundFor ((·.1) <$> permutationOf xs : SPMF (List N
 /-! The combined law is split by hand; `walk` takes a half. -/
 
 /--
-error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation tagged `@[walk_rel]`, got
+error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation registered by `@[walk_rel]`, got
   IsSoundAndComplete (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo)
 Split the law into its halves first: `refine .intro ?sound ?complete`.
 -/
@@ -284,7 +284,7 @@ example : IsSoundAndComplete (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo) := by
 passed as `.obs`. -/
 
 /--
-error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation tagged `@[walk_rel]`, got
+error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation registered by `@[walk_rel]`, got
   IsSoundFor
     (do
       let n ← genTwo

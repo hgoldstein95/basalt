@@ -8,6 +8,7 @@ module
 public import Basalt.Combinators
 public import Basalt.Gen
 public import Basalt.GenRel
+public import Basalt.GenRel.Basic
 public import Basalt.GenStats.Basic
 public import Basalt.GenStats.Command
 public import Basalt.IO
@@ -56,12 +57,9 @@ public import Basalt.Walk.Average
 public import Basalt.Walk.Basic
 public import Basalt.Walk.Complete
 public import Basalt.Walk.Cost
-public import Basalt.Walk.CostErasure
 public import Basalt.Walk.Entry
 public import Basalt.Walk.Expect
 public import Basalt.Walk.ExpectedCost
-public import Basalt.Walk.IO
-public import Basalt.Walk.Ideal
 public import Basalt.Walk.Mass
 public import Basalt.Walk.Match
 public import Basalt.Walk.Names

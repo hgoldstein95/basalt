@@ -158,8 +158,9 @@ the failure model, the supported platforms, and how fast each backend finds a bu
       observation commutes with it.
     - `Walk/`, the walk over observations that discharges every proof obligation: its `walk`
       tactic, and one file per judgment of what the walk knows about it.
-    - `GenRel.lean`, each combinator related to itself at two monads, for the judgments that relate
-      interpretations.
+    - `GenRel/Basic.lean`, the structure of a relation between two interpretations that the walk
+      relates construct by construct, and `GenRel.lean`, each combinator related to itself under
+      every such relation.
     - `Order.lean`, the definition of admissibility that fixpoint-induction proofs unfold;
   - *what a proof calls*: `walk`, and `Tactic/`, the tactics that do more than walk
     (`mass_fixpoint`, `faithful_fixpoint`) plus `support_simp` and `cost_support_simp`; and `PBT/`
