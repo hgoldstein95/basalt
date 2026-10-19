@@ -160,7 +160,7 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
     expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
     `PlausibleGen.lean`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`, with `Random.lean`
-    holding the facts about core's `randNat` that the PRNG-backed ones share;
+    holding `stdChoose`, the exactly uniform draw from core's `StdGen` that `GenStats/` makes;
   - *the proof machinery*: `Obs/`, the layer every per-combinator lemma is derived from — a
     judgment about a generator (its support, an expectation, a cost bound) is an *observation*, a
     `choose`-preserving monad morphism into a specification monad, and each combinator has one lemma
@@ -169,8 +169,8 @@ behind several nested guards is reachable only by coverage guidance. `fuzz-run/c
     judgment of what the walk knows about it, and `GenRel.lean`, each combinator related to itself
     at two monads, for the judgments that relate interpretations;
   - *what a proof calls*: `walk`, and `Tactic/`, the tactics that do more than walk
-    (`mass_fixpoint`, `faithful_fixpoint`) plus the support and `ℝ≥0∞` helpers; and `PBT/` and
-    `Tuning/`, the front ends above.
+    (`mass_fixpoint`, `faithful_fixpoint`) plus `support_simp` and `cost_support_simp`; and `PBT/`
+    and `Tuning/`, the front ends above.
 
   `Basalt.lean` is the only module that imports the library wholesale; every other module, inside
   the library and out, imports the narrowest thing it needs.

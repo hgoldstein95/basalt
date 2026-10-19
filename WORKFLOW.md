@@ -92,12 +92,11 @@ Guidelines that make the proofs go smoothly:
 
 ## Part 2: The Three Proof Obligations
 
-The properties to prove are these three (`Basalt/Laws.lean`, where they are plain `def`s — there is
-no bundle to instantiate).
+The properties to prove are these three (`Basalt/Laws.lean`).
 
 | Obligation | Statement shape | Meaning |
 |---|---|---|
-| Support | `IsSoundAndComplete g P`, i.e. `∀ a, a ∈ SPMF.support g ↔ P a` | Soundness and completeness: nothing invalid is produced, nothing valid is missed. |
+| Support | `IsSoundAndComplete g P`, i.e. `IsSoundFor g P` (`∀ a ∈ SPMF.support g, P a`) and `IsCompleteFor g P` (`∀ a, P a → a ∈ SPMF.support g`) | Soundness and completeness: nothing invalid is produced, nothing valid is missed. |
 | Termination | `IsAlmostSurelyTerminating g`, i.e. `g.mass = 1` | The generator terminates with probability 1. |
 | Cost | `IsCostBounded g c` | Producing `v` takes at most `c v` random choices. |
 
@@ -106,9 +105,9 @@ over one step of the recursion. Each law (support by its halves) is defined in t
 checks and restated on an observation by `<Law>.iff_obs` (`Basalt/Laws.lean`); a proof rewrites its
 goal with that, and `walk` pushes the observation's postcondition backward through the generator's
 syntax, closes recursive occurrences itself and callees with the laws you pass it, and leaves what
-only you can supply — logic about `P`, or arithmetic. Support is two judgments, one per direction of
-its `↔`. What differs between judgments is the observation, the algebra the walk computes in, the
-direction of the bound, and who supplies the induction:
+only you can supply — logic about `P`, or arithmetic. Support is two judgments, one per half. What
+differs between judgments is the observation, the algebra the walk computes in, the direction of the
+bound, and who supplies the induction:
 
 | Judgment | Restated by | Algebra | Bound | Induction | What is left |
 |---|---|---|---|---|---|

@@ -11,7 +11,7 @@ public import Basalt.Obs.Combinators
 /-!
 # Observations into an Ordered Algebra
 
-Rules for a bound `O.spec g post ≤ b` or `b ≤ O.spec g post` A combinator with a `@[gen_map]` lemma
+Rules for a bound `O.spec g post ≤ b` or `b ≤ O.spec g post`. A combinator with a `@[gen_map]` lemma
 needs no rule here; its bound is its shape's, in the algebra.
 -/
 

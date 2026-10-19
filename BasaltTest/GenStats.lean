@@ -15,7 +15,7 @@ meta import BasaltExamples.BST.Weighted
 /-!
 # `#genstats` Examples
 
-`#genstats` draws from a generator and summarizes its distribution
+`#genstats` draws from a generator and summarizes its distribution.
 -/
 
 @[expose] public section

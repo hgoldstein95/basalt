@@ -13,10 +13,10 @@ public import BasaltExamples.ArbString.Def
 /-!
 # Arbitrary Strings
 
-Correctness proofs for `String.arbitrary` (defined in `BasaltExamples/ArbString.Def`), an arbitrary
-alphanumeric string. Each property is proved first for the underlying `genCharList` and then
-transported across `String.ofList`. The `genCharList` proofs mirror `List.arbitrary`'s, with
-`Char.arbitrary` in place of `Nat.arbitrary`.
+Correctness proofs for `String.arbitrary` and `NonEmptyString.arbitrary` (defined in
+`BasaltExamples/ArbString.Def`), arbitrary alphanumeric strings. Each property is proved directly on
+`String.ofList` mapped over `listOf Char.arbitrary` or `nonEmptyListOf Char.arbitrary`, with
+`Char.arbitrary`'s laws for the elements.
 -/
 
 @[expose] public section

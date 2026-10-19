@@ -13,9 +13,10 @@ public import BasaltExamples.ArbChar.Def
 # Arbitrary Strings (definitions)
 
 The generator definitions for `ArbString`, split from their proofs
-(`BasaltExamples/ArbString.lean`). `String.arbitrary` maps `String.ofList` over `genCharList`, a
-recursive generator of alphanumeric character lists with the same subcritical shape as
-`List.arbitrary`.
+(`BasaltExamples/ArbString.lean`). `String.arbitrary` maps `String.ofList` over
+`listOf Char.arbitrary`, a recursive generator of alphanumeric character lists with the same
+subcritical shape as `List.arbitrary`; `NonEmptyString.arbitrary` maps it over
+`nonEmptyListOf Char.arbitrary`.
 -/
 
 @[expose] public section

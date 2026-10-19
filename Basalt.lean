@@ -25,6 +25,7 @@ public import Basalt.Obs.Ordered
 public import Basalt.Obs.Presentation
 public import Basalt.Obs.Spec
 public import Basalt.OptionT
+public import Basalt.Order
 public import Basalt.PBT.Backend
 public import Basalt.PBT.Campaign
 public import Basalt.PBT.Driver
@@ -60,6 +61,8 @@ public import Basalt.Walk.ExpectedCost
 public import Basalt.Walk.IO
 public import Basalt.Walk.Ideal
 public import Basalt.Walk.Mass
+public import Basalt.Walk.Match
+public import Basalt.Walk.Names
 public import Basalt.Walk.Sound
 
 /-!

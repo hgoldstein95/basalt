@@ -15,7 +15,7 @@ as a generator of test results (pass, fail, or discard). The following property 
 makes some assumptions that discard invalid data, and then checks a predicate.
 
 ```lean
-def prop [Gen G] : Property := do
+def prop [Gen G] : PropM G Unit := do
   let xs ← generate (listOf (chooseNat 0 99))
   let k ← generate (chooseNat 0 99)
   assume !xs.isEmpty                          -- a precondition

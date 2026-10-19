@@ -9,9 +9,8 @@ module
 /-!
 # Exactly Uniform Draws from `StdGen`
 
-`stdChoose` is the draw shared by the interpretations that sample from a `StdGen`. It reduces by
-rejection instead of core's `randNat` modulo, so every value in range is equally likely given the
-generator.
+`stdChoose` draws from a `StdGen`. It reduces by rejection instead of core's `randNat` modulo, so
+every value in range is equally likely given the generator.
 -/
 
 public section

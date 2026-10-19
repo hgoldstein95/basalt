@@ -426,9 +426,8 @@ The counterexample (`Repr`-rendered, hence fully qualified) is a *valid* BST plu
 contains; `insertBuggy` lacks the equal-key guard, so it duplicates the key and breaks the invariant.
 
 The `buffer` row and the `[basalt] runs …` line are the [Extending the buffer](#extending-the-buffer)
-report: this input asked for 4 bytes and got 1, and 10 of the 18 runs went short — a property whose
-generator outruns the buffer this often is one `--grow` can help. The `[basalt]` line comes from C, on
-stderr, and is printed at both exits (here past `abort()`; on the `-runs`-exhausted path from an
+report: this input asked for 4 bytes and got 1, and 10 of the 18 runs went short. The `[basalt]` line
+comes from C, on stderr, and is printed at both exits (here past `abort()`; on the `-runs`-exhausted path from an
 `atexit` handler). libFuzzer's own `MS:` lines end in `Custom-` in every campaign, `--grow` or not,
 because the mutator is linked unconditionally and delegates.
 
@@ -523,20 +522,15 @@ it.
 
 ## Limitations and future work
 
-- **Growth attributes the deficit by input size, not by identity.** `LLVMFuzzerCustomMutator` is handed
-  a buffer, not a run, so it appends only when the size it is given matches the size of the run that
-  reported the deficit — the common case, since libFuzzer mutates the input it just executed, but a
-  same-size buffer from elsewhere in the queue would inherit the deficit and a differently-sized one
-  would drop it. The fix is to key the deficit on the buffer's content (a hash) rather than its length.
 - **One deficit, appended at the end.** The signal is a single count of unmet demand, so a generator
   that went short *in the middle* of a structure gets its bytes at the end anyway, where a later draw
   reads them. Anchoring at the end is what keeps every earlier draw's meaning fixed
   ([Extending the buffer](#extending-the-buffer)), so a per-draw record would have to buy its
   precision back some other way — most likely a length-prefixed encoding, which is a different
   interpretation, not a tweak to this one.
-- **Growth is not measured to help, and cannot be undone.** It is off by default because 3,000 trials
-  put it 4.7 points *behind* leaving it off, an effect traced to zeros being stopping values for most
-  decoders rather than to the appending itself ([How much growth helps](#how-much-growth-helps)). It is
+- **Growth is not measured to help, and cannot be undone.** It is off by default because the trials
+  in [How much growth helps](#how-much-growth-helps) find no benefit from it, and what penalty there is
+  traces to zeros being stopping values for most decoders rather than to the appending itself. It is
   also one-way: growth is capped at `-max_len`, a run blocked by the cap is only counted, and nothing
   shrinks a buffer that grew past what the property needs — that is libFuzzer's corpus minimization,
   which never runs on a growth path it found no features for.

@@ -15,8 +15,8 @@ public import BasaltExamples.SortedList
 `List.genSortedBySorting` generates a sorted list the indirect way: draw an arbitrary list
 (`BasaltExamples/ArbList`) and sort it. It reaches exactly the lists `List.genSorted`
 (`BasaltExamples/SortedList`) reaches by building them in order
-(`List.support_genSortedBySorting_eq`), though not with the same probabilities; and being a
-post-processing step over a generator whose laws are already proved, none of its three proofs needs
+(`List.genSortedBySorting.sound_complete`), though not with the same probabilities; and being a
+post-processing step over a generator whose laws are already proved, none of its laws' proofs needs
 `fix_induct` or an induction on the generated value.
 -/
 

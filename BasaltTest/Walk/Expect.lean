@@ -65,8 +65,7 @@ example : SPMF.expect (Nat.arbitrary : SPMF Nat) (fun n => (n : ℝ≥0∞)) ≤
 
 -- A list combinator has no shape of choice, so it is bounded by a rule that uses only the mass:
 -- a constant postexpectation exactly, and otherwise its worst case over every value, dually to the
--- `⨅` a lower bound on the mass leaves. a constant postexpectation exactly, and otherwise its worst case
--- over every value, dually to the `⨅` a lower bound on the mass leaves.
+-- `⨅` a lower bound on the mass leaves.
 /--
 trace: ⊢ ⨆ a, ↑a.length ≤ ∞
 -/

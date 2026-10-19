@@ -14,7 +14,7 @@ public import BasaltExamples.BST
 `Tree.genBSTByInsertion` generates a search tree the indirect way: draw a list of keys from
 `[lo, hi]` and insert them into `leaf` one after another, rather than shaping the tree directly like
 `Tree.genBST` (`BasaltExamples/BST`). Both reach exactly `Tree.isBST lo hi`
-(`Tree.support_genBSTByInsertion_eq`).
+(`Tree.genBSTByInsertion.sound_complete`).
 
 It is sound, complete, and almost surely terminating — but *not* cost bounded, and the failure is
 inherent rather than an artifact of a loose bound: the draw has no length limit, and duplicate keys

@@ -21,14 +21,14 @@ alongside it. This file exercises the whole contract:
 1. `genWeightedBST.tuned genWeightedBST.defaults` and `genWeightedBST` are
    interchangeable — `tuned_defaults` is definitional, and `BST.lean`'s
    existing proofs compile unchanged.
-2. Two `Tuning`s can be compared in the same file with no recompilation
+2. `sites` reports each site's offset, arity, and per-branch recursive calls.
+3. Two `Tuning`s can be compared in the same file with no recompilation
    between them, and the distributions differ.
-3. A schedule with a nonzero depth coefficient produces a depth-varying
+4. A schedule with a nonzero depth coefficient produces a depth-varying
    distribution.
-4. `sites` reports each site's offset, arity, and per-branch recursive calls.
 5. A literal `0` weight is rejected at elaboration.
 
-`genWeightedBST` is written with `frequency!`; section 9 has the other recursion forms.
+`genWeightedBST` is written with `frequency!`; section 6 has the other recursion forms.
 -/
 
 @[expose] public section
@@ -53,7 +53,7 @@ example (lo hi : Int) (t : BST.Tree Int) :
       t ∈ SPMF.support (Tree.genWeightedBST lo hi) := by
   rw [Tree.genWeightedBST.tuned_defaults]
 
-/-! ## 4. The site table -/
+/-! ## 2. The site table -/
 
 /--
 info: #[{ name := `BST.Tree.genWeightedBST.site0, offset := 0, arity := 2, holes := #[0, 2] }]
@@ -64,7 +64,7 @@ info: #[{ name := `BST.Tree.genWeightedBST.site0, offset := 0, arity := 2, holes
 /-- The defaults are the literal weights from the source. -/
 example : Tree.genWeightedBST.defaults = ⟨#[(1, 0), (5, 0)]⟩ := rfl
 
-/-! ## 2. Two weightings, one compiled generator, one file
+/-! ## 3. Two weightings, one compiled generator, one file
 
 `θ` is an ordinary runtime value: evaluating a new candidate weighting is a
 function call, not an edit-and-recompile. With the leaf/node weights flipped
@@ -125,7 +125,7 @@ info: Tree.genWeightedBST.tuned ⟨#[(5, 0), (1, 0)]⟩ 0 10 — 200 draws (seed
 #guard_msgs in
 #genstats (draws := 200) Tree.genWeightedBST.tuned ⟨#[(5, 0), (1, 0)]⟩ 0 10
 
-/-! ## 3. Depth-indexed schedules
+/-! ## 4. Depth-indexed schedules
 
 A generator with an explicit `depth` binder reads each site's weights at that
 depth, so a nonzero growth coefficient `b` makes the distribution
