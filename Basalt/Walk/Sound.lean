@@ -5,7 +5,6 @@ Authors: Harrison Goldstein
 -/
 module
 
-import Basalt.Order
 public import Basalt.SPMF.Support
 public import Basalt.Walk.Attr
 
@@ -13,8 +12,7 @@ public import Basalt.Walk.Attr
 # Walking Soundness
 
 What the walk needs of `SPMF.alwaysObs`, on which `IsSoundFor g P` is `alwaysObs.spec g P`: how a
-fact about a sub-generator closes a leaf, the rules of the list combinators and of `suchThat`, and
-the admissibility `walk fixpoint` inducts with.
+fact about a sub-generator closes a leaf and the rules of the list combinators and of `suchThat`.
 -/
 
 @[expose] public section
@@ -22,14 +20,6 @@ the admissibility `walk fixpoint` inducts with.
 open RandomChoice
 
 namespace SPMF
-
-open Lean.Order in
-theorem alwaysObs.admissible (P : α → Prop) : admissible fun x : SPMF α => alwaysObs.spec x P := by
-  rw [Lean.Order.admissible_iff]
-  intro c hc ih a ha
-  rw [mem_support_csup hc] at ha
-  obtain ⟨x, hxc, hxa⟩ := ha
-  exact ih x hxc a hxa
 
 /-! ## Leaves
 

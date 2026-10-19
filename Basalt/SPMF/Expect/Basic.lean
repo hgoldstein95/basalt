@@ -224,28 +224,9 @@ theorem expect_csup {c : SPMF α → Prop} (hc : chain c) (f : α → ℝ≥0∞
     expect (CCPO.csup hc) f = ⨆ p, ⨆ (_ : c p), expect p f := by
   refine le_antisymm ?_ (iSup₂_le fun p hp => ENNReal.tsum_le_tsum fun a =>
     mul_le_mul_left (le_csup hc hp a) _)
-  calc expect (CCPO.csup hc) f
-      = ∑' a, (⨆ p, ⨆ (_ : c p), p a) * f a := by
-        unfold expect
-        exact tsum_congr fun a => by rw [csup_apply hc a]
-    _ = ∑' a, ⨆ p, ⨆ (_ : c p), p a * f a := by
-        refine tsum_congr fun a => ?_
-        rw [ENNReal.iSup_mul]
-        congr 1
-        ext p
-        rw [ENNReal.iSup_mul]
-    _ = ⨆ s : Finset α, ∑ a ∈ s, ⨆ p, ⨆ (_ : c p), p a * f a := ENNReal.tsum_eq_iSup_sum
-    _ ≤ ⨆ s : Finset α, ⨆ p, ⨆ (_ : c p), ∑ a ∈ s, p a * f a := by
-        refine iSup_mono fun s => ?_
-        simp_rw [iSup_subtype']
-        rw [ENNReal.finsetSum_iSup]
-        intro ⟨p, hp⟩ ⟨q, hq⟩
-        rcases hc p q hp hq with h | h
-        · exact ⟨⟨q, hq⟩, fun a => ⟨mul_le_mul_left (h a) _, le_rfl⟩⟩
-        · exact ⟨⟨p, hp⟩, fun a => ⟨le_rfl, mul_le_mul_left (h a) _⟩⟩
-    _ ≤ ⨆ p, ⨆ (_ : c p), expect p f := by
-        refine iSup_le fun s => iSup₂_mono fun p hp => ?_
-        exact ENNReal.sum_le_tsum s
+  unfold expect
+  simp_rw [csup_apply hc, ENNReal.iSup_mul]
+  exact tsum_iSup₂_le_of_chain hc (fun p a => p a * f a) fun _ _ h a => mul_le_mul_left (h a) _
 
 /-- Only *upper* bounds on expectations are admissible: the fixpoint iteration starts at `⊥`,
 where every expectation is `0`, so a lower bound cannot ride `fix_induct` — prove exact laws by

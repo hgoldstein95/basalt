@@ -7,7 +7,6 @@ module
 
 public import Basalt.GenRel
 public import Basalt.IO.SplitMix
-import Basalt.Order
 public import Basalt.SPMF.Expect.Obs
 public import Basalt.SPMF.Mass
 public import Basalt.Walk.Attr
@@ -124,12 +123,8 @@ theorem below_word : src.Below uniformWord fun s => some (WordSource.next s) := 
 
 /-- Fixpoint induction on the `SPMF` side needs nothing of `E`: `expect` is continuous. -/
 theorem Below.admissible (x : WordModel σ α) :
-    Lean.Order.admissible fun y : SPMF α => src.Below y x := by
-  rw [Lean.Order.admissible_iff]
-  intro c hc ih G
-  show expect _ _ ≤ _
-  rw [expect_csup]
-  exact iSup₂_le fun y hy => ih y hy G
+    Lean.Order.admissible fun y : SPMF α => src.Below y x :=
+  Lean.Order.admissible_pi _ fun _ => admissible_expect_le _ _
 
 /-- A terminating `y` below `x` is `x`'s distribution on the ideal source: the bound holds for `f`
 and for `1 - f`, and on each side the two add up to at most, and to exactly, `1`. -/

@@ -359,32 +359,11 @@ local instance List.instPartialOrderPointwise {α : Type u} [PartialOrder α] :
   rel l1 l2 :=
     l1.length = l2.length ∧
     ∀ (i : Nat) (h1 : i < l1.length) (h2 : i < l2.length), l1[i] ⊑ l2[i]
-  rel_refl := by
-    intro xs
-    constructor
-    . rfl
-    . intro i _ _
-      apply PartialOrder.rel_refl
-  rel_trans := by
-    intro xs ys zs h12 h23
-    obtain ⟨heq1, hle1⟩ := h12
-    obtain ⟨heq2, hle2⟩ := h23
-    constructor
-    . apply Eq.trans <;> assumption
-    . intro i h1 h2
-      apply PartialOrder.rel_trans
-      . apply hle1
-        omega
-      . apply hle2
-  rel_antisymm := by
-    intro x y hxy hyx
-    obtain ⟨hlen, helem_xy⟩ := hxy
-    obtain ⟨_, helem_yx⟩ := hyx
-    apply List.ext_getElem hlen
-    intro i hx hy
-    apply PartialOrder.rel_antisymm
-    . apply helem_xy
-    . apply helem_yx
+  rel_refl := ⟨rfl, fun _ _ _ => PartialOrder.rel_refl⟩
+  rel_trans h12 h23 := ⟨h12.1.trans h23.1, fun i h1 h2 =>
+    PartialOrder.rel_trans (h12.2 i h1 (by omega)) (h23.2 i (by omega) h2)⟩
+  rel_antisymm hxy hyx := List.ext_getElem hxy.1 fun i hx hy =>
+    PartialOrder.rel_antisymm (hxy.2 i hx hy) (hyx.2 i hy hx)
 
 /-- The partial order on `Nat × α` behind `frequency`'s monotonicity: `(w1, g1) ⊑ (w2, g2)` iff
 `w1 = w2 ∧ g1 ⊑ g2`. The weights must be *equal*, not `≤` — raising one branch's weight lowers every
@@ -392,25 +371,9 @@ other branch's probability, so under `w1 ≤ w2` the `frequency` combinator woul
 `⊑` on `SPMF`. -/
 local instance instPartialOrderConstFst {α : Type u} [PartialOrder α] : PartialOrder (Nat × α) where
   rel p q := p.1 = q.1 ∧ p.2 ⊑ q.2
-  rel_refl := by
-    intro p
-    constructor
-    . rfl
-    . apply PartialOrder.rel_refl
-  rel_trans := by
-    intro p q r hpq hqr
-    obtain ⟨hw1, hg1⟩ := hpq
-    obtain ⟨hw2, hg2⟩ := hqr
-    constructor
-    . apply hw1.trans; assumption
-    . apply PartialOrder.rel_trans <;> assumption
-  rel_antisymm := by
-    intro p q hpq hqp
-    obtain ⟨hw, hg⟩ := hpq
-    obtain ⟨_, hg'⟩ := hqp
-    apply Prod.ext
-    . assumption
-    . apply PartialOrder.rel_antisymm <;> assumption
+  rel_refl := ⟨rfl, PartialOrder.rel_refl⟩
+  rel_trans hpq hqr := ⟨hpq.1.trans hqr.1, PartialOrder.rel_trans hpq.2 hqr.2⟩
+  rel_antisymm hpq hqp := Prod.ext hpq.1 (PartialOrder.rel_antisymm hpq.2 hqp.2)
 
 @[partial_fixpoint_monotone]
 theorem List.monotone_cons
@@ -656,62 +619,38 @@ def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
       return x :: xs]
 partial_fixpoint
 
+private theorem admissible_le {α : Sort u} [CCPO α] (w : α) : admissible (· ⊑ w) :=
+  admissible_iff.2 fun _ hc hall => csup_le hc hall
+
 @[partial_fixpoint_monotone]
 theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (g : γ → G α) (hg : monotone g) :
-    monotone (fun x => listOf (g x)) := by
-  unfold monotone
-  intro x y hxy
-  show listOf (g x) ⊑ listOf (g y)
-  generalize hw : listOf (g y) = w
-  delta listOf
-  apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
-  · exact Lean.Order.admissible_iff.2 fun _ hc hall => Lean.Order.csup_le hc hall
-  · intro z hz
-    subst hw
-    unfold listOf
+    monotone (fun x => listOf (g x)) := fun x y hxy =>
+  listOf.fixpoint_induct (G := G) (g x) (· ⊑ listOf (g y)) (admissible_le _) fun z hz => by
+    conv => rhs; rw [listOf]
     rw [oneOfWith_eq, oneOfWith_eq]
     apply oneOf_le
     refine ⟨rfl, ?_⟩
     rintro (_ | _ | i) h1 h2 <;> intro _
-    · apply PartialOrder.rel_refl
-    · apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
-      apply MonoBind.bind_mono_right
-      intro a
-      apply MonoBind.bind_mono_left
-      assumption
-    · simp at h1
-      omega
+    · exact PartialOrder.rel_refl
+    · exact PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
+        (MonoBind.bind_mono_right fun _ => MonoBind.bind_mono_left hz)
+    · simp at h1; omega
 
 @[partial_fixpoint_monotone]
 theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (g : γ → G α) (hg : monotone g) :
-    monotone (fun x => nonEmptyListOf (g x)) := by
-  unfold monotone
-  intro x y hxy
-  show nonEmptyListOf (g x) ⊑ nonEmptyListOf (g y)
-  generalize hw : nonEmptyListOf (g y) = w
-  delta nonEmptyListOf
-  apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
-  · exact Lean.Order.admissible_iff.2 fun _ hc hall => Lean.Order.csup_le hc hall
-  · intro z hz
-    subst hw
-    unfold nonEmptyListOf
+    monotone (fun x => nonEmptyListOf (g x)) := fun x y hxy =>
+  nonEmptyListOf.fixpoint_induct (G := G) (g x) (· ⊑ nonEmptyListOf (g y)) (admissible_le _) fun z hz => by
+    conv => rhs; rw [nonEmptyListOf]
     rw [oneOfWith_eq, oneOfWith_eq]
     apply oneOf_le
     refine ⟨rfl, ?_⟩
     rintro (_ | _ | i) h1 h2 <;> intro _
-    · unfold monotone at hg
-      apply MonoBind.bind_mono_left
-      apply hg
-      assumption
-    · apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
-      apply MonoBind.bind_mono_right
-      intro a
-      apply MonoBind.bind_mono_left
-      assumption
-    · simp at h1
-      omega
+    · exact MonoBind.bind_mono_left (hg x y hxy)
+    · exact PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
+        (MonoBind.bind_mono_right fun _ => MonoBind.bind_mono_left hz)
+    · simp at h1; omega
 
 /-- Draws from `g` until the value drawn satisfies `p`: rejection sampling. It terminates exactly
 when `g` accepts with positive probability, and each rejected draw costs as much as an accepted one;
@@ -724,22 +663,13 @@ partial_fixpoint
 @[partial_fixpoint_monotone]
 theorem monotone_suchThat [Gen G] {γ : Sort w} [PartialOrder γ]
     (g : γ → G α) (p : α → Bool) (hg : monotone g) :
-    monotone (fun x => suchThat (g x) p) := by
-  unfold monotone
-  intro x y hxy
-  show suchThat (g x) p ⊑ suchThat (g y) p
-  generalize hw : suchThat (g y) p = w
-  delta suchThat
-  apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
-  · exact Lean.Order.admissible_iff.2 fun _ hc hall => Lean.Order.csup_le hc hall
-  · intro z hz
-    subst hw
-    unfold suchThat
-    apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
-    apply MonoBind.bind_mono_right
-    intro a
+    monotone (fun x => suchThat (g x) p) := fun x y hxy =>
+  suchThat.fixpoint_induct (G := G) (g x) p (· ⊑ suchThat (g y) p) (admissible_le _) fun z hz => by
+    conv => rhs; rw [suchThat]
+    refine PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
+      (MonoBind.bind_mono_right fun a => ?_)
     split
-    · apply PartialOrder.rel_refl
-    · assumption
+    · exact PartialOrder.rel_refl
+    · exact hz
 
 end recursive_combinators

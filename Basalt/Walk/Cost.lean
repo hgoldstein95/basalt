@@ -6,7 +6,6 @@ Authors: Harrison Goldstein
 module
 
 public import Mathlib.Data.ENat.Lattice
-import Basalt.Order
 public import Basalt.SPMF.Cost
 public import Basalt.Walk.Entry
 
@@ -28,12 +27,8 @@ namespace SPMF.Cost
 
 open Lean.Order in
 theorem alwaysObs.admissible (Q : α → Nat → Prop) :
-    admissible fun x : SPMF.Cost α => alwaysObs.spec x Q := by
-  rw [Lean.Order.admissible_iff]
-  intro c hc ih p hp
-  rw [SPMF.mem_support_csup hc] at hp
-  obtain ⟨x, hxc, hxp⟩ := hp
-  exact ih x hxc p hxp
+    admissible fun x : SPMF.Cost α => alwaysObs.spec x Q :=
+  SPMF.alwaysObs.admissible fun p : α × Nat => Q p.1 p.2
 
 /-- A cost bound on a generator argument, when no fact gives one: the argument's worst case, a bound
 that ignores the value. -/
