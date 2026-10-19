@@ -115,6 +115,7 @@ lake build                # library + examples + tests
 lake build Basalt         # library only
 lake build BasaltExamples # the cookbook
 lake build BasaltTest     # regression tests
+lake check                # CI's axiom check (macOS: --inadvisably-no-sandbox)
 ```
 
 ### Using Basalt from a module

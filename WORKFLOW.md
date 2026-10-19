@@ -526,8 +526,8 @@ once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`)
   from, or pass one that is.
 - **`mass_fixpoint` leaves an arithmetic goal that is false** → the structural half is not in doubt;
   the certificate you named is. Re-count the mean offspring.
-- **Finite-domain data (chars, enums)** → the walk leaves a fact about a literal list; `decide` /
-  `native_decide` on it directly (see `ArbChar.lean`).
+- **Finite-domain data (chars, enums)** → the walk leaves a fact about a literal list; `decide` it,
+  by `decide +kernel` over a bounded encoding when the domain is large (`ArbChar.lean`).
 
 ## Prior Art
 

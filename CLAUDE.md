@@ -254,8 +254,8 @@ the definition, and the definition is right here to run.
   is the only wholesale import of the library and nothing inside the library may import it. Upstream
   imports (`Lean`, `Batteries`, `Mathlib`, `Plausible`) come first, then Basalt's, each block
   alphabetical. An import is `public` when the module's statements name it, plain when only its
-  proofs do, and `meta` when its code runs at elaboration time (`#eval`, `native_decide`, a
-  tactic); `import all` is only for a core module whose hidden definitions a proof must see. An
+  proofs do, and `meta` when its code runs at elaboration time (`#eval`, a tactic); `import all`
+  is only for a core module whose hidden definitions a proof must see. An
   import whose only use is inside a macro body or a `@[gen_rule]` registry is
   load-bearing at the tactic's *use* sites, so it stays even though the module compiles without it.
 - `BasaltExamples/` files are cookbook entries: a generator plus proofs of the correctness

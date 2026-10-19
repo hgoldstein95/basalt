@@ -5,8 +5,6 @@ Authors: Harrison Goldstein
 -/
 module
 
-public import Batteries.Data.Char
-meta import Batteries.Data.Char.Basic
 public import Basalt
 public import BasaltExamples.ArbChar.Def
 meta import BasaltExamples.ArbChar.Def
@@ -25,8 +23,19 @@ open RandomChoice
 
 namespace ArbChar
 
-private theorem alphanumChars_eq_filter :
-    ∀ c : Char, c ∈ alphanumChars ↔ c.isAlphanum = true := by native_decide
+private theorem alphanumChars_eq_filter (c : Char) :
+    c ∈ alphanumChars ↔ c.isAlphanum = true := by
+  by_cases hc : c.toNat < 128
+  · have h : ∀ n : Fin 128, Char.ofNat n ∈ alphanumChars ↔ (Char.ofNat n).isAlphanum = true := by
+      decide +kernel
+    simpa using h ⟨c.toNat, hc⟩
+  · have hall : alphanumChars.all (·.toNat < 128) := by decide
+    have h1 : c ∉ alphanumChars := fun hm => hc (of_decide_eq_true (List.all_eq_true.mp hall c hm))
+    have h2 : c.isAlphanum = false := by
+      simp only [Char.toNat] at hc
+      simp only [Char.isAlphanum, Char.isAlpha, Char.isDigit, Char.isUpper, Char.isLower]
+      grind
+    simp [h1, h2]
 
 theorem Char.arbitrary.sound_complete :
     IsSoundAndComplete Char.arbitrary (fun c => c.isAlphanum = true) := by
