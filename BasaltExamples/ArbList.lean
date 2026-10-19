@@ -52,7 +52,7 @@ theorem List.arbitrary.sound_complete : IsSoundAndComplete List.arbitrary ⊤ :=
     exact ⟨x, xs, ih trivial, rfl⟩
 
 theorem List.arbitrary.terminates : IsAlmostSurelyTerminating List.arbitrary := by
-  mass_fixpoint [Nat.arbitrary.terminates.obs] using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint [Nat.arbitrary.terminates.obs] using SPMF.LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Producing `xs` costs at most `2 * xs.length + xs.sum + 1` choices: one `oneOf` and one

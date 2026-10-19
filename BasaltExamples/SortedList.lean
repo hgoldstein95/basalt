@@ -89,7 +89,7 @@ theorem List.genSorted.sound_complete : IsSoundAndComplete List.genSorted List.s
   simpa [List.forall_iff_forall_mem] using List.genSortedGt.sound_complete (m := 0)
 
 theorem List.genSortedGt.terminates : IsAlmostSurelyTerminating (List.genSortedGt m) := by
-  mass_fixpoint [Nat.arbitrary.terminates.obs] using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint [Nat.arbitrary.terminates.obs] using SPMF.LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.div_eq_inv_mul, mul_add]
 
 theorem List.genSorted.terminates : IsAlmostSurelyTerminating List.genSorted :=

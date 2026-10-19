@@ -5,7 +5,6 @@ Authors: Harrison Goldstein
 -/
 module
 
-import Mathlib.Tactic.Basify
 public import Basalt.Combinators
 public import BasaltExamples.ArbNat
 
@@ -116,7 +115,6 @@ theorem Tree.genLeftistOfRank.sound_complete :
 theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist lo) := by
   mass_fixpoint [Nat.arbitrary.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem Tree.genLeftist.faithful : IsFaithful (Tree.genLeftist lo) := by

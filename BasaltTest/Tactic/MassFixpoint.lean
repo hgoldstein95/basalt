@@ -5,7 +5,6 @@ Authors: Harrison Goldstein
 -/
 module
 
-import Mathlib.Tactic.Basify
 public import Basalt
 public import BasaltExamples.BST
 
@@ -36,7 +35,6 @@ lo hi : ℤ
 #guard_msgs in
 example (lo hi : Int) : IsAlmostSurelyTerminating (BST.Tree.genBST lo hi) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   trace_state
   split
   · rw [zero_mul, add_zero]
@@ -59,7 +57,7 @@ b : Bool
 example (b : Bool) : IsAlmostSurelyTerminating (coins b) := by
   mass_fixpoint
   trace_state
-  exact SPMF.LfpIsOne.mono (SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)) fun c _ => by
+  exact SPMF.LfpIsOne.mono (SPMF.LfpIsOne.affine (m := 1 / 2)) fun c _ => by
     simp [ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Weights that depend on the seed. -/
@@ -150,7 +148,7 @@ hrec : ∀ (j : ℕ), c ≤ SPMF.expectObs.spec (passThrough (m + 1) j) fun x =>
 -/
 #guard_msgs in
 example (m k : Nat) : IsAlmostSurelyTerminating (passThrough (m + 1) k) := by
-  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2)
   trace_state
   simp [ENNReal.one_sub_inv_two, ENNReal.div_eq_inv_mul, mul_add]
 
@@ -188,7 +186,7 @@ error: `MassFixpointTest.abstractedLoop`'s fixpoint abstracts its instance argum
 -/
 #guard_msgs in
 example : IsAlmostSurelyTerminating (abstractedLoop : SPMF Nat) := by
-  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2)
 
 /-- The geometric loop, stopped by a `coin` rather than a two-branch `oneOf`. -/
 def coinLoop [Gen G] : G Nat := do
@@ -208,11 +206,11 @@ trace: case certificate
 example : IsAlmostSurelyTerminating (coinLoop : SPMF Nat) := by
   mass_fixpoint
   trace_state
-  exact (SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)).mono fun c _ => by
+  exact (SPMF.LfpIsOne.affine (m := 1 / 2)).mono fun c _ => by
     simp [ENNReal.one_sub_inv_two]
 
 theorem coinLoop.terminates : IsAlmostSurelyTerminating (coinLoop : SPMF Nat) := by
-  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.one_sub_inv_two]
 
 end MassFixpointTest

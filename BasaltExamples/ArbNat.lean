@@ -42,7 +42,7 @@ theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ := b
     exact ⟨n, ih trivial, rfl⟩
 
 theorem Nat.arbitrary.terminates : IsAlmostSurelyTerminating Nat.arbitrary := by
-  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Producing `n` costs `n + 1` random choices (one per increment, plus the final stop). -/

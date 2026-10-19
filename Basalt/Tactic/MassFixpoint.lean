@@ -193,12 +193,12 @@ variable {α : Type*}
 
 theorem isAlmostSurelyTerminating_listOf {g : SPMF α} (hg : IsAlmostSurelyTerminating g) :
     IsAlmostSurelyTerminating (listOf g) := by
-  mass_fixpoint [hg.obs] using LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint [hg.obs] using LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.one_sub_inv_two, div_eq_mul_inv, add_mul, mul_comm]
 
 theorem isAlmostSurelyTerminating_nonEmptyListOf {g : SPMF α} (hg : IsAlmostSurelyTerminating g) :
     IsAlmostSurelyTerminating (nonEmptyListOf g) := by
-  mass_fixpoint [hg.obs] using LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint [hg.obs] using LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.one_sub_inv_two, div_eq_mul_inv, add_mul, mul_comm]
 
 private theorem ite_le_listOf {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ expectObs.spec g fun _ => 1) :

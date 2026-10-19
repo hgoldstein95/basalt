@@ -28,7 +28,6 @@ theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by
 theorem genTerm.terminates : IsAlmostSurelyTerminating (genTerm Γ τ) := by
   mass_fixpoint [genZero.terminates.obs, genType.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 3) (b := 1 / 3) (d := 1 / 3)
-    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   all_goals
     split
     all_goals

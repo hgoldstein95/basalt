@@ -35,80 +35,24 @@ def typeCheck (Γ : Ctx) (e : Term) : Option Ty :=
 
 /-- Typechecker is sound with respect to the typing relation -/
 theorem typeCheck_sound : typeCheck Γ e = some τ → Typing Γ e τ := by
-  intro h
   induction e generalizing Γ τ with
-  | Bool b =>
-    simp [typeCheck] at h
-    subst h
-    constructor
-  | Var x =>
-    simp [typeCheck] at h
-    constructor
-    apply getElem?_lookup
-    assumption
+  | Bool b => simp [typeCheck]; rintro rfl; exact .TBool ..
+  | Var x => exact fun h => .TVar _ _ _ (getElem?_lookup h)
   | Abs τ1 body IH =>
-    cases hbody : typeCheck (τ1 :: Γ) body with
-    | none =>
-      rw [typeCheck, hbody] at h
-      contradiction
-    | some τ2 =>
-      rw [typeCheck, hbody] at h
-      simp at h
-      subst h
-      constructor
-      apply IH
-      assumption
+    simp only [typeCheck, Option.bind_eq_bind, Option.bind_eq_some_iff, Option.some.injEq]
+    rintro ⟨τ2, h, rfl⟩
+    exact .TAbs _ _ _ _ (IH h)
   | App e1 e2 IH1 IH2 =>
-    rw [typeCheck] at h
-    simp at h
-    cases h1 : typeCheck Γ e1 with
-    | none =>
-      rw [h1] at h
-      dsimp at h
-      contradiction
-    | some τ1 =>
-      rw [h1] at h
-      simp at h
-      cases h2 : typeCheck Γ e2 with
-      | none =>
-        rw [h2] at h
-        dsimp at h
-        contradiction
-      | some τ2 =>
-        rw [h2] at h
-        dsimp at h
-        cases τ1 with
-        | Bool =>
-          dsimp at h
-          contradiction
-        | Fun τ11 τ12 =>
-          dsimp at h
-          by_cases (τ11 = τ2)
-          . simp at h
-            obtain ⟨h1, h2⟩ := h
-            rename_i h1
-            constructor
-            . apply IH2
-              assumption
-            . subst_vars
-              apply IH1
-              assumption
-          . split at h <;> simp_all
+    simp only [typeCheck, Option.bind_eq_bind, Option.bind_eq_some_iff]
+    rintro ⟨τf, h1, τ2, h2, h⟩
+    split at h
+    · split at h <;> simp_all
+      exact .TApp _ _ _ _ _ (IH2 h2) (IH1 h1)
+    · contradiction
 
 /-- Typechecker is complete with respect to the typing relation -/
 theorem typeCheck_complete : Typing Γ e τ → typeCheck Γ e = some τ := by
   intro h
   induction h with
-  | TBool Γ b => rfl
-  | TVar Γ x =>
-    simp [typeCheck]
-    apply lookup_getElem?
-    assumption
-  | TAbs Γ body τ1 τ2 hbody IH =>
-    simp [typeCheck]
-    rw [IH]
-    rfl
-  | TApp Γ e1 e2 τ1 τ2 h2 h1 IH2 IH1 =>
-    simp [typeCheck]
-    rw [IH2, IH1]
-    simp
+  | TVar _ _ _ hx => exact lookup_getElem? hx
+  | _ => simp_all [typeCheck]

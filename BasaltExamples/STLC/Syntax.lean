@@ -104,20 +104,12 @@ def Ty.size : Ty → Nat
 /-- If `Γ[i]` returns `τ`, then the judgment `lookup Γ i τ` holds -/
 theorem getElem?_lookup :
     Γ[i]? = some τ → lookup Γ i τ := by
-  intro h
-  induction Γ generalizing i τ with
-  | nil => contradiction
+  induction Γ generalizing i with
+  | nil => simp
   | cons τ' Γ' IH =>
     cases i with
-    | zero =>
-      simp at h
-      subst h
-      constructor
-    | succ i' =>
-      apply lookup.Later
-      apply IH
-      simp at h
-      assumption
+    | zero => rintro ⟨⟩; exact .Now _ _
+    | succ i => exact fun h => .Later _ _ _ _ (IH h)
 
 /-- Converse of `getElem?_lookup`: `lookup Γ i τ` implies `Γ[i]? = some τ`. -/
 theorem lookup_getElem? :

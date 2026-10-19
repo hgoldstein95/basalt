@@ -5,7 +5,6 @@ Authors: Harrison Goldstein
 -/
 module
 
-import Mathlib.Tactic.Basify
 public import Basalt
 public import BasaltExamples.ArbNat
 
@@ -85,7 +84,6 @@ theorem Tree.genHeap.sound_complete :
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   mass_fixpoint [Nat.arbitrary.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/

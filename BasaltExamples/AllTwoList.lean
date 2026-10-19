@@ -54,7 +54,7 @@ theorem genAllTwos.sound_complete : IsSoundAndComplete genAllTwos AllTwos := by
       exact ⟨xs, ih fun y hy => h y (by simp [hy]), rfl⟩
 
 theorem genAllTwos.terminates : IsAlmostSurelyTerminating genAllTwos := by
-  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genAllTwos.cost_bounded : IsCostBounded genAllTwos AllTwos.cost := by

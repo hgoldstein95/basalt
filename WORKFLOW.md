@@ -248,8 +248,8 @@ no recursion — including one that only post-processes a callee — is the firs
 | Generator | Certificate | `F c` |
 |---|---|---|
 | No recursive call | `SPMF.LfpIsOne.one` | `1` |
-| Mean offspring `m < 1` | `SPMF.LfpIsOne.affine (m := m) h` | `(1 - m) + m * c` |
-| At most two calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.quadratic (a := _) (b := _) (d := _) h₁ h₂ h₃` | `a + b * c + d * c ^ 2` |
+| Mean offspring `m < 1` | `SPMF.LfpIsOne.affine (m := m)` | `(1 - m) + m * c` |
+| At most two calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.quadratic (a := _) (b := _) (d := _)` | `a + b * c + d * c ^ 2` |
 | Shrinking seed, mean offspring `> 1` | `SPMF.LfpIsOne.ranking …` with `mass_fixpoint per_seed` (below) | a function of `c` and the seed |
 
 `m` is weights-on-recursive-branches over total weights, counting each branch once per recursive
@@ -258,8 +258,9 @@ call: a two-branch `oneOf` with one recursive branch has `m = 1/2`;
 quadratic, `a = 2/3`, `d = 1/3`; a two-branch `oneOf` between a leaf and two calls is the quadratic
 `a = d = 1/2`. **A critical generator
 (`m = 1`) terminates but has no finite `IsExpectedCostBounded`**
-(`AllTwoTree.genTree.not_expected_cost_bounded`) — reweight it if you can. The side conditions of a
-certificate are closed numerals: `by norm_num`, or `by basify; norm_num`.
+(`AllTwoTree.genTree.not_expected_cost_bounded`) — reweight it if you can. A certificate closes its
+own side conditions when its weights are numerals; otherwise pass them as arguments
+(`SPMF.LfpIsOne.affine (m := m) h`).
 
 **`mass_fixpoint`** applies the criterion to the family over the generator's seed, unfolds one
 step, and walks it; its docstring says what it leaves in context, `hrec` among it: the bound on

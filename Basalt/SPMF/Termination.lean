@@ -5,7 +5,7 @@ Authors: Harrison Goldstein
 -/
 module
 
-import Mathlib.Tactic.Basify
+public meta import Mathlib.Tactic.Basify
 import Mathlib.Tactic.Linarith
 public import Basalt.SPMF.Mass
 
@@ -73,30 +73,19 @@ theorem LfpIsOne.one : LfpIsOne fun _ : ℝ≥0∞ => (1 : ℝ≥0∞) :=
 
 /-- **Subcritical**: the non-recursive branches carry probability `1 - m`, with `m < 1` the mean
 number of recursive calls. -/
-theorem LfpIsOne.affine {m : ℝ≥0∞} (hm : m < 1) : LfpIsOne fun c => (1 - m) + m * c := by
+theorem LfpIsOne.affine {m : ℝ≥0∞} (hm : m < 1 := by norm_num) :
+    LfpIsOne fun c => (1 - m) + m * c := by
   intro c hle hge
-  have hm_top : m ≠ ⊤ := (hm.trans one_lt_top).ne
-  have hdef : 1 - c ≤ m * (1 - c) :=
-    calc 1 - c
-        ≤ 1 - ((1 - m) + m * c) := tsub_le_tsub_left hge 1
-      _ = (1 - (1 - m)) - m * c := by rw [tsub_add_eq_tsub_tsub]
-      _ = m - m * c := by rw [ENNReal.sub_sub_cancel one_ne_top hm.le]
-      _ = m * (1 - c) := by rw [ENNReal.mul_sub fun _ _ => hm_top, mul_one]
-  by_contra hne
-  have hpos : 0 < 1 - c :=
-    pos_iff_ne_zero.mpr fun h0 => hne (le_antisymm hle (tsub_eq_zero_iff_le.mp h0))
-  have htop : (1 : ℝ≥0∞) - c ≠ ⊤ := (tsub_le_self.trans_lt one_lt_top).ne
-  have hlt : (1 : ℝ≥0∞) - c < 1 - c :=
-    calc 1 - c ≤ m * (1 - c) := hdef
-      _ = (1 - c) * m := mul_comm _ _
-      _ < (1 - c) * 1 := ENNReal.mul_lt_mul_right hpos.ne' htop hm
-      _ = 1 - c := mul_one _
-  exact lt_irrefl _ hlt
+  simp only at hge
+  basify
+  rw [max_eq_left (by linarith)] at hge
+  nlinarith
 
 /-- **At most two recursive calls**, with probabilities `a`, `b`, `d` of zero, one, and two: mean
 offspring `b + 2d ≤ 1`, so this covers the critical case, provided a step can stop (`0 < a`). -/
-theorem LfpIsOne.quadratic {a b d : ℝ≥0∞} (habd : a + b + d = 1) (hbd : b + 2 * d ≤ 1)
-    (ha : 0 < a) : LfpIsOne fun c => a + b * c + d * c ^ 2 := by
+theorem LfpIsOne.quadratic {a b d : ℝ≥0∞} (habd : a + b + d = 1 := by basify; norm_num)
+    (hbd : b + 2 * d ≤ 1 := by basify; norm_num) (ha : 0 < a := by norm_num) :
+    LfpIsOne fun c => a + b * c + d * c ^ 2 := by
   intro c hle hge
   simp only at hge
   basify

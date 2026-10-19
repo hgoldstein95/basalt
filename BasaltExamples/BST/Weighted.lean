@@ -73,7 +73,8 @@ private theorem levelOp_bstLevel (w : ℝ≥0∞) : LevelOp (bstLevel w) := by
     simp only [bstLevel, Pi.add_apply]
     split
     · simp
-    · simp only [add_add_add_comm, Finset.sum_add_distrib, ← ENNReal.div_add_div_same, mul_add]
+    · rw [← mul_add, ENNReal.div_add_div_same, ← Finset.sum_add_distrib]
+      simp only [add_add_add_comm]
   · -- smul
     intro r e
     funext p
