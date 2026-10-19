@@ -123,10 +123,6 @@ Basalt is written in Lean's module system; a file that is not a `module` imports
 `module`:
 
 - A generator proved about from another module must be exposed (`@[expose]`).
-- A recursive generator with a `by` proof in its body that names a recursive call (`oneOf [...]`'s
-  default side condition, for one) needs the `backward.proofsInPublic` option that Basalt's own
-  `lakefile.toml` sets. Without it, `walk fixpoint` and `mass_fixpoint` reject the generator and name
-  the option.
 - Running a generator at elaboration time (`#eval`, `#genstats`) needs a `meta import` of each module
   whose code runs.
 

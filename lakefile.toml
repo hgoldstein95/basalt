@@ -1,6 +1,9 @@
 name = "basalt"
 version = "0.1.0"
 defaultTargets = ["Basalt", "BasaltExamples", "BasaltTest", "BasaltFuzz"]
+
+# TODO: Remove this if/when the Lean folks fix the way arguments get abstracted in
+# `partial_fixpoint`s with modules.
 leanOptions = { backward.proofsInPublic = true }
 
 # `-fsanitize=fuzzer-no-link` here is *not* about fuzzing Basalt: it is about what libFuzzer can see
