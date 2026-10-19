@@ -489,7 +489,7 @@ private theorem bind_choose_congr {G : Type u → Type v} [Gen G] {β : Type u} 
     (hn : n = n') (f : (i : Nat) → i ≤ n → G β) :
     (RandomChoice.choose 0 n (Nat.zero_le _) >>= fun i => f i.down.val i.down.property.2)
       = (RandomChoice.choose 0 n' (Nat.zero_le _) >>= fun i =>
-          f i.down.val (by have := i.down.property.2; omega)) := by
+          f i.down.val (by lia [i.down.property.2])) := by
   subst hn
   rfl
 
@@ -502,7 +502,7 @@ private theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) 
   have h2len : 0 < l2.length := List.length_pos_iff.mpr h2
   rw [show oneOf l1 h1
         = RandomChoice.choose 0 (l2.length - 1) (Nat.zero_le _) >>= fun i =>
-            (l1[i.down.val]'(by have := i.down.property.2; omega)) ()
+            (l1[i.down.val]'(by lia [i.down.property.2])) ()
       from bind_choose_congr (by omega) (fun i hi => (l1[i]'(by omega)) ())]
   simp only [oneOf]
   apply MonoBind.bind_mono_right

@@ -66,7 +66,7 @@ theorem select_demonic (l : List (Nat × Prop)) {T : Nat} (hT : T = (l.map Prod.
         (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ T - 1} => Obs.selectD l a.down.val d)
       ↔ ∀ p ∈ l, 0 < p.1 → p.2 := by
   rw [← selectD_forall l d, ← hT]
-  exact ⟨fun h n hn => h ⟨⟨n, by omega⟩⟩, fun h a => h _ (by have := a.down.property; omega)⟩
+  exact ⟨fun h n hn => h ⟨⟨n, by omega⟩⟩, fun h a => h _ (by lia [a.down.property])⟩
 
 /-! ## Angelic -/
 
@@ -130,7 +130,7 @@ theorem select_angelic (l : List (Nat × Prop)) {T : Nat} (hT : T = (l.map Prod.
         (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ T - 1} => Obs.selectD l a.down.val d)
       ↔ ∃ p ∈ l, 0 < p.1 ∧ p.2 := by
   rw [← selectD_exists l d, ← hT]
-  exact ⟨fun ⟨a, h⟩ => ⟨_, by have := a.down.property; omega, h⟩,
+  exact ⟨fun ⟨a, h⟩ => ⟨_, by lia [a.down.property], h⟩,
     fun ⟨n, hn, h⟩ => ⟨⟨⟨n, by omega⟩⟩, h⟩⟩
 
 /-! ## A choice holds when every outcome does -/

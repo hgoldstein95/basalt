@@ -49,7 +49,7 @@ def chooseVia [∀ α, Inhabited (m α)] [∀ α, CCPO (m α)] [MonoBind m] (lo 
     m (ULift {x : Nat // lo ≤ x ∧ x ≤ hi}) :=
   if lo < hi then
     let shape := SplitMix.rangeShape (hi - lo)
-    (fun i => ULift.up ⟨lo + i.val, by omega, by have := i.property; omega⟩) <$>
+    (fun i => ULift.up ⟨lo + i.val, by omega, by lia [i.property]⟩) <$>
       rejectVia (drawDigitsVia word shape.1 shape.2) (hi - lo)
   else pure (ULift.up ⟨lo, Nat.le_refl lo, h⟩)
 

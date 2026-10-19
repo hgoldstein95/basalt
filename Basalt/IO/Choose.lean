@@ -224,10 +224,10 @@ theorem chooseVia_uniformWord (lo hi : Nat) (h : lo ≤ hi) :
         = chooseNat 0 (2 ^ topBits (hi - lo) * 2 ^ (64 * ((hi - lo).log2 / 64)) - 1) :=
       ext_expect (expect_drawDigitsVia (topBits_le _) _)
     simp only [hD, ← bind_pure_comp, bind_apply, pure_apply]
-    have hi₀ : m.down.val - lo ≤ hi - lo := by have := m.down.property; omega
+    have hi₀ : m.down.val - lo ≤ hi - lo := by lia [m.down.property]
     rw [tsum_eq_single ⟨m.down.val - lo, hi₀⟩ fun i hi => ?_]
     · have hm : m = ULift.up ⟨lo + (m.down.val - lo), by omega, by omega⟩ := by
-        ext; simp; have := m.down.property; omega
+        ext; simp; lia [m.down.property]
       rw [rejectVia_apply (lt_candidates _)]
       split
       · rw [mul_one, one_div]
@@ -240,7 +240,7 @@ theorem chooseVia_uniformWord (lo hi : Nat) (h : lo ≤ hi) :
       · rw [mul_zero]
   · rename_i hlt
     have hm : m = ULift.up ⟨lo, Nat.le_refl lo, h⟩ := by
-      ext; have := m.down.property; simp; omega
+      ext; simp; lia [m.down.property]
     simp [hm, show hi - lo + 1 = 1 by omega]
 
 end SPMF

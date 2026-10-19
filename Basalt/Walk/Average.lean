@@ -57,7 +57,7 @@ private theorem rangeInt_average {lo hi : ℤ} (h : lo ≤ hi) (d : ℤ → ℝ�
 private theorem rangeInt_mono {lo hi : ℤ} {h : lo ≤ hi} {F d : ℤ → ℝ≥0∞}
     (hF : ∀ x, lo ≤ x ∧ x ≤ hi → F x ≤ d x) :
     (Mix.average.{0}).rangeInt lo hi h F ≤ (Mix.average.{0}).rangeInt lo hi h d :=
-  average_mix_mono fun a => hF _ ⟨by omega, by have := a.down.property.2; omega⟩
+  average_mix_mono fun a => hF _ ⟨by omega, by lia [a.down.property.2]⟩
 
 private theorem average_const {lo hi : Nat} (h : lo ≤ hi) (d : ℝ≥0∞) :
     Mix.average.mix.{u} lo hi (fun _ => d) = d := by

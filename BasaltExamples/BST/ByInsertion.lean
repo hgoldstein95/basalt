@@ -84,8 +84,8 @@ theorem Tree.mem_preorder_bounds {lo hi : Int} {t : Tree Int} (h : t.isBST lo hi
     simp only [Tree.preorder, List.mem_cons, List.mem_append] at hy
     rcases hy with rfl | hy | hy
     · exact ⟨hlo, hhi⟩
-    · have := ihl hl y hy; omega
-    · have := ihr hr y hy; omega
+    · lia [ihl hl y hy]
+    · lia [ihr hr y hy]
 
 theorem Tree.foldl_insert_of_lt {l r : Tree Int} {x : Int} (ys : List Int)
     (h : ∀ y ∈ ys, y < x) :
@@ -117,9 +117,9 @@ theorem Tree.foldl_insert_preorder {lo hi : Int} {t : Tree Int} (h : t.isBST lo 
     obtain ⟨hlo, hhi, hl, hr⟩ := h
     simp only [Tree.preorder, List.foldl_cons, List.foldl_append]
     rw [show Tree.insert leaf x = node leaf x leaf from rfl,
-      Tree.foldl_insert_of_lt _ (fun y hy => by have := Tree.mem_preorder_bounds hl y hy; omega),
+      Tree.foldl_insert_of_lt _ (fun y hy => by lia [Tree.mem_preorder_bounds hl y hy]),
       ihl hl,
-      Tree.foldl_insert_of_gt _ (fun y hy => by have := Tree.mem_preorder_bounds hr y hy; omega),
+      Tree.foldl_insert_of_gt _ (fun y hy => by lia [Tree.mem_preorder_bounds hr y hy]),
       ihr hr]
 
 theorem Tree.genBSTByInsertion.sound_complete {lo hi : Int} (h : lo ≤ hi) :

@@ -44,8 +44,8 @@ theorem Term.two_le_costInCtx (Γ : Ctx) (e : Term) : 2 ≤ Term.costInCtx Γ e 
   induction e generalizing Γ with
   | Bool => simp [Term.costInCtx]
   | Var => simp [Term.costInCtx]
-  | Abs τ1 e IH => simp only [Term.costInCtx]; have := IH (τ1 :: Γ); omega
-  | App e1 e2 IH1 _ => simp only [Term.costInCtx]; have := IH1 Γ; omega
+  | Abs τ1 e IH => simp only [Term.costInCtx]; lia [IH (τ1 :: Γ)]
+  | App e1 e2 IH1 _ => simp only [Term.costInCtx]; lia [IH1 Γ]
 
 theorem genZero.cost_typed :
     SPMF.Cost.alwaysObs.spec (genZero Γ τ) (fun e n => Typing Γ e τ ∧ n ≤ 1) := by
