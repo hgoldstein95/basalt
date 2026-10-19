@@ -5,6 +5,7 @@ Authors: Harrison Goldstein
 -/
 module
 
+import Mathlib.Tactic.Basify
 public import Basalt
 
 /-!
@@ -73,7 +74,7 @@ theorem genTree.sound_complete : IsSoundAndComplete genTree Tree.isAllTwos := by
 
 theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genTree.cost_bounded : IsCostBounded genTree Tree.cost := by
@@ -117,7 +118,7 @@ partial_fixpoint
 
 theorem genWeightedTree.terminates : IsAlmostSurelyTerminating genWeightedTree := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 2 / 3) (b := 0) (d := 1 / 3)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genWeightedTree.faithful : IsFaithful genWeightedTree := by

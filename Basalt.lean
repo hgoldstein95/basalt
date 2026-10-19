@@ -43,7 +43,6 @@ public import Basalt.SPMF.Ranking
 public import Basalt.SPMF.Support
 public import Basalt.SPMF.Termination
 public import Basalt.Sized
-public import Basalt.Tactic.ENNReal
 public import Basalt.Tactic.Faithful
 public import Basalt.Tactic.MassFixpoint
 public import Basalt.Tactic.Support

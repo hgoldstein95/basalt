@@ -5,6 +5,7 @@ Authors: Harrison Goldstein
 -/
 module
 
+import Mathlib.Tactic.Basify
 public import Basalt
 public import BasaltExamples.BST
 
@@ -35,7 +36,7 @@ lo hi : ℤ
 #guard_msgs in
 example (lo hi : Int) : IsAlmostSurelyTerminating (BST.Tree.genBST lo hi) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   trace_state
   split
   · rw [zero_mul, add_zero]

@@ -5,6 +5,7 @@ Authors: Harrison Goldstein
 -/
 module
 
+import Mathlib.Tactic.Basify
 public import Basalt
 public import Basalt.Combinators
 
@@ -77,7 +78,7 @@ open scoped ENNReal
 
 theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   split
   · rw [zero_mul, add_zero]
     calc (1 : ℝ≥0∞) / 2 + 1 / 2 * c ^ 2 ≤ 1 / 2 + 1 / 2 * 1 ^ 2 := by gcongr

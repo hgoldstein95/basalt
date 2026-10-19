@@ -5,6 +5,7 @@ Authors: Harrison Goldstein & Ernest Ng
 -/
 module
 
+import Mathlib.Tactic.Basify
 public import Basalt
 public import BasaltExamples.STLC.Syntax
 
@@ -44,7 +45,7 @@ theorem genType.sound_complete : IsSoundAndComplete genType (fun _ => True) := b
 
 theorem genType.terminates : IsAlmostSurelyTerminating genType := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genType.cost_bounded : IsCostBounded genType Ty.size := by

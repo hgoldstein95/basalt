@@ -5,6 +5,7 @@ Authors: Harrison Goldstein & Ernest Ng
 -/
 module
 
+import Mathlib.Tactic.Basify
 public import Basalt
 public import BasaltExamples.STLC.GenTerm
 
@@ -27,10 +28,10 @@ theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by
 theorem genTerm.terminates : IsAlmostSurelyTerminating (genTerm Γ τ) := by
   mass_fixpoint [genZero.terminates.obs, genType.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 3) (b := 1 / 3) (d := 1 / 3)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
+    (by basify; norm_num) (by basify; norm_num) (by norm_num)
   all_goals
     split
     all_goals
-      norm_num [ENNReal.div_self]
-      ennreal_to_real
-      nlinarith [c.toReal_nonneg, ENNReal.toReal_le_of_le_ofReal zero_le_one (by simpa using hc1)]
+      norm_num only [List.sum_cons, List.sum_nil, List.length_cons, List.length_nil]
+      basify
+      nlinarith

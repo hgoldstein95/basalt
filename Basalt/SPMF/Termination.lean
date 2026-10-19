@@ -5,8 +5,9 @@ Authors: Harrison Goldstein
 -/
 module
 
+import Mathlib.Tactic.Basify
+import Mathlib.Tactic.Linarith
 public import Basalt.SPMF.Mass
-public import Basalt.Tactic.ENNReal
 
 /-!
 # Almost-Sure Termination
@@ -97,25 +98,13 @@ offspring `b + 2d ≤ 1`, so this covers the critical case, provided a step can 
 theorem LfpIsOne.quadratic {a b d : ℝ≥0∞} (habd : a + b + d = 1) (hbd : b + 2 * d ≤ 1)
     (ha : 0 < a) : LfpIsOne fun c => a + b * c + d * c ^ 2 := by
   intro c hle hge
-  have ha1 : a ≤ 1 := habd ▸ le_self_add.trans le_self_add
-  have hb1 : b ≤ 1 := habd ▸ le_add_self.trans le_self_add
-  have hd1 : d ≤ 1 := habd ▸ le_add_self
-  have ha0 : 0 < a.toReal := ENNReal.toReal_pos ha.ne' (by finiteness)
-  have hb0 := b.toReal_nonneg
-  have hd0 := d.toReal_nonneg
-  have hc0 := c.toReal_nonneg
   simp only at hge
-  ennreal_to_real at hge
-  ennreal_to_real at habd
-  ennreal_to_real at hbd
-  ennreal_to_real at hle
-  rw [← ENNReal.toReal_eq_one_iff]
+  basify
   refine le_antisymm hle (not_lt.mp fun hlt => ?_)
-  have hb : b.toReal = 1 - a.toReal - d.toReal := by linarith
-  rw [hb] at hge
+  obtain rfl : b = 1 - a - d := by linarith
   -- `a + bc + dc² - c = a(1-c)² + c(1-c)(a-d)`, and `a ≥ d`
-  nlinarith [mul_pos (mul_pos ha0 (sub_pos.mpr hlt)) (sub_pos.mpr hlt),
-    mul_nonneg (mul_nonneg hc0 (sub_nonneg.mpr hle)) (show 0 ≤ a.toReal - d.toReal by linarith)]
+  nlinarith [mul_pos (mul_pos ha (sub_pos.mpr hlt)) (sub_pos.mpr hlt),
+    mul_nonneg (mul_nonneg ‹0 ≤ c› (sub_nonneg.mpr hle)) (show 0 ≤ a - d by linarith)]
 
 end certificates
 

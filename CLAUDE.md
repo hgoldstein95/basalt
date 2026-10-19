@@ -93,8 +93,8 @@ the definition, and the definition is right here to run.
   `admissible`/`admissible_le` or the relation's `admissible`. What the walk knows of each judgment
   — its leaves, its list-combinator rules, its admissibility — is one file per judgment in
   [Basalt/Walk/](Basalt/Walk/); each bound's is pinned by its namesake in
-  [BasaltTest/Walk/](BasaltTest/Walk/). [Basalt/Tactic/](Basalt/Tactic/) holds, besides the
-  `support_simp` and `ennreal_to_real` helpers, the tactics that do more than walk: `mass_fixpoint`
+  [BasaltTest/Walk/](BasaltTest/Walk/). [Basalt/Tactic/](Basalt/Tactic/) holds, besides
+  `support_simp`, the tactics that do more than walk: `mass_fixpoint`
   (above) and `faithful_fixpoint`. Some judgments relate a generator at two monads instead of
   bounding it, tagged `@[walk_rel]`: `src.Below` ([Basalt/Walk/Ideal.lean](Basalt/Walk/Ideal.lean)),
   `IOModel.Approx` ([Basalt/Walk/IO.lean](Basalt/Walk/IO.lean)), and the two directions of cost
@@ -122,8 +122,6 @@ the definition, and the definition is right here to run.
   [Basalt/Walk/ExpectedCost.lean](Basalt/Walk/ExpectedCost.lean), pinned by
   [BasaltTest/Walk/ExpectedCost.lean](BasaltTest/Walk/ExpectedCost.lean). The practical entry is
   WORKFLOW.md's Recipe 3.
-- **ENNReal arithmetic** — `ennreal_to_real` in
-  [Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean).
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
   [Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)'s module docstring;
   [BasaltTest/Tuning.lean](BasaltTest/Tuning.lean) is the full tour.
@@ -213,7 +211,7 @@ the definition, and the definition is right here to run.
   first ([Basalt/Order.lean](Basalt/Order.lean)).
 
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
-  `ennreal_to_real` ([Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean)) and finish over `ℝ`.
+  Mathlib's `basify` and finish over `ℝ`.
 
 ## Documentation rules
 

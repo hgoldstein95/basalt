@@ -260,7 +260,7 @@ quadratic, `a = 2/3`, `d = 1/3`; a two-branch `oneOf` between a leaf and two cal
 `a = d = 1/2`. **A critical generator
 (`m = 1`) terminates but has no finite `IsExpectedCostBounded`**
 (`AllTwoTree.genTree.not_expected_cost_bounded`) — reweight it if you can. The side conditions of a
-certificate are closed numerals: `by norm_num`, or `by ennreal_to_real; norm_num`.
+certificate are closed numerals: `by norm_num`, or `by basify; norm_num`.
 
 **`mass_fixpoint`** applies the criterion to the family over the generator's seed, unfolds one
 step, and walks it; its docstring says what it leaves in context, `hrec` among it: the bound on
@@ -294,7 +294,7 @@ generator that uses every combinator). Of the generator, only its callees' laws 
 **The arithmetic** has your `F c` on the left, the computed bound on the right, and no generator in
 sight. Try `simp` (`ArbNat.lean`, `SortedList.lean`), then `simp` with the identities the goal needs
 (`simp [sq, ENNReal.div_eq_inv_mul, mul_add]` in `LeftistHeap.lean` and `AllTwoTree.lean`), then
-`ennreal_to_real` (`Basalt/Tactic/ENNReal.lean`) and `nlinarith`. If it looks *false*, your
+`basify` and `nlinarith`. If it looks *false*, your
 certificate is wrong, not your proof. A generator whose seed has an argument typed by another goes
 through `IsAlmostSurelyTerminating.of_lfpIsOne_uniform` on an explicit family. A bare combinator
 term, which has no definition to unfold, is

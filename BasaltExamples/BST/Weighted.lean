@@ -5,6 +5,7 @@ Authors: Harrison Goldstein
 -/
 module
 
+import Mathlib.Tactic.Basify
 public import Basalt
 public import BasaltExamples.BST
 
@@ -117,8 +118,7 @@ private theorem genWeightedBST_drift (p : Int × Int) :
       simp only [ne_eq, Nat.cast_eq_zero]
       omega
     rw [hcast, mul_div_assoc, ENNReal.mul_div_cancel hne0 (ENNReal.natCast_ne_top _)]
-    ennreal_to_real
-    ennreal_to_real at hrank1
+    basify
     linarith
 
 theorem Tree.genWeightedBST.terminates : IsAlmostSurelyTerminating (Tree.genWeightedBST lo hi) := by
@@ -140,7 +140,7 @@ theorem Tree.genWeightedBST.terminates : IsAlmostSurelyTerminating (Tree.genWeig
   -- Split off the leaf branch, then the union bound over the pivot and over the two children.
   calc _ ≤ 5 / 6 * (1 - (∑ x ∈ Finset.Icc lo hi, c (lo, x - 1) * c (x + 1, hi))
           / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞)) :=
-        ENNReal.one_sub_le_mul_one_sub (w := 1 / 6) (by ennreal_to_real; norm_num) (by finiteness)
+        ENNReal.one_sub_le_mul_one_sub (w := 1 / 6) (by basify; norm_num) (by finiteness)
           (by rw [show ((1 + 5 : ℕ) : ℝ≥0∞) = 6 by norm_num, ENNReal.add_div,
             ENNReal.mul_div_right_comm])
     _ ≤ 5 / 6 * ((∑ x ∈ Finset.Icc lo hi, (1 - c (lo, x - 1) * c (x + 1, hi)))
