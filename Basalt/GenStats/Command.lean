@@ -8,6 +8,7 @@ module
 public meta import Lean.Elab.Command
 public meta import Lean.Elab.SyntheticMVars
 public import Basalt.GenStats.Basic
+public meta import Basalt.GenStats.Basic
 
 /-!
 # The `#genstats` Command
@@ -40,10 +41,7 @@ Options (all optional, in any order, before the generator term): `(draws := n)`,
 for an inductive output type. -/
 syntax (name := genStatsCmd) "#genstats " genStatsArg* term : command
 
-private structure Opts where
-  draws : Nat := 1000
-  fuel : Nat := 10000
-  seed : Nat := 0
+private structure Opts extends GenStats.Config where
   size? : Option Term := none
 
 private def asNatLit (v : Term) : CommandElabM Nat := do
@@ -190,20 +188,7 @@ elab_rules : command
         | some ss => ss.toString
         | none => toString g.raw
       -- Collapse all whitespace runs to single spaces so multi-line terms label cleanly.
-      let words := Id.run do
-        let mut ws : Array String := #[]
-        let mut cur := ""
-        for c in raw.toList do
-          if c.isWhitespace then
-            if cur ≠ "" then
-              ws := ws.push cur
-              cur := ""
-          else
-            cur := cur.push c
-        if cur ≠ "" then
-          ws := ws.push cur
-        return ws
-      " ".intercalate words.toList
+      " ".intercalate ((raw.splitToList Char.isWhitespace).filter (· ≠ ""))
     let cfg ← `({ draws := $(quote opts.draws), fuel := $(quote opts.fuel),
                   seed := $(quote opts.seed) : GenStats.Config })
     elabCommand (← `(#eval GenStats.report (($g) : GenStats.StatGen _) $(Syntax.mkStrLit label)

@@ -71,6 +71,13 @@ def assignProofsFrom (xs : Array Expr) (src : Expr) : MetaM Unit := do
         x.mvarId!.assign c
         break
 
+/-- Synthesize each of `xs` that its binder `bis` makes an instance and unification left
+unassigned. -/
+def synthInstMVars (xs : Array Expr) (bis : Array BinderInfo) : MetaM Unit := do
+  for x in xs, bi in bis do
+    if bi.isInstImplicit && !(← x.mvarId!.isAssigned) then
+      x.mvarId!.assign (← synthInstance (← inferType x))
+
 /-- `apply` that matches `e`'s conclusion against the goal without unfolding it. A judgment may be a
 definition whose body is a `∀`, and `MVarId.apply` then tries the unfolded arities first. Returns
 the unassigned explicit premises. -/
@@ -81,9 +88,7 @@ def applyExact (goal : MVarId) (e : Expr) : MetaM (List MVarId) := goal.withCont
   unless ← isDefEq concl target do
     throwError "could not unify the conclusion of{indentExpr e}\n{indentExpr concl}\n\
       with the goal{indentExpr target}"
-  for x in xs, bi in bis do
-    if bi.isInstImplicit && !(← x.mvarId!.isAssigned) then
-      x.mvarId!.assign (← synthInstance (← inferType x))
+  synthInstMVars xs bis
   assignProofsFrom ((xs.zip bis).filterMap fun (x, bi) => if bi.isExplicit then none else some x)
     target
   goal.assign (mkAppN e xs)
@@ -385,7 +390,6 @@ def unfold? (g : Expr) (combinators := false) : MetaM (Option (Name × Expr)) :=
   if ← isInstance c then return none
   let some (.defnInfo info) := env.find? c | return none
   if ← isRecursiveDefinition c then return none
-  if (← observing? (fixpointSeed? c)).join.isSome then return none
   let v ← instantiateValueLevelParams (.defnInfo info) us
   return some (c, (renameLambdas v).beta g.getAppArgs)
 
@@ -419,9 +423,7 @@ def applyMap (adapter mapLem : Name) (goal : MVarId) : MetaM (List MVarId) := go
   let (ys, ybis, eqn) ← forallMetaTelescope (← inferType lem)
   unless ← isDefEq eqn (← inferType hEq) do
     throwError "walk: `{mapLem}` does not apply to{indentExpr (← inferType hEq)}"
-  for x in xs ++ ys, bi in bis ++ ybis do
-    if bi.isInstImplicit && !(← x.mvarId!.isAssigned) then
-      x.mvarId!.assign (← synthInstance (← inferType x))
+  synthInstMVars (xs ++ ys) (bis ++ ybis)
   assignProofsFrom ys (← goal.getType)
   hEq.mvarId!.assign (mkAppN lem ys)
   goal.assign (mkAppN ad xs)
@@ -519,6 +521,14 @@ private def tryRules (j : Judgment) (goal : MVarId) (g : Expr) (rest : WalkRest)
   let some mapLem := g.getAppFn.constName?.bind (mapFor (← getEnv)) | return none
   firstApplying (adapters j) (applyMap · mapLem goal) finish
 
+/-- `t`, a fact a caller passed, elaborated with its metavariables instantiated: an error is thrown,
+not elaborated to `sorry`. -/
+def elabFact (t : Term) : TermElabM Expr :=
+  Term.withoutErrToSorry do
+    let e ← Term.elabTerm t none
+    Term.synthesizeSyntheticMVarsNoPostponing
+    instantiateMVars e
+
 /-- A fact about `g`: one the caller passed, or a hypothesis (a recursive occurrence). A passed fact
 is committed to before its bridge's premises are walked, so that a failure inside them is reported
 where it happens. -/
@@ -532,10 +542,7 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
     | _ => true
   for t in extras do
     let r ← observing? do
-      let e ← Term.withoutErrToSorry do
-        let e ← Term.elabTerm t none
-        Term.synthesizeSyntheticMVarsNoPostponing
-        instantiateMVars e
+      let e ← elabFact t
       unless mentionsHead (← instantiateMVars (← inferType e)) do failure
       let some gs ← tryFact leaves goal e | failure
       namePremises none (← goal.getType) gs
@@ -557,10 +564,7 @@ private def unelaboratedFacts (extras : Array Term) (goal : MVarId) : TermElabM 
   for t in extras do
     let saved ← saveState
     try
-      discard <| Term.withoutErrToSorry do
-        let e ← Term.elabTerm t none
-        Term.synthesizeSyntheticMVarsNoPostponing
-        instantiateMVars e
+      discard <| elabFact t
     catch ex =>
       msg := msg ++ m!"\nThe fact{indentD t}\ndoes not elaborate here: {ex.toMessageData}"
     saved.restore
@@ -571,10 +575,8 @@ bounding it: a rule's premise about a combinator's generator argument, whose pos
 rule's to learn, so that only a fact can close it. -/
 private def argumentSubject? (ty : Expr) : MetaM (Option Expr) :=
   forallTelescope ty fun xs concl => do
-    let concl := concl.headBeta.consumeMData
-    unless concl.isAppOfArity ``Obs.spec 10 do return none
-    let g := concl.getArg! 8
-    return if g.hasAnyFVar (fun v => xs.contains (.fvar v)) then none else some g
+    let some s := specParts? concl.headBeta.consumeMData | return none
+    return if s.g.hasAnyFVar (fun v => xs.contains (.fvar v)) then none else some s.g
 
 /-- A bound on `g` by itself (`@[obs_leaf self]`), the tightest first. -/
 private def trySelf (leaves : Leaves) (goal : MVarId) (g : Expr) (rest : WalkRest) :

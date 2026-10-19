@@ -58,20 +58,12 @@ elab_rules : tactic
     let some x := (if ty.isAppOfArity ``IsAlmostSurelyTerminating 2 then some ty.appArg! else none)
       | throwError "mass_fixpoint: expected a goal `IsAlmostSurelyTerminating (gen …)`, \
           got{indentExpr ty}"
-    let some gen := x.getAppFn.constName?
-      | throwError "mass_fixpoint: expected a generator applied to its arguments, got{indentExpr x}"
-    if isCombinator (← getEnv) gen then
-      throwError "mass_fixpoint: `{gen}` is a combinator, not a generator definition; prove the \
-        termination of a combinator term with `rw [IsAlmostSurelyTerminating.iff_obs]` and `walk`"
+    let restate := "`rw [IsAlmostSurelyTerminating.iff_obs]`"
+    let (gen, seed?) ← fixpointGen "mass_fixpoint"
+      s!"the termination of a combinator term with {restate} and `walk`"
+      s!"{restate}, unfold it, and `walk`" x
     let args := x.getAppArgs
-    let seed ← match ← fixpointSeed? gen with
-      | some (_, seed) => pure seed
-      | none => do
-        if ← isRecursiveDefinition gen then
-          throwError "mass_fixpoint: `{gen}` is recursive but not a `partial_fixpoint`; induct on \
-            its decreasing argument, `rw [IsAlmostSurelyTerminating.iff_obs]`, unfold it, and \
-            `walk`"
-        pure #[]
+    let seed := (seed?.map (·.2)).getD #[]
     unless seed.all (· < args.size) do
       throwError "mass_fixpoint: `{gen}` is not fully applied in{indentExpr x}"
     -- The family over the seed.
@@ -201,19 +193,12 @@ theorem isAlmostSurelyTerminating_nonEmptyListOf {g : SPMF α} (hg : IsAlmostSur
   mass_fixpoint [hg.obs] using LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.one_sub_inv_two, div_eq_mul_inv, add_mul, mul_comm]
 
-private theorem ite_le_listOf {g : SPMF α} {c : ℝ≥0∞} (hg : c ≤ expectObs.spec g fun _ => 1) :
-    (if 1 ≤ c then 1 else 0) ≤ expectObs.spec (listOf g) fun _ => 1 := by
-  split
-  · exact (isAlmostSurelyTerminating_listOf
-      (IsAlmostSurelyTerminating.iff_obs.mpr (‹1 ≤ c›.trans hg))).obs
-  · exact zero_le
-
-private theorem ite_le_nonEmptyListOf {g : SPMF α} {c : ℝ≥0∞}
+private theorem ite_le_of_terminates {β : Type*} {g : SPMF α} {x : SPMF β} {c : ℝ≥0∞}
+    (hx : IsAlmostSurelyTerminating g → IsAlmostSurelyTerminating x)
     (hg : c ≤ expectObs.spec g fun _ => 1) :
-    (if 1 ≤ c then 1 else 0) ≤ expectObs.spec (nonEmptyListOf g) fun _ => 1 := by
+    (if 1 ≤ c then 1 else 0) ≤ expectObs.spec x fun _ => 1 := by
   split
-  · exact (isAlmostSurelyTerminating_nonEmptyListOf
-      (IsAlmostSurelyTerminating.iff_obs.mpr (‹1 ≤ c›.trans hg))).obs
+  · exact (hx (IsAlmostSurelyTerminating.iff_obs.mpr (‹1 ≤ c›.trans hg))).obs
   · exact zero_le
 
 /-- An unbounded-length list only passes termination through: its bound is `1` exactly when its
@@ -222,25 +207,25 @@ element generator's is, which is the shape that still chains when that generator
 theorem le_expect_listOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
     (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (listOf g) p :=
-  le_expect_of_le (ite_le_listOf hg) hp
+  le_expect_of_le (ite_le_of_terminates isAlmostSurelyTerminating_listOf hg) hp
 
 @[gen_rule, inherit_doc le_expect_vectorOf_iInf]
 theorem le_expect_listOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) :
     (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (listOf g) p :=
-  le_expect_iInf_of_le (ite_le_listOf hg)
+  le_expect_iInf_of_le (ite_le_of_terminates isAlmostSurelyTerminating_listOf hg)
 
 @[gen_rule, inherit_doc le_expect_listOf]
 theorem le_expect_nonEmptyListOf {g : SPMF α} {c d : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) (hp : ∀ a, p a = d) :
     (if 1 ≤ c then 1 else 0) * d ≤ expectObs.spec (nonEmptyListOf g) p :=
-  le_expect_of_le (ite_le_nonEmptyListOf hg) hp
+  le_expect_of_le (ite_le_of_terminates isAlmostSurelyTerminating_nonEmptyListOf hg) hp
 
 @[gen_rule, inherit_doc le_expect_vectorOf_iInf]
 theorem le_expect_nonEmptyListOf_iInf {g : SPMF α} {c : ℝ≥0∞} {p : List α → ℝ≥0∞}
     (hg : c ≤ expectObs.spec g fun _ => 1) :
     (if 1 ≤ c then 1 else 0) * ⨅ a, p a ≤ expectObs.spec (nonEmptyListOf g) p :=
-  le_expect_iInf_of_le (ite_le_nonEmptyListOf hg)
+  le_expect_iInf_of_le (ite_le_of_terminates isAlmostSurelyTerminating_nonEmptyListOf hg)
 
 /-- One step of rejection sampling: a draw accepted with chance at least `1 - r`, or else a retry of
 mass at least `c`. -/

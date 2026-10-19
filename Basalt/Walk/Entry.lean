@@ -16,8 +16,9 @@ public meta import Basalt.Walk.Basic
 
 The `walk` tactic, and the pieces a specialized tactic builds on. A statement on an observation is
 walked with `computeBound`, and the result turned into goals for the user by the observation's
-algebra: `pathsBound` gives one goal per path of a demonic precondition, `prunedBound` simplifies an
-angelic one, and `arithBound` gives one inequality to close by arithmetic. `walk fixpoint` first
+algebra: `preconditionBound` gives one goal per path of a demonic precondition (`splitPaths`) or
+simplifies an angelic one (`prunePaths`), and `arithBound` gives one inequality to close by
+arithmetic. `walk fixpoint` first
 takes one induction step with `fixpointStep`. A relational judgment, one generator at two monads,
 walks with `walkRel`, and takes its step with `relFixpoint`.
 -/
@@ -80,27 +81,37 @@ private partial def mkAdmissible (gTy : Expr) (leaf : Array Expr → MetaM Expr)
         #[d, ← mkLambdaFVars #[y] (b.instantiate1 y), none, P, ← mkLambdaFVars #[y] inner]
   | _ => leaf ys
 
+/-- The generator definition that `x` applies, and its `fixpointSeed?`: `none` when it is not
+recursive. `tac` is the caller, `combinatorHint` how to prove the statement about a combinator term,
+and `recursiveHint` how to prove it about a recursive generator that is not a `partial_fixpoint`
+once inducted on, for the errors. -/
+def fixpointGen (tac combinatorHint recursiveHint : String) (x : Expr) :
+    MetaM (Name × Option (Name × Array Nat)) := do
+  let some gen := x.getAppFn.constName?
+    | throwError "{tac}: expected a generator applied to its arguments, got{indentExpr x}"
+  if isCombinator (← getEnv) gen then
+    throwError "{tac}: `{gen}` is a combinator, not a generator definition; prove {combinatorHint}"
+  let seed? ← fixpointSeed? gen
+  if seed?.isNone && (← isRecursiveDefinition gen) then
+    throwError "{tac}: `{gen}` is recursive but not a `partial_fixpoint`; induct on its decreasing \
+      argument, {recursiveHint}"
+  return (gen, seed?)
+
 /-- One step of `gen.fixpoint_induct` on `goal`, a statement `P (gen a₁ … aₙ)` about the generator
 application `x`: the induction is over the arguments some recursive call of `gen` changes, and the
 goal returned has the recursive function (named after `gen`), `ih`, and those arguments introduced.
 `adm` proves `admissible P`; the motive is read off it, generalized over the changing arguments. A
-`gen` that is not recursive is unfolded instead. `tac` is the caller, and `boundTac` the tactic it
-runs on the goal returned, for the errors. -/
-def fixpointStep (tac boundTac : String) (x adm : Expr) (goal : MVarId) : TermElabM MVarId :=
-  goal.withContext do
+`gen` that is not recursive is unfolded instead, which the `Bool` returned says. `tac` is the
+caller, and `boundTac` the tactic it runs on the goal returned, for the errors. -/
+def fixpointStep (tac boundTac : String) (x adm : Expr) (goal : MVarId) :
+    TermElabM (MVarId × Bool) := goal.withContext do
   let ty ← instantiateMVars (← goal.getType)
-  let some gen := x.getAppFn.constName?
-    | throwError "{tac}: expected a generator applied to its arguments, got{indentExpr x}"
-  if isCombinator (← getEnv) gen then
-    throwError "{tac}: `{gen}` is a combinator, not a generator definition; prove a bound on a \
-      combinator term with `{boundTac}`"
-  let some (indName, seed) ← fixpointSeed? gen
-    | if ← isRecursiveDefinition gen then
-        throwError "{tac}: `{gen}` is recursive but not a `partial_fixpoint`; induct on its \
-          decreasing argument, unfold it, and apply `{boundTac}`"
-      let [goal] ← Lean.Elab.Tactic.run goal (evalTactic (← `(tactic| unfold $(mkIdent gen))))
+  let (gen, seed?) ← fixpointGen tac s!"a bound on a combinator term with `{boundTac}`"
+    s!"unfold it, and apply `{boundTac}`" x
+  let some (indName, seed) := seed?
+    | let [goal] ← Lean.Elab.Tactic.run goal (evalTactic (← `(tactic| unfold $(mkIdent gen))))
         | throwError "{tac}: could not unfold `{gen}`"
-      return goal
+      return (goal, false)
   let ind ← mkConstWithFreshMVarLevels indName
   let (xs, _, concl) ← forallMetaTelescope (← inferType ind)
   let some step := xs.back? | throwError "{tac}: internal error"
@@ -138,7 +149,9 @@ def fixpointStep (tac boundTac : String) (x adm : Expr) (goal : MVarId) : TermEl
   let (_, s) ← step.mvarId!.introN 2 [recName.eraseMacroScopes, `ih]
   let (_, s) ← s.introN seed.size (← seed.mapM (binderName gen ·)).toList
   let s ← s.tryClearMany (seedFVars.map (·.fvarId!))
-  s.withContext do s.replaceTargetDefEq (← Core.betaReduce (← instantiateMVars (← s.getType)))
+  let s ← s.withContext do
+    s.replaceTargetDefEq (← Core.betaReduce (← instantiateMVars (← s.getType)))
+  return (s, true)
 
 /-- `goal`, a residual goal of a walk begun in `lctx`, with its metavariables instantiated and
 `tidyExpr` applied, in the target and every hypothesis, a `match` of one value in the target
@@ -184,9 +197,9 @@ def relFixpoint (tac boundTac : String) (rel : Name) (adm : Array Expr → MetaM
   let y := args[args.size - 2]!
   let some gen := y.getAppFn.constName?
     | throwError "{tac}: expected a generator applied to its arguments, got{indentExpr y}"
-  let step ← fixpointStep tac boundTac y (← adm args) goal
+  let (step, inducted) ← fixpointStep tac boundTac y (← adm args) goal
   -- `eq_def`, not the equation lemmas: a generator defined by cases has one per case.
-  let step ← if (← fixpointSeed? gen).isSome then
+  let step ← if inducted then
       match ← Lean.Elab.Tactic.run step
           (evalTactic (← `(tactic| rw [$(mkCIdent (gen ++ `eq_def)):ident]))) with
       | [g] => pure g
@@ -286,17 +299,17 @@ partial def prunePaths (g : MVarId) : TermElabM (List MVarId) := do
     let some gs ← splitCtxMatch? id g | return [g]
     gs.flatMapM prunePaths
 
-
 /-- Prove `goal`, which is `O.spec g post` for `O` the observation `obs` into `Prop`, by the walk of
-a lower bound: one goal per path through the precondition it computed (`splitPaths`), then whatever
-else the walk left, tidied. -/
-def pathsBound (extras : Array Term) (obs : Name) (g post : Expr) (goal : MVarId) :
+a lower bound: the precondition it computed, turned into goals by `finish`, which is given the
+context the walk began in, then whatever else the walk left, tidied. -/
+def preconditionBound (finish : LocalContext → MVarId → TermElabM (List MVarId))
+    (extras : Array Term) (obs : Name) (g post : Expr) (goal : MVarId) :
     TermElabM (List MVarId) := do
   let lctx := (← goal.getDecl).lctx
   let (pre, structural, rest) ← computeBound extras obs true g post
   let paths ← mkFreshExprMVar pre
   goal.assign (mkApp structural paths)
-  ((← splitPaths paths.mvarId!) ++ rest).mapM fun g => tidy lctx g
+  return (← finish lctx paths.mvarId!) ++ (← rest.mapM fun g => tidy lctx g)
 
 /-- Prove `goal`, which is `other ≤ O.spec g post` when `lower` and `O.spec g post ≤ other`
 otherwise, for `O` the observation `obs`: the arithmetic goal relating `other` to the bound the walk
@@ -312,48 +325,24 @@ def arithBound (extras : Array Term) (obs : Name) (lower : Bool) (g post other :
   let ariths ← splitBoundMatches (if lower then 3 else 2) (← tidy lctx arith.mvarId!)
   return ariths ++ (← rest.mapM fun g => tidy lctx g)
 
-/-- Prove `goal`, which is `O.spec g post` for `O` the observation `obs` into `Prop`, by the walk of
-a lower bound in an angelic algebra: the precondition it computed, pruned (`prunePaths`), then
-whatever else the walk left, tidied. -/
-def prunedBound (extras : Array Term) (obs : Name) (g post : Expr) (goal : MVarId) :
-    TermElabM (List MVarId) := do
-  let lctx := (← goal.getDecl).lctx
-  let (pre, structural, rest) ← computeBound extras obs true g post
-  let paths ← mkFreshExprMVar pre
-  goal.assign (mkApp structural paths)
-  return (← prunePaths paths.mvarId!) ++ (← rest.mapM fun g => tidy lctx g)
-
 /-! ## The `walk` tactic -/
 
 /-- A statement on an observation: `O.spec g post` for an observation into `Prop` (`bound` is
 `none`), or a bound `b ≤ O.spec g post` (`bound` is `(b, true)`) or `O.spec g post ≤ b`. -/
-structure SpecGoal where
-  /-- The observation, `O`. -/
+structure SpecGoal extends SpecParts where
+  /-- The observation's name: `O` is a constant applied to its parameters. -/
   obs : Name
-  /-- `O` itself, as it appears in the goal. -/
-  obsExpr : Expr
-  g : Expr
-  post : Expr
   bound : Option (Expr × Bool)
-
-/-- `e` as `O.spec g post`, for `O` a constant. -/
-private def specParts? (e : Expr) : Option (Name × Expr × Expr × Expr) := do
-  let e := e.headBeta
-  guard (e.isAppOfArity ``Obs.spec 10)
-  let O := e.getArg! 6
-  let obs ← O.getAppFn.constName?
-  return (obs, O, e.getArg! 8, e.getArg! 9)
 
 /-- `ty` as a statement on an observation. -/
 def specGoal? (ty : Expr) : Option SpecGoal :=
-  if let some (obs, O, g, post) := specParts? ty then some ⟨obs, O, g, post, none⟩
-  else if ty.isAppOfArity ``LE.le 4 then
-    if let some (obs, O, g, post) := specParts? (ty.getArg! 3) then
-      some ⟨obs, O, g, post, some (ty.getArg! 2, true)⟩
-    else if let some (obs, O, g, post) := specParts? (ty.getArg! 2) then
-      some ⟨obs, O, g, post, some (ty.getArg! 3, false)⟩
+  let spec (e : Expr) (bound : Option (Expr × Bool)) : Option SpecGoal := do
+    let s ← specParts? e
+    return { s with obs := ← s.O.getAppFn.constName?, bound }
+  spec ty none <|> if ty.isAppOfArity ``LE.le 4 then
+      spec (ty.getArg! 3) (some (ty.getArg! 2, true)) <|>
+        spec (ty.getArg! 2) (some (ty.getArg! 3, false))
     else none
-  else none
 
 /-- Whether the observation `O` is into an angelic algebra: its specification monad is `WP` or `WPC`
 of `Mix.angelic`. -/
@@ -408,8 +397,10 @@ partial def walkGoal (extras : Array Term) (goal : MVarId) : TermElabM (List MVa
   | some (b, lower) => arithBound extras sg.obs lower sg.g sg.post b goal
   | none =>
     let post ← etaPost sg.post
-    if ← isAngelic sg.obsExpr then prunedBound extras sg.obs sg.g post goal
-    else pathsBound extras sg.obs sg.g post goal
+    if ← isAngelic sg.O then preconditionBound (fun _ => prunePaths) extras sg.obs sg.g post goal
+    else
+      preconditionBound (fun lctx g => do (← splitPaths g).mapM (tidy lctx ·)) extras sg.obs sg.g
+        post goal
 
 /-- `rel.admissible`, instantiated to the motive `fun y => rel … y x` of the goal `rel … y x` whose
 arguments are `args`. -/
@@ -418,15 +409,13 @@ private def relAdmissible (rel : Name) (args : Array Expr) : MetaM Expr := do
   unless (← getEnv).contains lemName do
     throwError "walk fixpoint: no `{.ofConstName lemName}` to induct on `{.ofConstName rel}` with"
   let lem ← mkConstWithFreshMVarLevels lemName
-  let (xs, _, concl) ← forallMetaTelescope (← inferType lem)
+  let (xs, bis, concl) ← forallMetaTelescope (← inferType lem)
   let i := args.size - 2
   let P ← withLocalDeclD `y (← inferType args[i]!) fun y => do
     mkLambdaFVars #[y] (← mkAppOptM rel ((args.set! i y).map some))
   unless ← isDefEq concl.appArg! P do
     throwError "walk fixpoint: `{.ofConstName lemName}` does not prove{indentExpr P}\nadmissible"
-  for x in xs do
-    unless ← x.mvarId!.isAssigned do
-      x.mvarId!.assign (← synthInstance (← inferType x))
+  synthInstMVars xs bis
   instantiateMVars (mkAppN lem xs)
 
 /-- The admissibility of `sg`'s statement, for fixpoint induction on its generator: `O.admissible`
@@ -435,7 +424,7 @@ private def specAdmissible (sg : SpecGoal) : MetaM Expr := do
   -- In an angelic algebra, a statement by itself is a lower bound too: some run reaches it.
   let lower ← match sg.bound with
     | some (_, lower) => pure lower
-    | none => isAngelic sg.obsExpr
+    | none => isAngelic sg.O
   if lower then
     throwError "walk fixpoint: a lower bound on `{.ofConstName sg.obs}` is false of the generator \
       that never returns, so fixpoint induction cannot prove it. Induct yourself \
@@ -457,17 +446,11 @@ def walkFixpoint (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId)
       return ← relFixpoint "walk fixpoint" "walk" rel (relAdmissible rel) extras goal
   let some sg := specGoal? ty | throwError (← notASpec ty)
   let goal ← goal.replaceTargetDefEq ty
-  walkGoal extras (← fixpointStep "walk fixpoint" "walk" sg.g (← specAdmissible sg) goal)
+  walkGoal extras (← fixpointStep "walk fixpoint" "walk" sg.g (← specAdmissible sg) goal).1
 
 /-- The error for a fact passed in the form a reader checks: `h : L …` when `L.obs` exists. -/
 def checkFact (t : Term) : TermElabM Unit := do
-  let some ty ← observing? do
-      let e ← Term.withoutErrToSorry do
-        let e ← Term.elabTerm t none
-        Term.synthesizeSyntheticMVarsNoPostponing
-        instantiateMVars e
-      inferType e
-    | return
+  let some ty ← observing? do inferType (← elabFact t) | return
   let some L ← forallTelescope ty fun _ concl => return concl.getAppFn.constName? | return
   if (← getEnv).contains (L ++ `obs) then
     throwError "walk: the fact{indentD t}\nis stated as `{.ofConstName L}`; a walk takes facts \

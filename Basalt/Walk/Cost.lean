@@ -219,14 +219,11 @@ private theorem selectD_le {l : List (Nat × ℕ∞)} {b : ℕ∞} (h : ∀ p �
     (h : Weighted (· ≤ ·) F cs l) :
     (Mix.sup.{u}).select l hpos F d ≤ (cs.map Prod.snd).foldr max 0 := by
   have key : ∀ q ∈ l, F q.2 ≤ (cs.map Prod.snd).foldr max 0 := by
+    refine le_foldr_max (F := fun q : Nat × γ => F q.2) ?_
     clear hpos
     induction h with
-    | nil => simp
-    | cons hc _ ih =>
-      intro q hq
-      rcases List.mem_cons.mp hq with rfl | hq
-      · exact hc.trans (le_max_left _ _)
-      · exact (ih q hq).trans (le_max_right _ _)
+    | nil => exact .nil
+    | cons hc _ ih => exact .cons hc ih
   refine iSup_le fun a => selectD_le (fun p hp => ?_) d _ ?_
   · obtain ⟨q, hq, rfl⟩ := List.mem_map.mp hp
     exact key q hq

@@ -27,20 +27,28 @@ open Lean Meta
 
 namespace Basalt.Walk
 
-/-- The generator of `O.spec g post`, and how to restate it about another. -/
-private def specSubject? (e : Expr) : Option (Expr × (Expr → Expr)) :=
+/-- `O.spec g post`, by its parts. -/
+structure SpecParts where
+  /-- The observation. -/
+  O : Expr
+  g : Expr
+  post : Expr
+  /-- `O.spec g' post`, for another generator `g'`. -/
+  restate : Expr → Expr
+
+/-- `e` as `O.spec g post`. -/
+def specParts? (e : Expr) : Option SpecParts :=
   let e := e.headBeta
   if e.isAppOfArity ``Obs.spec 10 then
-    some (e.getArg! 8, fun g => mkAppN e.getAppFn (e.getAppArgs.set! 8 g))
+    some ⟨e.getArg! 6, e.getArg! 8, e.getArg! 9, fun g => mkAppN e.getAppFn (e.getAppArgs.set! 8 g)⟩
   else none
 
 /-- The observation a bound `O.spec g post ≤ b` (`upper`) or `b ≤ O.spec g post` is about. -/
 def specObs? (ty : Expr) : Option (Name × Bool) := do
   guard (ty.isAppOfArity ``LE.le 4)
-  let (spec, upper) ← if (specSubject? (ty.getArg! 2)).isSome then some (ty.getArg! 2, true)
-    else if (specSubject? (ty.getArg! 3)).isSome then some (ty.getArg! 3, false) else none
-  let obs ← (spec.headBeta.getArg! 6).getAppFn.constName?
-  return (obs, upper)
+  let (s, upper) ← ((·, true) <$> specParts? (ty.getArg! 2)) <|>
+    ((·, false) <$> specParts? (ty.getArg! 3))
+  return (← s.O.getAppFn.constName?, upper)
 
 /-! ## Shapes of choice -/
 
@@ -113,8 +121,8 @@ def subject? (env : Environment) (j : Judgment) (ty : Expr) : Option (Expr × (E
   match j with
   | spec upper => do
     guard (ty.isAppOfArity ``LE.le 4)
-    let (g, restate) ← specSubject? (ty.getArg! (side upper))
-    return (g, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! (side upper) (restate g)))
+    let s ← specParts? (ty.getArg! (side upper))
+    return (s.g, fun g => mkAppN ty.getAppFn (ty.getAppArgs.set! (side upper) (s.restate g)))
   | mix upper => do
     guard (ty.isAppOfArity ``LE.le 4)
     let shape := ty.getArg! (side upper)

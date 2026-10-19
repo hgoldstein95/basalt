@@ -95,14 +95,6 @@ structure TuneCtx where
   /-- The declaration's own lambda binders — never recursive occurrences. -/
   outer : Array FVarId
 
-/-- The elements of a `List` literal, if `e` is one. -/
-private partial def listLitElems? (e : Expr) : Option (List Expr) :=
-  if e.isAppOfArity ``List.nil 1 then some []
-  else if e.isAppOfArity ``List.cons 3 then
-    let args := e.getAppArgs
-    (listLitElems? args[2]!).map (args[1]! :: ·)
-  else none
-
 /-- The depth expression for a site: the innermost `Nat` local named `ctx.depthName`, or `0`. -/
 private def siteDepth (ctx : TuneCtx) : MetaM Expr := do
   let d? ← (← getLCtx).findDeclRevM? fun decl => do
@@ -223,7 +215,7 @@ private partial def tuneFrequency (ctx : TuneCtx) (e : Expr) : TuneM Expr := do
   let α := args[1]!
   let inst := args[2]!
   let gs := args[3]!
-  let some elems := listLitElems? gs
+  let some (_, elems) := gs.listLit?
     | throwError "tunable: `{ctx.declName}` has a `frequency` whose branch list is not a literal \
         list of `(weight, generator)` pairs — the weights have to be visible to be collected"
   if elems.isEmpty then
@@ -270,19 +262,8 @@ end
 
 /-! ## Emitting the declarations -/
 
-/-- `⟨#[(a₀, b₀), …]⟩ : Tuning` as a closed term. -/
-private def mkTuningLit (entries : Array (Nat × Nat)) : MetaM Expr := do
-  let natTy := mkConst ``Nat
-  let pairTy := mkAppN (mkConst ``Prod [0, 0]) #[natTy, natTy]
-  let elems := entries.toList.map fun (a, b) =>
-    mkAppN (mkConst ``Prod.mk [0, 0]) #[natTy, natTy, mkNatLit a, mkNatLit b]
-  return mkApp (mkConst ``Tuning.mk) (← mkAppM ``List.toArray #[← mkListLit pairTy elems])
-
-/-- `#[⟨name, offset, arity, holes⟩, …] : Array Site` as a closed term. -/
-private def mkSitesLit (sites : Array Site) : MetaM Expr := do
-  let elems := sites.toList.map fun s =>
-    mkAppN (mkConst ``Site.mk) #[toExpr s.name, toExpr s.offset, toExpr s.arity, toExpr s.holes]
-  mkAppM ``List.toArray #[← mkListLit (mkConst ``Site) elems]
+deriving instance ToExpr for Tuning
+deriving instance ToExpr for Site
 
 /-- Tune one declaration's body: introduce `θ` after the first `k` binders of `type`, rewrite the
 `frequency` sites under it, and re-abstract.  Taking the binders from the *type* rather than the
@@ -394,11 +375,11 @@ def tuneDecl (declName : Name) (depthName? : Option Name) : MetaM Unit := do
     compileDecl tunedDecl
   addAndCompile <| .defnDecl
     { name := defaultsName, levelParams := [], type := mkConst ``Tuning
-      value := ← mkTuningLit st.defaults, hints := .abbrev, safety := .safe }
+      value := toExpr (Tuning.mk st.defaults), hints := .abbrev, safety := .safe }
   addAndCompile <| .defnDecl
     { name := sitesName, levelParams := []
-      type := mkApp (mkConst ``Array [.zero]) (mkConst ``Site)
-      value := ← mkSitesLit st.sites, hints := .abbrev, safety := .safe }
+      type := toTypeExpr (Array Site), value := toExpr st.sites, hints := .abbrev
+      safety := .safe }
   -- `tuned_defaults` is `Eq.refl` typed at `tuned defaults args = orig args`: the two bodies differ
   -- only where a literal weight became `Tuning.weight defaults i d`, which reduces back to it.
   -- `addDecl` hands this straight to the kernel, which has no smart unfolding to get in the way.
