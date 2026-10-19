@@ -66,7 +66,7 @@ fi
 #   2. A toolchain `libclang_rt.fuzzer_no_main*.a` whose clang major MATCHES the instrumenting clang.
 #   3. fuzz-run/vendor/libFuzzerNoMain.a, built from compiler-rt source by ./get-libfuzzer.sh, pinned
 #      to Lean's clang major — so it is version-matched too (macOS; and any Linux whose only system
-#      runtime is a different clang, e.g. `ubuntu-latest`'s clang 16 vs Lean's clang 22).
+#      runtime is a different clang, e.g. `ubuntu-latest`).
 #   4. Last resort: a version-*mismatched* system runtime, with a warning (see below).
 # `fuzzer_no_main` (not `fuzzer`) is required: we provide LLVMFuzzerTestOneInput and call the driver
 # ourselves from Lean's `main`.
@@ -79,7 +79,7 @@ fi
 if [ -z "${FUZZER_LIB_FLAGS+x}" ]; then
   arch=$(uname -m)
   # The major of the clang `leanc` actually drives — via `$CC`, so it honors LEAN_CC (on the Amazon
-  # Linux 2 box this is the system clang 11, not Lean's vendored 22). $CC emits __clang_major__.
+  # Linux 2 box this is the system clang 11, not Lean's vendored one). $CC emits __clang_major__.
   instr_major=$(echo | $CC -dM -E - 2>/dev/null | sed -n 's/^#define __clang_major__ \([0-9][0-9]*\).*/\1/p')
 
   # Two runtime-dir layouts coexist: the legacy `.../lib/linux/libclang_rt.fuzzer_no_main-<arch>.a`

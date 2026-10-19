@@ -504,8 +504,8 @@ needs. `libstdc++` is not on the default link path either. `env.example.sh` carr
 
 **Amazon Linux 2023 (x86_64, clang 22 / `compiler-rt22`).** The current-Linux case: `dnf install
 clang22 compiler-rt22`, Lean via `elan`, and no `env.sh` at all. glibc 2.34 is new enough for Lean's
-vendored clang, so no `LEAN_CC` wrapper; instrumentation and runtime are the same clang 22, so no
-skew; the runtime lives in the per-triple dir. The from-source fallback also works here, which is why
+vendored clang, so no `LEAN_CC` wrapper; its runtime, in the per-triple dir, is used when its major
+matches Lean's clang. The from-source fallback also works here, which is why
 `get-libfuzzer.sh` compiles `-fPIC` unconditionally (`leanc` links a PIE, and a non-PIC runtime
 object fails with `relocation R_X86_64_32 cannot be used against local symbol`).
 

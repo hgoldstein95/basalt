@@ -171,9 +171,9 @@ def evalClosed (e : Expr) : MetaM Expr := do
   let closed (x : Expr) := !x.hasFVar && !x.hasMVar && !x.hasLooseBVars
   Meta.transform (← instantiateMVars e) (pre := fun x => do
     if x.isAppOfArity ``ite 5 && closed (x.getArg! 1) then
-      let inst ← whnf (x.getArg! 2)
-      if inst.isAppOf ``Decidable.isTrue then return .visit (x.getArg! 3)
-      if inst.isAppOf ``Decidable.isFalse then return .visit (x.getArg! 4)
+      let b ← whnf (mkApp2 (.const ``Decidable.decide []) (x.getArg! 1) (x.getArg! 2))
+      if b.isConstOf ``Bool.true then return .visit (x.getArg! 3)
+      if b.isConstOf ``Bool.false then return .visit (x.getArg! 4)
     if closed x && x.isApp &&
         (x.find? fun e => e.isConstOf ``Rat.num || e.isConstOf ``Rat.den).isSome then
       -- `Rat`'s operations are irreducible, which the kernel's `rfl` does not see.
