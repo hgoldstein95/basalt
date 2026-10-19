@@ -7,7 +7,6 @@ module
 
 import all Init.Internal.Order.Basic
 import all Init.System.IO
-import all Init.System.ST
 public import Basalt.GenRel
 public import Basalt.IO
 public import Basalt.Walk.Attr
