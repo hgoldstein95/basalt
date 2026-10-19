@@ -6,9 +6,9 @@ Authors: Harrison Goldstein
 module
 
 public import Basalt.IO.Laws
+public import Basalt.Walk.Entry
 public import Basalt.Walk.IO
 public import Basalt.Walk.Ideal
-public import Basalt.Walk.Entry
 
 /-!
 # Proving a Generator Faithful

@@ -20,6 +20,8 @@ cost (`genType.not_expected_cost_bounded`).
 
 open RandomChoice
 
+namespace STLC
+
 /-- Generates an arbitrary type. -/
 def genType [Gen G] : G Ty :=
   oneOf! [
@@ -67,3 +69,5 @@ theorem genType.not_expected_cost_bounded {B : ℝ≥0∞} (hB : B ≠ ⊤) :
   norm_num
   rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num)]
   exact le_of_eq (by ring)
+
+end STLC

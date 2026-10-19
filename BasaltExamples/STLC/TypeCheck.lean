@@ -15,6 +15,8 @@ A STLC typechecker, proved sound and complete with respect to the `Typing` judge
 
 @[expose] public section
 
+namespace STLC
+
 /-- Typechecks a term `e` in context `Γ`, return a type if typechecking succeeds.
     Adapted from the STLC typechecker in Software Foundations: https://softwarefoundations.cis.upenn.edu/plf-current/Typechecking.html -/
 def typeCheck (Γ : Ctx) (e : Term) : Option Ty :=
@@ -56,3 +58,5 @@ theorem typeCheck_complete : Typing Γ e τ → typeCheck Γ e = some τ := by
   induction h with
   | TVar _ _ _ hx => exact lookup_getElem? hx
   | _ => simp_all [typeCheck]
+
+end STLC

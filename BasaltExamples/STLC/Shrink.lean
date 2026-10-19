@@ -16,6 +16,8 @@ shrinks.
 
 @[expose] public section
 
+namespace STLC
+
 /-- Produces structurally smaller terms. Each candidate stays well-typed in the
     same context, but its type may change (see `shrinkTerm_sound`). -/
 def shrinkTerm (e : Term) : List Term :=
@@ -57,3 +59,5 @@ theorem shrinkTerm_sound :
       exists .Fun τ τ2'
       apply Typing.TAbs
       assumption
+
+end STLC

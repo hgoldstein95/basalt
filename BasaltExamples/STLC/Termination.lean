@@ -20,6 +20,8 @@ terminates almost surely; its expected cost has no finite bound
 
 @[expose] public section
 
+namespace STLC
+
 theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by
   induction τ generalizing Γ with
   | Bool => rw [IsAlmostSurelyTerminating.iff_obs, genZero]; walk; norm_num [ENNReal.div_self]
@@ -34,3 +36,5 @@ theorem genTerm.terminates : IsAlmostSurelyTerminating (genTerm Γ τ) := by
       norm_num only [List.sum_cons, List.sum_nil, List.length_cons, List.length_nil]
       basify
       nlinarith
+
+end STLC

@@ -18,6 +18,8 @@ public import BasaltExamples.STLC.GenType
 
 open RandomChoice
 
+namespace STLC
+
 /-- Generates an arbitrary `Bool`. -/
 def Bool.arbitrary [Gen G] : G Bool :=
   oneOf! [fun _ => pure true, fun _ => pure false]
@@ -143,3 +145,5 @@ theorem genTerm.sound_complete : IsSoundAndComplete (genTerm Γ τ) (Typing Γ �
       rw [genTerm.eq_def, SPMF.mem_support_iff_may]
       walk [genType.sound_complete.complete.obs, Bool.arbitrary.sound_complete.complete.obs]
       all_goals split <;> simp only [happ, or_true]
+
+end STLC

@@ -17,6 +17,8 @@ relations are walked under an induction of their own.
 
 @[expose] public section
 
+namespace STLC
+
 theorem genZero.faithful : IsFaithful (genZero Γ τ) where
   terminates := genZero.terminates
   below _ _ _ := by
@@ -30,3 +32,5 @@ theorem genZero.faithful : IsFaithful (genZero Γ τ) where
 
 theorem genTerm.faithful : IsFaithful (genTerm Γ τ) := by
   faithful_fixpoint [genTerm.terminates, genZero.faithful, genType.faithful]
+
+end STLC

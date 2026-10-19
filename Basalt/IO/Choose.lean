@@ -6,8 +6,8 @@ Authors: Harrison Goldstein
 module
 
 public import Basalt.IO.Ideal
-public import Basalt.Walk.Expect
 public import Basalt.Tactic.MassFixpoint
+public import Basalt.Walk.Expect
 
 /-!
 # Uniform Words Make a Uniform Choice

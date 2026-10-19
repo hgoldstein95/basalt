@@ -5,9 +5,9 @@ Authors: Harrison Goldstein
 -/
 module
 
+public meta import Lean.Elab.Tactic.Simproc
 public meta import Lean.Meta.Match.MatcherApp.Transform
 public meta import Lean.Meta.Tactic.Assumption
-public meta import Lean.Elab.Tactic.Simproc
 public meta import Lean.Meta.Tactic.Simp.Main
 public meta import Basalt.Walk.Attr
 

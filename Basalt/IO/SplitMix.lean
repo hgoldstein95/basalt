@@ -5,8 +5,8 @@ Authors: Harrison Goldstein
 -/
 module
 
-public import Basalt.RandomChoice
 public import SplitMix.Native
+public import Basalt.RandomChoice
 
 /-!
 # SplitMix's Range Reduction

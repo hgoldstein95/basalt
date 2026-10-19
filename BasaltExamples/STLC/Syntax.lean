@@ -15,6 +15,8 @@ Bools, along with lemmas relating the `lookup` judgement to `List` indexing.
 
 @[expose] public section
 
+namespace STLC
+
 /-- Types are just Bool or function types -/
 inductive Ty where
   | Bool : Ty
@@ -118,3 +120,5 @@ theorem lookup_getElem? :
   induction h with
   | Now τ Γ => simp
   | Later τ τ' n Γ hl IH => simpa using IH
+
+end STLC

@@ -5,11 +5,11 @@ Authors: Michael Hicks
 -/
 module
 
+import Basalt
 public import Basalt.Combinators
 public import Basalt.IO.Backend
 public import Basalt.PlausibleGen.Backend
 public import BasaltExamples.BST.ByInsertion
-import Basalt
 meta import BasaltExamples.BST.ByInsertion
 
 /-!

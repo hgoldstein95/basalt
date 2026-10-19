@@ -20,6 +20,8 @@ expected cost (`genTerm.not_expected_cost_bounded`).
 
 @[expose] public section
 
+namespace STLC
+
 /-- The choices `genTerm Γ` makes to produce a term: one `oneOf` per node, one more for a literal or
 a variable, and `argTy.size` for the argument type an application draws.
 
@@ -100,3 +102,5 @@ theorem genTerm.not_expected_cost_bounded {B : ℝ≥0∞} (hB : B ≠ ⊤) :
         (hz Γ τ) zero_le]
     all_goals split <;> simp [ENNReal.top_div_of_ne_top]
   exact hB (top_unique (htop.trans h))
+
+end STLC
