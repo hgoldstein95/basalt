@@ -3,8 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Obs.Presentation
-import Basalt.SPMF.Expect.Obs
+module
+
+public import Basalt.Obs.Presentation
+import Basalt.Order
+public import Basalt.SPMF.Expect.Obs
 
 /-!
 # SPMF Support
@@ -14,6 +17,8 @@ on monad notation, which is what do-notation elaborates to; the may and always o
 from them; and the support laws of the list combinators, which the walker's rules bridge. A
 combinator's support is otherwise not a lemma: it is what `walk` computes from its `Obs.map_*`.
 -/
+
+@[expose] public section
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
@@ -40,18 +45,8 @@ theorem support_bind
 @[simp]
 theorem support_pure :
     (Pure.pure a : SPMF _).support = {a} := by
-  classical
   ext x
-  simp only [support, Function.mem_support, Set.mem_singleton_iff]
-  constructor
-  · intro h
-    by_contra hne
-    apply h
-    show (if x = a then (1 : ℝ≥0∞) else 0) = 0
-    simp [hne]
-  · intro h
-    show (if x = a then (1 : ℝ≥0∞) else 0) ≠ 0
-    simp [h]
+  simp [support, Function.mem_support]
 
 @[simp]
 theorem mem_support_pure_iff :
@@ -165,59 +160,12 @@ theorem support_vectorOf
     {g : SPMF α} :
     support (vectorOf n g) = { xs | List.length xs = n ∧ ∀ x ∈ xs, x ∈ g.support } := by
   induction n with
-  | zero =>
-    simp [vectorOf]
-    ext a
-    dsimp only [Set.mem_setOf_eq]
-    constructor
-    . intro h
-      rw [Set.mem_singleton_iff] at h
-      constructor
-      . assumption
-      . intro x hmem
-        subst h
-        contradiction
-    . intro h
-      obtain ⟨heq, hmem⟩ := h
-      apply Set.mem_singleton_iff.mpr
-      assumption
-  | succ n' IH =>
-    rw [vectorOf_succ]
+  | zero => ext xs; simp +contextual [vectorOf, List.eq_nil_iff_forall_not_mem]
+  | succ n ih =>
     ext xs
-    simp [Set.mem_setOf_eq]
-    constructor
-    . intro h
-      obtain ⟨x, ⟨hmem, ⟨xs, ⟨hxs, hcons⟩⟩⟩⟩ := h
-      subst hcons
-      rw [IH] at hxs
-      dsimp at hxs
-      obtain ⟨hlen, hsupp⟩ := hxs
-      constructor
-      . simp
-        assumption
-      . intro y hy
-        rw [List.mem_cons] at hy
-        obtain ⟨heq, hy⟩ := hy
-        . assumption
-        . apply hsupp
-          assumption
-    . intro ⟨hlen, hmem⟩
-      obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hlen
-      exists y
-      constructor
-      . apply hmem
-        apply List.mem_cons_self
-      . exists ys
-        constructor
-        . rw [IH]
-          apply Set.mem_sep
-          . simp at hlen
-            assumption
-          . intro x hx
-            apply hmem
-            apply List.mem_cons_of_mem
-            assumption
-        . rfl
+    rw [vectorOf_succ]
+    cases xs <;> simp [ih]
+    grind
 
 /-- Membership form of `support_vectorOf`. -/
 @[simp]
@@ -249,45 +197,8 @@ theorem support_listOf
     support (listOf g) = { xs | ∀ x ∈ xs, x ∈ g.support } := by
   ext xs
   induction xs with
-  | nil =>
-    dsimp
-    constructor
-    . intro h x hvacuous
-      contradiction
-    . intro h
-      unfold listOf
-      simp [support_oneOf]
-  | cons x xs' IH =>
-    constructor
-    . dsimp
-      intro h y hy
-      cases hy with
-      | head =>
-        unfold listOf at h
-        simp [support_oneOf] at h
-        obtain ⟨h1, _⟩ := h
-        assumption
-      | tail =>
-        rename_i hy
-        unfold listOf at h
-        simp [support_oneOf] at h
-        obtain ⟨_, h2⟩ := h
-        rw [IH] at h2
-        apply h2
-        assumption
-    . intro h
-      rw [Set.mem_setOf_eq] at h
-      unfold listOf
-      simp [support_oneOf]
-      constructor
-      . apply h
-        apply List.mem_cons_self
-      . apply IH.mpr
-        rw [Set.mem_setOf_eq]
-        intro x hx
-        apply h
-        apply List.mem_cons_of_mem
-        assumption
+  | nil => rw [listOf]; simp
+  | cons x xs ih => rw [listOf]; simp [ih]
 
 /-- The support of `nonEmptyListOf g` is the set of all *non-empty* lists where each element
     is in `g`'s support -/
@@ -296,71 +207,24 @@ theorem support_nonEmptyListOf
     support (nonEmptyListOf g) = { xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support } := by
   ext xs
   induction xs with
-  | nil =>
-    dsimp
-    constructor
-    . intro h
-      unfold nonEmptyListOf at h
-      simp [support_oneOf] at h
-    . intro ⟨hneq, hmem⟩
-      contradiction
-  | cons x xs' IH =>
-    constructor
-    . dsimp
-      intro hy
-      constructor
-      . apply List.cons_ne_nil
-      . intro y hy
-        cases hy with
-        | head =>
-          unfold nonEmptyListOf at hy
-          simp [support_oneOf] at hy
-          rcases hy with ⟨h, _⟩ | ⟨h, _⟩ <;> assumption
-        | tail =>
-          rename_i hmem
-          unfold nonEmptyListOf at hy
-          simp [support_oneOf] at hy
-          rcases hy with ⟨_, hxs⟩ | ⟨_, hxs⟩
-          · subst hxs
-            contradiction
-          · apply (IH.mp hxs).2
-            assumption
-    . intro h
-      rw [Set.mem_setOf_eq] at h
-      unfold nonEmptyListOf
-      simp [support_oneOf]
-      obtain ⟨h1, h2⟩ := h
-      have hx : x ∈ g.support := by
-        apply h2
-        apply List.mem_cons_self
-      by_cases he : xs' = []
-      · left
-        constructor <;> assumption
-      · right
-        constructor
-        . assumption
-        . apply IH.mpr
-          apply Set.mem_setOf.mpr
-          constructor
-          . assumption
-          . intro w hw
-            apply h2
-            apply List.mem_cons_of_mem
-            assumption
+  | nil => rw [nonEmptyListOf]; simp
+  | cons x xs ih =>
+    rw [nonEmptyListOf]
+    cases xs <;> simp_all
 
 
 @[simp]
-theorem mem_support_listOf
+theorem mem_support_listOf_iff
     {xs : List α}
     {g : SPMF α} :
-    xs ∈ (listOf g).support ↔ xs ∈ {xs | ∀ x ∈ xs, x ∈ g.support} := by
+    xs ∈ (listOf g).support ↔ ∀ x ∈ xs, x ∈ g.support := by
   simp [support_listOf]
 
 @[simp]
-theorem mem_support_nonEmptylistOf
+theorem mem_support_nonEmptyListOf_iff
     {xs : List α}
     {g : SPMF α} :
-    xs ∈ (nonEmptyListOf g).support ↔ xs ∈ {xs | xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support} := by
+    xs ∈ (nonEmptyListOf g).support ↔ xs ≠ [] ∧ ∀ x ∈ xs, x ∈ g.support := by
   simp [support_nonEmptyListOf]
 
 /-- The support of `permutationOf xs` is the set of all values of the subtype `{ys // xs ~ ys}`,
@@ -420,37 +284,26 @@ theorem support_frequency
   · rintro ⟨w, g, hmem, hw, ha⟩
     exact ⟨_, List.mem_map.mpr ⟨(w, g), hmem, rfl⟩, hw, mem_support_iff_may.mp ha⟩
 
-theorem bind_congr_support
-    {x : SPMF α}
-    (h : ∀ a ∈ x.support, f a = g a) :
-    bind x f = bind x g := by
-  simp only [bind]
-  ext a
-  simp only [DFunLike.coe]
-  congr
-  funext v
-  by_cases hsupport : v ∈ x.support
-  · rwa [h]
-  · simp only [support, Function.notMem_support] at hsupport
-    simp_all [DFunLike.coe]
-
-theorem mem_support_csup {c : SPMF α → Prop} (hc : chain c) {a : α} :
+theorem mem_support_csup_iff {c : SPMF α → Prop} (hc : chain c) {a : α} :
     a ∈ (CCPO.csup hc).support ↔ ∃ f, c f ∧ a ∈ f.support := by
   simp only [mem_support_iff_prob_pos, prob, expect_csup, lt_iSup_iff, exists_prop]
 
+theorem alwaysObs.admissible (P : α → Prop) : admissible fun x : SPMF α => alwaysObs.spec x P :=
+  admissible_iff.2 fun _ hc ih a ha =>
+    let ⟨x, hxc, hxa⟩ := (mem_support_csup_iff hc).mp ha
+    ih x hxc a hxa
+
 /-- A value is reachable by `suchThat g p` exactly when `g` reaches it and `p` accepts it, whatever
 the chance of acceptance: the first draw can be that value. -/
-theorem mem_support_suchThat {g : SPMF α} {p : α → Bool} {a : α} :
+theorem mem_support_suchThat_iff {g : SPMF α} {p : α → Bool} {a : α} :
     a ∈ (suchThat g p).support ↔ a ∈ g.support ∧ p a = true := by
   have key : ∀ a ∈ (suchThat g p).support, a ∈ g.support ∧ p a = true := by
     refine suchThat.fixpoint_induct g p (fun x => ∀ a ∈ x.support, a ∈ g.support ∧ p a = true)
-      (fun c hc ih a ha => ?_) (fun z ih a ha => ?_)
-    · obtain ⟨x, hxc, hxa⟩ := (mem_support_csup hc).mp ha
-      exact ih x hxc a hxa
-    · obtain ⟨b, hb, hab⟩ := mem_support_bind_iff.mp ha
-      split at hab
-      · exact (mem_support_pure_iff.mp hab) ▸ ⟨hb, ‹_›⟩
-      · exact ih a hab
+      (alwaysObs.admissible _) fun z ih a ha => ?_
+    obtain ⟨b, hb, hab⟩ := mem_support_bind_iff.mp ha
+    split at hab
+    · exact (mem_support_pure_iff.mp hab) ▸ ⟨hb, ‹_›⟩
+    · exact ih a hab
   refine ⟨key a, fun ⟨ha, hp⟩ => ?_⟩
   rw [suchThat]
   exact mem_support_bind_iff.mpr ⟨a, ha, by simp only [hp, ↓reduceIte, mem_support_pure_iff]⟩

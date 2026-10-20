@@ -5,6 +5,8 @@ Authors: Michael Hicks
 -/
 import Basalt.Combinators
 import Basalt.Fuzz.Runner
+import Basalt.IO.Backend
+import Basalt.PlausibleGen.Backend
 import BasaltFuzz.BuggyBST
 import BasaltFuzz.Staged
 
@@ -48,9 +50,9 @@ def properties : List (String × Property) :=
     ("long-32",              fun _ => Staged.propLong 32),
     ("long-64",              fun _ => Staged.propLong 64) ]
 
-/-- `dispatch`'s default backend is the first one registered, which is `io` — Basalt's own backends
-are registered by the import. This executable is a fuzzer, so it moves `fuzzBackend` to the front
-rather than listing the backends: anything else tagged `@[basalt_backend]` is still offered. -/
+/-- `dispatch`'s default backend is the first one registered, which depends on import order. This
+executable is a fuzzer, so it moves `fuzzBackend` to the front rather than listing the backends:
+anything else tagged `@[basalt_backend]` is still offered. -/
 def main (args : List String) : IO Unit :=
   let (fuzz, others) := (registered_backends% : List Backend).partition (·.name == fuzzBackend.name)
   dispatch "basalt-fuzz" properties args (fuzz ++ others)

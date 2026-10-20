@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Obs.Combinators
-import Basalt.Obs.Ordered
-import Basalt.Obs.Spec
-import Basalt.SPMF.Expect.Basic
+module
+
+public import Basalt.Obs.Combinators
+public import Basalt.Obs.Ordered
+public import Basalt.Obs.Spec
+public import Basalt.SPMF.Expect.Basic
 
 /-!
 # The Expectation Observation
@@ -15,6 +17,8 @@ import Basalt.SPMF.Expect.Basic
 the expectation equation of each combinator, which is its `Obs.map_*` lemma read through one of
 those presentations.
 -/
+
+@[expose] public section
 
 open RandomChoice NNReal ENNReal
 
@@ -34,40 +38,28 @@ theorem range_average (lo hi : Nat) (m : Nat → ℝ≥0∞) :
   rw [ENNReal.tsum_mul_left, one_div, mul_comm, div_eq_mul_inv]
   exact congrArg (· * _) (SPMF.tsum_subtype_Icc lo hi m)
 
-private theorem sum_ite_lt {d : Nat} {k : ℤ} (hd : 0 < d) (h0 : 0 ≤ k) (hk : k ≤ d)
-    (t e : ℝ≥0∞) :
-    ∑ n ∈ Finset.Icc 0 (d - 1), (if (n : ℤ) < k then t else e)
+/-- `range_average` over `[0, N - 1]`, summed over `Finset.range N`. -/
+theorem range_average_zero {N : Nat} (hN : 0 < N) (m : Nat → ℝ≥0∞) :
+    Mix.average.mix 0 (N - 1) (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ N - 1} => m a.down.val)
+      = (∑ x ∈ Finset.range N, m x) / (N : ℝ≥0∞) := by
+  rw [range_average, show N - 1 - 0 + 1 = N by omega,
+    show Finset.Icc 0 (N - 1) = Finset.range N by ext; simp; omega]
+
+private theorem sum_ite_lt {d : Nat} {k : ℤ} (h0 : 0 ≤ k) (hk : k ≤ d) (t e : ℝ≥0∞) :
+    ∑ n ∈ Finset.range d, (if (n : ℤ) < k then t else e)
       = (k.toNat : ℝ≥0∞) * t + ((d - k.toNat : ℕ) : ℝ≥0∞) * e := by
-  have hkd : k.toNat ≤ d := by omega
-  have hIcc : Finset.Icc 0 (d - 1) = Finset.range d := by
-    ext n
-    simp only [Finset.mem_Icc, Finset.mem_range]
-    omega
-  rw [hIcc, Finset.range_eq_Ico, ← Finset.sum_Ico_consecutive _ (Nat.zero_le k.toNat) hkd]
-  have hfirst : ∑ n ∈ Finset.Ico 0 k.toNat, (if (n : ℤ) < k then t else e)
-      = (k.toNat : ℝ≥0∞) * t := by
-    have hall : ∀ n ∈ Finset.Ico 0 k.toNat, (if (n : ℤ) < k then t else e) = t := by
-      intro n hn
-      have := (Finset.mem_Ico.mp hn).2
-      rw [if_pos (by omega)]
-    rw [Finset.sum_congr rfl hall, Finset.sum_const, Nat.card_Ico, Nat.sub_zero, nsmul_eq_mul]
-  have hsecond : ∑ n ∈ Finset.Ico k.toNat d, (if (n : ℤ) < k then t else e)
-      = ((d - k.toNat : ℕ) : ℝ≥0∞) * e := by
-    have hall : ∀ n ∈ Finset.Ico k.toNat d, (if (n : ℤ) < k then t else e) = e := by
-      intro n hn
-      have := (Finset.mem_Ico.mp hn).1
-      rw [if_neg (by omega)]
-    rw [Finset.sum_congr rfl hall, Finset.sum_const, Nat.card_Ico, nsmul_eq_mul]
-  rw [hfirst, hsecond]
+  rw [Finset.range_eq_Ico, ← Finset.sum_Ico_consecutive _ (Nat.zero_le k.toNat) (by omega),
+    Finset.sum_congr rfl fun n hn => if_pos (by have := (Finset.mem_Ico.mp hn).2; omega),
+    Finset.sum_congr rfl fun n hn => if_neg (by have := (Finset.mem_Ico.mp hn).1; omega)]
+  simp
 
 theorem threshold_average {d : Nat} {k : ℤ} (hd : 0 < d) (h0 : 0 ≤ k) (hk : k ≤ d)
     (t e : ℝ≥0∞) :
     Mix.average.mix 0 (d - 1)
         (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ d - 1} => if (a.down.val : ℤ) < k then t else e)
       = (k.toNat : ℝ≥0∞) / (d : ℝ≥0∞) * t + ((d - k.toNat : ℕ) : ℝ≥0∞) / (d : ℝ≥0∞) * e := by
-  rw [range_average 0 (d - 1) fun n => if (n : ℤ) < k then t else e, sum_ite_lt hd h0 hk]
-  have hd' : d - 1 - 0 + 1 = d := by omega
-  rw [hd', ENNReal.add_div]
+  rw [range_average_zero hd fun n => if (n : ℤ) < k then t else e, sum_ite_lt h0 hk,
+    ENNReal.add_div]
   congr 1 <;> rw [div_eq_mul_inv, div_eq_mul_inv, mul_right_comm]
 
 private theorem sum_range_getD (l : List ℝ≥0∞) :
@@ -91,13 +83,9 @@ theorem index_average {γ : Type v} (l : List γ) (hne : l ≠ []) (F : γ → �
     funext ⟨⟨i, _, hi⟩⟩
     have hi' : i < l.length := by omega
     simp [List.getD_eq_getElem?_getD, List.getElem?_map, List.getElem?_eq_getElem hi']
-  refine (congrArg (Mix.average.mix 0 (l.length - 1)) hF).trans ((range_average 0 _ fun n : Nat => (l.map F).getD n 0).trans ?_)
-  have hIcc : Finset.Icc 0 (l.length - 1) = Finset.range (l.map F).length := by
-    ext n
-    simp only [Finset.mem_Icc, Finset.mem_range, List.length_map]
-    omega
-  have hT : l.length - 1 - 0 + 1 = l.length := by omega
-  rw [hIcc, hT, sum_range_getD]
+  refine (congrArg (Mix.average.mix 0 (l.length - 1)) hF).trans
+    ((range_average_zero hlen fun n : Nat => (l.map F).getD n 0).trans ?_)
+  rw [← List.length_map (f := F), sum_range_getD, List.length_map]
 
 /-- Summing `selectD` over every offset counts each entry `(w, x)` exactly `w` times. -/
 private theorem sum_selectD (l : List (Nat × ℝ≥0∞)) (d : ℝ≥0∞) :
@@ -122,13 +110,7 @@ theorem select_average (l : List (Nat × ℝ≥0∞)) {T : Nat} (hT : T = (l.map
     Mix.average.mix 0 (T - 1)
         (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ T - 1} => Obs.selectD l a.down.val d)
       = (l.map fun p => (p.1 : ℝ≥0∞) * p.2).sum / ((T : ℕ) : ℝ≥0∞) := by
-  rw [range_average 0 (T - 1) fun n => Obs.selectD l n d]
-  have hIcc : Finset.Icc 0 (T - 1) = Finset.range T := by
-    ext n
-    simp only [Finset.mem_Icc, Finset.mem_range]
-    omega
-  have hT' : T - 1 - 0 + 1 = T := by omega
-  rw [hIcc, hT', hT, sum_selectD]
+  rw [range_average_zero hpos fun n => Obs.selectD l n d, hT, sum_selectD]
 
 end Mix
 
@@ -157,10 +139,8 @@ theorem expect_chooseNat {lo hi : Nat} (h : lo ≤ hi) (f : Nat → ℝ≥0∞) 
   (congrFun (expectObs.map_chooseNat lo hi h) f).trans (Mix.range_average lo hi f)
 
 theorem expect_chooseNat_zero {N : Nat} (hN : 0 < N) (f : Nat → ℝ≥0∞) :
-    expect (chooseNat 0 (N - 1)) f = (∑ x ∈ Finset.range N, f x) / N := by
-  rw [expect_chooseNat]
-  have : Finset.Icc 0 (N - 1) = Finset.range N := by ext; simp; omega
-  rw [this, show N - 1 - 0 + 1 = N by omega]
+    expect (chooseNat 0 (N - 1)) f = (∑ x ∈ Finset.range N, f x) / N :=
+  (congrFun (expectObs.map_chooseNat 0 (N - 1) _) f).trans (Mix.range_average_zero hN f)
 
 theorem expect_chooseInt {lo hi : Int} (h : lo ≤ hi) (f : Int → ℝ≥0∞) :
     expect (chooseInt lo hi h) f

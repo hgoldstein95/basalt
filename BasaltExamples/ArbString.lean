@@ -3,26 +3,30 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Batteries.Data.Char
-import Basalt
-import BasaltExamples.ArbChar
-import BasaltExamples.ArbString.Def
+module
+
+public import Batteries.Data.Char
+public import Basalt
+public import BasaltExamples.ArbChar
+public import BasaltExamples.ArbString.Def
 
 /-!
 # Arbitrary Strings
 
-Correctness proofs for `String.arbitrary` (defined in `BasaltExamples/ArbString.Def`), an arbitrary
-alphanumeric string. Each property is proved first for the underlying `genCharList` and then
-transported across `String.ofList`. The `genCharList` proofs mirror `List.arbitrary`'s, with
-`Char.arbitrary` in place of `Nat.arbitrary`.
+Correctness proofs for `String.arbitrary` and `NonEmptyString.arbitrary` (defined in
+`BasaltExamples/ArbString.Def`), arbitrary alphanumeric strings. Each property is proved directly on
+`String.ofList` mapped over `listOf Char.arbitrary` or `nonEmptyListOf Char.arbitrary`, with
+`Char.arbitrary`'s laws for the elements.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbChar
 
 namespace ArbString
 
 /-- `String.arbitrary`'s support is exactly the set of alphanumeric strings -/
-theorem String.arbitrary_support :
+theorem String.arbitrary.sound_complete :
     IsSoundAndComplete String.arbitrary (fun s => ∀ c ∈ s.toList, c.isAlphanum = true) := by
   refine .intro ?sound ?complete
   case sound =>
@@ -37,19 +41,19 @@ theorem String.arbitrary_support :
 
 /-- `NonEmptyString.arbitrary`'s support is exactly the set of
     *non-empty* alphanumeric strings -/
-theorem NonEmptyString.arbitrary_support :
+theorem NonEmptyString.arbitrary.sound_complete :
     IsSoundAndComplete NonEmptyString.arbitrary (fun s => !s.isEmpty ∧ ∀ c ∈ s.toList, c.isAlphanum = true) := by
   refine .intro ?sound ?complete
   case sound =>
     rw [IsSoundFor.iff_obs]
     walk fixpoint [Char.arbitrary.sound_complete.sound.obs]
-    all_goals simp_all [String.isEmpty]
+    all_goals simp_all [Bool.eq_false_iff, String.isEmpty_iff]
   case complete =>
     intro s ⟨hne, hs⟩
     rw [NonEmptyString.arbitrary, SPMF.mem_support_iff_may]
     walk [Char.arbitrary.sound_complete.complete.obs]
     refine ⟨s.toList, ⟨?_, hs⟩, String.ofList_toList⟩
-    simpa [String.isEmpty, String.toList_eq_nil_iff] using hne
+    simpa [Bool.not_eq_true', Bool.eq_false_iff, String.isEmpty_iff, String.toList_eq_nil_iff] using hne
 
 theorem String.arbitrary.terminates : IsAlmostSurelyTerminating String.arbitrary := by
   mass_fixpoint using SPMF.LfpIsOne.one
@@ -69,7 +73,7 @@ theorem NonEmptyString.arbitrary.faithful : IsFaithful NonEmptyString.arbitrary 
 
 /-- `listOf`'s bound with `Char.arbitrary`'s per-element cost of `1`: one `oneOf` and one character
 per element, plus the `oneOf` that ends the list. -/
-theorem String.arbitrary_cost :
+theorem String.arbitrary.cost_bounded :
     IsCostBounded String.arbitrary (fun s => 2 * s.length + 1) := by
   rw [IsCostBounded.iff_obs]
   walk fixpoint
@@ -78,7 +82,7 @@ theorem String.arbitrary_cost :
 
 /-- `String.arbitrary`'s bound less the final `oneOf`: `nonEmptyListOf` draws its last element
 directly. -/
-theorem NonEmptyString.arbitrary_cost :
+theorem NonEmptyString.arbitrary.cost_bounded :
     IsCostBounded NonEmptyString.arbitrary (fun s => 2 * s.length) := by
   rw [IsCostBounded.iff_obs]
   walk fixpoint

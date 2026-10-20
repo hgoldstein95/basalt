@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import Basalt
-import BasaltExamples.STLC.GenTerm
-import BasaltExamples.STLC.Termination
-import BasaltExamples.STLC.TypeCheck
+module
+
+public import Basalt
+public import BasaltExamples.STLC.GenTerm
+public import BasaltExamples.STLC.Termination
+public import BasaltExamples.STLC.TypeCheck
 
 /-!
 # Cost Bounds for `genTerm`
@@ -15,6 +17,10 @@ import BasaltExamples.STLC.TypeCheck
 context, and the proof carries well-typedness alongside the cost. Yet no finite bound holds of its
 expected cost (`genTerm.not_expected_cost_bounded`).
 -/
+
+@[expose] public section
+
+namespace STLC
 
 /-- The choices `genTerm Γ` makes to produce a term: one `oneOf` per node, one more for a literal or
 a variable, and `argTy.size` for the argument type an application draws.
@@ -40,8 +46,8 @@ theorem Term.two_le_costInCtx (Γ : Ctx) (e : Term) : 2 ≤ Term.costInCtx Γ e 
   induction e generalizing Γ with
   | Bool => simp [Term.costInCtx]
   | Var => simp [Term.costInCtx]
-  | Abs τ1 e IH => simp only [Term.costInCtx]; have := IH (τ1 :: Γ); omega
-  | App e1 e2 IH1 _ => simp only [Term.costInCtx]; have := IH1 Γ; omega
+  | Abs τ1 e IH => simp only [Term.costInCtx]; (have := IH (τ1 :: Γ); omega)
+  | App e1 e2 IH1 _ => simp only [Term.costInCtx]; (have := IH1 Γ; omega)
 
 theorem genZero.cost_typed :
     SPMF.Cost.alwaysObs.spec (genZero Γ τ) (fun e n => Typing Γ e τ ∧ n ≤ 1) := by
@@ -96,3 +102,5 @@ theorem genTerm.not_expected_cost_bounded {B : ℝ≥0∞} (hB : B ≠ ⊤) :
         (hz Γ τ) (zero_le _)]
     all_goals split <;> simp [ENNReal.top_div_of_ne_top]
   exact hB (top_unique (htop.trans h))
+
+end STLC

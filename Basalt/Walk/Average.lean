@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Obs.Ordered
-import Basalt.SPMF.Expect.Obs
+module
+
+public import Basalt.Obs.Ordered
+public import Basalt.SPMF.Expect.Obs
 
 /-!
 # Bounding an Average
@@ -13,6 +15,8 @@ The walker's rules for the shapes of choice in `Mix.average`, in both directions
 bounds bounds the average. They are shared by every judgment about an expectation, at either
 interpretation.
 -/
+
+@[expose] public section
 
 open ENNReal
 
@@ -53,7 +57,7 @@ private theorem rangeInt_average {lo hi : ℤ} (h : lo ≤ hi) (d : ℤ → ℝ�
 private theorem rangeInt_mono {lo hi : ℤ} {h : lo ≤ hi} {F d : ℤ → ℝ≥0∞}
     (hF : ∀ x, lo ≤ x ∧ x ≤ hi → F x ≤ d x) :
     (Mix.average.{0}).rangeInt lo hi h F ≤ (Mix.average.{0}).rangeInt lo hi h d :=
-  average_mix_mono fun a => hF _ ⟨by omega, by have := a.down.property.2; omega⟩
+  average_mix_mono fun a => hF _ ⟨by omega, by (have := a.down.property.2; omega)⟩
 
 private theorem average_const {lo hi : Nat} (h : lo ≤ hi) (d : ℝ≥0∞) :
     Mix.average.mix.{u} lo hi (fun _ => d) = d := by

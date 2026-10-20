@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Batteries.Data.List.Basic
-import Basalt.Obs.Ordered
+module
+
+public import Batteries.Data.List.Basic
+public import Basalt.Obs.Ordered
 
 /-!
 # Presentations of a Choice in `Prop`
@@ -15,6 +17,8 @@ index, a weighted selection), demonically (`Mix.demonic`, a `∀`) and angelical
 splits the choice pointwise instead (`Mix.le_demonic_threshold`) has no demonic presentation. These
 are facts about quantifiers over a range, not about combinators.
 -/
+
+@[expose] public section
 
 namespace Mix
 
@@ -62,7 +66,7 @@ theorem select_demonic (l : List (Nat × Prop)) {T : Nat} (hT : T = (l.map Prod.
         (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ T - 1} => Obs.selectD l a.down.val d)
       ↔ ∀ p ∈ l, 0 < p.1 → p.2 := by
   rw [← selectD_forall l d, ← hT]
-  exact ⟨fun h n hn => h ⟨⟨n, by omega⟩⟩, fun h a => h _ (by have := a.down.property; omega)⟩
+  exact ⟨fun h n hn => h ⟨⟨n, by omega⟩⟩, fun h a => h _ (by (have := a.down.property; omega))⟩
 
 /-! ## Angelic -/
 
@@ -126,7 +130,7 @@ theorem select_angelic (l : List (Nat × Prop)) {T : Nat} (hT : T = (l.map Prod.
         (fun a : ULift.{u} {x : Nat // 0 ≤ x ∧ x ≤ T - 1} => Obs.selectD l a.down.val d)
       ↔ ∃ p ∈ l, 0 < p.1 ∧ p.2 := by
   rw [← selectD_exists l d, ← hT]
-  exact ⟨fun ⟨a, h⟩ => ⟨_, by have := a.down.property; omega, h⟩,
+  exact ⟨fun ⟨a, h⟩ => ⟨_, by (have := a.down.property; omega), h⟩,
     fun ⟨n, hn, h⟩ => ⟨⟨⟨n, by omega⟩⟩, h⟩⟩
 
 /-! ## A choice holds when every outcome does -/

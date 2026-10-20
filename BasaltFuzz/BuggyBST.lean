@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Combinators
-import Basalt.PBT.Property
+module
+
+public import Basalt.Combinators
+public import Basalt.PBT.Property
 
 /-!
 # A worked fuzzing target: binary search trees with buggy operations
@@ -13,12 +15,9 @@ A self-contained demonstration of coverage-guided fuzzing: generate binary searc
 insert/delete on them, and check the output against a postcondition. Each operation comes in a
 correct version (whose property never fails, showing no false positives) and a buggy one (whose
 property every backend finds a counterexample for).
-
-The duplication of `BasaltExamples/BST`'s `genBST` here is forced, not a choice: an executable links
-everything it imports, and that module imports the `Basalt` umbrella for its proofs, which reaches
-Mathlib (`fuzz-run/README.md`). `genBST` is the one declaration held identical to the original, and
-`BasaltTest/Fuzz.lean` pins that.
 -/
+
+@[expose] public section
 
 namespace BuggyBST
 
@@ -78,8 +77,8 @@ def Tree.insertBuggy (t : Tree) (k : Int) : Tree :=
 below instead *silently drops* keys: the output is still a perfectly valid BST, so `isBST` passes on
 every input and the postcondition has to be a model comparison (`toList` against `List.erase`). The
 lesson is about the specification, not the search — an invariant check is strictly weaker than a
-model, and this bug is invisible to the former. It is still a shallow bug (a few dozen runs for any
-backend); `BasaltFuzz/Staged.lean` is the one that separates them. -/
+model, and this bug is invisible to the former. It is still a shallow bug (`fuzz-run/README.md`);
+`BasaltFuzz/Staged.lean` is the one that separates the backends. -/
 
 /-- Split off the smallest key: `some (min, rest)`, or `none` for a leaf. -/
 def Tree.deleteMin : Tree → Option (Int × Tree)

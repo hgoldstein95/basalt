@@ -7,13 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Basalt is a Lean 4 library: **a foundational representation of random data generators for
 property-based testing**, plus machine-checked proofs about them. A generator is a term polymorphic
 in its monad (`def myGen [Gen G] : G α`) — the same term runs at `Plausible.Gen`/`IO` and is
-reasoned about at `SPMF`. Research code; APIs are unstable.
+reasoned about at `SPMF`. **That duality is the point of the repo:** every generator is meant to be
+both sampled for testing and proved about.
 
 `README.md` is the user-facing reference and is kept accurate — it owns the build commands, the
 repository layout, the interpretation table, and the correctness-law vocabulary. Read it before
 changing public behavior, and update it when you do.
-[Palamedes](https://github.com/hgoldstein95/palamedes-lean), the flagship client, synthesizes
-Basalt generators and proves their laws with Basalt's tactics.
 
 ## Commands
 
@@ -21,20 +20,22 @@ Build targets and the directory layout are `README.md`'s. **There is no separate
 Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake build`, so
 `lake build` *is* the test suite and a regression is a build failure.
 
+**To see how a generator behaves, run it.** It is executable as written: put `#genstats` in a
+scratch file that imports the generator's module, and run `lake lean <file>`. A scratch file that is
+itself a `module` also needs a `meta import` of that module. There is no need to re-implement a
+generator in Python or another language to simulate it: the copy is unchecked against the
+definition, and the definition is right here to run.
+
 ## Where things live
 
-- **Writing a generator and proving it correct** — `WORKFLOW.md`: a recipe for each of the three
-  obligations (support, termination, cost) as a skeleton with named holes, the table of judgments
-  (the lemma that restates each on its observation, algebra, direction, who supplies the induction),
-  the unfolding-idiom table, and a when-stuck table. [BasaltExamples/](BasaltExamples/) holds the
-  worked instances each recipe names. Start there for any per-generator work; do not improvise a
-  proof shape.
-- **The laws** (`IsSoundAndComplete` and its halves `IsSoundFor` and `IsCompleteFor`,
-  `IsAlmostSurelyTerminating`, `IsCostBounded`, `IsExpectedCostBounded`), each but the bundle
-  restated on its observation (`iff_obs`, and `.obs` for a fact), and their introduction lemmas —
-  [Basalt/Laws.lean](Basalt/Laws.lean); `IsFaithful`, which relates `IO` to `SPMF` and so has no
-  observation — [Basalt/IO/Laws.lean](Basalt/IO/Laws.lean); `IsCostFaithful`, which relates
-  `SPMF.Cost` to `SPMF`, is in `Laws.lean` beside the others.
+- **Writing a generator and proving it correct** — `WORKFLOW.md`: a recipe for each judgment as a
+  skeleton with named holes, the table of judgments (the lemma that restates each on its
+  observation, algebra, direction, who supplies the induction), the unfolding-idiom table, and a
+  when-stuck table. [BasaltExamples/](BasaltExamples/) holds the worked instances each recipe names.
+  Start there for any per-generator work; do not improvise a proof shape.
+- **The laws**, their restatements on an observation (`iff_obs`, `.obs`), and their introduction
+  lemmas — [Basalt/Laws.lean](Basalt/Laws.lean); `IsFaithful` —
+  [Basalt/IO/Laws.lean](Basalt/IO/Laws.lean).
 - **The `Gen` bundle** — [Basalt/Gen.lean](Basalt/Gen.lean).
 - **Compiled choice** (`oneOf!`, `frequency!`) — the `compiled_choice` section of
   [Basalt/Combinators.lean](Basalt/Combinators.lean). Its contract (no list in the compiled code, the
@@ -47,12 +48,10 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean), the cost ones in
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean). A new combinator needs its `map_` lemma and
   nothing per judgment; [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour.
-- **Support** — a support law is two walks: soundness, a lower bound on `SPMF.alwaysObs` in the
-  demonic algebra ([Basalt/Walk/Sound.lean](Basalt/Walk/Sound.lean), pinned by
-  [BasaltTest/Walk/Sound.lean](BasaltTest/Walk/Sound.lean)); and completeness, a lower bound on
-  `SPMF.mayObs` in the angelic one, under an induction the user chooses (`IsCompleteFor.of_measure`
-  or their own; [Basalt/Walk/Complete.lean](Basalt/Walk/Complete.lean), pinned by
-  [BasaltTest/Walk/Complete.lean](BasaltTest/Walk/Complete.lean)). The practical entry is
+- **Support** — soundness: [Basalt/Walk/Sound.lean](Basalt/Walk/Sound.lean), pinned by
+  [BasaltTest/Walk/Sound.lean](BasaltTest/Walk/Sound.lean); completeness:
+  [Basalt/Walk/Complete.lean](Basalt/Walk/Complete.lean), pinned by
+  [BasaltTest/Walk/Complete.lean](BasaltTest/Walk/Complete.lean). The practical entry is
   WORKFLOW.md's Recipe 1. Support inversion outside a law (`mem_support_*_iff`, for a probability
   goal or a support equation) — [Basalt/SPMF/Support.lean](Basalt/SPMF/Support.lean); the
   `support_simp` / `cost_support_simp` wrappers —
@@ -60,65 +59,63 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 - **Termination** — the criterion (`IsAlmostSurelyTerminating.of_lfpIsOne`, in
   [Basalt/Laws.lean](Basalt/Laws.lean), on `SPMF.mass_eq_one_of_lfpIsOne`) and its `LfpIsOne`
   certificates: [Basalt/SPMF/Termination.lean](Basalt/SPMF/Termination.lean); what the walk needs
-  of a mass bound:
-  [Basalt/Walk/Mass.lean](Basalt/Walk/Mass.lean), pinned by
-  [BasaltTest/Walk/Mass.lean](BasaltTest/Walk/Mass.lean); the `mass_fixpoint` tactic:
+  of a mass bound: [Basalt/Walk/Mass.lean](Basalt/Walk/Mass.lean), pinned by
+  [BasaltTest/Walk/Mass.lean](BasaltTest/Walk/Mass.lean); the `mass_fixpoint` tactic, and the mass
+  bridges for `listOf`, `nonEmptyListOf`, and `suchThat`, which are proved with it:
   [Basalt/Tactic/MassFixpoint.lean](Basalt/Tactic/MassFixpoint.lean), contract pinned by
   [BasaltTest/Tactic/MassFixpoint.lean](BasaltTest/Tactic/MassFixpoint.lean). Ranking functions:
   [Basalt/SPMF/Ranking.lean](Basalt/SPMF/Ranking.lean). The equations of `mass`:
   [Basalt/SPMF/Mass.lean](Basalt/SPMF/Mass.lean). The practical entry is WORKFLOW.md's Recipe 2.
-- **The generator walker** — one walk proves every judgment, each stated on an observation as a
-  bound `O.spec g post ≤ b` or `b ≤ O.spec g post` that the walk computes from the postcondition. A
-  combinator has no rule: its `@[gen_map]` lemma is applied and rewritten (`@[spec_apply]`) into a
-  *shape of choice* in the algebra. The `@[gen_rule]` rules are for the host constructs, once for
-  every monotone observation ([Basalt/Obs/Ordered.lean](Basalt/Obs/Ordered.lean)), for the shapes,
-  per algebra and direction ([Basalt/Walk/Average.lean](Basalt/Walk/Average.lean) for expectations;
-  the demonic and angelic ones beside the presentations they are derived from, in
-  [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean); the `sup` ones in
-  [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean)), and for bridging a recursive combinator's law. A
-  `match` has no rule: the walk generates a congruence lemma for its matcher on first use
-  ([Basalt/Walk/Match.lean](Basalt/Walk/Match.lean), pinned by
-  [BasaltTest/Walk/Match.lean](BasaltTest/Walk/Match.lean)). What closes a leaf of a bound on one observation is tagged `@[obs_leaf]`. The registries are
-  [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean); the walk and its side-goal solvers are
-  [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean), and the names it gives what it leaves
-  [Basalt/Walk/Names.lean](Basalt/Walk/Names.lean). The one entry tactic, `walk`, is
-  [Basalt/Walk/Entry.lean](Basalt/Walk/Entry.lean): it reads the observation and direction off a
-  goal stated on an observation, finishes by the algebra (one goal per path, a pruned precondition,
-  or one inequality), and `walk fixpoint` first inducts, admissible by the observation's
-  `admissible`/`admissible_le` or the relation's `admissible`. What the walk knows of each judgment
-  — its leaves, its list-combinator rules, its admissibility — is one file per judgment in
-  [Basalt/Walk/](Basalt/Walk/); each bound's is pinned by its namesake in
-  [BasaltTest/Walk/](BasaltTest/Walk/). [Basalt/Tactic/](Basalt/Tactic/) holds, besides the
-  `support_simp` and `ennreal_to_real` helpers, the tactics that do more than walk: `mass_fixpoint`
-  (above) and `faithful_fixpoint`. Some judgments relate a generator at two monads instead of
-  bounding it, tagged `@[walk_rel]`: `src.Below` ([Basalt/Walk/Ideal.lean](Basalt/Walk/Ideal.lean)),
-  `IOModel.Approx` ([Basalt/Walk/IO.lean](Basalt/Walk/IO.lean)), and the two directions of cost
-  erasure, `SPMF.Cost.ErasedLe` and `SPMF.Cost.LeErased`
-  ([Basalt/Walk/CostErasure.lean](Basalt/Walk/CostErasure.lean), pinned by
-  [BasaltTest/Walk/CostErasure.lean](BasaltTest/Walk/CostErasure.lean)), for which the walk unfolds
-  any combinator with no rule; `faithful_fixpoint`
-  ([Basalt/Tactic/Faithful.lean](Basalt/Tactic/Faithful.lean), pinned by
-  [BasaltTest/Tactic/Faithful.lean](BasaltTest/Tactic/Faithful.lean)) walks both. Their combinator
-  rules are instances of [Basalt/GenRel.lean](Basalt/GenRel.lean).
-  [BasaltTest/Obs.lean](BasaltTest/Obs.lean) is the tour, and fails the build when one of the
-  combinators it names loses its `@[gen_map]` lemma or a list combinator loses a bridge — it checks
-  that list, not the registry, so a *new* combinator with no lemma is not caught. Nothing else in a
-  termination, cost, or expectation proof mentions combinators.
+- **The generator walker** — one walk proves every judgment, stated on an observation as a bound
+  `O.spec g post ≤ b` or `b ≤ O.spec g post`.
+  - The entry tactic, `walk` and `walk fixpoint` — [Basalt/Walk/Entry.lean](Basalt/Walk/Entry.lean).
+  - The walk and its side-goal solvers — [Basalt/Walk/Basic.lean](Basalt/Walk/Basic.lean); the names
+    it gives what it leaves — [Basalt/Walk/Names.lean](Basalt/Walk/Names.lean); the registries
+    (`@[gen_rule]`, `@[gen_map]`, `@[obs_leaf]`, `@[walk_rel]`, …) —
+    [Basalt/Walk/Attr.lean](Basalt/Walk/Attr.lean).
+  - A combinator has no rule: its `@[gen_map]` lemma rewrites it into a *shape of choice*. The rules
+    for the host constructs — [Basalt/Obs/Ordered.lean](Basalt/Obs/Ordered.lean); for the shapes of
+    choice — [Basalt/Walk/Average.lean](Basalt/Walk/Average.lean) (expectations),
+    [Basalt/Obs/Presentation.lean](Basalt/Obs/Presentation.lean) (demonic and angelic),
+    [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean) (`sup`).
+  - A `match` — [Basalt/Walk/Match.lean](Basalt/Walk/Match.lean), pinned by
+    [BasaltTest/Walk/Match.lean](BasaltTest/Walk/Match.lean).
+  - What the walk knows of each judgment (its leaves, its list-combinator rules) — one file per
+    judgment in [Basalt/Walk/](Basalt/Walk/), each pinned by its namesake in
+    [BasaltTest/Walk/](BasaltTest/Walk/). The admissibility `walk fixpoint` needs sits beside the
+    observation or relation it is about.
+  - Judgments that relate a generator at two monads, each registered by a `@[walk_rel]` proof that
+    it is a `GenRel` ([Basalt/GenRel/Basic.lean](Basalt/GenRel/Basic.lean)): `IOModel.Approx` —
+    [Basalt/IO/Approx.lean](Basalt/IO/Approx.lean); `src.Below` — defined in
+    [Basalt/IO/Ideal.lean](Basalt/IO/Ideal.lean), registered in
+    [Basalt/IO/Choose.lean](Basalt/IO/Choose.lean) beside the draw it needs; cost erasure,
+    `SPMF.Cost.ErasedLe` and `SPMF.Cost.LeErased` —
+    [Basalt/SPMF/CostErasure.lean](Basalt/SPMF/CostErasure.lean), pinned by
+    [BasaltTest/Walk/CostErasure.lean](BasaltTest/Walk/CostErasure.lean). Their rules are the
+    `@[gen_rel_rule]`s of [Basalt/GenRel.lean](Basalt/GenRel.lean), applied to that proof.
+  - The tactics that do more than walk — [Basalt/Tactic/](Basalt/Tactic/): `support_simp`,
+    `mass_fixpoint` (above), and `faithful_fixpoint`
+    ([Basalt/Tactic/Faithful.lean](Basalt/Tactic/Faithful.lean), pinned by
+    [BasaltTest/Tactic/Faithful.lean](BasaltTest/Tactic/Faithful.lean)), which walks `src.Below`
+    and `IOModel.Approx`.
+  - The tour — [BasaltTest/Obs.lean](BasaltTest/Obs.lean). It fails the build when a combinator it
+    names loses its `@[gen_map]` lemma or a list combinator loses a bridge. It checks that list, not
+    the registry, so a *new* combinator with no lemma is not caught.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
-  [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean). The practical entry
-  for a bound is WORKFLOW.md's Recipe 4.
+  [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean); what the walk needs
+  of an expectation bound — [Basalt/Walk/Expect.lean](Basalt/Walk/Expect.lean), pinned by
+  [BasaltTest/Walk/Expect.lean](BasaltTest/Walk/Expect.lean). The practical entry for a bound is
+  WORKFLOW.md's Recipe 4.
 - **Cost** — the interpretation (`SPMF.Cost` and its support inversion):
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); what the walk needs of it:
   [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean), pinned by
   [BasaltTest/Walk/Cost.lean](BasaltTest/Walk/Cost.lean) and, for `walk fixpoint`,
   [BasaltTest/Walk/CostFixpoint.lean](BasaltTest/Walk/CostFixpoint.lean); for its expectation,
   [Basalt/Walk/ExpectedCost.lean](Basalt/Walk/ExpectedCost.lean), pinned by
-  [BasaltTest/Walk/ExpectedCost.lean](BasaltTest/Walk/ExpectedCost.lean). The practical entry is
-  WORKFLOW.md's Recipe 3.
-- **ENNReal arithmetic** — `ennreal_to_real` in
-  [Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean).
+  [BasaltTest/Walk/ExpectedCost.lean](BasaltTest/Walk/ExpectedCost.lean). The practical entries are
+  WORKFLOW.md's Recipes 3 and 5.
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
   [Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)'s module docstring;
   [BasaltTest/Tuning.lean](BasaltTest/Tuning.lean) is the full tour.
@@ -134,20 +131,24 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `WordModel σ` on an `IdealSource` has the `SPMF` distribution —
   [Basalt/IO/Ideal.lean](Basalt/IO/Ideal.lean), with a draw's case in
   [Basalt/IO/Choose.lean](Basalt/IO/Choose.lean) and an ideal source in
-  [Basalt/IO/Stream.lean](Basalt/IO/Stream.lean). WORKFLOW.md's Recipe 5 is the practical entry.
+  [Basalt/IO/Stream.lean](Basalt/IO/Stream.lean). WORKFLOW.md's Recipe 6 is the practical entry.
 - **Stating and running a property** — [Basalt/PBT/](Basalt/PBT/), guarded by
-  [BasaltTest/PBT.lean](BasaltTest/PBT.lean), which is the tour. Nothing there may name an
-  interpretation: a runner that needs one belongs with that interpretation and tags itself
-  `@[basalt_backend]`.
+  [BasaltTest/PBT.lean](BasaltTest/PBT.lean), which is the tour and fails the build when a
+  `Basalt.PBT` module imports an interpretation. A runner that needs one belongs with that
+  interpretation and tags itself `@[basalt_backend]`:
+  [Basalt/IO/Backend.lean](Basalt/IO/Backend.lean),
+  [Basalt/PlausibleGen/Backend.lean](Basalt/PlausibleGen/Backend.lean), and
+  [Basalt/Fuzz/Runner.lean](Basalt/Fuzz/Runner.lean).
 - **Coverage-guided fuzzing** (`FuzzGen`, the libFuzzer bridge, the opt-in `basalt-fuzz` executable)
   — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
-  the measured comparison between backends. This is the repo's only FFI and native-link config. The
-  code under test lives in the `BasaltFuzz` library, which is the only instrumented one — a generator
-  or property that wants coverage feedback belongs there and nowhere else. The default build
-  type-checks it but emits no C, so a change to the *native* half (bridge, runtime detection, link) is
-  caught only by `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow; a drift from the proved
-  `genBST` is caught by `BasaltTest/Fuzz.lean`. Anything added to the Mathlib-free link closure must
-  stay Mathlib-free: import the narrowest module, not an umbrella.
+  the measured comparison between backends. This is the repo's only FFI and native-link config. A
+  generator or property to be fuzzed goes in `BasaltFuzz/`. The SanitizerCoverage scope is set in
+  `lakefile.toml` and asserted by `fuzz-run/build.sh`; do not narrow it without re-running the
+  measurement fuzz-run/README.md records. The default build type-checks these modules but emits no
+  C, so a change to the *native* half (bridge, runtime detection, link) is caught only by
+  `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow; a drift from the proved `genBST` is caught
+  by `BasaltTest/Fuzz.lean`. Anything added to the link closure must stay Mathlib-free: import the
+  narrowest module, not an umbrella.
 
 ## Gotchas (symptom → cause → pointer)
 
@@ -176,9 +177,8 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   interpretation (`(prop : PropM IO Unit)`) at the call site.
 
 - **A walk reports that nothing bounds a recursive occurrence you have an induction hypothesis
-  for** — the hypothesis is stated as a law (`IsSoundFor …`), and a walk uses a hypothesis only when
-  it is stated on an observation, so it skips this one silently. Pass it as `walk [ih.obs]`
-  (WORKFLOW.md, When Stuck).
+  for** — the hypothesis is stated as a law (`IsSoundFor …`), so the walk skips it silently. Pass it
+  as `walk [ih.obs]` (WORKFLOW.md, When Stuck).
 
 - **A walk ignores the hypothesis you have about a combinator term**
   (`ih : SPMF.Cost.alwaysObs.spec (vectorOf n g) …` is in context, and the goal comes back stated
@@ -190,6 +190,20 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
   `oneOf! [...]`** — `oneOf!`/`frequency!` elaborate to `oneOfWith`/`frequencyWith`, which only
   display as the source form. Rewrite with `oneOfWith_eq`/`frequencyWith_eq` first, or use `simp`,
   which applies them ([Basalt/Combinators.lean](Basalt/Combinators.lean)).
+
+- **Running a scratch file that samples a generator fails with `Could not find native
+  implementation of external declaration 'SplitMix.Gen.new'`**, suggesting a `supportInterpreter`
+  change to the lakefile — the file was run with `lake env lean`, which does not load the `splitmix`
+  dependency's native code. Run it with `lake lean <file>` instead; the lakefile is fine.
+
+- **`#eval` in a `module` aborts Lean** (`libc++abi: terminating`, with `IR of declaration … not
+  available` or `Could not find native implementation of external declaration …`) — the evaluated
+  code reaches a module that was imported without `meta`. Add a `meta import` of each module whose
+  code runs, as the `BasaltTest/` files that `#eval` do.
+
+- **`intro` on a `Lean.Order.admissible` goal fails with "no additional binders"** — core does not
+  expose `admissible`, so a module cannot see that it is a `∀`. `rw [Lean.Order.admissible_iff]`
+  first ([Basalt/Order.lean](Basalt/Order.lean)).
 
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
   `ennreal_to_real` ([Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean)) and finish over `ℝ`.
@@ -225,14 +239,20 @@ Examples and tests elaborate their proofs and `#guard_msgs` pins during `lake bu
 
 ## Conventions
 
-- Every module opens with the MIT copyright header and a `/-! # … -/` module docstring, sized and
-  scoped per the documentation rules above.
+- Every file is a `module`: the MIT copyright header, `module`, the imports, a `/-!` module
+  docstring whose first line is a `# Title`, sized and scoped per the documentation rules above,
+  then its section. That is `@[expose] public section` where proofs unfold the module's definitions
+  (generators, interpretations, combinators, laws), `public section` for runtime plumbing whose
+  bodies no proof reads, and `public meta section` for a pure metaprogram; a metaprogram's helpers
+  in an ordinary module are marked `meta`.
 - Imports: the narrowest module that supplies what the file names, never an umbrella — `Basalt.lean`
   is the only wholesale import of the library and nothing inside the library may import it. Upstream
   imports (`Lean`, `Batteries`, `Mathlib`, `Plausible`) come first, then Basalt's, each block
-  alphabetical. An import whose only use is inside a macro body or a `@[gen_rule]` registry is
-  load-bearing at the tactic's *use* sites, so it stays even though the module compiles without it.
-- Declaration docstrings explain design tension, not just signature — where rule 4 admits one.
+  alphabetical. An import is `public` when the module's statements name it, plain when only its
+  proofs do, and `meta` when its code runs at elaboration time (`#eval`, a tactic); `import all`
+  is only for a core module whose hidden definitions a proof must see. An import whose only use is
+  inside a macro body or a `@[gen_rule]` registry is load-bearing at the tactic's *use* sites, so it
+  stays even though the module compiles without it.
 - `BasaltExamples/` files are cookbook entries: a generator plus proofs of the correctness
   properties that apply to it, nothing else — no `#eval`/`#guard_msgs`. Anything pinned or run
   for effect belongs in `BasaltTest/`; nothing built has a `sorry`.

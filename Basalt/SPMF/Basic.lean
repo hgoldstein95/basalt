@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.MeasureTheory.Measure.Dirac
-import Mathlib.Topology.Instances.ENNReal.Lemmas
-import Basalt.RandomChoice
+module
+
+public import Mathlib.MeasureTheory.Measure.Dirac
+public import Mathlib.Topology.Instances.ENNReal.Lemmas
+public import Basalt.RandomChoice
 
 /-!
 # Sub-Probability Mass Functions
@@ -14,6 +16,8 @@ This file defines a type of sub-probability mass functions, similar to `PMF` fro
 `support` (the values with nonzero mass) and its `mass` (the total probability of producing a value,
 as opposed to diverging — always ≤ 1).
 -/
+
+@[expose] public section
 
 open Lean.Order RandomChoice NNReal ENNReal MeasureTheory
 
@@ -41,11 +45,6 @@ theorem tsum_coe_ne_top (p : SPMF α) : ∑' a, p a ≠ ∞ := by
   have := p.tsum_coe
   grind only
 
-theorem tsum_coe_indicator_ne_top (p : SPMF α) (s : Set α) : ∑' a, s.indicator p a ≠ ∞ :=
-  ne_of_lt (lt_of_le_of_lt
-    (ENNReal.tsum_le_tsum (fun _ => Set.indicator_apply_le fun _ => le_rfl))
-    (lt_of_le_of_ne le_top p.tsum_coe_ne_top))
-
 theorem coe_le_one (p : SPMF α) (a : α) : p a ≤ 1 := by
   have h₁ := p.tsum_coe
   have h₂ := ENNReal.le_tsum (f := p) a
@@ -53,9 +52,6 @@ theorem coe_le_one (p : SPMF α) (a : α) : p a ≤ 1 := by
 
 theorem apply_ne_top (p : SPMF α) (a : α) : p a ≠ ∞ :=
   ne_of_lt (lt_of_le_of_lt (p.coe_le_one a) ENNReal.one_lt_top)
-
-theorem apply_lt_top (p : SPMF α) (a : α) : p a < ∞ :=
-  lt_of_le_of_ne le_top (p.apply_ne_top a)
 
 instance : Lean.Order.PartialOrder (SPMF α) where
   rel p q := ∀ a, p a ≤ q a
@@ -67,42 +63,22 @@ instance : Lean.Order.PartialOrder (SPMF α) where
 noncomputable def csupFun {α : Type u} (c : Set (SPMF α)) : α → ℝ≥0∞ :=
   fun a => ⨆ f ∈ c, f a
 
+/-- A sum of suprema along a chain is at most the supremum of the sums. -/
+theorem tsum_iSup₂_le_of_chain {c : SPMF α → Prop} (hc : chain c) (g : SPMF α → α → ℝ≥0∞)
+    (hg : ∀ p q, p ⊑ q → ∀ a, g p a ≤ g q a) :
+    ∑' a, ⨆ p, ⨆ (_ : c p), g p a ≤ ⨆ p, ⨆ (_ : c p), ∑' a, g p a := by
+  rw [ENNReal.tsum_eq_iSup_sum]
+  refine iSup_le fun s => ?_
+  simp_rw [iSup_subtype']
+  rw [ENNReal.finsetSum_iSup fun ⟨p, hp⟩ ⟨q, hq⟩ => (hc p q hp hq).elim
+    (fun h => ⟨⟨q, hq⟩, fun a => ⟨hg p q h a, le_rfl⟩⟩)
+    (fun h => ⟨⟨p, hp⟩, fun a => ⟨le_rfl, hg q p h a⟩⟩)]
+  exact iSup_mono fun _ => ENNReal.sum_le_tsum s
+
 /-- `csupFun` is a valid SPMF. -/
-theorem csupFun_sum_le_one
-  {c : Set (SPMF α)}
-  (h_chain : chain c) :
-  (∑' a, csupFun c a) ≤ 1 := by
-  by_cases hc : c = ∅
-  case pos =>
-    simp [csupFun, hc]
-  case neg =>
-    have h_directed : DirectedOn (· ⊑ ·) c := fun x hx y hy => by
-      rcases h_chain x y hx hy with h | h
-      · exact ⟨y, hy, h, PartialOrder.rel_refl⟩
-      · exact ⟨x, hx, PartialOrder.rel_refl, h⟩
-    have h_directed_le : DirectedOn (fun f g => ∀ a, f a ≤ g a) c := fun x hx y hy => by
-      rcases h_directed x hx y hy with ⟨z, hz, hxz, hyz⟩
-      exact ⟨z, hz, hxz, hyz⟩
-    calc ∑' a, csupFun c a
-      _ = ⨆ s : Finset α, ∑ a ∈ s, csupFun c a := ENNReal.tsum_eq_iSup_sum
-      _ = ⨆ s : Finset α, ∑ a ∈ s, ⨆ f ∈ c, f a := rfl
-      _ ≤ ⨆ s : Finset α, ⨆ f ∈ c, ∑ a ∈ s, f a := by
-          apply iSup_mono
-          intro s
-          simp_rw [iSup_subtype']
-          rw [ENNReal.finsetSum_iSup]
-          intro ⟨f, hf⟩ ⟨g, hg⟩
-          rcases h_directed_le f hf g hg with ⟨k, hk, hfk, hgk⟩
-          exact ⟨⟨k, hk⟩, fun a => ⟨hfk a, hgk a⟩⟩
-      _ = ⨆ f ∈ c, ⨆ s : Finset α, ∑ a ∈ s, f a := by
-          rw [iSup_comm]
-          congr 1
-          ext f
-          rw [iSup_comm]
-      _ = ⨆ f ∈ c, ∑' a, f a := by
-          congr 1; ext f; congr 1; ext _
-          exact ENNReal.tsum_eq_iSup_sum.symm
-      _ ≤ 1 := by simp
+theorem csupFun_sum_le_one {c : Set (SPMF α)} (h_chain : chain c) : (∑' a, csupFun c a) ≤ 1 :=
+  (tsum_iSup₂_le_of_chain h_chain (fun p a => p a) fun _ _ h => h).trans
+    (iSup₂_le fun p _ => p.tsum_coe)
 
 noncomputable instance : CCPO (SPMF α) where
   has_csup := by
@@ -154,16 +130,7 @@ instance : MonoBind SPMF where
 instance : Inhabited (SPMF α) where
   default := Bot.bot
 
-theorem tsum_subtype_Icc_const (lo hi : Nat) (c : ℝ≥0∞) :
-    ∑' (_ : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}), c = (Finset.Icc lo hi).card * c := by
-  have e : ULift {x : Nat // lo ≤ x ∧ x ≤ hi} ≃ ↥(Finset.Icc lo hi) :=
-    Equiv.ulift.trans (Equiv.subtypeEquivRight (fun a => (Finset.mem_Icc).symm))
-  calc ∑' (_ : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}), c
-      = ∑' (_ : ↥(Finset.Icc lo hi)), c := Equiv.tsum_eq e (fun _ => c)
-    _ = ∑ _ ∈ Finset.Icc lo hi, c := Finset.tsum_subtype (Finset.Icc lo hi) (fun _ => c)
-    _ = (Finset.Icc lo hi).card * c := by rw [Finset.sum_const, nsmul_eq_mul]
 
-/-- Generalizes `tsum_subtype_Icc_const` to non-constant summands. -/
 theorem tsum_subtype_Icc (lo hi : Nat) (f : Nat → ℝ≥0∞) :
     ∑' (m : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi}), f m.down.val
       = ∑ n ∈ Finset.Icc lo hi, f n := by
@@ -177,6 +144,10 @@ theorem tsum_subtype_Icc (lo hi : Nat) (f : Nat → ℝ≥0∞) :
             ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} ≃ ↥(Finset.Icc lo hi)))
           (fun n : ↥(Finset.Icc lo hi) => f n.val)
     _ = ∑ n ∈ Finset.Icc lo hi, f n := Finset.tsum_subtype _ _
+
+theorem tsum_subtype_Icc_const (lo hi : Nat) (c : ℝ≥0∞) :
+    ∑' (_ : ULift {x : Nat // lo ≤ x ∧ x ≤ hi}), c = (Finset.Icc lo hi).card * c := by
+  rw [tsum_subtype_Icc lo hi fun _ => c, Finset.sum_const, nsmul_eq_mul]
 
 theorem card_Icc_eq (lo hi : Nat) (h : lo ≤ hi) :
     (Finset.Icc lo hi).card = hi - lo + 1 := by
@@ -233,30 +204,8 @@ theorem bind_assoc (m : SPMF α) (f : α → SPMF β) (g : β → SPMF γ) :
   rw [mul_assoc]
   rfl
 
-instance instLawfulMonadSPMF : LawfulMonad SPMF where
-  bind_pure_comp := by intros; rfl
-  bind_map := by intros; rfl
-  pure_bind := pure_bind
-  bind_assoc := bind_assoc
-  map_const := by intros; rfl
-  id_map := bind_pure
-  seqLeft_eq := by
-    intros
-    simp only [SeqLeft.seqLeft, Seq.seq, Functor.map]
-    unfold Function.comp Function.const
-    rw [bind_assoc]
-    simp [pure_bind]
-  seqRight_eq := by
-    intros
-    simp only [SeqRight.seqRight, Seq.seq, Functor.map]
-    unfold Function.comp Function.const
-    rw [bind_assoc]
-    simp [pure_bind, bind_pure]
-  pure_seq := by
-    intros
-    simp only [Seq.seq, Functor.map, Pure.pure]
-    unfold Function.comp
-    simp [pure_bind]
+instance instLawfulMonadSPMF : LawfulMonad SPMF := LawfulMonad.mk' _
+  (id_map := bind_pure) (pure_bind := pure_bind) (bind_assoc := bind_assoc)
 
 theorem bind_apply {x : SPMF α} {f : α → SPMF β} (b : β) :
     (x >>= f) b = ∑' a, x a * (f a) b := rfl

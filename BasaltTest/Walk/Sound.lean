@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
-import BasaltExamples.Heap
-import BasaltExamples.LeftistHeap
+module
+
+public import Basalt
+public import BasaltExamples.BST
+public import BasaltExamples.Heap
+public import BasaltExamples.LeftistHeap
 
 /-!
 # The Soundness Walk Contract
@@ -15,6 +17,8 @@ Pins the step `walk fixpoint` leaves on `SPMF.alwaysObs.spec`: the recursive fun
 the generator, `ih` over the arguments its recursive calls change, and one goal per path, stated on
 the value the path built under the generator's own names.
 -/
+
+@[expose] public section
 
 open RandomChoice
 
@@ -268,7 +272,7 @@ example (xs : List Nat) : IsSoundFor ((·.1) <$> permutationOf xs : SPMF (List N
 /-! The combined law is split by hand; `walk` takes a half. -/
 
 /--
-error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation tagged `@[walk_rel]`, got
+error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation registered by `@[walk_rel]`, got
   IsSoundAndComplete (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo)
 Split the law into its halves first: `refine .intro ?sound ?complete`.
 -/
@@ -280,7 +284,7 @@ example : IsSoundAndComplete (Heap.Tree.genHeap lo) (Heap.Tree.isHeap lo) := by
 passed as `.obs`. -/
 
 /--
-error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation tagged `@[walk_rel]`, got
+error: walk: expected a statement on an observation, `O.spec (gen …) post`, `b ≤ O.spec (gen …) post`, or `O.spec (gen …) post ≤ b`, or a relation registered by `@[walk_rel]`, got
   IsSoundFor
     (do
       let n ← genTwo

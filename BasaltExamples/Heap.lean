@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbNat
+module
+
+public import Basalt
+public import BasaltExamples.ArbNat
 
 /-!
 # Min-Heaps
@@ -16,6 +18,8 @@ recursing on *two* children makes the mean offspring exactly `1`, so this is a *
 generator: almost surely terminating, with no finite bound on its expected cost
 (`Tree.genHeap.not_expected_cost_bounded`).
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 
@@ -67,19 +71,20 @@ theorem Tree.genHeap.sound_complete :
     walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]
     all_goals simp_all [Tree.isHeap]
   case complete =>
-    intro t
-    induction t generalizing lo with
-    | leaf => intro _; rw [Tree.genHeap, SPMF.mem_support_iff_may]; walk
-    | node l x r ihl ihr =>
-      intro ⟨hle, hl, hr⟩
-      obtain ⟨d, rfl⟩ : ∃ d, x = lo + d := ⟨x - lo, by omega⟩
-      rw [Tree.genHeap, SPMF.mem_support_iff_may]; walk [Nat.arbitrary.sound_complete.complete.obs]
-      exact ⟨d, l, ihl hl, r, ihr hr, rfl⟩
+    refine IsCompleteFor.of_measure (gen := fun lo => (Tree.genHeap lo : SPMF Tree))
+      (fun _ t => t.size) (fun n ih lo t hn h => ?_) lo
+    beta_reduce
+    rw [Tree.genHeap, SPMF.mem_support_iff_may]
+    walk [Nat.arbitrary.sound_complete.complete.obs, SPMF.le_may_of_measure ih]
+    cases t with
+    | leaf => simp
+    | node l x r =>
+      obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le h.1
+      grind [= size, = isHeap]
 
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   mass_fixpoint [Nat.arbitrary.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/

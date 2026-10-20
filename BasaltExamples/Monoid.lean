@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Algebra.Group.Defs
-import Mathlib.Algebra.Group.Nat.Defs
-import Mathlib.Data.Real.Basic
-import Basalt.Combinators
+module
+
+public import Mathlib.Algebra.Group.Defs
+public import Mathlib.Algebra.Group.Nat.Defs
+public import Mathlib.Data.Real.Basic
+public import Basalt.Combinators
 
 /-!
 # Generating a Type with Structure
@@ -20,6 +22,8 @@ Unlike the other examples, this file states no correctness laws — the property
 there is no established validity predicate for "an arbitrary monoid." It is kept as a demonstration
 of what the representation is capable of expressing.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

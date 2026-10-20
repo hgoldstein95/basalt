@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Cost
+module
+
+public import Basalt.SPMF.Cost
 
 /-!
 # Proof-Recipe Tactics
@@ -12,6 +14,8 @@ Packaged `simp only` sets for support inversion: `support_simp` at the `SPMF` in
 `cost_support_simp` at `SPMF.Cost`. Both accept extra simp lemmas and an optional location,
 like `simp only`.
 -/
+
+@[expose] public section
 
 open Lean.Parser.Tactic
 
@@ -25,7 +29,7 @@ macro_rules
     `(tactic| simp only [SPMF.mem_support_bind_iff,
         SPMF.mem_support_pure_iff, SPMF.mem_support_map_iff, SPMF.mem_support_choose_iff,
         SPMF.mem_support_ite_iff, SPMF.mem_support_dite_iff, SPMF.mem_support_vectorOf_iff,
-        SPMF.mem_support_listOfMaxLength_iff, SPMF.mem_support_listOf,
+        SPMF.mem_support_listOfMaxLength_iff, SPMF.mem_support_listOf_iff,
         SPMF.mem_support_permutationOf_iff, Set.mem_setOf_eq,
         $args,*] $[$loc]?)
 

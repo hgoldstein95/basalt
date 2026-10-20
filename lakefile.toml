@@ -2,6 +2,10 @@ name = "basalt"
 version = "0.1.0"
 defaultTargets = ["Basalt", "BasaltExamples", "BasaltTest", "BasaltFuzz"]
 
+# TODO: Remove this if/when the Lean folks fix the way arguments get abstracted in
+# `partial_fixpoint`s with modules.
+leanOptions = { backward.proofsInPublic = true }
+
 [[lean_lib]]
 name = "Basalt"
 globs = ["Basalt", "Basalt.+"]
@@ -55,4 +59,4 @@ rev = "v4.29.1"
 [[require]]
 name = "splitmix"
 git = "https://github.com/hgoldstein95/splitmix"
-rev = "splitmix-0.1.0"
+rev = "splitmix-0.3.0"

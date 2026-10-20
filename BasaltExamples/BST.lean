@@ -3,12 +3,16 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import Basalt.Combinators
+module
+
+public import Basalt
+public import Basalt.Combinators
 
 /-!
 # Binary Search Trees
 -/
+
+@[expose] public section
 
 open RandomChoice
 
@@ -73,7 +77,6 @@ open scoped ENNReal
 
 theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   split
   · rw [zero_mul, add_zero]
     calc (1 : ℝ≥0∞) / 2 + 1 / 2 * c ^ 2 ≤ 1 / 2 + 1 / 2 * 1 ^ 2 := by gcongr
@@ -211,7 +214,7 @@ theorem Tree.genBST.cost_faithful : IsCostFaithful (Tree.genBST lo hi) :=
   ⟨by walk fixpoint, by walk fixpoint⟩
 
 /-- `cost_bounded` in expectation: three choices per node of the expected size, and one more. -/
-theorem Tree.genBST.expected_cost {lo hi : Int} :
+theorem Tree.genBST.expected_cost_bounded {lo hi : Int} :
     IsExpectedCostBounded (Tree.genBST lo hi : SPMF.Cost (Tree Int))
       (3 * (harmonic (hi + 1 - lo).toNat / 2) + 1) := by
   refine (IsExpectedCostBounded.of_costBounded Tree.genBST.cost_faithful

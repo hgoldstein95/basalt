@@ -5,10 +5,9 @@ conjunction with property-based testing frameworks in Lean and other languages t
 of bugs in code.
 
 This file provides a workflow for creating your own generator and proving it correct. The first half
-covers writing the generator; the second half gives a **recipe for each of the three proof
-obligations**, as a skeleton with named holes. The recipes are written so that every step is a
-standard tactic with a local, legible failure mode — follow them mechanically and the failures tell
-you what to fix.
+covers writing the generator; the second half gives a **recipe for each proof obligation**, as a
+skeleton with named holes. The recipes are written so that every step is a standard tactic with a
+local, legible failure mode — follow them mechanically and the failures tell you what to fix.
 
 The worked instances live in `BasaltExamples/`; each recipe below names the examples that follow it
 verbatim.
@@ -52,7 +51,7 @@ For a list generator that flips a coin per element, the bound is `fun xs => xs.l
 Keep the bound *tight*: a precise bound is what catches accidental backtracking or other
 inefficiency, and (see the cost recipe) a too-tight bound fails as a legible `omega` goal that
 shows you exactly which term is missing. A generator that retries or discards draws has no such
-bound; bound its expected cost instead (Recipe 3).
+bound; bound its expected cost instead (Recipe 5).
 
 ### Step 3: Create and Validate Your Generator
 
@@ -92,12 +91,11 @@ Guidelines that make the proofs go smoothly:
 
 ## Part 2: The Three Proof Obligations
 
-The properties to prove are these three (`Basalt/Laws.lean`, where they are plain `def`s — there is
-no bundle to instantiate).
+The properties to prove are these three (`Basalt/Laws.lean`).
 
 | Obligation | Statement shape | Meaning |
 |---|---|---|
-| Support | `IsSoundAndComplete g P`, i.e. `∀ a, a ∈ SPMF.support g ↔ P a` | Soundness and completeness: nothing invalid is produced, nothing valid is missed. |
+| Support | `IsSoundAndComplete g P`, i.e. `IsSoundFor g P` (`∀ a ∈ SPMF.support g, P a`) and `IsCompleteFor g P` (`∀ a, P a → a ∈ SPMF.support g`) | Soundness and completeness: nothing invalid is produced, nothing valid is missed. |
 | Termination | `IsAlmostSurelyTerminating g`, i.e. `g.mass = 1` | The generator terminates with probability 1. |
 | Cost | `IsCostBounded g c` | Producing `v` takes at most `c v` random choices. |
 
@@ -106,14 +104,14 @@ over one step of the recursion. Each law (support by its halves) is defined in t
 checks and restated on an observation by `<Law>.iff_obs` (`Basalt/Laws.lean`); a proof rewrites its
 goal with that, and `walk` pushes the observation's postcondition backward through the generator's
 syntax, closes recursive occurrences itself and callees with the laws you pass it, and leaves what
-only you can supply — logic about `P`, or arithmetic. Support is two judgments, one per direction of
-its `↔`. What differs between judgments is the observation, the algebra the walk computes in, the
-direction of the bound, and who supplies the induction:
+only you can supply — logic about `P`, or arithmetic. Support is two judgments, one per half. What
+differs between judgments is the observation, the algebra the walk computes in, the direction of the
+bound, and who supplies the induction:
 
 | Judgment | Restated by | Algebra | Bound | Induction | What is left |
 |---|---|---|---|---|---|
 | Soundness, `IsSoundFor g P` | `IsSoundFor.iff_obs` | demonic: `∀`, `∧` | lower, by `True` | `walk fixpoint` | one goal per path: `P` of the value it built |
-| Completeness, `a ∈ SPMF.support g` | `SPMF.mem_support_iff_may` | angelic: `∃`, `∨` | lower | yours, on the value or on `P` | one goal: an `∃` per draw, an `∨` per choice, recursive occurrences as themselves |
+| Completeness, `IsCompleteFor g P` | `IsCompleteFor.iff_obs` | angelic: `∃`, `∨` | lower | yours, on the value or on `P` | one goal: an `∃` per draw, an `∨` per choice, recursive occurrences as themselves |
 | Termination, `IsAlmostSurelyTerminating g` | `IsAlmostSurelyTerminating.iff_obs` | average | lower | `mass_fixpoint using <certificate>` | `F c ≤ <computed bound>`, in `ℝ≥0∞` |
 | Cost, `IsCostBounded g c` | `IsCostBounded.iff_obs` | demonic | lower, by `True` | `walk fixpoint` | one arithmetic goal per path |
 | Expected cost, `IsExpectedCostBounded g B` | `IsExpectedCostBounded.iff_obs` | average | upper | `walk fixpoint` | `<computed bound> ≤ B`, in `ℝ≥0∞` |
@@ -125,6 +123,17 @@ value and having mass `1` are lower bounds on a least fixed point, false of that
 a ranking (Hark et al., "Aiming Low Is Harder") — a certificate for termination, your induction for
 completeness. That is why `walk fixpoint` refuses a lower bound.
 
+**Two shapes have no fixpoint to induct on**, and every recipe handles them the same way:
+
+- **A bare combinator term** (`listOf g`) has no definition to unfold: rewrite with the law's
+  `iff_obs` and `walk` (`BasaltTest/Walk/Cost.lean`).
+- **A generator recursive by `termination_by`**, or by structural recursion: induct on its
+  decreasing argument, and in each case rewrite with the law's `iff_obs` where it has one, unfold
+  one step, and `walk [ih.obs]` (`BasaltTest/Tactic/MassFixpoint.lean`,
+  `BasaltTest/Walk/CostFixpoint.lean`, `Tree.genTree` in `BST/ByFiltering.lean`). For a relation,
+  pass the field being proved (`ih.erasedLe` in `Tree.genTree.cost_faithful`); `genZero`
+  (`STLC/Faithful.lean`) is the `IsFaithful` instance.
+
 **A generator that post-processes another** (`let x ← g; return f x`) has no recursion to unfold,
 and every obligation reduces to composition instead: the recipes unchanged, with
 `mass_fixpoint using SPMF.LfpIsOne.one` for termination. `List.genSortedBySorting`
@@ -133,19 +142,18 @@ law follows from the corresponding law of `List.arbitrary`, passed to the walk, 
 about `f`: that sorting sorts, that it fixes a sorted list, that it is a permutation. Cost is the
 obligation that can fail outright for this shape (Step 2).
 
-**A callee's law is passed, never found.** A walk uses a law of a sub-generator only when it is
-given one, restated on its observation by `.obs` —
-`walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]` — so the facts a proof passes are exactly
-the laws it depends on, and a missing one is an error at the proof that needs it. Wherever
-`[<CALLEES>]` appears below it stands for the callees' laws for that judgment, each as `h.obs`, and
-is dropped when there are none. A law that bundles others is passed by the half the judgment needs
-(`h.sound.obs`, `h.complete.obs`), except to `faithful_fixpoint`, which takes an `IsFaithful` law
-whole. A hypothesis in context is used the same way, when it is stated on the observation: one of
-your own induction that is stated as a law is passed as `ih.obs`. By convention the laws are named
-`<GEN>.sound_complete`,
-`<GEN>.terminates`, `<GEN>.cost_bounded`, `<GEN>.faithful` (`<GEN>.sound` or `<GEN>.complete` for
-a generator that has only one half of the support law, as a size-bounded generator is sound and
-deliberately incomplete).
+**A callee's law is passed, never found.** A walk uses a law of a sub-generator only when you pass
+it, restated on its observation by `.obs`: `walk fixpoint [Nat.arbitrary.sound_complete.sound.obs]`.
+A missing law is an error at the proof that needs it. Below, `[<CALLEES>]` stands for the callees'
+laws for that judgment, each as `h.obs`; drop it when there are none. Pass a bundled law by the half
+the judgment needs (`h.sound.obs`, `h.complete.obs`); only `faithful_fixpoint` takes an `IsFaithful`
+law whole. A walk also uses a hypothesis in context, but only one stated on the observation, so pass
+an induction hypothesis stated as a law as `ih.obs`.
+
+Laws are named `<GEN>.sound_complete`, `<GEN>.terminates`, `<GEN>.cost_bounded`,
+`<GEN>.expected_cost_bounded`, `<GEN>.cost_faithful`, and `<GEN>.faithful`. A generator with one
+half of the support law names it `<GEN>.sound` or `<GEN>.complete`: a size-bounded generator, for
+example, is sound and deliberately incomplete.
 
 ### Unfolding: one idiom per context
 
@@ -162,8 +170,8 @@ deliberately incomplete).
 Worked instances: `Tree.genHeap.sound_complete` (`Heap.lean`) is the recipe verbatim;
 `Tree.genBST.sound_complete` (`BST.lean`) has a `dite`, a `frequency`, and a pivot;
 `Tree.genLeftistOfRank.sound_complete` (`LeftistHeap.lean`) is defined by `match` and draws a value
-its predicate must solve for; `String.arbitrary_support` (`ArbString.lean`) goes through a list
-combinator.
+its predicate must solve for; `String.arbitrary.sound_complete` (`ArbString.lean`) goes through a
+list combinator.
 
 ```lean
 theorem <GEN>.sound_complete : IsSoundAndComplete (<GEN> <IDX>) (<PRED> <IDX>) := by
@@ -249,18 +257,18 @@ no recursion — including one that only post-processes a callee — is the firs
 | Generator | Certificate | `F c` |
 |---|---|---|
 | No recursive call | `SPMF.LfpIsOne.one` | `1` |
-| Mean offspring `m < 1` | `SPMF.LfpIsOne.affine (m := m) h` | `(1 - m) + m * c` |
-| At most two calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.quadratic (a := _) (b := _) (d := _) h₁ h₂ h₃` | `a + b * c + d * c ^ 2` |
+| Mean offspring `m < 1` | `SPMF.LfpIsOne.affine (m := m)` | `(1 - m) + m * c` |
+| At most two calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.quadratic (a := _) (b := _) (d := _)` | `a + b * c + d * c ^ 2` |
 | Shrinking seed, mean offspring `> 1` | `SPMF.LfpIsOne.ranking …` with `mass_fixpoint per_seed` (below) | a function of `c` and the seed |
 
 `m` is weights-on-recursive-branches over total weights, counting each branch once per recursive
-call: a two-branch `oneOf` with one recursive branch has `m = 1/2`;
-`frequency [(2, leaf…), (1, node…)]` with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a
-quadratic, `a = 2/3`, `d = 1/3`; a two-branch `oneOf` between a leaf and two calls is the quadratic
-`a = d = 1/2`. **A critical generator
-(`m = 1`) terminates but has no finite `IsExpectedCostBounded`**
-(`AllTwoTree.genTree.not_expected_cost_bounded`) — reweight it if you can. The side conditions of a
-certificate are closed numerals: `by norm_num`, or `by ennreal_to_real; norm_num`.
+call: a two-branch `oneOf` with one recursive branch has `m = 1/2`; `frequency [(2, leaf…), (1,
+node…)]` with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a quadratic, `a = 2/3`, `d = 1/3`;
+a two-branch `oneOf` between a leaf and two calls is the quadratic `a = d = 1/2`. **A critical
+generator (`m = 1`) terminates but has no finite `IsExpectedCostBounded`**
+(`AllTwoTree.genTree.not_expected_cost_bounded`) — reweight it if you can. A certificate closes its
+own side conditions when its weights are numerals; otherwise pass them as arguments
+(`SPMF.LfpIsOne.affine (m := m) h`).
 
 **`mass_fixpoint`** applies the criterion to the family over the generator's seed, unfolds one
 step, and walks it; its docstring says what it leaves in context, `hrec` among it: the bound on
@@ -270,10 +278,10 @@ every recursive occurrence. Without `using`, finish the `LfpIsOne` goal it leave
 **The walk is the whole structural argument.** It walks the unfolded generator and *computes* a
 lower bound on its mass. Mass is the expectation of `1`, and the walk pushes that postexpectation
 backward: a draw is bounded at the bound its continuation computed, so the bound comes out in the
-shape of the do-block and is exact wherever the generator's callees are
-(`Basalt/Walk/Mass.lean` owns how a fact is used, `Basalt/Walk/Average.lean` the bound of
-each shape of choice, `Basalt/Walk/Basic.lean` the walk; `BasaltTest/Walk/Mass.lean` shows a
-generator that uses every combinator). Of the generator, only its callees' laws are yours to supply:
+shape of the do-block and is exact wherever the generator's callees are (`Basalt/Walk/Mass.lean`
+owns how a fact is used, `Basalt/Walk/Average.lean` the bound of each shape of choice,
+`Basalt/Walk/Basic.lean` the walk; `BasaltTest/Walk/Mass.lean` shows a generator that uses every
+combinator). Of the generator, only its callees' laws are yours to supply:
 
 - a **recursive occurrence** is discharged by `hrec`, whatever the shape of the seed.
 - a **callee** is discharged by its `<callee>.terminates` law, passed with any other fact:
@@ -294,26 +302,21 @@ generator that uses every combinator). Of the generator, only its callees' laws 
 **The arithmetic** has your `F c` on the left, the computed bound on the right, and no generator in
 sight. Try `simp` (`ArbNat.lean`, `SortedList.lean`), then `simp` with the identities the goal needs
 (`simp [sq, ENNReal.div_eq_inv_mul, mul_add]` in `LeftistHeap.lean` and `AllTwoTree.lean`), then
-`ennreal_to_real` (`Basalt/Tactic/ENNReal.lean`) and `nlinarith`. If it looks *false*, your
-certificate is wrong, not your proof. A generator whose seed has an argument typed by another goes
-through `IsAlmostSurelyTerminating.of_lfpIsOne_uniform` on an explicit family. A bare combinator
-term, which has no definition to unfold, is
-`rw [IsAlmostSurelyTerminating.iff_obs]` and `walk`. A generator recursive by `termination_by` has
-no fixpoint: induct on its decreasing argument and close each case with the same two, passing the
-induction hypothesis as `ih.obs` (`BasaltTest/Tactic/MassFixpoint.lean`).
+`ennreal_to_real` (`Basalt/Tactic/ENNReal.lean`) and `nlinarith`. If it looks *false*, your certificate is wrong, not your proof. A
+generator whose seed has an argument typed by another goes through
+`IsAlmostSurelyTerminating.of_lfpIsOne_uniform` on an explicit family.
 
-**Shrinking seed** (`Tree.genWeightedBST`, `BST/Weighted.lean`) is the one regime with real
-content, and the one where the bound is not a single `F c`: `mass_fixpoint per_seed` takes the
-bound family `c` and the computed bound `T c seed` as functions of the seed, and leaves
-`LfpIsOne T`. You supply a ranking function `φ : Seed → ℝ≥0∞` whose expected value drops by `ε` at
-every step, and `SPMF.LfpIsOne.ranking` (`Basalt/SPMF/Ranking.lean`) discharges the certificate.
-Its obligations are a `LevelOp` `A` (three algebra laws), a
-drift lemma (`A φ + ε ≤ φ` — pure arithmetic about your rank), and the deficit condition
-`1 - T c seed ≤ A (1 - c) seed` — arithmetic about `T`, with no generator in sight, pushed through
-the branches by `ENNReal.one_sub_le_mul_one_sub`, `one_sub_sum_div_le`, and `one_sub_mul_le_add`.
-A uniform pivot's continuation has a bound that depends on the pivot, which the walk computes as the
-average over the range. Follow `genWeightedBST_drift`/`genWeightedBST.terminates`.
-Two things to know:
+**Shrinking seed** (`Tree.genWeightedBST`, `BST/Weighted.lean`) is the one regime with real content,
+and the one where the bound is not a single `F c`: `mass_fixpoint per_seed` takes the bound family
+`c` and the computed bound `T c seed` as functions of the seed, and leaves `LfpIsOne T`. You supply
+a ranking function `φ : Seed → ℝ≥0∞` whose expected value drops by `ε` at every step, and
+`SPMF.LfpIsOne.ranking` (`Basalt/SPMF/Ranking.lean`) discharges the certificate. Its obligations are
+a `LevelOp` `A` (three algebra laws), a drift lemma (`A φ + ε ≤ φ` — pure arithmetic about your
+rank), and the deficit condition `1 - T c seed ≤ A (1 - c) seed` — arithmetic about `T`, with no
+generator in sight, pushed through the branches by `ENNReal.one_sub_le_mul_one_sub`,
+`one_sub_sum_div_le`, and `one_sub_mul_le_add`. A uniform pivot's continuation has a bound that
+depends on the pivot, which the walk computes as the average over the range. Follow
+`genWeightedBST_drift`/`genWeightedBST.terminates`. Two things to know:
 
 - Candidate `φ`s, in order: the seed measure; `≡ const` (that's the static-seed case); seed measure
   plus a depth term. Evaluate the drift in the seed's *actual* arithmetic: `bstRank` is the plain
@@ -354,66 +357,14 @@ goals `genHeap` and `genBST` leave. Of the generator, only its callees' laws are
   through instead.
 - a **combinator that takes a generator** (`listOf`, `vectorOf`, …) asks for that generator's cost
   law the same way, and the goal states the combinator's bound in terms of it —
-  `String.arbitrary_cost` (`ArbString.lean`). A combinator term in that position, which has no law,
-  is bounded by its worst case: the most choices any of its runs makes.
+  `String.arbitrary.cost_bounded` (`ArbString.lean`). A combinator term in that position, which has
+  no law, is bounded by its worst case: the most choices any of its runs makes.
 
 **The arithmetic** is the only content. Unfold the cost function one constructor and finish with
 `omega`; when the cost function is a named `def`, unfold it `at *` so the hypotheses about
 sub-costs unfold too (`AllTwoTree.lean`). If `omega` fails, the bound is too tight: the failing goal
 is exactly the linear inequality that doesn't hold, with each sub-cost's bound as a hypothesis.
-Adjust the bound in Step 2; nothing else in the proof changes. A bare combinator term, which has no
-definition to unfold, is `walk` alone (`BasaltTest/Walk/Cost.lean`). A generator recursive by
-`termination_by` is induction on its decreasing argument and `walk [ih.obs]` in each case
-(`BasaltTest/Walk/CostFixpoint.lean`).
-
-**Expected cost.** A generator that discards draws — retrying a rejected value, absorbing a
-duplicate — has no `<COST>`: any number of choices can end in the same value
-(`Tree.genBSTByInsertion.not_cost_bounded`, `BST/ByInsertion.lean`). Bound what a run costs on
-average instead, by `B`, a function of the arguments:
-
-```lean
-theorem <GEN>.cost : IsExpectedCostBounded (<GEN> <ARGS>) <B> := by
-  rw [IsExpectedCostBounded.iff_obs]
-  walk fixpoint [<CALLEES>]
-  <arithmetic>          -- `<computed bound> ≤ <B>`, in `ℝ≥0∞`, with `ih` in context
-```
-
-The walk is Recipe 4's, over `SPMF.Cost.expectObs`, with each draw adding its choice to the cost:
-a recursive occurrence is bounded by `ih`, and a callee by its `IsExpectedCostBounded` law, passed
-as `h.obs`. A generator recursive by `termination_by` is induction on its decreasing argument, as
-above (`Tree.genTree.cost`, `BST/ByFiltering.lean`). `BasaltTest/Walk/ExpectedCost.lean` pins the
-goals.
-
-**Rejection sampling** is `suchThat g p`. Its rule takes `g`'s expected cost `C` and a bound `r` on
-how often `p` rejects, `SPMF.Cost.expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r`, and
-bounds the loop by `C / (1 - r)`; `SPMF.Cost.div_one_sub_le` turns the arithmetic into one step of
-the loop, `C + r * B ≤ B`. The rejection bound is the one fact about `g` a filter needs, and it is
-the termination proof's, read at `SPMF.Cost` through `g`'s `IsCostFaithful` law
-(`IsCostFaithful.expect_eq`; `Tree.genBSTByFiltering.cost`, `BST/ByFiltering.lean`).
-`NonEmptyList.genNonEmpty.cost` (`NonEmptyList.lean`) is the same proof for a source that rarely
-rejects.
-
-**`IsCostFaithful gen`** is `walk fixpoint` on each field, `⟨by walk fixpoint, by walk fixpoint⟩`,
-passing a callee's law by the field being proved (`h.erasedLe`, `h.leErased`); a generator
-recursive by `termination_by` is induction, `unfold`, and `walk`, as for `IsFaithful`
-(`Tree.genTree.cost_faithful`). `BasaltTest/Walk/CostErasure.lean` pins it.
-
-**From a cost bound.** A generator with an `IsCostBounded` law and an `IsCostFaithful` one has its
-expected cost bounded by the `SPMF` expectation of its cost function,
-`IsExpectedCostBounded.of_costBounded`, which is Recipe 4's (`Tree.genBST.expected_cost`,
-`BST.lean`).
-
-**A lower bound** on an expected cost cannot be had by fixpoint induction: the generator that never
-returns costs nothing. Unfold the generator once instead (`conv_rhs => rw [<GEN>]`), which is an
-equation, and pass its own expected cost as the fact about its recursive calls:
-`SPMF.Cost.le_expect_add hm le_rfl`, where `hm`, its mass at `SPMF.Cost`, is
-`IsCostFaithful.one_le_mass` of its termination law. The walk leaves `E`'s one-step inequality. A
-critical generator's is `1 + E ≤ E`, and `IsExpectedCostBounded.not_of_step` turns it into the
-absence of any finite bound (`AllTwoTree.genTree.not_expected_cost_bounded`, `AllTwoTree.lean`).
-When the recursive calls change the generator's arguments, bound each by the least expected cost
-over all of them, `⨅ j, E j`, and conclude with `not_of_step_iInf`
-(`Tree.genHeap.not_expected_cost_bounded`, `Heap.lean`). A callee with no finite bound passes its
-`⊤` on, with no step inequality at all (`genTerm.not_expected_cost_bounded`, `STLC/Cost.lean`).
+Adjust the bound in Step 2; nothing else in the proof changes.
 
 ### Recipe 4: Expected Values
 
@@ -434,14 +385,63 @@ again: it pushes `<QUANTITY>` backward and computes an upper bound. A recursive 
 bounded by `ih`, used under whatever the walk arrives with as long as that is `ih`'s own quantity
 plus a constant (`(node l x r).size` is `l.size + 1 + r.size`); a callee's bound is passed
 explicitly, restated with the same lemma as the goal. Only an upper bound can be proved this way:
-the fixpoint induction starts from the generator that never returns. `BasaltTest/Walk/Expect.lean` pins the goals.
+the fixpoint induction starts from the generator that never returns. `BasaltTest/Walk/Expect.lean`
+pins the goals.
 
 A **list combinator** has no shape of choice, so it is bounded by a rule rather than averaged, and
 only its mass is used: a constant postexpectation exactly, and otherwise its worst case over every
-value (`⨆`), which for an unbounded quantity is `⊤`. When that is
-too coarse, prove the bound separately and pass it: `walk [h]`.
+value (`⨆`), which for an unbounded quantity is `⊤`. When that is too coarse, prove the bound
+separately and pass it: `walk [h]`.
 
-### Recipe 5: Running at `IO`
+### Recipe 5: Expected Cost
+
+A generator that discards draws — retrying a rejected value, absorbing a duplicate — has no cost
+bound: any number of choices can end in the same value (`Tree.genBSTByInsertion.not_cost_bounded`,
+`BST/ByInsertion.lean`). Bound what a run costs on average instead, by `B`, a function of the
+arguments.
+
+```lean
+theorem <GEN>.expected_cost_bounded : IsExpectedCostBounded (<GEN> <ARGS>) <B> := by
+  rw [IsExpectedCostBounded.iff_obs]
+  walk fixpoint [<CALLEES>]
+  <arithmetic>          -- `<computed bound> ≤ <B>`, in `ℝ≥0∞`, with `ih` in context
+```
+
+The walk is Recipe 4's, over `SPMF.Cost.expectObs`, with each draw adding its choice to the cost: a
+recursive occurrence is bounded by `ih`, and a callee by its `IsExpectedCostBounded` law, passed as
+`h.obs`. `BasaltTest/Walk/ExpectedCost.lean` pins the goals.
+
+**Rejection sampling** is `suchThat g p`. Its rule takes `g`'s expected cost `C` and a bound `r` on
+how often `p` rejects, `SPMF.Cost.expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r`, and
+bounds the loop by `C / (1 - r)`; `SPMF.Cost.div_one_sub_le` turns the arithmetic into one step of
+the loop, `C + r * B ≤ B`. The rejection bound is the one fact about `g` a filter needs, and it is
+the termination proof's, read at `SPMF.Cost` through `g`'s `IsCostFaithful` law
+(`IsCostFaithful.expect_eq`; `Tree.genBSTByFiltering.expected_cost_bounded`,
+`BST/ByFiltering.lean`). `NonEmptyList.genNonEmpty.expected_cost_bounded` (`NonEmptyList.lean`) is
+the same proof for a source that rarely rejects.
+
+**`IsCostFaithful gen`** is `walk fixpoint` on each field, `⟨by walk fixpoint, by walk fixpoint⟩`,
+passing a callee's law by the field being proved (`h.erasedLe`, `h.leErased`).
+`BasaltTest/Walk/CostErasure.lean` pins it.
+
+**From a cost bound.** A generator with an `IsCostBounded` law and an `IsCostFaithful` one has its
+expected cost bounded by the `SPMF` expectation of its cost function,
+`IsExpectedCostBounded.of_costBounded`, which is Recipe 4's (`Tree.genBST.expected_cost_bounded`,
+`BST.lean`).
+
+**A lower bound** on an expected cost cannot be had by fixpoint induction: the generator that never
+returns costs nothing. Unfold the generator once instead (`conv_rhs => rw [<GEN>]`), which is an
+equation, and pass its own expected cost as the fact about its recursive calls:
+`SPMF.Cost.le_expect_add hm le_rfl`, where `hm`, its mass at `SPMF.Cost`, is
+`IsCostFaithful.one_le_mass` of its termination law. The walk leaves `E`'s one-step inequality. A
+critical generator's is `1 + E ≤ E`, and `IsExpectedCostBounded.not_of_step` turns it into the
+absence of any finite bound (`AllTwoTree.genTree.not_expected_cost_bounded`, `AllTwoTree.lean`).
+When the recursive calls change the generator's arguments, bound each by the least expected cost
+over all of them, `⨅ j, E j`, and conclude with `not_of_step_iInf`
+(`Tree.genHeap.not_expected_cost_bounded`, `Heap.lean`). A callee with no finite bound passes its
+`⊤` on, with no step inequality at all (`genTerm.not_expected_cost_bounded`, `STLC/Cost.lean`).
+
+### Recipe 6: Running at `IO`
 
 Not one of the three obligations either: that what `IO` runs has the distribution the other recipes
 reason about, up to what `idealized_faithful` (`Basalt/IO/Faithful.lean`) states. Worked instances:
@@ -453,23 +453,21 @@ theorem <GEN>.faithful : IsFaithful (<GEN> <ARGS>) := by
 ```
 
 `IsFaithful` (`Basalt/IO/Laws.lean`) has three fields. `terminates` is the `<GEN>.terminates` law
-you pass. `below`, a relation on ideal words, is what the walk proves and composes; it
-bounds the distribution from one side only, and `terminates` gives the other. `approx` is that `IO`
-runs `IOModel` wherever that terminates. A generator with no `.terminates` law states the two
-relations alone, as `<GEN>.ideal` and `<GEN>.io` (`Tree.genLeftistOfRank`,
+you pass. `below`, a relation on ideal words, is what the walk proves and composes; it bounds the
+distribution from one side only, and `terminates` gives the other. `approx` is that `IO` runs
+`IOModel` wherever that terminates. A generator with no `.terminates` law states the two relations
+alone, as `<GEN>.below` and `<GEN>.approx` (`Tree.genLeftistOfRank`,
 `BasaltExamples/LeftistHeap.lean`), which a caller passes in place of `.faithful`.
 
-**`walk fixpoint`** on either relation, `src.Below (<GEN> …) (<GEN> …)` (`Basalt/Walk/Ideal.lean`)
-or `IOModel.Approx (<GEN> …) (<GEN> …)` (`Basalt/Walk/IO.lean`), inducts on one side (`SPMF`,
+**`walk fixpoint`** on either relation, `src.Below (<GEN> …) (<GEN> …)` (`Basalt/IO/Ideal.lean`)
+or `IOModel.Approx (<GEN> …) (<GEN> …)` (`Basalt/IO/Approx.lean`), inducts on one side (`SPMF`,
 `IOModel`), unfolds the other side one step, and walks the two together; `faithful_fixpoint`
 (`Basalt/Tactic/Faithful.lean`) runs both, passing a callee's `.faithful` law as its `below` and
 `approx`. A recursive occurrence is closed by `ih`, a callee by the fact you pass (`h.below`,
 `h.approx`), and a combinator with no rule is unfolded on both sides, as is a helper that is not
-recursive. A generator defined by structural recursion is induction on the argument it recurses
-on, `unfold`, and `walk` in each case (`genZero`, `BasaltExamples/STLC/Faithful.lean`). A
-recursive combinator of your own needs a `@[gen_rule]` relating it at each pair of monads: prove it
-once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`) and instantiate it
-(`IdealSource.below_listOf`, `IOModel.approx_listOf`).
+recursive. A recursive combinator of your own needs a `@[gen_rel_rule]` relating it at the two
+monads, proved once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`);
+each relation applies it through its `@[walk_rel]` proof that it is one (`IOModel.genRel`).
 
 ## When Stuck
 
@@ -481,14 +479,12 @@ once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`)
 - **The completeness witness for a draw** → it is almost always the inverse of the index arithmetic
   (`x - lo` when the recursion ran at `lo + d`). Substitute it *before* unfolding
   (`obtain ⟨d, rfl⟩ : ∃ d, x = lo + d`), so that the equation at the end of the goal is `rfl`.
-- **A walk says it expected a statement on an observation** → the goal is a law, or `a ∈ support`,
-  `g.mass`, `SPMF.expect`: rewrite it with the lemma in Part 2's table first. The error names
-  `<Law>.iff_obs` when there is one.
-- **A walk says a fact is stated as a law** → pass `h.obs` (a bundled law's half: `h.sound.obs`).
-- **A walk does not use a hypothesis you have** (an induction hypothesis about a recursive
-  occurrence, and the walk reports that nothing bounds that occurrence) → the hypothesis is stated
-  as a law, and the walk uses a hypothesis only when it is stated on the observation. Pass it:
-  `walk [ih.obs]`.
+- **A walk says it expected a statement on an observation** → the goal is a law, `g.mass`, or
+  `SPMF.expect`: rewrite it with the lemma in Part 2's table first, or `a ∈ support` with
+  `SPMF.mem_support_iff_may`. The error names `<Law>.iff_obs` when there is one.
+- **A walk says a fact is stated as a law, or that nothing bounds a recursive occurrence you have an
+  induction hypothesis for** → a walk uses a fact or hypothesis only when it is stated on the
+  observation. Pass `h.obs` (a bundled law's half: `h.sound.obs`), or `walk [ih.obs]`.
 - **A completeness walk leaves `∃ a ∈ SPMF.support <callee>, …` for a callee** → no law of the
   callee was passed. The walk does not fail there, unlike the others; the missing law shows up as
   this residual.
@@ -505,10 +501,10 @@ once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`)
   satisfy, with every sub-cost's bound in context. Either the cost function is still folded in a
   hypothesis (`simp only [...] at *`), or the bound is too tight.
 - **A cost walk says nothing bounds a sub-generator** → it is a callee whose cost law was not
-  passed, or the generator argument of a combinator that has no law of its own and no worst
-  case (it recurses, or draws from something that does); pass a bound for it:
-  `walk fixpoint [h.obs]`. A recursive combinator of your own gets the same message: it needs a law
-  and a bridge from it (`SPMF.Cost.le_always_listOf`, `Basalt/Walk/Cost.lean`).
+  passed, or the generator argument of a combinator that has no law of its own and no worst case (it
+  recurses, or draws from something that does); pass a bound for it: `walk fixpoint [h.obs]`. A
+  recursive combinator of your own gets the same message: it needs a law and a bridge from it
+  (`SPMF.Cost.le_always_listOf`, `Basalt/Walk/Cost.lean`).
 - **A mass walk says nothing bounds a sub-generator** → it is a recursive combinator of your own
   (bridge its law, as `SPMF.le_expect_listOf` does in `Basalt/Tactic/MassFixpoint.lean`), a callee
   whose termination law was not passed (`mass_fixpoint [h.obs]`), or a recursive occurrence whose
@@ -526,11 +522,5 @@ once for any relation that is a `GenRel` (`GenRel.listOf`, `Basalt/GenRel.lean`)
   from, or pass one that is.
 - **`mass_fixpoint` leaves an arithmetic goal that is false** → the structural half is not in doubt;
   the certificate you named is. Re-count the mean offspring.
-- **Finite-domain data (chars, enums)** → the walk leaves a fact about a literal list; `decide` /
-  `native_decide` on it directly (see `ArbChar.lean`).
-
-## Prior Art
-
-For the *theory* behind the termination recipe — the least-fixed-point criterion and its
-certificates — see `Basalt/SPMF/Termination.lean` (the tactic is `Basalt/Tactic/MassFixpoint.lean`);
-for the ranking-function certificate, `Basalt/SPMF/Ranking.lean`.
+- **Finite-domain data (chars, enums)** → the walk leaves a fact about a literal list; `decide` it,
+  by `decide +kernel` over a bounded encoding when the domain is large (`ArbChar.lean`).

@@ -3,16 +3,22 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.AllTwoTree
-import BasaltExamples.BST
-import BasaltExamples.BST.Weighted
+module
+
+public import Basalt
+public import BasaltExamples.AllTwoTree
+meta import BasaltExamples.AllTwoTree
+public import BasaltExamples.BST
+public import BasaltExamples.BST.Weighted
+meta import BasaltExamples.BST.Weighted
 
 /-!
 # `#genstats` Examples
 
-`#genstats` draws from a generator and summarizes its distribution
+`#genstats` draws from a generator and summarizes its distribution.
 -/
+
+@[expose] public section
 
 open RandomChoice
 
@@ -88,9 +94,9 @@ info: AllTwoTree.genTree — 1000 draws (seed 0, fuel 10000)
 
 /-
 The subcritical variant (`m = 2/3`) makes at most `3` choices on average, one per constructor
-(`AllTwoTree.genWeightedTree.cost`), and the measured mean below is 2.9 — against `genTree`'s fueled
-mean of 75.4 with a 9851-node maximum above. The size function counts constructors
-(`2 * size + 1` for a binary tree).
+(`AllTwoTree.genWeightedTree.expected_cost_bounded`), and the measured mean below is 2.9 — against
+`genTree`'s fueled mean of 75.4 with a 9851-node maximum above. The size function counts
+constructors (`2 * size + 1` for a binary tree).
 -/
 /--
 info: AllTwoTree.genWeightedTree — 200 draws (seed 0, fuel 10000)

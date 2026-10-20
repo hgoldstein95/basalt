@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
+module
+
+public import Basalt
+public import BasaltExamples.BST
 
 /-!
 # The `mass_fixpoint` Contract
@@ -12,6 +14,8 @@ import BasaltExamples.BST
 Pins what `mass_fixpoint` leaves behind: the context it introduces over a tupled seed, the
 certificate goal when no certificate is named, and its failures.
 -/
+
+@[expose] public section
 
 open RandomChoice ENNReal
 
@@ -31,7 +35,6 @@ lo hi : ℤ
 #guard_msgs in
 example (lo hi : Int) : IsAlmostSurelyTerminating (BST.Tree.genBST lo hi) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   trace_state
   split
   · rw [zero_mul, add_zero]
@@ -54,7 +57,7 @@ b : Bool
 example (b : Bool) : IsAlmostSurelyTerminating (coins b) := by
   mass_fixpoint
   trace_state
-  exact SPMF.LfpIsOne.mono (SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)) fun c _ => by
+  exact SPMF.LfpIsOne.mono (SPMF.LfpIsOne.affine (m := 1 / 2)) fun c _ => by
     simp [ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Weights that depend on the seed. -/
@@ -145,7 +148,7 @@ hrec : ∀ (j : ℕ), c ≤ SPMF.expectObs.spec (passThrough (m + 1) j) fun x =>
 -/
 #guard_msgs in
 example (m k : Nat) : IsAlmostSurelyTerminating (passThrough (m + 1) k) := by
-  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2)
   trace_state
   simp [ENNReal.one_sub_inv_two, ENNReal.div_eq_inv_mul, mul_add]
 
@@ -171,6 +174,20 @@ example (fuel : Nat) : IsAlmostSurelyTerminating (fuelled fuel) := by
     walk [ih.obs]
     norm_num [ENNReal.div_self]
 
+-- Without `backward.proofsInPublic`, `oneOf`'s side-condition proof names the recursive call and
+-- is abstracted out of the exposed body, so `partial_fixpoint` fixes no argument, not even `G`.
+set_option backward.proofsInPublic false in
+def abstractedLoop [Gen G] : G Nat :=
+  oneOf [fun _ => pure 0, fun _ => do let n ← abstractedLoop; pure (n + 1)]
+partial_fixpoint
+
+/--
+error: `MassFixpointTest.abstractedLoop`'s fixpoint abstracts its instance arguments, so its induction ranges over every interpretation at once: a `by` proof in its body names a recursive call, and a module abstracts such a proof out of an exposed definition. Set `backward.proofsInPublic true` where `MassFixpointTest.abstractedLoop` is defined, or give the proof as a term.
+-/
+#guard_msgs in
+example : IsAlmostSurelyTerminating (abstractedLoop : SPMF Nat) := by
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2)
+
 /-- The geometric loop, stopped by a `coin` rather than a two-branch `oneOf`. -/
 def coinLoop [Gen G] : G Nat := do
   let b ← coin (1 / 2)
@@ -189,11 +206,11 @@ trace: case certificate
 example : IsAlmostSurelyTerminating (coinLoop : SPMF Nat) := by
   mass_fixpoint
   trace_state
-  exact (SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)).mono fun c _ => by
+  exact (SPMF.LfpIsOne.affine (m := 1 / 2)).mono fun c _ => by
     simp [ENNReal.one_sub_inv_two]
 
 theorem coinLoop.terminates : IsAlmostSurelyTerminating (coinLoop : SPMF Nat) := by
-  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.one_sub_inv_two]
 
 end MassFixpointTest

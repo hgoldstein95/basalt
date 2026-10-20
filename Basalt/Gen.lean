@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.RandomChoice
+module
+
+public import Basalt.RandomChoice
 
 /-!
 # Generator Typeclass
@@ -12,6 +14,8 @@ import Basalt.RandomChoice
 order-theoretic structure that lets it represent potentially non-terminating computations (via
 `partial_fixpoint`).
 -/
+
+@[expose] public section
 
 open Lean.Order
 

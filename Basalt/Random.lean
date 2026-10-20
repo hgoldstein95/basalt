@@ -3,13 +3,17 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+module
+
+
 /-!
 # Exactly Uniform Draws from `StdGen`
 
-`stdChoose` is the draw shared by the interpretations that sample from a `StdGen`. It reduces by
-rejection instead of core's `randNat` modulo, so every value in range is equally likely given the
-generator.
+`stdChoose` draws from a `StdGen`. It reduces by rejection instead of core's `randNat` modulo, so
+every value in range is equally likely given the generator.
 -/
+
+public section
 
 /-- The number of distinct values one `stdNext` returns. -/
 private def stdSpan : Nat := stdRange.2 - stdRange.1 + 1

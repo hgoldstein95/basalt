@@ -3,9 +3,13 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.GenRel
-import Basalt.IO
-import Basalt.Walk.Attr
+module
+
+import all Init.Internal.Order.Basic
+import all Init.System.IO
+public import Basalt.GenRel
+public import Basalt.IO
+public import Basalt.Walk.Attr
 
 /-!
 # `IO` Runs `IOModel`
@@ -13,8 +17,10 @@ import Basalt.Walk.Attr
 `IOModel.Approx m x` says that, if `ioGen` behaves as SplitMix specifies (`IOModel.IOGenLaws`), then
 wherever `m` terminates the `IO` action `x` does what `m` does run against `ioGen`. A faithful
 generator's `IsFaithful.approx` is this relation between it at `IOModel` and at `IO`, which
-`walk fixpoint` proves.
+`walk fixpoint` proves through `IOModel.genRel`.
 -/
+
+@[expose] public section
 
 open Lean.Order
 
@@ -85,8 +91,7 @@ operation on `ioGen` is opaque C, so Lean fixes no world and decides none of the
 `idealized_faithful` (`Basalt/IO/Faithful.lean`) takes them as a premise. The reading is exact for
 what the premise is applied to: a generator's `IO` term reaches the world only through
 `ioGen.randNat`, so projecting the world onto `ioGen`'s state loses nothing the term can observe.
-It fails when another thread uses `ioGen` between two operations, and it is checked against the
-compiled C by `BasaltTest/IO.lean`. -/
+-/
 structure IOGenLaws : Prop where
   /-- Reading the state and writing it back does nothing: the C `get` copies the state out, and
   `set` copies it back in. -/
@@ -182,67 +187,37 @@ theorem toIO_bind (hc : IOGenLaws) (m : IOModel α) (k : α → IOModel β) :
 
 /-- `x` runs `m` wherever `m` terminates, if `ioGen` is lawful: `m.toIO ⊑ x` in `IO`'s order, which
 is flat at each world, with divergence at the bottom. -/
-@[walk_rel]
 def Approx (m : IOModel α) (x : IO α) : Prop := IOGenLaws → m.toIO ⊑ x
 
 /-- Fixpoint induction on the `IOModel` side needs nothing of `ioGen`: `toIO` is continuous. -/
 theorem Approx.admissible (x : IO α) : admissible fun m : IOModel α => Approx m x := by
-  have key : ∀ m : IOModel α, m.toIO ⊑ x ↔ ∀ s, (fun s (o : Option (α × SplitMix)) =>
-      ∀ w w', ioGen.get w = ⟨s, w'⟩ → @FlatOrder.rel _ (EST.bot w) (finish o w') (x w))
-        s (m s) := by
-    intro m
-    constructor
-    · intro h s w w' hg
-      have := h w
-      rw [toIO, lift_bind_apply, hg] at this
-      exact this
-    · intro h w
-      show @FlatOrder.rel _ (EST.bot w) (m.toIO w) (x w)
-      rw [toIO, lift_bind_apply]
-      rcases hg : ioGen.get w with ⟨s, w'⟩
-      exact h s w w' hg
-  have hadm : Lean.Order.admissible fun m : IOModel α => m.toIO ⊑ x := by
-    rw [show (fun m : IOModel α => m.toIO ⊑ x) = fun m => ∀ s, _ from
-      funext fun m => propext (key m)]
-    exact admissible_pi_apply (β := fun _ => Option (α × SplitMix)) _ fun s =>
-      admissible_flatOrder (b := (none : Option (α × SplitMix))) (fun o => ∀ w w',
-        ioGen.get w = ⟨s, w'⟩ → @FlatOrder.rel _ (EST.bot w) (finish o w') (x w))
-        fun _ _ _ => FlatOrder.rel.bot
-  intro c hchain ih hc
-  exact hadm c hchain fun m hm => ih m hm hc
+  have hadm := admissible_pi_apply (β := fun _ => Option (α × SplitMix))
+    (fun s o => ∀ w w', ioGen.get w = ⟨s, w'⟩ → @FlatOrder.rel _ (EST.bot w) (finish o w') (x w))
+    fun s => admissible_flatOrder _ fun _ _ _ => FlatOrder.rel.bot
+  intro c hchain ih hc w
+  have := hadm c hchain fun m hm s w w' hg => by
+    have := ih m hm hc w
+    rwa [toIO, lift_bind_apply, hg] at this
+  show @FlatOrder.rel _ (EST.bot w) _ (x w)
+  rw [toIO, lift_bind_apply]
+  rcases hg : ioGen.get w with ⟨s, w'⟩
+  exact this s w w' hg
 
-@[gen_rule]
 theorem approx_pure (a : α) : Approx (pure a) (pure a) := fun hc => by
   rw [toIO_pure hc]
   exact PartialOrder.rel_refl
 
-@[gen_rule]
 theorem approx_bind {m : IOModel α} {x : IO α} {k : α → IOModel β} {f : α → IO β}
     (hk : ∀ a, Approx (k a) (f a)) (hm : Approx m x) : Approx (m >>= k) (x >>= f) := fun hc => by
   rw [toIO_bind hc]
   exact PartialOrder.rel_trans (MonoBind.bind_mono_right fun a => hk a hc)
     (MonoBind.bind_mono_left (hm hc))
 
-@[gen_rule]
 theorem approx_map {m : IOModel α} {x : IO α} (f : α → β) (hm : Approx m x) :
     Approx (f <$> m) (f <$> x) := by
   rw [← bind_pure_comp, show (f <$> x : IO β) = x >>= fun a => pure (f a) from rfl]
   exact approx_bind (fun a => approx_pure (f a)) hm
 
-@[gen_rule]
-theorem approx_ite {p : Prop} [Decidable p] {m₁ m₂ : IOModel α} {x₁ x₂ : IO α}
-    (h₁ : p → Approx m₁ x₁) (h₂ : ¬p → Approx m₂ x₂) :
-    Approx (if p then m₁ else m₂) (if p then x₁ else x₂) :=
-  GenRel.ite h₁ h₂
-
-@[gen_rule]
-theorem approx_dite {p : Prop} [Decidable p] {m₁ : p → IOModel α} {m₂ : ¬p → IOModel α}
-    {x₁ : p → IO α} {x₂ : ¬p → IO α}
-    (h₁ : ∀ h, Approx (m₁ h) (x₁ h)) (h₂ : ∀ h, Approx (m₂ h) (x₂ h)) :
-    Approx (if h : p then m₁ h else m₂ h) (if h : p then x₁ h else x₂ h) :=
-  GenRel.dite h₁ h₂
-
-@[gen_rule]
 theorem approx_default (x : IO α) : Approx default x := fun _ w => by
   rw [toIO, lift_bind_apply]
   cases ioGen.get w
@@ -263,7 +238,6 @@ private theorem choose_io (lo hi : Nat) (h : lo ≤ hi) :
   rw [dif_pos this]
 
 /-- The step Lean does not see: a draw at `IO` is SplitMix's draw at `IOModel`. -/
-@[gen_rule]
 theorem approx_choose (lo hi : Nat) (h : lo ≤ hi) :
     Approx (RandomChoice.choose lo hi h) (RandomChoice.choose lo hi h) := fun hc => by
   rw [choose_io, toIO, ← hc.get_set_bind ((Subtype.val <$> (ioGen.randNat lo hi : IO _)) >>= _)]
@@ -279,5 +253,14 @@ theorem approx_choose (lo hi : Nat) (h : lo ≤ hi) :
         else ULift.up ⟨lo, Nat.le_refl lo, h⟩))
     rw [ha]
     exact PartialOrder.rel_refl
+
+@[walk_rel]
+theorem genRel : GenRel IOModel IO @Approx where
+  pure := approx_pure
+  bind := approx_bind
+  map := approx_map
+  default := approx_default
+  choose := approx_choose
+  admissible := Approx.admissible
 
 end IOModel

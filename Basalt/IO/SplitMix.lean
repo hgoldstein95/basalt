@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.RandomChoice
-import SplitMix.Native
+module
+
+public import SplitMix.Native
+public import Basalt.RandomChoice
 
 /-!
 # SplitMix's Range Reduction
@@ -14,6 +16,8 @@ import SplitMix.Native
 terminates is `randNatRef`'s (`WordModel.choose_run_splitMix`, `Basalt/IO/Approx.lean`), and on
 uniform ones it is `SPMF`'s (`Basalt/IO/Choose.lean`).
 -/
+
+@[expose] public section
 
 section via
 
@@ -45,7 +49,7 @@ def chooseVia [∀ α, Inhabited (m α)] [∀ α, CCPO (m α)] [MonoBind m] (lo 
     m (ULift {x : Nat // lo ≤ x ∧ x ≤ hi}) :=
   if lo < hi then
     let shape := SplitMix.rangeShape (hi - lo)
-    (fun i => ULift.up ⟨lo + i.val, by omega, by have := i.property; omega⟩) <$>
+    (fun i => ULift.up ⟨lo + i.val, by omega, by (have := i.property; omega)⟩) <$>
       rejectVia (drawDigitsVia word shape.1 shape.2) (hi - lo)
   else pure (ULift.up ⟨lo, Nat.le_refl lo, h⟩)
 

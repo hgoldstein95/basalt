@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Data.ENat.Lattice
-import Basalt.SPMF.Cost
-import Basalt.Walk.Entry
+module
+
+public import Mathlib.Data.ENat.Lattice
+public import Basalt.SPMF.Cost
+public import Basalt.Walk.Entry
 
 /-!
 # Walking Cost Bounds
@@ -17,17 +19,16 @@ term, which a list combinator falls back on when no fact bounds its argument, is
 `SPMF.Cost.worstObs` in the `sup` algebra.
 -/
 
+@[expose] public section
+
 open RandomChoice
 
 namespace SPMF.Cost
 
 open Lean.Order in
 theorem alwaysObs.admissible (Q : α → Nat → Prop) :
-    admissible fun x : SPMF.Cost α => alwaysObs.spec x Q := by
-  intro c hc ih p hp
-  rw [SPMF.mem_support_csup hc] at hp
-  obtain ⟨x, hxc, hxp⟩ := hp
-  exact ih x hxc p hxp
+    admissible fun x : SPMF.Cost α => alwaysObs.spec x Q :=
+  SPMF.alwaysObs.admissible fun p : α × Nat => Q p.1 p.2
 
 /-- A cost bound on a generator argument, when no fact gives one: the argument's worst case, a bound
 that ignores the value. -/
@@ -218,14 +219,11 @@ private theorem selectD_le {l : List (Nat × ℕ∞)} {b : ℕ∞} (h : ∀ p �
     (h : Weighted (· ≤ ·) F cs l) :
     (Mix.sup.{u}).select l hpos F d ≤ (cs.map Prod.snd).foldr max 0 := by
   have key : ∀ q ∈ l, F q.2 ≤ (cs.map Prod.snd).foldr max 0 := by
+    refine le_foldr_max (F := fun q : Nat × γ => F q.2) ?_
     clear hpos
     induction h with
-    | nil => simp
-    | cons hc _ ih =>
-      intro q hq
-      rcases List.mem_cons.mp hq with rfl | hq
-      · exact hc.trans (le_max_left _ _)
-      · exact (ih q hq).trans (le_max_right _ _)
+    | nil => exact .nil
+    | cons hc _ ih => exact .cons hc ih
   refine iSup_le fun a => selectD_le (fun p hp => ?_) d _ ?_
   · obtain ⟨q, hq, rfl⟩ := List.mem_map.mp hp
     exact key q hq

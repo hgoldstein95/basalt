@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.RandomChoice
-import Basalt.Walk.Attr
+module
+
+public import Basalt.RandomChoice
+public import Basalt.Walk.Attr
 
 /-!
 # Specification Monads
@@ -13,6 +15,8 @@ The targets of an observation: continuation monads over an algebra `Ω` whose on
 says what a uniform choice means in `Ω`. `WP m` transforms a postcondition on values; `WPC m`
 transforms one that also sees the number of choices made.
 -/
+
+@[expose] public section
 
 /-- What a uniform choice over `[lo, hi]` means in `Ω`, given what each outcome means. A structure
 rather than a class, because `Prop` carries two. -/

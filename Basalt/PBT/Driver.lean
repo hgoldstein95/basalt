@@ -3,13 +3,17 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks, Harrison Goldstein
 -/
-import Basalt.PBT.Backend
+module
+
+public import Basalt.PBT.Backend
 
 /-!
 # A Command-Line Front End
 
 Infrastructure for running Basalt properties from the command line.
 -/
+
+public section
 
 namespace Basalt.PBT
 
@@ -30,21 +34,9 @@ def runsOf (argv : Array String) (default : Nat := 100000) : Nat :=
 def discardRatioOf (argv : Array String) (default : Nat := 10) : Nat :=
   natFlag argv "-discard_ratio=" default
 
-/-- Uniform random testing at `IO`. -/
-@[basalt_backend]
-def ioBackend : Backend where
-  name := "io"
-  campaign T argv := ioCampaign T (runsOf argv) (discardRatioOf argv)
-
-/-- Uniform random testing at `Plausible.Gen`. -/
-@[basalt_backend]
-def plausibleBackend : Backend where
-  name := "plausible"
-  campaign T argv := plausibleCampaign T (runsOf argv) (discardRatioOf argv)
-
 /-- Report a usage error and exit with code `2`. A campaign reports its verdict only through its exit
-status, so a usage error must read as neither a pass (`0`) nor a counterexample (`77` at
-`IO`/`Plausible`, libFuzzer's own code under the fuzzer). -/
+status, so a usage error must read as neither a pass (`0`) nor a counterexample (`failureExitCode`,
+which is also libFuzzer's own). -/
 def usageError (msg : String) : IO α := do
   IO.eprintln msg
   IO.Process.exit 2
@@ -59,8 +51,8 @@ def findBackend (backends : List Backend) : Option String → Option Backend
 reproduces a saved input.
 
 `backends` defaults to everything tagged `@[basalt_backend]` at the *call site*, so an executable
-that imports a fuzzer backend offers it with no further ceremony; the first one registered is the
-default, which is `ioBackend` for anyone importing this module. -/
+offers each backend whose module it imports, with no further ceremony; the first one registered, in
+import order, is the default. -/
 def dispatch (exe : String) (props : List (String × Property)) (args : List String)
     (backends : List Backend := by exact registered_backends%) : IO Unit := do
   let names := String.intercalate ", " (props.map (·.1))
@@ -71,6 +63,8 @@ def dispatch (exe : String) (props : List (String × Property)) (args : List Str
       ++ s!"known properties: {names}"
   let (flags, rest) := args.partition (·.startsWith "--backend=")
   let requested := flags.head?.map (fun f => (f.drop "--backend=".length).toString)
+  if backends.isEmpty then
+    usageError "no backend is registered: import a module that tags one `@[basalt_backend]`"
   match findBackend backends requested, rest with
   | none, _ => usageError s!"unknown backend '{requested.getD ""}'\n{usage}"
   | some backend, "replay" :: name :: path :: _ =>

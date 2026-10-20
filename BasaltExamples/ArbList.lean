@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbNat
+module
+
+public import Basalt
+public import BasaltExamples.ArbNat
 
 /-!
 # Arbitrary Lists
@@ -15,6 +17,8 @@ a coin to stop, otherwise draw a `Nat.arbitrary` head and recurse for the tail. 
 then fill it); it is exercised in `BasaltTest/IO.lean`, but the laws below are all stated about
 `List.arbitrary`.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 
@@ -48,7 +52,7 @@ theorem List.arbitrary.sound_complete : IsSoundAndComplete List.arbitrary ⊤ :=
     exact ⟨x, xs, ih trivial, rfl⟩
 
 theorem List.arbitrary.terminates : IsAlmostSurelyTerminating List.arbitrary := by
-  mass_fixpoint [Nat.arbitrary.terminates.obs] using SPMF.LfpIsOne.affine (m := 1 / 2) (by norm_num)
+  mass_fixpoint [Nat.arbitrary.terminates.obs] using SPMF.LfpIsOne.affine (m := 1 / 2)
   simp [ENNReal.div_eq_inv_mul, mul_add]
 
 /-- Producing `xs` costs at most `2 * xs.length + xs.sum + 1` choices: one `oneOf` and one

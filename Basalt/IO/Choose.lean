@@ -3,16 +3,24 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.IO.Ideal
-import Basalt.Walk.Expect
-import Basalt.Tactic.MassFixpoint
+module
+
+public import Basalt.GenRel
+public import Basalt.IO.Ideal
+public import Basalt.Tactic.MassFixpoint
+public import Basalt.Walk.Attr
+public import Basalt.Walk.Expect
 
 /-!
 # Uniform Words Make a Uniform Choice
 
 SplitMix's range reduction on uniform words is `SPMF`'s `choose` (`chooseVia_uniformWord`): the
-step that carries the ideal law from one word to a whole draw (`IdealSource.below_choose`).
+step that carries the ideal law from one word to a whole draw (`IdealSource.below_choose`). That
+step completes `IdealSource.genRel`, by which `walk` relates a generator at `SPMF` to the same
+generator at `WordModel σ`.
 -/
+
+public section
 
 open RandomChoice ENNReal
 
@@ -109,7 +117,7 @@ section rejection
 variable {N R : Nat}
 
 /-- `{x // x ≤ R}` as the `Fin` it is. -/
-private def finEquivLe (R : Nat) : Fin (R + 1) ≃ {x // x ≤ R} where
+def finEquivLe (R : Nat) : Fin (R + 1) ≃ {x // x ≤ R} where
   toFun i := ⟨i.val, Nat.lt_succ_iff.mp i.isLt⟩
   invFun x := ⟨x.val, Nat.lt_succ_of_le x.property⟩
   left_inv _ := rfl
@@ -220,10 +228,10 @@ theorem chooseVia_uniformWord (lo hi : Nat) (h : lo ≤ hi) :
         = chooseNat 0 (2 ^ topBits (hi - lo) * 2 ^ (64 * ((hi - lo).log2 / 64)) - 1) :=
       ext_expect (expect_drawDigitsVia (topBits_le _) _)
     simp only [hD, ← bind_pure_comp, bind_apply, pure_apply]
-    have hi₀ : m.down.val - lo ≤ hi - lo := by have := m.down.property; omega
+    have hi₀ : m.down.val - lo ≤ hi - lo := by (have := m.down.property; omega)
     rw [tsum_eq_single ⟨m.down.val - lo, hi₀⟩ fun i hi => ?_]
     · have hm : m = ULift.up ⟨lo + (m.down.val - lo), by omega, by omega⟩ := by
-        ext; simp; have := m.down.property; omega
+        ext; simp; (have := m.down.property; omega)
       rw [rejectVia_apply (lt_candidates _)]
       split
       · rw [mul_one, one_div]
@@ -236,7 +244,7 @@ theorem chooseVia_uniformWord (lo hi : Nat) (h : lo ≤ hi) :
       · rw [mul_zero]
   · rename_i hlt
     have hm : m = ULift.up ⟨lo, Nat.le_refl lo, h⟩ := by
-      ext; have := m.down.property; simp; omega
+      ext; simp; (have := m.down.property; omega)
     simp [hm, show hi - lo + 1 = 1 by omega]
 
 end SPMF
@@ -259,10 +267,12 @@ theorem below_rejectVia {cand' : SPMF Nat} {cand : WordModel σ Nat} (hc : src.B
   refine rejectVia.fixpoint_induct (m := SPMF) cand' range
     (fun y => src.Below y (rejectVia cand range)) (Below.admissible src _) (fun z ih => ?_)
   rw [rejectVia]
-  exact src.below_bind (fun _ => src.below_dite (fun h => src.below_pure _) fun _ => ih) hc
+  refine src.below_bind (fun _ => ?_) hc
+  split
+  · exact src.below_pure _
+  · exact ih
 
 /-- The ideal law for one word is the ideal law for a choice. -/
-@[gen_rule]
 theorem below_choose (lo hi : Nat) (h : lo ≤ hi) :
     src.Below (RandomChoice.choose lo hi h) (RandomChoice.choose lo hi h) := by
   rw [show (RandomChoice.choose lo hi h : SPMF _) = chooseVia uniformWord lo hi h from
@@ -270,8 +280,18 @@ theorem below_choose (lo hi : Nat) (h : lo ≤ hi) :
   show src.Below (chooseVia uniformWord lo hi h)
     (chooseVia (fun s => some (WordSource.next s)) lo hi h)
   unfold chooseVia drawDigitsVia
-  exact src.below_ite (fun _ => src.below_map _ (src.below_rejectVia
-    (src.below_bind (fun _ => src.below_go src.below_word _ _) src.below_word) _))
-    fun _ => src.below_pure _
+  split
+  · exact src.below_map _ (src.below_rejectVia
+      (src.below_bind (fun _ => src.below_go src.below_word _ _) src.below_word) _)
+  · exact src.below_pure _
+
+@[walk_rel]
+theorem genRel : GenRel SPMF (WordModel σ) (@IdealSource.Below σ _ src) where
+  pure := src.below_pure
+  bind := src.below_bind
+  map := src.below_map
+  default := src.below_default
+  choose := src.below_choose
+  admissible := IdealSource.Below.admissible src
 
 end IdealSource

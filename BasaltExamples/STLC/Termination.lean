@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import Basalt
-import BasaltExamples.STLC.GenTerm
+module
+
+public import Basalt
+public import BasaltExamples.STLC.GenTerm
 
 /-!
 # Almost-Sure Termination for `genTerm`
@@ -15,6 +17,10 @@ terminates almost surely; its expected cost has no finite bound
 (`genTerm.not_expected_cost_bounded`, `STLC/Cost.lean`).
 -/
 
+@[expose] public section
+
+namespace STLC
+
 theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by
   induction τ generalizing Γ with
   | Bool => rw [IsAlmostSurelyTerminating.iff_obs, genZero]; walk; norm_num [ENNReal.div_self]
@@ -23,10 +29,11 @@ theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by
 theorem genTerm.terminates : IsAlmostSurelyTerminating (genTerm Γ τ) := by
   mass_fixpoint [genZero.terminates.obs, genType.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 3) (b := 1 / 3) (d := 1 / 3)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   all_goals
     split
     all_goals
       norm_num [ENNReal.div_self]
       ennreal_to_real
       nlinarith [c.toReal_nonneg, ENNReal.toReal_le_of_le_ofReal zero_le_one (by simpa using hc1)]
+
+end STLC

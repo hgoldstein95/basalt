@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+public import Basalt
 
 /-!
 # The `match` Congruence Contract
@@ -12,6 +14,8 @@ Pins how the walk enters a `match` (`Basalt/Walk/Match.lean`): the lemma it gene
 the bound it makes a `match` in each algebra, the cases a residual `match` is split into, and the
 `match` it does not enter.
 -/
+
+@[expose] public section
 
 open RandomChoice
 

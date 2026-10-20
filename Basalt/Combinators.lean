@@ -3,9 +3,12 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import Lean.Elab.ElabRules
-import Basalt.Gen
-import Basalt.RandomChoice
+module
+
+public meta import Lean.Elab.ElabRules
+public import Basalt.Gen
+import Basalt.Order
+public import Basalt.RandomChoice
 
 /-!
 # Generator Combinators
@@ -14,6 +17,8 @@ Derived combinators (`chooseNat`, `elements`, `oneOf`, `frequency`, `listOf`, �
 `RandomChoice.choose`, and `oneOf!`/`frequency!`, which run a literal choice as a chain of tests
 while every proof sees the combinator.
 -/
+
+@[expose] public section
 
 open Lean.Order
 
@@ -96,7 +101,7 @@ def vectorOf [Gen G] (n : Nat) (g : G α) : G (List α) :=
     pure (x :: xs)) (pure []) (List.replicate n g)
 
 /-- Helper lemma that unfolds one layer of recursion in `vectorOf (n + 1) g`.  This is needed for
-the lemmas `support_vectorOf`, `le_mass_vectorOf`. -/
+lemmas such as `support_vectorOf` and `pow_le_vectorOf`. -/
 theorem vectorOf_succ [Gen G] {n : Nat} {g : G α} :
     vectorOf (n + 1) g = (do let x ← g; let xs ← vectorOf n g; pure (x :: xs)) :=
   rfl
@@ -233,7 +238,7 @@ open Lean Meta in
 (`oneOf_eq_chain` or `frequency_eq_chain`) at the draw's bound `hi`, with the continuation's body
 replaced by `chain` of the drawn `Nat`. The draw is the model's own term, so the chain starts with the
 model's bind. -/
-private def mkChainImpl (eqChain : Name) (model hi : Expr) (chain : Expr → MetaM Expr) :
+private meta def mkChainImpl (eqChain : Name) (model hi : Expr) (chain : Expr → MetaM Expr) :
     MetaM (Expr × Expr) := do
   let hEq := mkAppN (mkConst eqChain model.getAppFn.constLevels!)
     (model.getAppArgs.extract 0 5 ++ #[hi, ← mkEqRefl hi])
@@ -250,20 +255,20 @@ private def mkChainImpl (eqChain : Name) (model hi : Expr) (chain : Expr → Met
 open Lean in
 /-- `e` with the `let`s along its list spine substituted: a list literal of eight or more entries
 elaborates to one, its tails `let`-bound. -/
-private partial def zetaSpine : Expr → Expr
+private meta partial def zetaSpine : Expr → Expr
   | .letE _ _ v b _ => zetaSpine (b.instantiate1 v)
   | e => if e.isAppOfArity ``List.cons 3 then mkApp e.appFn! (zetaSpine e.appArg!) else e
 
 open Lean Meta in
 /-- `e`, a `c` of five arguments, with its list argument's spine free of `let`s. -/
-private def literalModel? (c : Name) (e : Expr) : MetaM (Option Expr) := do
+private meta def literalModel? (c : Name) (e : Expr) : MetaM (Option Expr) := do
   let e ← instantiateMVars e
   unless e.isAppOfArity c 5 do return none
   return some (mkAppN e.getAppFn (e.getAppArgs.modify 3 zetaSpine))
 
 open Lean Meta in
 /-- `oneOf gs hne` for a literal `gs`, as `oneOfWith gs hne impl h`; `none` for any other term. -/
-def mkOneOfWith? (e : Expr) : MetaM (Option Expr) := do
+meta def mkOneOfWith? (e : Expr) : MetaM (Option Expr) := do
   let some e ← literalModel? ``oneOf e | return none
   let some (_, gs) := e.appFn!.appArg!.listLit? | return none
   let some last := gs.getLast? | return none
@@ -281,7 +286,7 @@ open Lean Meta in
 Literal weights give literal running totals; any other weight is summed as `frequencyChain`
 unfolds it, `0 + w₀ + w₁ + …`, which is all that makes the chain an instance of
 `frequency_eq_chain` when the weights are not closed. -/
-def mkFrequencyWith? (e : Expr) : MetaM (Option Expr) := do
+meta def mkFrequencyWith? (e : Expr) : MetaM (Option Expr) := do
   let some e ← literalModel? ``frequency e | return none
   let some (_, ps) := e.appFn!.appArg!.listLit? | return none
   let mut branches : Array (Expr × Expr) := #[]
@@ -314,7 +319,7 @@ syntax (name := frequencyBang) "frequency! " "[" term,+ "]" (ppSpace colGt term:
 
 open Lean Elab Term in
 @[term_elab oneOfBang]
-def elabOneOfBang : TermElab := fun stx ty? => do
+meta def elabOneOfBang : TermElab := fun stx ty? => do
   let `(oneOf! [$gs,*]) := stx | throwUnsupportedSyntax
   let e ← elabTermEnsuringType (← `(oneOf [$gs,*] (List.cons_ne_nil _ _))) ty?
   let some e' ← mkOneOfWith? e | throwError "oneOf!: expected a `oneOf` of a literal list"
@@ -322,7 +327,7 @@ def elabOneOfBang : TermElab := fun stx ty? => do
 
 open Lean Elab Term in
 @[term_elab frequencyBang]
-def elabFrequencyBang : TermElab := fun stx ty? => do
+meta def elabFrequencyBang : TermElab := fun stx ty? => do
   let `(frequency! [$ps,*] $[$h]?) := stx | throwUnsupportedSyntax
   let model ← match h with
     | some h => `(frequency [$ps,*] $h)
@@ -333,12 +338,12 @@ def elabFrequencyBang : TermElab := fun stx ty? => do
   return e'
 
 @[app_unexpander oneOfWith]
-def unexpandOneOfWith : Lean.PrettyPrinter.Unexpander
+meta def unexpandOneOfWith : Lean.PrettyPrinter.Unexpander
   | `($_ [$gs,*] $_ $_ $_) => `(oneOf! [$gs,*])
   | _ => throw ()
 
 @[app_unexpander frequencyWith]
-def unexpandFrequencyWith : Lean.PrettyPrinter.Unexpander
+meta def unexpandFrequencyWith : Lean.PrettyPrinter.Unexpander
   | `($_ [$ps,*] $_ $_ $_) => `(frequency! [$ps,*])
   | _ => throw ()
 
@@ -349,63 +354,26 @@ section monotonicity
 /-- Define a partial order over `List α` that says `l1 ⊑ l2` when:
 - `l1.length = l2.length`
 - `l1[i] ⊑ l2[i]` for all list elements (here we are comparing them using the `PartialOrder` on `α`) -/
-private instance List.instPartialOrderPointwise {α : Type u} [PartialOrder α] :
+local instance List.instPartialOrderPointwise {α : Type u} [PartialOrder α] :
     PartialOrder (List α) where
   rel l1 l2 :=
     l1.length = l2.length ∧
     ∀ (i : Nat) (h1 : i < l1.length) (h2 : i < l2.length), l1[i] ⊑ l2[i]
-  rel_refl := by
-    intro xs
-    constructor
-    . rfl
-    . intro i _ _
-      apply PartialOrder.rel_refl
-  rel_trans := by
-    intro xs ys zs h12 h23
-    obtain ⟨heq1, hle1⟩ := h12
-    obtain ⟨heq2, hle2⟩ := h23
-    constructor
-    . apply Eq.trans <;> assumption
-    . intro i h1 h2
-      apply PartialOrder.rel_trans
-      . apply hle1
-        omega
-      . apply hle2
-  rel_antisymm := by
-    intro x y hxy hyx
-    obtain ⟨hlen, helem_xy⟩ := hxy
-    obtain ⟨_, helem_yx⟩ := hyx
-    apply List.ext_getElem hlen
-    intro i hx hy
-    apply PartialOrder.rel_antisymm
-    . apply helem_xy
-    . apply helem_yx
+  rel_refl := ⟨rfl, fun _ _ _ => PartialOrder.rel_refl⟩
+  rel_trans h12 h23 := ⟨h12.1.trans h23.1, fun i h1 h2 =>
+    PartialOrder.rel_trans (h12.2 i h1 (by omega)) (h23.2 i (by omega) h2)⟩
+  rel_antisymm hxy hyx := List.ext_getElem hxy.1 fun i hx hy =>
+    PartialOrder.rel_antisymm (hxy.2 i hx hy) (hyx.2 i hy hx)
 
 /-- The partial order on `Nat × α` behind `frequency`'s monotonicity: `(w1, g1) ⊑ (w2, g2)` iff
 `w1 = w2 ∧ g1 ⊑ g2`. The weights must be *equal*, not `≤` — raising one branch's weight lowers every
 other branch's probability, so under `w1 ≤ w2` the `frequency` combinator would not be monotone in
 `⊑` on `SPMF`. -/
-private instance instPartialOrderConstFst {α : Type u} [PartialOrder α] : PartialOrder (Nat × α) where
+local instance instPartialOrderConstFst {α : Type u} [PartialOrder α] : PartialOrder (Nat × α) where
   rel p q := p.1 = q.1 ∧ p.2 ⊑ q.2
-  rel_refl := by
-    intro p
-    constructor
-    . rfl
-    . apply PartialOrder.rel_refl
-  rel_trans := by
-    intro p q r hpq hqr
-    obtain ⟨hw1, hg1⟩ := hpq
-    obtain ⟨hw2, hg2⟩ := hqr
-    constructor
-    . apply hw1.trans; assumption
-    . apply PartialOrder.rel_trans <;> assumption
-  rel_antisymm := by
-    intro p q hpq hqp
-    obtain ⟨hw, hg⟩ := hpq
-    obtain ⟨_, hg'⟩ := hqp
-    apply Prod.ext
-    . assumption
-    . apply PartialOrder.rel_antisymm <;> assumption
+  rel_refl := ⟨rfl, PartialOrder.rel_refl⟩
+  rel_trans hpq hqr := ⟨hpq.1.trans hqr.1, PartialOrder.rel_trans hpq.2 hqr.2⟩
+  rel_antisymm hpq hqp := Prod.ext hpq.1 (PartialOrder.rel_antisymm hpq.2 hqp.2)
 
 @[partial_fixpoint_monotone]
 theorem List.monotone_cons
@@ -484,7 +452,7 @@ private theorem bind_choose_congr {G : Type u → Type v} [Gen G] {β : Type u} 
     (hn : n = n') (f : (i : Nat) → i ≤ n → G β) :
     (RandomChoice.choose 0 n (Nat.zero_le _) >>= fun i => f i.down.val i.down.property.2)
       = (RandomChoice.choose 0 n' (Nat.zero_le _) >>= fun i =>
-          f i.down.val (by have := i.down.property.2; omega)) := by
+          f i.down.val (by (have := i.down.property.2; omega))) := by
   subst hn
   rfl
 
@@ -497,7 +465,7 @@ private theorem oneOf_le [Gen G] {l1 l2 : List (Unit → G α)} (h : l1 ⊑ l2) 
   have h2len : 0 < l2.length := List.length_pos_iff.mpr h2
   rw [show oneOf l1 h1
         = RandomChoice.choose 0 (l2.length - 1) (Nat.zero_le _) >>= fun i =>
-            (l1[i.down.val]'(by have := i.down.property.2; omega)) ()
+            (l1[i.down.val]'(by (have := i.down.property.2; omega))) ()
       from bind_choose_congr (by omega) (fun i hi => (l1[i]'(by omega)) ())]
   simp only [oneOf]
   apply MonoBind.bind_mono_right
@@ -520,19 +488,6 @@ theorem monotone_oneOfWith {G : Type u → Type v} {α : Type u} [Gen G] {γ : S
     (h : ∀ x, impl x = oneOf (gs x) (hne x)) (himpl : monotone impl) :
     monotone (fun x => oneOfWith (gs x) (hne x) (impl x) (h x)) :=
   himpl
-
-/-- A uniform binary choice. -/
-@[deprecated "use `oneOf [x, y]`" (since := "2026-09-22")]
-def RandomChoice.pick [Gen G] (x y : Unit → G α) : G α := oneOf [x, y]
-
-set_option linter.deprecated false in
-@[partial_fixpoint_monotone, deprecated monotone_oneOf (since := "2026-09-22")]
-theorem RandomChoice.monotone_pick [Gen G] {γ : Sort w} [PartialOrder γ] {x y : γ → G α}
-    (hx : monotone x) (hy : monotone y) :
-    monotone fun a => RandomChoice.pick (fun () => x a) (fun () => y a) :=
-  monotone_oneOf (fun a => [fun () => x a, fun () => y a]) (fun _ => by simp)
-    (List.monotone_cons _ _ (monotone_of_monotone_apply _ fun _ => hx)
-      (List.monotone_cons _ _ (monotone_of_monotone_apply _ fun _ => hy) (monotone_const _)))
 
 @[partial_fixpoint_monotone]
 theorem monotone_pair_snd {α : Type u} {γ : Sort w} [PartialOrder α] [PartialOrder γ]
@@ -651,64 +606,40 @@ def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
       return x :: xs]
 partial_fixpoint
 
+private theorem admissible_le {α : Sort u} [CCPO α] (w : α) : admissible (· ⊑ w) :=
+  admissible_iff.2 fun _ hc hall => csup_le hc hall
+
 @[partial_fixpoint_monotone]
 theorem monotone_listOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (g : γ → G α) (hg : monotone g) :
-    monotone (fun x => listOf (g x)) := by
-  unfold monotone
-  intro x y hxy
-  show listOf (g x) ⊑ listOf (g y)
-  generalize hw : listOf (g y) = w
-  delta listOf
-  apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
-  · intro c hc hall
-    apply Lean.Order.csup_le <;> assumption
-  · intro z hz
-    subst hw
-    unfold listOf
+    monotone (fun x => listOf (g x)) := fun x y hxy =>
+  listOf.fixpoint_induct (G := G) (g x) (· ⊑ listOf (g y)) (admissible_le _) fun z hz => by
+    dsimp only at hz ⊢
+    conv => rhs; rw [listOf]
     rw [oneOfWith_eq, oneOfWith_eq]
     apply oneOf_le
     refine ⟨rfl, ?_⟩
     rintro (_ | _ | i) h1 h2 <;> intro _
-    · apply PartialOrder.rel_refl
-    · apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
-      apply MonoBind.bind_mono_right
-      intro a
-      apply MonoBind.bind_mono_left
-      assumption
-    · simp at h1
-      omega
+    · exact PartialOrder.rel_refl
+    · exact PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
+        (MonoBind.bind_mono_right fun _ => MonoBind.bind_mono_left hz)
+    · simp at h1; omega
 
 @[partial_fixpoint_monotone]
 theorem monotone_nonEmptyListOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (g : γ → G α) (hg : monotone g) :
-    monotone (fun x => nonEmptyListOf (g x)) := by
-  unfold monotone
-  intro x y hxy
-  show nonEmptyListOf (g x) ⊑ nonEmptyListOf (g y)
-  generalize hw : nonEmptyListOf (g y) = w
-  delta nonEmptyListOf
-  apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
-  · intro c hc hall
-    apply Lean.Order.csup_le <;> assumption
-  · intro z hz
-    subst hw
-    unfold nonEmptyListOf
+    monotone (fun x => nonEmptyListOf (g x)) := fun x y hxy =>
+  nonEmptyListOf.fixpoint_induct (G := G) (g x) (· ⊑ nonEmptyListOf (g y)) (admissible_le _) fun z hz => by
+    dsimp only at hz ⊢
+    conv => rhs; rw [nonEmptyListOf]
     rw [oneOfWith_eq, oneOfWith_eq]
     apply oneOf_le
     refine ⟨rfl, ?_⟩
     rintro (_ | _ | i) h1 h2 <;> intro _
-    · unfold monotone at hg
-      apply MonoBind.bind_mono_left
-      apply hg
-      assumption
-    · apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
-      apply MonoBind.bind_mono_right
-      intro a
-      apply MonoBind.bind_mono_left
-      assumption
-    · simp at h1
-      omega
+    · exact MonoBind.bind_mono_left (hg x y hxy)
+    · exact PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
+        (MonoBind.bind_mono_right fun _ => MonoBind.bind_mono_left hz)
+    · simp at h1; omega
 
 /-- Draws from `g` until the value drawn satisfies `p`: rejection sampling. It terminates exactly
 when `g` accepts with positive probability, and each rejected draw costs as much as an accepted one;
@@ -721,23 +652,14 @@ partial_fixpoint
 @[partial_fixpoint_monotone]
 theorem monotone_suchThat [Gen G] {γ : Sort w} [PartialOrder γ]
     (g : γ → G α) (p : α → Bool) (hg : monotone g) :
-    monotone (fun x => suchThat (g x) p) := by
-  unfold monotone
-  intro x y hxy
-  show suchThat (g x) p ⊑ suchThat (g y) p
-  generalize hw : suchThat (g y) p = w
-  delta suchThat
-  apply Lean.Order.fix_induct (motive := fun z => z ⊑ w)
-  · intro c hc hall
-    apply Lean.Order.csup_le <;> assumption
-  · intro z hz
-    subst hw
-    unfold suchThat
-    apply PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
-    apply MonoBind.bind_mono_right
-    intro a
+    monotone (fun x => suchThat (g x) p) := fun x y hxy =>
+  suchThat.fixpoint_induct (G := G) (g x) p (· ⊑ suchThat (g y) p) (admissible_le _) fun z hz => by
+    dsimp only at hz ⊢
+    conv => rhs; rw [suchThat]
+    refine PartialOrder.rel_trans (MonoBind.bind_mono_left (hg x y hxy))
+      (MonoBind.bind_mono_right fun a => ?_)
     split
-    · apply PartialOrder.rel_refl
-    · assumption
+    · exact PartialOrder.rel_refl
+    · exact hz
 
 end recursive_combinators

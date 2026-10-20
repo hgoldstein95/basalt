@@ -3,6 +3,8 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
+module
+
 
 /-!
 # Tuning: runtime-addressable generator weights
@@ -10,21 +12,14 @@ Authors: Harrison Goldstein
 A generator's branch weights live in `frequency` calls. `@[tunable]` (see `Basalt.Tuning.Attr`)
 collects those sites and threads a `Tuning` — an ordinary runtime value — through the generator, so
 a different weighting is a function call away instead of an edit-and-recompile away.
-
-Weights are schedules in the recursion depth `d`: an affine `(a, b)` pair denotes
-`w(d) = max a 1 + b·d`, and a constant weight is `(a, 0)`.  Depth-indexing is what lets a generator
-be exploratory near the root and subcritical deep in the recursion.
-
-## Ensuring Positivity
-
-`Tuning.weight` clamps every branch to a weight of at least 1, so a runtime `θ` can never zero one
-out. To prune a branch, the user must remove it from the `frequency`.
 -/
 
-/-- A weight schedule per branch: entry `(aⱼ, bⱼ)` denotes the depth-indexed weight
-`wⱼ(d) = max aⱼ 1 + bⱼ · d`; a constant weight is `(a, 0)`. The schedules of all sites of one
-generator are concatenated into this one flat array; each `Site.offset` says where its block starts.
--/
+@[expose] public section
+
+/-- A weight schedule per branch: entry `(aⱼ, bⱼ)` is an affine weight in the recursion depth
+(`Tuning.weight`), so a generator can be exploratory near the root and subcritical deep in the
+recursion; a constant weight is `(a, 0)`. The schedules of all sites of one generator are
+concatenated into this one flat array; each `Site.offset` says where its block starts. -/
 structure Tuning where
   schedules : Array (Nat × Nat)
   deriving Repr, DecidableEq, Inhabited
@@ -42,9 +37,11 @@ structure Site where
   holes  : Array Nat
   deriving Repr, DecidableEq, Inhabited
 
-/-- The weight of the branch whose schedule lives at flat index `i` (that is, `Site.offset + j` for
-  branch `j` of a site), at recursion depth `d`.  `@[tunable]` emits the flat index as a literal,
-  so terms and proof goals stay small; `Site` carries the structure for diagnostics.  -/
+/-- The weight of the branch whose schedule `(a, b)` lives at flat index `i` (that is,
+  `Site.offset + j` for branch `j` of a site), at recursion depth `d`: `max a 1 + d * b`. The clamp
+  to `1` means a runtime `θ` can never zero a branch out; to prune one, remove it from the
+  `frequency`. `@[tunable]` emits the flat index as a literal, so terms and proof goals stay small;
+  `Site` carries the structure for diagnostics. -/
 def Tuning.weight (θ : Tuning) (i : Nat) (d : Nat) : Nat :=
   let p := θ.schedules.getD i (1, 0)
   max p.1 1 + d * p.2

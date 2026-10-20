@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import SplitMix.IO
-import Basalt.IO.SplitMix
-import Basalt.RandomChoice
+module
+
+public import SplitMix.IO
+public import Basalt.IO.SplitMix
+public import Basalt.RandomChoice
 
 /-!
 # The `IO` Interpretation
@@ -15,6 +17,8 @@ Sampling from a generator with `ioGen`, a C implementation of SplitMix, and what
 `IsFaithful` (`Basalt/IO/Laws.lean`) relates a generator here to its `SPMF` distribution; what it
 leaves out is `idealized_faithful`'s (`Basalt/IO/Faithful.lean`).
 -/
+
+@[expose] public section
 
 /-- The generator every `IO` draw advances, seeded from system entropy at initialization; reseed it
 with `ioGen.set (SplitMix.ofSeed n)`. Not thread-safe, like the `SplitMix.Gen` it is. -/

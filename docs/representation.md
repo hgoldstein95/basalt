@@ -1,8 +1,8 @@
-# A Coinductive Model for Generators
+# A Fixed-Point Model for Generators
 
-Basalt's formal definition of PBT generators allows for first-class coinductive fixed points. This
-note gives the background on prior generator representations and explains how Basalt's relates to
-them.
+Basalt's formal definition of PBT generators allows for first-class recursive fixed points (least
+fixed points, defined with `partial_fixpoint`). This note gives the background on prior generator
+representations and explains how Basalt's relates to them.
 
 ## Background
 
@@ -59,7 +59,7 @@ QuickCheck style operational generator or as a QuickChick style support set.
 Our representation borrows ideas from all of the above representations.
 
 - Our core definition of generators allows for multiple interpretations, much like free generators.
-- We provide an executable interpretation (like QuickChick's) in terms Lean's standard RNG.
+- We provide an executable interpretation (like QuickCheck's) in terms of the SplitMix PRNG.
 - We provide a proof-optimized interpretation (like QuickChick's) in terms of sub-probability mass
   functions.
 

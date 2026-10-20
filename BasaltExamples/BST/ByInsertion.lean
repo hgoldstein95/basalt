@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
+module
+
+public import Basalt
+public import BasaltExamples.BST
 
 /-!
 # Binary Search Trees by Insertion
@@ -12,13 +14,15 @@ import BasaltExamples.BST
 `Tree.genBSTByInsertion` generates a search tree the indirect way: draw a list of keys from
 `[lo, hi]` and insert them into `leaf` one after another, rather than shaping the tree directly like
 `Tree.genBST` (`BasaltExamples/BST`). Both reach exactly `Tree.isBST lo hi`
-(`Tree.support_genBSTByInsertion_eq`).
+(`Tree.genBSTByInsertion.sound_complete`).
 
 It is sound, complete, and almost surely terminating — but *not* cost bounded, and the failure is
 inherent rather than an artifact of a loose bound: the draw has no length limit, and duplicate keys
 collapse arbitrarily long draws onto the same tree, so no cost function of the output tree can exist
 (`Tree.genBSTByInsertion.not_cost_bounded`).
 -/
+
+@[expose] public section
 
 open RandomChoice
 
@@ -80,8 +84,8 @@ theorem Tree.mem_preorder_bounds {lo hi : Int} {t : Tree Int} (h : t.isBST lo hi
     simp only [Tree.preorder, List.mem_cons, List.mem_append] at hy
     rcases hy with rfl | hy | hy
     · exact ⟨hlo, hhi⟩
-    · have := ihl hl y hy; omega
-    · have := ihr hr y hy; omega
+    · (have := ihl hl y hy; omega)
+    · (have := ihr hr y hy; omega)
 
 theorem Tree.foldl_insert_of_lt {l r : Tree Int} {x : Int} (ys : List Int)
     (h : ∀ y ∈ ys, y < x) :
@@ -113,9 +117,9 @@ theorem Tree.foldl_insert_preorder {lo hi : Int} {t : Tree Int} (h : t.isBST lo 
     obtain ⟨hlo, hhi, hl, hr⟩ := h
     simp only [Tree.preorder, List.foldl_cons, List.foldl_append]
     rw [show Tree.insert leaf x = node leaf x leaf from rfl,
-      Tree.foldl_insert_of_lt _ (fun y hy => by have := Tree.mem_preorder_bounds hl y hy; omega),
+      Tree.foldl_insert_of_lt _ (fun y hy => by (have := Tree.mem_preorder_bounds hl y hy; omega)),
       ihl hl,
-      Tree.foldl_insert_of_gt _ (fun y hy => by have := Tree.mem_preorder_bounds hr y hy; omega),
+      Tree.foldl_insert_of_gt _ (fun y hy => by (have := Tree.mem_preorder_bounds hr y hy; omega)),
       ihr hr]
 
 theorem Tree.genBSTByInsertion.sound_complete {lo hi : Int} (h : lo ≤ hi) :

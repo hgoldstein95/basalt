@@ -3,12 +3,19 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
+module
+
+
 /-!
 # STLC Syntax and Typing
 
 Syntax, contexts, and the typing judgement for the simply-typed lambda calculus extended with
 Bools, along with lemmas relating the `lookup` judgement to `List` indexing.
 -/
+
+@[expose] public section
+
+namespace STLC
 
 /-- Types are just Bool or function types -/
 inductive Ty where
@@ -24,7 +31,7 @@ instance : LawfulBEq Ty := by infer_instance
 /-- Pretty-prints a `Ty`. Arrows are right-associative, so a function type on the
     left of an arrow gets parenthesized but one on the right does not
     (`(Bool → Bool) → Bool` vs. `Bool → Bool → Bool`). -/
-private def Ty.reprPrec (τ : Ty) (prec : Nat) : Std.Format :=
+def Ty.reprPrec (τ : Ty) (prec : Nat) : Std.Format :=
   match τ with
   | .Bool => "Bool"
   | .Fun τ1 τ2 =>
@@ -53,7 +60,7 @@ inductive Term where
       printed at the atomic level while the function (left child) stays at the
       application level;
     * variables and Boolean literals (`2`) are atomic and never parenthesized. -/
-private def Term.reprPrec (t : Term) (prec : Nat) : Std.Format :=
+def Term.reprPrec (t : Term) (prec : Nat) : Std.Format :=
   match t with
   | .Bool b => if b then "true" else "false"
   | .Var n => "#" ++ repr n
@@ -99,20 +106,12 @@ def Ty.size : Ty → Nat
 /-- If `Γ[i]` returns `τ`, then the judgment `lookup Γ i τ` holds -/
 theorem getElem?_lookup :
     Γ[i]? = some τ → lookup Γ i τ := by
-  intro h
-  induction Γ generalizing i τ with
-  | nil => contradiction
+  induction Γ generalizing i with
+  | nil => simp
   | cons τ' Γ' IH =>
     cases i with
-    | zero =>
-      simp at h
-      subst h
-      constructor
-    | succ i' =>
-      apply lookup.Later
-      apply IH
-      simp at h
-      assumption
+    | zero => rintro ⟨⟩; exact .Now _ _
+    | succ i => exact fun h => .Later _ _ _ _ (IH h)
 
 /-- Converse of `getElem?_lookup`: `lookup Γ i τ` implies `Γ[i]? = some τ`. -/
 theorem lookup_getElem? :
@@ -121,3 +120,5 @@ theorem lookup_getElem? :
   induction h with
   | Now τ Γ => simp
   | Later τ τ' n Γ hl IH => simpa using IH
+
+end STLC

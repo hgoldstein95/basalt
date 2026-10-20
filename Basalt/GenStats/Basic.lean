@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Gen
-import Basalt.Random
+module
+
+public import Basalt.Gen
+public import Basalt.Random
 
 /-!
 # Generator Statistics
@@ -13,6 +15,8 @@ Empirical measurements to back up the proofs in the rest of the repository: `Gen
 seeded, fuel-guarded, choice-counting interpretation of `Gen`, and `GenStats.report` renders draws
 from it as the deterministic text summary that `#genstats` (`Basalt.GenStats.Command`) prints.
 -/
+
+public section
 
 open Lean.Order
 

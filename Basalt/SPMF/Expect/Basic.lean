@@ -3,7 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Basic
+module
+
+import Basalt.Order
+public import Basalt.SPMF.Basic
 
 /-!
 # Expected Values and Event Probabilities
@@ -12,6 +15,8 @@ import Basalt.SPMF.Basic
 (the probability of an event): their monad equations, their order and support properties, and
 continuity of `expect` along a chain. Every other fact about a distribution is read off these.
 -/
+
+@[expose] public section
 
 open Lean.Order RandomChoice NNReal ENNReal
 
@@ -219,35 +224,16 @@ theorem expect_csup {c : SPMF α → Prop} (hc : chain c) (f : α → ℝ≥0∞
     expect (CCPO.csup hc) f = ⨆ p, ⨆ (_ : c p), expect p f := by
   refine le_antisymm ?_ (iSup₂_le fun p hp => ENNReal.tsum_le_tsum fun a =>
     mul_le_mul_left (le_csup hc hp a) _)
-  calc expect (CCPO.csup hc) f
-      = ∑' a, (⨆ p, ⨆ (_ : c p), p a) * f a := by
-        unfold expect
-        exact tsum_congr fun a => by rw [csup_apply hc a]
-    _ = ∑' a, ⨆ p, ⨆ (_ : c p), p a * f a := by
-        refine tsum_congr fun a => ?_
-        rw [ENNReal.iSup_mul]
-        congr 1
-        ext p
-        rw [ENNReal.iSup_mul]
-    _ = ⨆ s : Finset α, ∑ a ∈ s, ⨆ p, ⨆ (_ : c p), p a * f a := ENNReal.tsum_eq_iSup_sum
-    _ ≤ ⨆ s : Finset α, ⨆ p, ⨆ (_ : c p), ∑ a ∈ s, p a * f a := by
-        refine iSup_mono fun s => ?_
-        simp_rw [iSup_subtype']
-        rw [ENNReal.finsetSum_iSup]
-        intro ⟨p, hp⟩ ⟨q, hq⟩
-        rcases hc p q hp hq with h | h
-        · exact ⟨⟨q, hq⟩, fun a => ⟨mul_le_mul_left (h a) _, le_rfl⟩⟩
-        · exact ⟨⟨p, hp⟩, fun a => ⟨le_rfl, mul_le_mul_left (h a) _⟩⟩
-    _ ≤ ⨆ p, ⨆ (_ : c p), expect p f := by
-        refine iSup_le fun s => iSup₂_mono fun p hp => ?_
-        exact ENNReal.sum_le_tsum s
+  unfold expect
+  simp_rw [csup_apply hc, ENNReal.iSup_mul]
+  exact tsum_iSup₂_le_of_chain hc (fun p a => p a * f a) fun _ _ h a => mul_le_mul_left (h a) _
 
 /-- Only *upper* bounds on expectations are admissible: the fixpoint iteration starts at `⊥`,
 where every expectation is `0`, so a lower bound cannot ride `fix_induct` — prove exact laws by
 inducting on an index of the event instead (`prob_listOf_length`). -/
 theorem admissible_expect_le (f : α → ℝ≥0∞) (B : ℝ≥0∞) :
     admissible (fun (p : SPMF α) => expect p f ≤ B) := by
-  intro c hc ih
+  refine admissible_iff.2 fun c hc ih => ?_
   rw [expect_csup]
   exact iSup₂_le ih
 

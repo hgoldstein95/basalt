@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Mathlib.Data.ENat.Lattice
-import Basalt.RandomChoice
-import Basalt.SPMF.Support
+module
+
+public import Mathlib.Data.ENat.Lattice
+public import Basalt.RandomChoice
+public import Basalt.SPMF.Support
 
 /-!
 # Cost-Tracking SPMF
@@ -14,6 +16,8 @@ import Basalt.SPMF.Support
 Its observations land in `WPC`, whose `bind` and `choose` do the cost accounting, so a combinator's
 lemma is its `Obs.map_*` read through one of them.
 -/
+
+@[expose] public section
 
 open RandomChoice
 
@@ -64,27 +68,9 @@ instance instCCPO : CCPO (SPMF.Cost α) where
     exact @CCPO.has_csup (SPMF (α × Nat)) _ c hc
 
 instance instMonoBind : MonoBind SPMF.Cost where
-  bind_mono_left {α β} {m₁ m₂ : SPMF.Cost α} {f : α → SPMF.Cost β} (h : m₁ ⊑ m₂) := by
-    intro pair
-    simp only [Bind.bind, bind]
-    unfold SPMF.bind
-    apply ENNReal.tsum_le_tsum
-    intro ⟨a, n₁⟩
-    simp only [Lean.Order.PartialOrder.rel] at h
-    gcongr
-    exact h (a, n₁)
-  bind_mono_right {α β} {m : SPMF.Cost α} {f₁ f₂ : α → SPMF.Cost β} (h : ∀ a, f₁ a ⊑ f₂ a) := by
-    intro pair
-    simp only [Bind.bind, bind]
-    unfold SPMF.bind
-    simp only [Lean.Order.PartialOrder.rel] at h ⊢
-    apply ENNReal.tsum_le_tsum
-    intro ⟨a, n₁⟩
-    gcongr ?_ * ?_
-    apply ENNReal.tsum_le_tsum
-    intro i
-    gcongr ?_ * ?_
-    apply h
+  bind_mono_left h := MonoBind.bind_mono_left (m := SPMF) h
+  bind_mono_right h :=
+    MonoBind.bind_mono_right (m := SPMF) fun p => MonoBind.bind_mono_left (m := SPMF) (h p.1)
 
 end CCPO
 
@@ -172,54 +158,36 @@ section observations
 /-- The may observation. -/
 def mayObs : Obs SPMF.Cost.{u} (WPC Mix.angelic) where
   spec g := fun Q => ∃ p ∈ SPMF.support g, Q p.1 p.2
-  map_pure a := by
-    funext Q; apply propext
-    constructor
-    · rintro ⟨⟨b, n⟩, hp, h⟩
-      obtain ⟨rfl, rfl⟩ := mem_support_pure_iff.mp hp
-      exact h
-    · exact fun h => ⟨(a, 0), mem_support_pure_iff.mpr ⟨rfl, rfl⟩, h⟩
+  map_pure a := by funext Q; exact congrFun (SPMF.mayObs.map_pure (a, 0)) fun p => Q p.1 p.2
   map_bind x k := by
-    funext Q; apply propext
-    constructor
-    · rintro ⟨⟨b, n⟩, hp, h⟩
-      obtain ⟨a, n1, n2, h1, h2, rfl⟩ := mem_support_bind_iff.mp hp
-      exact ⟨(a, n1), h1, (b, n2), h2, h⟩
-    · rintro ⟨⟨a, n1⟩, h1, ⟨b, n2⟩, h2, h⟩
-      exact ⟨(b, n1 + n2), mem_support_bind_iff.mpr ⟨a, n1, n2, h1, h2, rfl⟩, h⟩
+    funext Q
+    show SPMF.mayObs.spec (x >>= fun p => k p.1 >>= fun q => Pure.pure (q.1, p.2 + q.2))
+      (fun p => Q p.1 p.2) = _
+    simp only [SPMF.mayObs.map_bind, SPMF.mayObs.map_pure]
+    rfl
   map_choose lo hi h := by
-    funext Q; apply propext
-    constructor
-    · rintro ⟨⟨a, c⟩, hp, h⟩
-      obtain rfl := mem_support_choose_iff.mp hp
-      exact ⟨a, h⟩
-    · exact fun ⟨a, h⟩ => ⟨(a, 1), mem_support_choose_iff.mpr rfl, h⟩
+    funext Q
+    show SPMF.mayObs.spec ((choose lo hi h : SPMF _) >>= fun a => Pure.pure (a, 1))
+      (fun p => Q p.1 p.2) = _
+    simp only [SPMF.mayObs.map_bind, SPMF.mayObs.map_pure, SPMF.mayObs.map_choose]
+    rfl
 
 /-- The always observation. -/
 def alwaysObs : Obs SPMF.Cost.{u} (WPC Mix.demonic) where
   spec g := fun Q => ∀ p ∈ SPMF.support g, Q p.1 p.2
-  map_pure a := by
-    funext Q; apply propext
-    constructor
-    · exact fun h => h (a, 0) (mem_support_pure_iff.mpr ⟨rfl, rfl⟩)
-    · rintro h ⟨b, n⟩ hp
-      obtain ⟨rfl, rfl⟩ := mem_support_pure_iff.mp hp
-      exact h
+  map_pure a := by funext Q; exact congrFun (SPMF.alwaysObs.map_pure (a, 0)) fun p => Q p.1 p.2
   map_bind x k := by
-    funext Q; apply propext
-    constructor
-    · rintro h ⟨a, n1⟩ h1 ⟨b, n2⟩ h2
-      exact h (b, n1 + n2) (mem_support_bind_iff.mpr ⟨a, n1, n2, h1, h2, rfl⟩)
-    · rintro h ⟨b, n⟩ hp
-      obtain ⟨a, n1, n2, h1, h2, rfl⟩ := mem_support_bind_iff.mp hp
-      exact h (a, n1) h1 (b, n2) h2
+    funext Q
+    show SPMF.alwaysObs.spec (x >>= fun p => k p.1 >>= fun q => Pure.pure (q.1, p.2 + q.2))
+      (fun p => Q p.1 p.2) = _
+    simp only [SPMF.alwaysObs.map_bind, SPMF.alwaysObs.map_pure]
+    rfl
   map_choose lo hi h := by
-    funext Q; apply propext
-    constructor
-    · exact fun hq a => hq (a, 1) (mem_support_choose_iff.mpr rfl)
-    · rintro hq ⟨a, c⟩ hp
-      obtain rfl := mem_support_choose_iff.mp hp
-      exact hq a
+    funext Q
+    show SPMF.alwaysObs.spec ((choose lo hi h : SPMF _) >>= fun a => Pure.pure (a, 1))
+      (fun p => Q p.1 p.2) = _
+    simp only [SPMF.alwaysObs.map_bind, SPMF.alwaysObs.map_pure, SPMF.alwaysObs.map_choose]
+    rfl
 
 /-- The worst-case observation: the most choices any run of the generator can make. -/
 noncomputable def worstObs : Obs SPMF.Cost.{u} (WPC Mix.sup) where
