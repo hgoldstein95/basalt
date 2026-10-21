@@ -29,9 +29,21 @@ def myGen [Gen G] : G α := ...
 
 `RandomChoice.choose` is the only source of randomness; every combinator (`elements`, `oneOf`,
 `frequency`, `listOf`, …) is built on it. Recursive generators are defined by
-`partial_fixpoint` over the `CCPO`. A choice between literal branches is written `oneOf! [g₀, g₁, …]`
-or `frequency! [(w₀, g₀), …]`: it runs as a chain of tests on the drawn index, allocating no list of
-branches, while every proof sees the plain `oneOf` / `frequency` (`Basalt/Combinators.lean`).
+`partial_fixpoint` over the `CCPO`. A choice between literal branches is written with one `|` per
+branch, and a branch may be guarded so that it is present only when a condition holds:
+
+```lean
+oneOf!
+| pure 0
+| if hne : xs ≠ [] => elements xs hne
+
+frequency!
+| 1 => pure 0
+| 3 if h : lo ≤ hi => chooseInt lo hi h
+```
+
+It runs as one draw and a chain of tests on it, allocating no list of branches, while every proof
+sees the plain `oneOf` / `frequency`, under a `dite` on each guard (`Basalt/Combinators.lean`).
 
 A generator that branches on a size adds a `[Sized G]` constraint and reads it with `getSize` or
 `Sized.sized`, shrinking it for recursive calls with `Sized.resize` (plus `[MonoSized G]` when the

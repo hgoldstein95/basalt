@@ -172,7 +172,7 @@ def matchCongr? (j : Judgment) (goal : MVarId) (restate : Expr → Expr) (g : Ex
   let other ← instantiateMVars (ty.getArg! i)
   let some (β, uβ, cs) ← (match j with
     | .rel .. => do
-      let some mb ← matchMatcherApp? other | return none
+      let some mb ← matchMatcherApp? other.headBeta | return none
       unless mb.matcherName == ma.matcherName && mb.remaining.isEmpty do return none
       let (xs, ys) := (ma.params ++ ma.discrs, mb.params ++ mb.discrs)
       unless xs.size == ys.size do return none

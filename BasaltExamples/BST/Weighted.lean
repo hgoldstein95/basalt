@@ -33,14 +33,13 @@ def Tree.genWeightedBST [Gen G] (lo hi : Int) : G (Tree Int) := do
   if h : lo > hi then
     return leaf
   else
-    frequency! [
-      (1, fun _ => pure leaf),
-      (5, fun _ => do
-        let x ← chooseInt lo hi (by omega)
-        let l ← Tree.genWeightedBST lo (x - 1)
-        let r ← Tree.genWeightedBST (x + 1) hi
-        return node l x r)
-    ] (by simp)
+    frequency!
+    | 1 => pure leaf
+    | 5 => do
+      let x ← chooseInt lo hi (by omega)
+      let l ← Tree.genWeightedBST lo (x - 1)
+      let r ← Tree.genWeightedBST (x + 1) hi
+      return node l x r
 partial_fixpoint
 
 /-- The level operator: recurse with probability `w` on the two subintervals of a uniform pivot. -/

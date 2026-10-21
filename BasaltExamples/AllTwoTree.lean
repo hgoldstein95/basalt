@@ -48,12 +48,12 @@ def Tree.cost : Tree → Nat := fun t => 3 * t.size + 1
 /-- Generates an all-`2`s tree with a uniform `oneOf`. Mean offspring `1`: critical, so almost surely
 terminating, with no finite bound on its expected cost (`genTree.not_expected_cost_bounded`). -/
 def genTree [Gen G] : G Tree :=
-  oneOf! [
-    fun _ => pure .leaf,
-    fun _ => do
-      let l ← genTree
-      let r ← genTree
-      return .node l 2 r]
+  oneOf!
+  | pure .leaf
+  | do
+    let l ← genTree
+    let r ← genTree
+    return .node l 2 r
 partial_fixpoint
 
 theorem genTree.sound_complete : IsSoundAndComplete genTree Tree.isAllTwos := by
@@ -106,13 +106,12 @@ open scoped NNReal ENNReal
 
 /-- Generates an all-`2`s tree, but weights the leaf branch twice as heavily as the node branch. -/
 def genWeightedTree [Gen G] : G Tree :=
-  frequency! [
-    (2, fun _ => pure .leaf),
-    (1, fun _ => do
-      let l ← genWeightedTree
-      let r ← genWeightedTree
-      return .node l 2 r)
-  ] (by simp)
+  frequency!
+  | 2 => pure .leaf
+  | 1 => do
+    let l ← genWeightedTree
+    let r ← genWeightedTree
+    return .node l 2 r
 partial_fixpoint
 
 theorem genWeightedTree.terminates : IsAlmostSurelyTerminating genWeightedTree := by

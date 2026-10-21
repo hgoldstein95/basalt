@@ -187,7 +187,7 @@ definition, and the definition is right here to run.
   first, as `always_vectorOf` does in [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean).
 
 - **`rw [support_oneOf]` (or `prob_frequency`, …) finds no occurrence in a goal that shows
-  `oneOf! [...]`** — `oneOf!`/`frequency!` elaborate to `oneOfWith`/`frequencyWith`, which only
+  `oneOf! | …`** — `oneOf!`/`frequency!` elaborate to `oneOfWith`/`frequencyWith`, which only
   display as the source form. Rewrite with `oneOfWith_eq`/`frequencyWith_eq` first, or use `simp`,
   which applies them ([Basalt/Combinators.lean](Basalt/Combinators.lean)).
 

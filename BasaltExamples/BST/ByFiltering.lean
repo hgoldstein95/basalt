@@ -40,14 +40,13 @@ theorem Tree.isBSTb_iff {lo hi : Int} {t : Tree Int} : t.isBSTb lo hi = true ↔
 def Tree.genTree [Gen G] (lo hi : Int) (h : lo ≤ hi) (n : Nat) : G (Tree Int) :=
   if hn : n = 0 then pure leaf
   else
-    frequency! [
-      (1, fun _ => pure leaf),
-      (n, fun _ => do
-        let x ← chooseInt lo hi h
-        let l ← Tree.genTree lo hi h (n / 2)
-        let r ← Tree.genTree lo hi h (n / 2)
-        return node l x r)
-    ] (by simp)
+    frequency!
+    | 1 => pure leaf
+    | n => do
+      let x ← chooseInt lo hi h
+      let l ← Tree.genTree lo hi h (n / 2)
+      let r ← Tree.genTree lo hi h (n / 2)
+      return node l x r
 termination_by n
 decreasing_by all_goals omega
 

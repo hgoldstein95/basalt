@@ -46,18 +46,17 @@ def Tree.isLeftist (lo : Nat) : Tree → Prop
     isLeftist x r
 
 def Tree.genLeftist [Gen G] (lo : Nat) : G Tree :=
-  oneOf! [
-    fun () => pure leaf,
-    fun () => do
-      let delta ← Nat.arbitrary
-      let x := lo + delta
-      let a ← Tree.genLeftist x
-      let b ← Tree.genLeftist x
-      if b.rank ≤ a.rank then
-        return node a x b
-      else
-        return node b x a
-  ]
+  oneOf!
+  | pure leaf
+  | do
+    let delta ← Nat.arbitrary
+    let x := lo + delta
+    let a ← Tree.genLeftist x
+    let b ← Tree.genLeftist x
+    if b.rank ≤ a.rank then
+      return node a x b
+    else
+      return node b x a
 partial_fixpoint
 
 def Tree.genLeftistOfRank [Gen G] (lo : Nat) : Nat → G Tree
