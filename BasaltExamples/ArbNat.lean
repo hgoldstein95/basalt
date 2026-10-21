@@ -23,12 +23,11 @@ namespace ArbNat
 
 /-- Generates an arbitrary natural number: flip a coin to stop at `0` or recurse and add one. -/
 def Nat.arbitrary [Gen G] : G Nat := do
-  oneOf! [
-    fun _ => pure 0,
-    fun _ => do
-      let n ← Nat.arbitrary
-      pure (n + 1)
-  ]
+  oneOf!
+  | pure 0
+  | do
+    let n ← Nat.arbitrary
+    pure (n + 1)
 partial_fixpoint
 
 theorem Nat.arbitrary.sound_complete : IsSoundAndComplete Nat.arbitrary ⊤ := by

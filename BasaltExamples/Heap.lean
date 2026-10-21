@@ -53,14 +53,14 @@ def Tree.isHeap (lo : Nat) : Tree → Prop
 
 /-- Generates an arbitrary min-heap whose values are all at least `lo`. -/
 def Tree.genHeap [Gen G] (lo : Nat) : G Tree :=
-  oneOf! [
-    fun _ => pure leaf,
-    fun _ => do
-      let delta ← Nat.arbitrary
-      let x := lo + delta
-      let l ← Tree.genHeap x
-      let r ← Tree.genHeap x
-      return node l x r]
+  oneOf!
+  | pure leaf
+  | do
+    let delta ← Nat.arbitrary
+    let x := lo + delta
+    let l ← Tree.genHeap x
+    let r ← Tree.genHeap x
+    return node l x r
 partial_fixpoint
 
 theorem Tree.genHeap.sound_complete :

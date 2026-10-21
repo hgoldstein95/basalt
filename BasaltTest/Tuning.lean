@@ -377,14 +377,14 @@ def genNested [Gen G] (size : Nat) : G (BST.Tree Nat) :=
   match size with
   | 0 => pure .leaf
   | n + 1 =>
-    oneOf! [
-      fun _ => pure .leaf,
-      fun _ => frequency! [
-        (1, fun _ => pure .leaf),
-        (5, fun _ => do
-          let l ← genNested n
-          let r ← genNested n
-          return .node l 0 r)]]
+    oneOf!
+    | pure .leaf
+    | frequency!
+      | 1 => pure .leaf
+      | 5 => do
+        let l ← genNested n
+        let r ← genNested n
+        return .node l 0 r
 
 example : genNested.sites = #[⟨`TunableExamples.genNested.site0, 0, 2, #[0, 2]⟩] := rfl
 
@@ -396,12 +396,12 @@ example [Gen G] (size : Nat) :
 def genWFCompiled [Gen G] (fuel : Nat) : G (BST.Tree Nat) :=
   if h : fuel = 0 then pure .leaf
   else
-    frequency! [
-      (1, fun _ => pure .leaf),
-      (5, fun _ => do
-        let l ← genWFCompiled (fuel - 1)
-        let r ← genWFCompiled (fuel - 1)
-        return .node l 0 r)]
+    frequency!
+    | 1 => pure .leaf
+    | 5 => do
+      let l ← genWFCompiled (fuel - 1)
+      let r ← genWFCompiled (fuel - 1)
+      return .node l 0 r
 termination_by fuel
 decreasing_by all_goals omega
 
@@ -409,14 +409,54 @@ example [Gen G] (fuel : Nat) :
     (genWFCompiled.tuned genWFCompiled.defaults fuel : G (BST.Tree Nat)) = genWFCompiled fuel :=
   genWFCompiled.tuned_defaults fuel
 
+/-! A `frequency!` under a guarded `oneOf!` is tuned as one site; a guarded `frequency!` itself is
+rejected, since its weights are compiled into each combination of guards. -/
+
+@[tunable]
+def genGuarded [Gen G] (size : Nat) : G (BST.Tree Nat) :=
+  match size with
+  | 0 => pure .leaf
+  | n + 1 =>
+    oneOf!
+    | pure .leaf
+    | if 2 < n =>
+      frequency!
+      | 1 => pure .leaf
+      | 5 => do
+        let l ← genGuarded n
+        let r ← genGuarded n
+        return .node l 0 r
+
+example : genGuarded.sites = #[⟨`TunableExamples.genGuarded.site0, 0, 2, #[0, 2]⟩] := rfl
+
+example [Gen G] (size : Nat) :
+    (genGuarded.tuned genGuarded.defaults size : G (BST.Tree Nat)) = genGuarded size :=
+  genGuarded.tuned_defaults size
+
+/--
+error: tunable: `TunableExamples.genGuardedWeights` has a guarded `frequency!`, whose weights `@[tunable]` does not tune; write the weights of each combination of guards as a `frequency!` of its own under an `if`
+-/
+#guard_msgs in
+@[tunable]
+def genGuardedWeights [Gen G] (size : Nat) : G (BST.Tree Nat) :=
+  match size with
+  | 0 => pure .leaf
+  | n + 1 =>
+    frequency!
+    | 1 => pure .leaf
+    | 5 if 2 < n => do
+      let l ← genGuardedWeights n
+      let r ← genGuardedWeights n
+      return .node l 0 r
+
 open Lean in
 run_cmd do
   let env ← getEnv
-  for n in [``genNested.tuned, ``genWFCompiled.tuned] do
+  for n in [``genNested.tuned, ``genWFCompiled.tuned, ``genGuarded.tuned] do
     let code := (IR.getDecls env).filter (n.isPrefixOf ·.name)
       |>.foldl (fun acc d => acc ++ toString (format d)) ""
     if code.isEmpty then throwError "`{n}` has no compiled code in this module"
-    for c in ["List.cons", "oneOf", "frequency"] do
+    for c in ["List.cons", "oneOf", "frequency", "Branch", "guardedWith"] do
       unless (code.splitOn c).length == 1 do
         throwError "`{n}`'s compiled code mentions `{c}`"
 

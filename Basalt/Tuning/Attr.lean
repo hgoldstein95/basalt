@@ -22,10 +22,10 @@ user tags a generator definition:
 @[tunable]
 def genBST [Gen G] (lo hi : Int) : G (Tree Int) := do
   if h : lo > hi then return leaf
-  else frequency! [
-    (1, fun _ => pure leaf),
-    (5, fun _ => do … genBST … genBST …)
-  ]
+  else
+    frequency!
+    | 1 => pure leaf
+    | 5 => do … genBST … genBST …
 partial_fixpoint
 ```
 
@@ -149,6 +149,14 @@ private def inlineAux? (declName : Name) (e : Expr) : MetaM (Option Expr) := do
   if (val.find? (·.isConstOf n)).isSome then return none
   unfoldDefinition? e
 
+/-- A leaf of a guarded choice's model, which is a `dite` on each guard. -/
+private partial def guardedLeaf (e : Expr) : Expr :=
+  if e.isAppOfArity ``dite 5 then
+    match e.getArg! 3 with
+    | .lam _ _ b _ => guardedLeaf b
+    | _ => e
+  else e
+
 mutual
 
 /-- Rewrite every `frequency` under `e`.  `pre` handles the things that are not leaf rewrites:
@@ -166,6 +174,11 @@ private partial def tune (ctx : TuneCtx) (e : Expr) : TuneM Expr :=
       return .done (← tuneCompiled ctx ``frequency mkFrequencyWith? e)
     if e.getAppFn.isConstOf ``oneOfWith && e.getAppNumArgs ≥ 7 then
       return .done (← tuneCompiled ctx ``oneOf mkOneOfWith? e)
+    if e.getAppFn.isConstOf ``guardedWith && e.getAppNumArgs ≥ 5 then
+      if guardedLeaf e.getAppArgs[2]! |>.isAppOf ``frequency then
+        throwError "tunable: `{ctx.declName}` has a guarded `frequency!`, whose weights \
+          `@[tunable]` does not tune; write the weights of each combination of guards as a \
+          `frequency!` of its own under an `if`"
     return .continue)
 
 /-- A compiled choice `oneOfWith`/`frequencyWith gs h impl h'`: tune its model and compile that
