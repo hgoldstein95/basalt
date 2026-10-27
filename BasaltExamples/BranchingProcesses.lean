@@ -53,9 +53,9 @@ partial_fixpoint
 theorem genT.mass_le : (genT : SPMF T).mass ≤ 1 / 2 := by
   rw [← SPMF.expect_one, SPMF.expect_eq_obs]
   walk fixpoint
-  simp only [List.sum_cons, List.sum_nil, List.length_cons, List.length_nil]
-  ennreal_to_real
-  norm_num
+  norm_num only [List.sum_cons, List.sum_nil, List.length_cons, List.length_nil]
+  basify
+  nlinarith
 
 /-- One unfolding: the mass `d` satisfies `d ≥ 1/3 + 2/3 · d²`, the paper's generation
 recurrence. -/
@@ -67,10 +67,9 @@ theorem genT.le_mass_step :
   have hm : (SPMF.expectObs.spec (genT : SPMF T) fun _ => 1) ≤ 1 :=
     (SPMF.expect_one _).trans_le (SPMF.mass_le_one _)
   generalize SPMF.expectObs.spec (genT : SPMF T) (fun _ => 1) = m at *
-  simp only [List.sum_cons, List.sum_nil, List.length_cons, List.length_nil]
-  ennreal_to_real
-  norm_num
-  linarith
+  norm_num only [List.sum_cons, List.sum_nil, List.length_cons, List.length_nil]
+  basify
+  nlinarith
 
 /-- **Appendix B.1**: "the extinction probability [is] the smallest `d` such that
 `d = (1/3) + (2/3) · d²` … In this case `d = 1/2`." -/
@@ -79,13 +78,10 @@ theorem genT.mass_eq : (genT : SPMF T).mass = 1 / 2 := by
   have hle := genT.mass_le
   have hstep := genT.le_mass_step
   generalize (genT : SPMF T).mass = m at *
-  ennreal_to_real at hstep
-  ennreal_to_real at hle
-  ennreal_to_real
-  have h0 := m.toReal_nonneg
+  basify
   by_contra hne
-  have hlt : m.toReal < 1 / 2 := lt_of_le_of_ne hle hne
-  nlinarith [mul_pos (sub_pos.mpr hlt) (show (0 : ℝ) < 1 - m.toReal by linarith)]
+  have hlt : m < 1 / 2 := lt_of_le_of_ne hle hne
+  nlinarith [mul_pos (sub_pos.mpr hlt) (show (0 : ℝ) < 1 - m by linarith)]
 
 /-- `derive`'s generator for a type with one leaf and `k` binary recursive constructors, which
 differ only in their label, so the `k` are one branch of weight `k`. `genT` is `k = 2`. -/
@@ -125,18 +121,14 @@ theorem genTk.mass_eq {k : Nat} (hk : 1 ≤ k) : (genTk k : SPMF T).mass = 1 / k
   have hstep := genTk.le_mass_step k
   generalize (genTk k : SPMF T).mass = m at *
   have hk0 : (k : ℝ≥0∞) ≠ 0 := by exact_mod_cast (by omega : k ≠ 0)
+  rw [ENNReal.div_le_iff (by simp) (by simp)] at hstep
+  rw [ENNReal.le_div_iff_mul_le (.inl hk0) (.inl (ENNReal.natCast_ne_top k))] at hle
+  rw [ENNReal.eq_div_iff hk0 (ENNReal.natCast_ne_top k)]
   have hk1 : (1 : ℝ) ≤ k := by exact_mod_cast hk
-  ennreal_to_real at hstep
-  ennreal_to_real at hle
-  ennreal_to_real
-  have h0 := m.toReal_nonneg
-  have hkpos : (0 : ℝ) < k := by linarith
-  rw [div_le_iff₀ (by linarith)] at hstep
-  rw [le_div_iff₀ hkpos] at hle
-  rw [eq_div_iff hkpos.ne']
+  basify
   by_contra hne
-  have hlt : m.toReal * k < 1 := lt_of_le_of_ne hle hne
-  nlinarith [mul_pos (sub_pos.mpr hlt) (show (0 : ℝ) < 1 - m.toReal by nlinarith)]
+  have hlt : m * k < 1 := lt_of_le_of_ne hle (by contrapose! hne; linarith)
+  nlinarith [mul_pos (sub_pos.mpr hlt) (show (0 : ℝ) < 1 - m by nlinarith)]
 
 /-! ## MegaDeTH's generator (§2.2, §3) -/
 
@@ -177,7 +169,7 @@ generator at size `10`; it has at most `15/32 = 0.46875`, since halving the size
 of `node`s, where the prediction counts eleven. -/
 theorem megaNodes_ten : megaNodes 10 = 15 / 32 := by
   simp [megaNodes]
-  ennreal_to_real
+  basify
   norm_num
 
 /-! ## Dragen's generator (§4) -/

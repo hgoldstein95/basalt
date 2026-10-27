@@ -76,7 +76,7 @@ example (g : SPMF Nat) (h : SPMF.expectObs.spec g (fun _ => 1) ≤ 1 / 2) :
   rw [SPMF.expect_eq_obs]
   walk [h]
   trace_state
-  ennreal_to_real; norm_num
+  basify; norm_num
 
 -- A list combinator has no shape of choice, so it is bounded by a rule that uses only the mass:
 -- a constant postexpectation exactly, and otherwise its worst case over every value, dually to the
