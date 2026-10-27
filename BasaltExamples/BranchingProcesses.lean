@@ -215,6 +215,9 @@ noncomputable def dragenB : Nat → ℝ≥0
   | 0 => 0
   | n + 1 => (3 + 13 * dragenB n) / 10
 
+/-- At size `n`, the expected number of `nodeA`s is at most `dragenA n`: one step adds `1` for a
+`nodeA` (probability `1/2`) and recurses into two subtrees, or recurses into one (`nodeB`, `3/10`),
+so the mean grows by the type's mean offspring `2 · 1/2 + 3/10 = 13/10` per level. -/
 theorem genDragen.expect_countA_le (n : Nat) :
     SPMF.expect (genDragen n) (fun t => (t.countA : ℝ≥0∞)) ≤ (dragenA n : ℝ≥0∞) := by
   rw [SPMF.expect_eq_obs]
@@ -222,6 +225,8 @@ theorem genDragen.expect_countA_le (n : Nat) :
   all_goals simp [Tree'.countA, dragenA, ENNReal.coe_div]
   all_goals (apply le_of_eq; ring_nf)
 
+/-- At size `n`, the expected number of `nodeB`s is at most `dragenB n`: the same recurrence as
+`genDragen.expect_countA_le`, with `1` added for a `nodeB` (probability `3/10`) instead. -/
 theorem genDragen.expect_countB_le (n : Nat) :
     SPMF.expect (genDragen n) (fun t => (t.countB : ℝ≥0∞)) ≤ (dragenB n : ℝ≥0∞) := by
   rw [SPMF.expect_eq_obs]
