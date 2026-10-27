@@ -114,6 +114,21 @@ example (g : SPMF Nat) : SPMF.expect (g >>= fun n => Pure.pure n) (fun n => (n :
   rw [SPMF.expect_eq_obs]
   walk
 
+-- A fact under a postcondition that is not its own plus a constant is reported as such, though a
+-- later leaf (the one for a bound on the mass) does not apply to it at all.
+/--
+error: the postcondition
+  2 * ↑a✝
+is not the fact's
+  ↑a✝
+plus a constant
+-/
+#guard_msgs in
+example (g : SPMF Nat) (h : SPMF.expectObs.spec g (fun n => (n : ℝ≥0∞)) ≤ 1) :
+    SPMF.expect (g >>= fun n => pure (2 * n) : SPMF Nat) (fun n => (n : ℝ≥0∞)) ≤ 2 := by
+  rw [SPMF.expect_eq_obs]
+  walk [h]
+
 -- The cookbook's expectation bound is this walk followed by arithmetic: `Tree.genBST.expect_size_le`
 -- (`BST.lean`).
 

@@ -13,7 +13,7 @@ public import Basalt
 This file formalizes some results
 from "Branching Processes for QuickCheck Generators" (Mista et al. Haskell '18).
 In particular, we prove results about the termination probability of an automatically
-derived generator (Appendix B.1 of their paper), and the expected no. of constructors
+derived generator (Appendix B.1 of their paper), and the exact expected no. of constructors
 for a few particular generators (sections 3 & 4 from the paper), and Theorem 1's prediction from
 the mean matrix of types for the mutually recursive types of section 6.
 -/
@@ -166,7 +166,39 @@ theorem genMegaDeTH.expect_nodes_le (n : Nat) :
   walk fixpoint
   all_goals simp [Tree.nodes, megaNodes, two_mul, add_assoc]
 
-/-- The expected no. of `node`s when `size = 10` is 15 / 32 -/
+theorem genMegaDeTH.le_expect_nodes (n : Nat) (k : ℝ≥0∞) :
+    k + megaNodes n ≤
+      SPMF.expectObs.spec (genMegaDeTH n : SPMF Tree) (fun t => k + (t.nodes : ℝ≥0∞)) := by
+  induction n using Nat.strong_induction_on generalizing k with
+  | _ n ih =>
+    cases n with
+    | zero =>
+      conv_rhs => rw [genMegaDeTH]
+      walk
+      simp only [Tree.nodes, megaNodes, List.sum_cons, List.sum_nil, List.length_cons,
+        List.length_nil, Nat.cast_zero, add_zero]
+      rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num)]
+      apply le_of_eq
+      push_cast
+      ring
+    | succ n =>
+      conv_rhs => rw [genMegaDeTH]
+      walk [ih ((n + 1) / 2) (by omega)]
+      simp only [Tree.nodes, megaNodes, List.sum_cons, List.sum_nil, List.length_cons,
+        List.length_nil, Nat.cast_zero, add_zero]
+      push_cast
+      rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num), add_mul,
+        ENNReal.div_mul_cancel (by norm_num) (by norm_num)]
+      apply le_of_eq
+      ring
+
+/-- The expected number of `node`s is exactly `megaNodes n`. -/
+theorem genMegaDeTH.expect_nodes (n : Nat) :
+    SPMF.expect (genMegaDeTH n) (fun t => (t.nodes : ℝ≥0∞)) = megaNodes n := by
+  refine le_antisymm (genMegaDeTH.expect_nodes_le n) ?_
+  simpa [SPMF.expect_eq_obs] using genMegaDeTH.le_expect_nodes n 0
+
+/-- The expected no. of `node`s when `size = 10` is 15 / 32 (`genMegaDeTH.expect_nodes`). -/
 theorem megaNodes_ten : megaNodes 10 = 15 / 32 := by
   simp [megaNodes]
   basify
@@ -234,6 +266,64 @@ theorem genDragen.expect_countB_le (n : Nat) :
   walk fixpoint
   all_goals simp [Tree'.countB, dragenB, ENNReal.coe_div]
   all_goals (apply le_of_eq; ring_nf)
+
+theorem genDragen.le_expect_countA (n : Nat) (k : ℝ≥0∞) :
+    k + (dragenA n : ℝ≥0∞) ≤
+      SPMF.expectObs.spec (genDragen n : SPMF Tree') (fun t => k + (t.countA : ℝ≥0∞)) := by
+  induction n generalizing k with
+  | zero =>
+    conv_rhs => rw [genDragen]
+    walk
+    simp [Tree'.countA, dragenA]
+  | succ n ih =>
+    conv_rhs => rw [genDragen]
+    walk [ih]
+    simp only [Tree'.countA, dragenA, List.map, List.sum_cons, List.sum_nil, Nat.cast_ofNat,
+      add_zero, Nat.cast_zero, ENNReal.coe_div (by norm_num : (10 : ℝ≥0) ≠ 0)]
+    push_cast
+    rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num), add_mul,
+      ENNReal.div_mul_cancel (by norm_num) (by norm_num)]
+    apply le_of_eq
+    ring
+
+theorem genDragen.le_expect_countB (n : Nat) (k : ℝ≥0∞) :
+    k + (dragenB n : ℝ≥0∞) ≤
+      SPMF.expectObs.spec (genDragen n : SPMF Tree') (fun t => k + (t.countB : ℝ≥0∞)) := by
+  induction n generalizing k with
+  | zero =>
+    conv_rhs => rw [genDragen]
+    walk
+    simp [Tree'.countB, dragenB]
+  | succ n ih =>
+    conv_rhs => rw [genDragen]
+    walk [ih]
+    simp only [Tree'.countB, dragenB, List.map, List.sum_cons, List.sum_nil, Nat.cast_ofNat,
+      add_zero, Nat.cast_zero, ENNReal.coe_div (by norm_num : (10 : ℝ≥0) ≠ 0)]
+    push_cast
+    rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num), add_mul,
+      ENNReal.div_mul_cancel (by norm_num) (by norm_num)]
+    apply le_of_eq
+    ring
+
+/-- The expected number of `nodeA`s is exactly `dragenA n`. -/
+theorem genDragen.expect_countA (n : Nat) :
+    SPMF.expect (genDragen n) (fun t => (t.countA : ℝ≥0∞)) = (dragenA n : ℝ≥0∞) := by
+  refine le_antisymm (genDragen.expect_countA_le n) ?_
+  simpa [SPMF.expect_eq_obs] using genDragen.le_expect_countA n 0
+
+/-- The expected number of `nodeB`s is exactly `dragenB n`. -/
+theorem genDragen.expect_countB (n : Nat) :
+    SPMF.expect (genDragen n) (fun t => (t.countB : ℝ≥0∞)) = (dragenB n : ℝ≥0∞) := by
+  refine le_antisymm (genDragen.expect_countB_le n) ?_
+  simpa [SPMF.expect_eq_obs] using genDragen.le_expect_countB n 0
+
+/-- §4 reports 21.322 `NodeA`s at size `10`; the expectation is `21.3097486415`. -/
+theorem dragenA_ten : dragenA 10 = 42619497283 / 2000000000 := by
+  norm_num [dragenA]
+
+/-- §4 reports 12.813 `NodeB`s at size `10`; the expectation is `12.7858491849`. -/
+theorem dragenB_ten : dragenB 10 = 127858491849 / 10000000000 := by
+  norm_num [dragenB]
 
 
 /-! ## Mutually recursive types (§6) -/
@@ -349,8 +439,8 @@ theorem predicted_succ (r : Fin 2) (c : Ctor) (n : Nat) :
     Finset.sum_add_distrib, ← Finset.mul_sum, Pi.single_apply]
   split_ifs <;> ring
 
-/-- **Theorem 1 for Figure 8**: each constructor's expected count is at most the paper's
-prediction from the mean matrix of types. -/
+/-- The upper half of `genT12.expect_count`: each constructor's expected count is at most the
+paper's prediction from the mean matrix of types. -/
 theorem genT12.expect_count_le (n : Nat) :
     (∀ c, SPMF.expect (genT1 n) (fun t => (t.count c : ℝ≥0∞)) ≤ predicted 0 c n) ∧
     (∀ c, SPMF.expect (genT2 n) (fun t => (t.count c : ℝ≥0∞)) ≤ predicted 1 c n) := by
@@ -380,5 +470,53 @@ theorem genT12.expect_count_le (n : Nat) :
       rw [predicted_succ]
       cases c <;> simp [T2.count, meanTypes, β, Ctor.ty, Ctor.prob]
       all_goals (apply le_of_eq; simp only [div_eq_mul_inv]; ring)
+
+theorem genT12.le_expect_count (n : Nat) :
+    (∀ c k, k + predicted 0 c n ≤
+      SPMF.expectObs.spec (genT1 n : SPMF T1) (fun t => k + (t.count c : ℝ≥0∞))) ∧
+    (∀ c k, k + predicted 1 c n ≤
+      SPMF.expectObs.spec (genT2 n : SPMF T2) (fun t => k + (t.count c : ℝ≥0∞))) := by
+  induction n with
+  | zero =>
+    refine ⟨fun c k => ?_, fun c k => ?_⟩
+    · conv_rhs => rw [genT1]
+      walk
+      cases c <;> simp [T1.count, predicted, level_zero, Ctor.terminal, Ctor.ty]
+    · conv_rhs => rw [genT2]
+      walk
+      cases c <;> simp [T2.count, predicted, level_zero, Ctor.terminal, Ctor.ty]
+  | succ n ih =>
+    refine ⟨fun c k => ?_, fun c k => ?_⟩
+    · conv_rhs => rw [genT1]
+      walk [ih.1 c, ih.2 c]
+      rw [predicted_succ]
+      cases c <;> simp [T1.count, meanTypes, β, Ctor.ty, Ctor.prob, Fin.sum_univ_two]
+      all_goals
+        apply le_of_eq
+        conv_lhs => rw [show k = 2⁻¹ * k + 2⁻¹ * k by
+          rw [← add_mul, ENNReal.inv_two_add_inv_two, one_mul]]
+        simp only [div_eq_mul_inv]
+        ring
+    · conv_rhs => rw [genT2]
+      walk [ih.1 c]
+      rw [predicted_succ]
+      cases c <;> simp [T2.count, meanTypes, β, Ctor.ty, Ctor.prob]
+      all_goals
+        apply le_of_eq
+        conv_lhs => rw [show k = 3⁻¹ * k + 2 * 3⁻¹ * k by
+          rw [← add_mul, ← one_add_mul, show (1 : ℝ≥0∞) + 2 = 3 by norm_num,
+            ENNReal.mul_inv_cancel (by norm_num) (by norm_num), one_mul]]
+        simp only [div_eq_mul_inv]
+        ring
+
+/-- **Theorem 1 for Figure 8**, exactly: each constructor's expected count is the paper's
+prediction from the mean matrix of types. -/
+theorem genT12.expect_count (n : Nat) :
+    (∀ c, SPMF.expect (genT1 n) (fun t => (t.count c : ℝ≥0∞)) = predicted 0 c n) ∧
+    (∀ c, SPMF.expect (genT2 n) (fun t => (t.count c : ℝ≥0∞)) = predicted 1 c n) := by
+  refine ⟨fun c => le_antisymm ((genT12.expect_count_le n).1 c) ?_,
+    fun c => le_antisymm ((genT12.expect_count_le n).2 c) ?_⟩
+  · simpa [SPMF.expect_eq_obs] using (genT12.le_expect_count n).1 c 0
+  · simpa [SPMF.expect_eq_obs] using (genT12.le_expect_count n).2 c 0
 
 end BranchingProcesses

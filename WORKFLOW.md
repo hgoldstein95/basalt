@@ -384,9 +384,18 @@ theorem <GEN>.<NAME> : SPMF.expect (<GEN> <ARGS>) (fun v => <QUANTITY> v) ≤ <B
 again: it pushes `<QUANTITY>` backward and computes an upper bound. A recursive occurrence is
 bounded by `ih`, used under whatever the walk arrives with as long as that is `ih`'s own quantity
 plus a constant (`(node l x r).size` is `l.size + 1 + r.size`), or, for a bound on the mass, a
-constant times it; a callee's bound is passed explicitly, restated with the same lemma as the goal. Only an upper bound can be proved this way:
-the fixpoint induction starts from the generator that never returns. `BasaltTest/Walk/Expect.lean`
-pins the goals.
+constant times it; a callee's bound is passed explicitly, restated with the same lemma as the goal.
+Only an upper bound can be proved this way: the fixpoint induction starts from the generator that
+never returns. `BasaltTest/Walk/Expect.lean` pins the goals.
+
+**An exact expectation** of a generator recursive on a shrinking seed adds the lower bound, by your
+induction on the seed instead of `walk fixpoint`. State it under every added constant `k`, as
+`k + B n ≤ SPMF.expectObs.spec (<GEN> n) fun v => k + <QUANTITY> v`, which only a generator of mass
+`1` satisfies; unfold one step (`conv_rhs => rw [<GEN>]`) and `walk [ih]`, which shifts `k` at each
+draw. `SPMF.le_expect_add` (`Basalt/Walk/Mass.lean`) states a callee's bound that way from its mass,
+and `le_antisymm` with the upper bound at `k = 0` gives the equation. Worked instances:
+`genDragen.expect_countA`, `genMegaDeTH.expect_nodes`, and `genT12.expect_count`, for a pair of
+mutually recursive generators, which `walk fixpoint` does not induct over (`BranchingProcesses.lean`).
 
 **A termination probability below `1`** is the quantity `1`, bounded above this way, and bounded
 below by one unfolding (`conv_rhs => rw [<GEN>]`) walked with the mass itself as the fact about the

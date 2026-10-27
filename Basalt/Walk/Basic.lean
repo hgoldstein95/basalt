@@ -316,7 +316,8 @@ def solveSideGoal (goal : MVarId) (ty : Expr) : MetaM Bool := goal.withContext d
 
 /-- Close `goal`, a leaf, with the fact `e`, as it is or through one of the observation's `leaves`,
 `e`'s binders instantiated by `instBinders` first: possibly all of them for the fact as it is, and
-all but the bridge's own for a bridge. `none` if nothing applies. -/
+all but the bridge's own for a bridge. If nothing applies, the error of the last bridge whose side
+goals failed, and `none` when no bridge got that far. -/
 private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
     MetaM (Option (List MVarId)) := do
   -- A fact that is the goal, binders and all: a generator argument's family of observations.
@@ -334,6 +335,7 @@ private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
       goal.withContext (assumeProps e)
       if (← instantiateMVars e).hasExprMVar then failure
     if r.isSome then return some []
+  let mut sidesErr : Option Exception := none
   for bridge in leaves.facts do
     let saved ← saveState
     let some (e, sides) ← observing? (do
@@ -349,8 +351,8 @@ private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
       return some []
     catch ex =>
       saved.restore
-      if leaves.facts.back? == some bridge then
-        throw ex
+      sidesErr := some ex
+  if let some ex := sidesErr then throw ex
   return none
 
 /-! ## Reading a recursive definition -/

@@ -16,7 +16,8 @@ public import BasaltTest.OptionGen
 Pins what `walk` leaves behind on a lower bound on a generator's mass,
 `c ≤ SPMF.expectObs.spec g fun _ => 1`: a bound whose shape mirrors the generator's, built from one
 `@[gen_rule]` rule per combinator and walked through the unfolding of any other definition, and the
-message for a generator that has neither.
+message for a generator that has neither; and a lower bound on an expectation, from facts that hold
+under any added constant.
 -/
 
 @[expose] public section
@@ -249,5 +250,20 @@ example : (1 : ℝ≥0∞) ≤ (suchThat (elements [0, 1]) (· != 0) : SPMF Nat)
   walk
   trace_state
   simp
+
+-- A lower bound on an expectation is a fact under every added constant, which a terminating
+-- generator has: each draw shifts the constant by what its continuation adds.
+/--
+trace: g : SPMF ℕ
+h : ∀ (k : ℝ≥0∞), k + 1 ≤ SPMF.expectObs.spec g fun n => k + ↑n
+⊢ 2 ≤ 1 + 1
+-/
+#guard_msgs in
+example (g : SPMF Nat) (h : ∀ k, k + 1 ≤ SPMF.expectObs.spec g fun n => k + (n : ℝ≥0∞)) :
+    2 ≤ SPMF.expectObs.spec (do let x ← g; let y ← g; pure (x + y) : SPMF Nat)
+      (fun n => (n : ℝ≥0∞)) := by
+  walk [h]
+  trace_state
+  norm_num
 
 end MassBoundTest
