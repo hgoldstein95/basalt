@@ -63,6 +63,21 @@ example : SPMF.expect (Nat.arbitrary : SPMF Nat) (fun n => (n : ℝ≥0∞)) ≤
   trace_state
   norm_num
 
+-- A fact bounding a mass below `1` is used under a constant postexpectation by scaling: the
+-- termination probability of a generator that may diverge.
+/--
+trace: g : SPMF ℕ
+h : (SPMF.expectObs.spec g fun x => 1) ≤ 1 / 2
+⊢ 1 / 2 * (1 / 2) ≤ 1 / 4
+-/
+#guard_msgs in
+example (g : SPMF Nat) (h : SPMF.expectObs.spec g (fun _ => 1) ≤ 1 / 2) :
+    SPMF.expect (do let _ ← g; let _ ← g; pure 0 : SPMF Nat) (fun _ => 1) ≤ 1 / 4 := by
+  rw [SPMF.expect_eq_obs]
+  walk [h]
+  trace_state
+  ennreal_to_real; norm_num
+
 -- A list combinator has no shape of choice, so it is bounded by a rule that uses only the mass:
 -- a constant postexpectation exactly, and otherwise its worst case over every value, dually to the
 -- `⨅` a lower bound on the mass leaves.
