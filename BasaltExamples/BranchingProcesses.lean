@@ -10,10 +10,11 @@ public import Basalt
 /-!
 # Branching Processes for QuickCheck Generators
 
-The generators of Mista, Russo, and Hughes, "Branching Processes for QuickCheck Generators"
-(Haskell '18, arXiv:1808.01520), with their claims about them stated and proved: the termination
-probability of a `derive` generator (Appendix B.1), and the expected constructor counts the paper
-predicts for MegaDeTH (§3) and Dragen (§4) generators at size `10`.
+This file formalizes some results
+from "Branching Processes for QuickCheck Generators" (Mista et al. Haskell '18).
+In particular, we prove results about the termination probability of an automatically
+derived generator (Appendix B.1 of their paper), and the expected no. of constructors
+for a few particular generators (sections 3 & 4 from the paper).
 -/
 
 @[expose] public section
@@ -153,7 +154,7 @@ def genMegaDeTH [Gen G] (n : Nat) : G Tree :=
         return .node l r]
 partial_fixpoint
 
-/-- The expected number of `node`s at size `n`, by the generator's own recurrence. -/
+/-- The expected number of `node`s at size `n` -/
 noncomputable def megaNodes : Nat → ℝ≥0∞
   | 0 => 0
   | n + 1 => (1 + 2 * megaNodes ((n + 1) / 2)) / 4
@@ -164,9 +165,7 @@ theorem genMegaDeTH.expect_nodes_le (n : Nat) :
   walk fixpoint
   all_goals simp [Tree.nodes, megaNodes, two_mul, add_assoc]
 
-/-- §3 predicts "an expected number of `Node` constructors up to level 10 of 0.4997" for this
-generator at size `10`; it has at most `15/32 = 0.46875`, since halving the size leaves four levels
-of `node`s, where the prediction counts eleven. -/
+/-- The expected no. of `node`s when `size = 10` is 15 / 32 -/
 theorem megaNodes_ten : megaNodes 10 = 15 / 32 := by
   simp [megaNodes]
   basify
@@ -206,12 +205,12 @@ def genDragen [Gen G] (n : Nat) : G Tree' :=
         return .nodeB t)] (by simp)
 partial_fixpoint
 
-/-- The expected number of `nodeA`s at size `n`, by the generator's own recurrence. -/
+/-- The expected number of `nodeA`s at size `n` -/
 noncomputable def dragenA : Nat → ℝ≥0
   | 0 => 0
   | n + 1 => (5 + 13 * dragenA n) / 10
 
-/-- The expected number of `nodeB`s at size `n`, by the generator's own recurrence. -/
+/-- The expected number of `nodeB`s at size `n` -/
 noncomputable def dragenB : Nat → ℝ≥0
   | 0 => 0
   | n + 1 => (3 + 13 * dragenB n) / 10
@@ -230,13 +229,5 @@ theorem genDragen.expect_countB_le (n : Nat) :
   all_goals simp [Tree'.countB, dragenB, ENNReal.coe_div]
   all_goals (apply le_of_eq; ring_nf)
 
-/-- §4: "our QuickCheck generator with a size parameter of 10 will generate on average 21.322
-`NodeA`s" — it generates fewer. -/
-theorem dragenA_ten : dragenA 10 < 21322 / 1000 := by
-  norm_num [dragenA]
-
-/-- §4: "… and 12.813 `NodeB`s" — it generates fewer. -/
-theorem dragenB_ten : dragenB 10 < 12813 / 1000 := by
-  norm_num [dragenB]
 
 end BranchingProcesses
