@@ -17,6 +17,8 @@ public import Basalt.Enum.CostLaws
 public import Basalt.Enum.FailLaws
 public import Basalt.Enum.BacktrackLaws
 public import Basalt.Enum.BacktrackCostLaws
+public import Basalt.Enum.WeightedBacktrack
+public import Basalt.Enum.BacktrackWeightLaws
 public import Basalt.Enum.MemoLaws
 public import Basalt.Enum.TabledLaws
 public import Basalt.Sized
@@ -40,6 +42,7 @@ read as everything it can produce rather than one random value.
 
 Failure is `Fail.fail`, read as `∅` here (`Basalt.Fail`); weighted backtracking is
 `Backtrack.backtrack`, and a weighted draw without retry `Pick.pick`, both read as the union of their
-branches (`Basalt.Backtrack`, `Basalt.Pick`); FEAT's exact sizing is
+branches (`Basalt.Backtrack`, `Basalt.Pick`), and `backtrack` at `WFinite` as each branch weighted by
+the probability that the search reaches it (`Basalt.Enum.WeightedBacktrack`); FEAT's exact sizing is
 `Sized.pay`, `Sized.splitBind` and `Sized.done` (`Basalt.Sized`).
 -/

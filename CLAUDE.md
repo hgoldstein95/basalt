@@ -125,7 +125,8 @@ definition, and the definition is right here to run.
     [Basalt/Enum/CostLaws.lean](Basalt/Enum/CostLaws.lean); successes of a generator that can
     `fail` — [Basalt/Enum/FailLaws.lean](Basalt/Enum/FailLaws.lean), and of weighted backtracking,
     read as a union at `Finite` — [Basalt/Enum/BacktrackLaws.lean](Basalt/Enum/BacktrackLaws.lean),
-    or at `CostGraded Finite`, complete only up to cost — [Basalt/Enum/BacktrackCostLaws.lean](Basalt/Enum/BacktrackCostLaws.lean).
+    or at `CostGraded Finite`, complete only up to cost — [Basalt/Enum/BacktrackCostLaws.lean](Basalt/Enum/BacktrackCostLaws.lean);
+    probabilities of both, failure included — [Basalt/Enum/BacktrackWeightLaws.lean](Basalt/Enum/BacktrackWeightLaws.lean).
   - An open-recursion step (`KeyedStep`, `PolyStep`) is not a `Gen` term, so the walk cannot prove
     its laws: they are built from per-construct lemmas — memoization in
     [Basalt/Enum/MemoLaws.lean](Basalt/Enum/MemoLaws.lean), tabling in

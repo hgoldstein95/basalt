@@ -96,6 +96,42 @@ partial_fixpoint
 #guard (List.range 4).map (drawn (G := CostGraded Basalt.Finite)).tier? ==
   [some [], some [3], some [1, 2], some []]
 
+-- The exact distribution: each branch's entries weighted by the probability of reaching it.
+#guard WFinite.entries? (rules (G := WFinite) 1) == some [(1, 3/8), (2, 3/8), (3, 1/4)]
+
+/-- Three rules, each of which can fail, one always. -/
+def failing [Monad G] [RandomChoice G] [Fail G] [Backtrack G] : G Nat :=
+  Backtrack.backtrack [
+    (2, fun _ => do
+      let n := (← RandomChoice.choose 0 2 (by omega)).down.val
+      if n = 0 then Fail.fail else pure n),
+    (1, fun _ => Fail.fail),
+    (3, fun _ => do
+      if (← RandomChoice.choose 0 1 (by omega)).down.val = 0 then Fail.fail else pure 5)]
+
+def byValue (l : List (Nat × Rat)) : List (Nat × Rat) := l.mergeSort fun a b => a.1 ≤ b.1
+
+open Basalt.Examples.Enum.Local in
+-- The search's distribution, and its probability of failing as what the weights leave of `1`.
+#guard byValue (distOf (failing (G := WFinite))) ==
+  byValue (failAndDist (failing (G := OptionT WFinite))).2
+open Basalt.Examples.Enum.Local in
+#guard 1 - ((WFinite.entries? (failing (G := WFinite))).getD []).foldl (fun s (_, w) => s + w) 0 ==
+  (failAndDist (failing (G := OptionT WFinite))).1
+
+-- An entry per value, where the search has one per order of retries.
+#guard (WFinite.entries? (failing (G := WFinite))).map List.length == some 3
+#guard (WFinite.entries? (failing (G := OptionT WFinite)).run).map List.length == some 104
+
+/-- Ten rules, each failing half the time. -/
+def coins [Monad G] [RandomChoice G] [Fail G] [Backtrack G] : G Nat :=
+  Backtrack.backtrack ((List.range 10).map fun k => (k + 1, fun _ => do
+    if (← RandomChoice.choose 0 1 (by omega)).down.val = 0 then Fail.fail else pure k))
+
+-- The search fails only if every rule does.
+#guard ((WFinite.entries? (coins (G := WFinite))).getD []).foldl (fun s (_, w) => s + w) 0 ==
+  1 - 1 / 2 ^ 10
+
 end Backtracking
 
 /-! ## Memoized tiers -/

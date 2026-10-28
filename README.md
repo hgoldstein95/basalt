@@ -151,7 +151,8 @@ the failure model, the supported platforms, and how fast each backend finds a bu
     expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
     `PlausibleGen.lean` and `PlausibleGen/`, `OptionT.lean`, `GenStats/`, `Enum/` (enumeration,
     with its laws; `Fail.lean` is the failure it reads as `∅`, and `Backtrack.lean` and `Pick.lean` the
-    weighted choices, with and without retry, it reads as a union), and the opt-in `Fuzz/`,
+    weighted choices, with and without retry, it reads as a union, or `backtrack` at `WFinite` as a
+    mixture, `Enum/WeightedBacktrack.lean`), and the opt-in `Fuzz/`,
     with `Random.lean` holding `stdChoose`, the exactly uniform draw from core's `StdGen` that
     `GenStats/` makes;
   - *the proof machinery*:
