@@ -316,7 +316,8 @@ def solveSideGoal (goal : MVarId) (ty : Expr) : MetaM Bool := goal.withContext d
 
 /-- Close `goal`, a leaf, with the fact `e`, as it is or through one of the observation's `leaves`,
 `e`'s binders instantiated by `instBinders` first: possibly all of them for the fact as it is, and
-all but the bridge's own for a bridge. `none` if nothing applies. -/
+all but the bridge's own for a bridge. If nothing applies, the error of the last bridge whose side
+goals failed, and `none` when no bridge got that far. -/
 private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
     MetaM (Option (List MVarId)) := do
   -- A fact that is the goal, binders and all: a generator argument's family of observations.
@@ -334,6 +335,7 @@ private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
       goal.withContext (assumeProps e)
       if (← instantiateMVars e).hasExprMVar then failure
     if r.isSome then return some []
+  let mut sidesErr : Option Exception := none
   for bridge in leaves.facts do
     let saved ← saveState
     let some (e, sides) ← observing? (do
@@ -349,8 +351,8 @@ private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
       return some []
     catch ex =>
       saved.restore
-      if leaves.facts.back? == some bridge then
-        throw ex
+      sidesErr := some ex
+  if let some ex := sidesErr then throw ex
   return none
 
 /-! ## Reading a recursive definition -/
@@ -581,12 +583,20 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
       let some gs ← tryFact leaves goal e | failure
       namePremises none (← goal.getType) gs
     if let some gs := r then return some (← rest gs)
+  -- A hypothesis whose bridge fails is reported only if no later one closes the leaf.
+  let mut err : Option Exception := none
   for decl in ← getLCtx do
     unless decl.isImplementationDetail do
       unless ← isProp decl.type do continue
       unless mentionsHead (← instantiateMVars decl.type) do continue
-      if let some gs ← tryFact leaves goal decl.toExpr then
+      let saved ← saveState
+      let r ← try tryFact leaves goal decl.toExpr catch ex => do
+        saved.restore
+        if err.isNone then err := some ex
+        pure none
+      if let some gs := r then
         return some (← rest (← namePremises none (← goal.getType) gs))
+  if let some ex := err then throw ex
   return none
 
 /-- Why each of `extras` that does not elaborate at `goal` does not, for the error of a leaf nothing

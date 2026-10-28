@@ -147,10 +147,10 @@ the failure model, the supported platforms, and how fast each backend finds a bu
   - *the representation*: `RandomChoice.lean`, `Gen.lean`, `Sized.lean`, `Combinators.lean`, and
     `Laws.lean`, the properties a generator may be proved to have;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
-    expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
-    `PlausibleGen.lean` and `PlausibleGen/`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`,
-    with `Random.lean` holding `stdChoose`, the exactly uniform draw from core's `StdGen` that
-    `GenStats/` makes;
+    expectations, cost, almost-sure termination, branching-process predictions), `IO.lean` and
+    `IO/` (with `IsFaithful`), `PlausibleGen.lean` and `PlausibleGen/`, `OptionT.lean`, `GenStats/`,
+    and the opt-in `Fuzz/`, with `Random.lean` holding `stdChoose`, the exactly uniform draw from
+    core's `StdGen` that `GenStats/` makes;
   - *the proof machinery*:
     - `Obs/`, the layer every per-combinator lemma is derived from. A judgment about a generator
       (its support, an expectation, a cost bound) is an *observation*: a `choose`-preserving monad
