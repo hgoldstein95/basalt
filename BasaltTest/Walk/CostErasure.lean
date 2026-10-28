@@ -30,6 +30,14 @@ example : IsCostFaithful (Tree.genBST lo hi) := ⟨by walk fixpoint, by walk fix
 example : IsCostFaithful (suchThat Nat.arbitrary (· != 0)) :=
   ⟨by walk [natFaithful.erasedLe], by walk [natFaithful.leErased]⟩
 
+/-- Defined here rather than imported, so `walk fixpoint` must realize its `eq_def` itself. -/
+def coins [Gen G] : G (List Bool) := do
+  if (← choose 0 1 (by omega)).down.val = 0 then pure []
+  else return ((← choose 0 1 (by omega)).down.val == 1) :: (← coins)
+partial_fixpoint
+
+example : IsCostFaithful coins := ⟨by walk fixpoint, by walk fixpoint⟩
+
 -- A callee's law is passed by the field the walk is proving.
 example : IsCostFaithful List.arbitrary :=
   ⟨by walk fixpoint [natFaithful.erasedLe], by walk fixpoint [natFaithful.leErased]⟩

@@ -218,6 +218,7 @@ def relFixpoint (tac boundTac : String) (rel genRel : Name) (extras : Array Term
     (← relAdmissible tac rel genRel args) goal
   -- `eq_def`, not the equation lemmas: a generator defined by cases has one per case.
   let step ← if inducted then
+      unless (← getEnv).contains (gen ++ `eq_def) do executeReservedNameAction (gen ++ `eq_def)
       match ← Lean.Elab.Tactic.run step
           (evalTactic (← `(tactic| rw [$(mkCIdent (gen ++ `eq_def)):ident]))) with
       | [g] => pure g
