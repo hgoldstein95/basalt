@@ -69,6 +69,15 @@ def sizedRules [Monad G] [RandomChoice G] [Fail G] [Sized G] [Backtrack G] : G N
 #guard ((sizedRules (G := WithSize Basalt.Finite)).run 2).toList? == some [2, 12]
 #guard ((sizedRules (G := WithSize Basalt.Finite)).run 0).toList? == some [0]
 
+/-- The draw without retry: at an enumeration the same union as `backtrack`, where the draw itself,
+enumerated, repeats each branch once per unit of weight. -/
+def drawn [Monad G] [RandomChoice G] [Fail G] [Pick G] : G Nat :=
+  Pick.pick [(3, fun _ => pickFrom [1, 2]), (0, fun _ => pure 9), (1, fun _ => pure 3)]
+
+#guard (drawn (G := Basalt.Finite)).toList? == some [1, 2, 3]
+#guard (drawn (G := OptionT Basalt.Finite)).run.toList? ==
+  some [some 1, some 2, some 1, some 2, some 1, some 2, some 3]
+
 end Backtracking
 
 /-! ## Memoized tiers -/

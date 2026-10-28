@@ -7,13 +7,15 @@ module
 
 public import Basalt.Backtrack
 public import Basalt.Enum.FailLaws
+public import Basalt.Pick
 
 /-!
 # Backtracking Enumerates Its Branches
 
 What `backtrack` can succeed with at `OptionT SPMF` is what its branches of positive weight can
 (`mem_support_backtrack_iff`), which is what the union at `Finite` lists, so the two are related by
-`EnumeratesSome` whenever their branches are (`EnumeratesSome.backtrack`).
+`EnumeratesSome` whenever their branches are (`EnumeratesSome.backtrack`); so is `pick`, the draw
+without retry (`EnumeratesSome.pick`).
 -/
 
 @[expose] public section
@@ -137,17 +139,49 @@ theorem backtrack_branch_defined {gs : List (Nat × (Unit → Finite α))}
 
 end Backtrack
 
+/-! ## Successes of the draw at `OptionT SPMF` -/
+
+namespace Pick
+
+open Backtrack
+
+variable {α : Type}
+
+/-- What `pick` can succeed with is what its branches of positive weight can. -/
+theorem mem_support_pick_iff (gs : List (Nat × (Unit → OptionT SPMF α))) (a : α) :
+    some a ∈ (pick gs : OptionT SPMF α).run.support ↔
+      ∃ p ∈ gs, 0 < p.1 ∧ some a ∈ (p.2 ()).run.support := by
+  change some a ∈ (draw gs).run.support ↔ _
+  constructor
+  · intro h
+    simp only [draw, OptionT.run_mk, SPMF.mem_support_bind_iff] at h
+    obtain ⟨n, _, h⟩ := h
+    split at h
+    · simp at h
+    · rename_i k g rest hpick
+      obtain ⟨hm, hk, _⟩ := pickDrop_some hpick
+      exact ⟨(k, g), hm, hk, h⟩
+  · rintro ⟨p, hp, hk, h⟩
+    obtain ⟨n, hn, rest, hpick⟩ := exists_pickDrop hp hk
+    simp only [draw, OptionT.run_mk, SPMF.mem_support_bind_iff]
+    refine ⟨ULift.up ⟨n, Nat.zero_le _, by omega⟩, by simp, ?_⟩
+    simp only [hpick]
+    exact h
+
+end Pick
+
 /-! ## The law -/
 
-/-- The union at `Finite` lists exactly what the search at `OptionT SPMF` can succeed with, when
-their branches are related weight for weight. -/
-@[gen_rule]
-theorem EnumeratesSome.backtrack {α : Type} {gs' : List (Nat × (Unit → Finite α))}
-    {gs : List (Nat × (Unit → OptionT SPMF α))} (hs : GenRel.Weighted @EnumeratesSome gs' gs) :
-    EnumeratesSome (Backtrack.backtrack gs') (Backtrack.backtrack gs) := fun hd a => by
-  rw [Backtrack.mem_backtrack_finite hd, Backtrack.mem_support_backtrack_iff]
+/-- The union at `Finite` lists exactly what `x` can succeed with, when `x`'s successes are its
+branches' of positive weight and the branches are related weight for weight. -/
+theorem EnumeratesSome.union {α : Type} {gs' : List (Nat × (Unit → Finite α))}
+    {gs : List (Nat × (Unit → OptionT SPMF α))} {x : OptionT SPMF α}
+    (hs : GenRel.Weighted @EnumeratesSome gs' gs)
+    (hx : ∀ a, some a ∈ x.run.support ↔ ∃ p ∈ gs, 0 < p.1 ∧ some a ∈ (p.2 ()).run.support) :
+    EnumeratesSome (Backtrack.backtrack gs') x := fun hd a => by
+  rw [Backtrack.mem_backtrack_finite hd, hx]
   have hdef := fun {p} (hp : p ∈ gs') (hk : 0 < p.1) => Backtrack.backtrack_branch_defined hd hp hk
-  clear hd
+  clear hd hx
   induction hs with
   | nil => simp
   | @cons w g' g gs' gs h hs ih =>
@@ -157,5 +191,20 @@ theorem EnumeratesSome.backtrack {α : Type} {gs' : List (Nat × (Unit → Finit
     · simp only [hw, true_and]
       exact h (hdef (List.mem_cons_self ..) hw) a
     · simp [hw]
+
+/-- The union at `Finite` lists exactly what the search at `OptionT SPMF` can succeed with, when
+their branches are related weight for weight. -/
+@[gen_rule]
+theorem EnumeratesSome.backtrack {α : Type} {gs' : List (Nat × (Unit → Finite α))}
+    {gs : List (Nat × (Unit → OptionT SPMF α))} (hs : GenRel.Weighted @EnumeratesSome gs' gs) :
+    EnumeratesSome (Backtrack.backtrack gs') (Backtrack.backtrack gs) :=
+  union hs (Backtrack.mem_support_backtrack_iff gs)
+
+/-- The union at `Finite` lists exactly what the draw at `OptionT SPMF` can succeed with. -/
+@[gen_rule]
+theorem EnumeratesSome.pick {α : Type} {gs' : List (Nat × (Unit → Finite α))}
+    {gs : List (Nat × (Unit → OptionT SPMF α))} (hs : GenRel.Weighted @EnumeratesSome gs' gs) :
+    EnumeratesSome (Pick.pick gs') (Pick.pick gs) :=
+  union hs (Pick.mem_support_pick_iff gs)
 
 end Basalt

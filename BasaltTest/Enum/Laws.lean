@@ -89,4 +89,13 @@ theorem digits_enumeratesSome :
     EnumeratesSome (digits (G := Basalt.Finite)) (digits (G := OptionT SPMF)) := by
   walk fixpoint
 
+/-- Unbounded recursion through `pick`, the draw without retry. -/
+def picked [Gen G] [Fail G] [Pick G] [MonoPick G] : G (List Nat) :=
+  Pick.pick [(1, fun _ => pure []), (3, fun _ => do return (← digit) :: (← picked)), (0, fun _ => Fail.fail)]
+partial_fixpoint
+
+theorem picked_enumeratesSome :
+    EnumeratesSome (picked (G := Basalt.Finite)) (picked (G := OptionT SPMF)) := by
+  walk fixpoint
+
 end EnumLawTest

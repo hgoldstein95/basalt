@@ -133,7 +133,8 @@ definition, and the definition is right here to run.
     (`*_defined` in [Basalt/Enum/Finite.lean](Basalt/Enum/Finite.lean), `fix_defined` in
     [Basalt/Enum/Memo.lean](Basalt/Enum/Memo.lean)).
   - `Fail` is [Basalt/Fail.lean](Basalt/Fail.lean); `Backtrack`, a choice among branches that a
-    search retries and an enumeration unions, is [Basalt/Backtrack.lean](Basalt/Backtrack.lean);
+    search retries and an enumeration unions, is [Basalt/Backtrack.lean](Basalt/Backtrack.lean), and
+    `Pick`, the same choice without retry, [Basalt/Pick.lean](Basalt/Pick.lean);
     FEAT-style exact sizing (`Sized.pay`,
     `splitBind`, `done`) is [Basalt/Sized.lean](Basalt/Sized.lean).
   - Worked instances, end to end with memoization: [BasaltExamples/Enum/BST.lean](BasaltExamples/Enum/BST.lean)

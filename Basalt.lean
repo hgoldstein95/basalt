@@ -35,6 +35,7 @@ public import Basalt.PBT.Backend
 public import Basalt.PBT.Campaign
 public import Basalt.PBT.Driver
 public import Basalt.PBT.Property
+public import Basalt.Pick
 public import Basalt.PlausibleGen
 public import Basalt.PlausibleGen.Backend
 public import Basalt.Random
