@@ -158,4 +158,30 @@ theorem hasTypeT_costEnumeratesWith (τ : Ty) (n : Nat) :
   | zero => unfold hasTypeT; walk
   | succ n ih => unfold hasTypeT; walk [ih .nat]
 
+theorem hasTypeT_weighsWith (τ : Ty) (n : Nat) :
+    WeighsWith (hasTypeT (G := ExceptT Unit WFinite) τ n)
+      (hasTypeT (G := ExceptT Unit (OptionT SPMF)) τ n) := by
+  induction n generalizing τ with
+  | zero => unfold hasTypeT; walk
+  | succ n ih => unfold hasTypeT; walk [ih .nat]
+
+/-- Unbounded recursion through `backtrack` and `pick`, a branch failing with a label. -/
+def digitsT [Gen G] [Fail G] [FailWith Unit G] [Backtrack G] [MonoBacktrack G] : G (List Nat) :=
+  Backtrack.backtrack [(1, fun _ => pure []), (2, fun _ => do return (← digit) :: (← digitsT)),
+    (1, fun _ => FailWith.failWith ())]
+partial_fixpoint
+
+def pickedT [Gen G] [Fail G] [FailWith Unit G] [Pick G] [MonoPick G] : G (List Nat) :=
+  Pick.pick [(1, fun _ => pure []), (3, fun _ => do return (← digit) :: (← pickedT)),
+    (1, fun _ => FailWith.failWith ())]
+partial_fixpoint
+
+theorem digitsT_weighsWith :
+    WeighsWith (digitsT (G := ExceptT Unit WFinite)) (digitsT (G := ExceptT Unit (OptionT SPMF))) := by
+  walk fixpoint
+
+theorem pickedT_weighsWith :
+    WeighsWith (pickedT (G := ExceptT Unit WFinite)) (pickedT (G := ExceptT Unit (OptionT SPMF))) := by
+  walk fixpoint
+
 end EnumLawTest

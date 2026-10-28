@@ -128,8 +128,9 @@ definition, and the definition is right here to run.
     or at `CostGraded Finite`, complete only up to cost — [Basalt/Enum/BacktrackCostLaws.lean](Basalt/Enum/BacktrackCostLaws.lean);
     probabilities of both, failure included — [Basalt/Enum/BacktrackWeightLaws.lean](Basalt/Enum/BacktrackWeightLaws.lean);
     with failures that say why (`FailWith`), successes exact and labels over-approximated —
-    [Basalt/Enum/BacktrackWithLaws.lean](Basalt/Enum/BacktrackWithLaws.lean), and graded by cost —
-    [Basalt/Enum/BacktrackWithCostLaws.lean](Basalt/Enum/BacktrackWithCostLaws.lean).
+    [Basalt/Enum/BacktrackWithLaws.lean](Basalt/Enum/BacktrackWithLaws.lean), graded by cost —
+    [Basalt/Enum/BacktrackWithCostLaws.lean](Basalt/Enum/BacktrackWithCostLaws.lean), and at `WFinite` every
+    outcome's probability exact — [Basalt/Enum/BacktrackWithWeightLaws.lean](Basalt/Enum/BacktrackWithWeightLaws.lean).
   - An open-recursion step (`KeyedStep`, `PolyStep`) is not a `Gen` term, so the walk cannot prove
     its laws: they are built from per-construct lemmas — memoization in
     [Basalt/Enum/MemoLaws.lean](Basalt/Enum/MemoLaws.lean), tabling in

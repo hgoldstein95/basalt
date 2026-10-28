@@ -177,6 +177,66 @@ def decided [Monad G] [RandomChoice G] [Fail G] [FailWith Unit G] [Backtrack G] 
 #guard (List.range 3).map (decided (G := ExceptT Unit (CostGraded Basalt.Finite))).run.tier? ==
   [some [], some [Except.error (), Except.ok 7], some []]
 
+/-- Rules that refute, fail with a label and succeed, each with its own probabilities; the labels
+join by `max`. -/
+def labelled [Monad G] [RandomChoice G] [Fail G] [FailWith Nat G] [Backtrack G] : G Nat :=
+  Backtrack.backtrack [
+    (2, fun _ => do
+      let n := (← RandomChoice.choose 0 2 (by omega)).down.val
+      if n = 0 then Fail.fail else if n = 1 then FailWith.failWith 1 else pure n),
+    (1, fun _ => do
+      if (← RandomChoice.choose 0 1 (by omega)).down.val = 0 then FailWith.failWith 2 else Fail.fail),
+    (3, fun _ => do
+      let n := (← RandomChoice.choose 0 3 (by omega)).down.val
+      if n = 0 then Fail.fail else if n = 1 then FailWith.failWith 1 else pure (n + 10))]
+
+/-- `labelled`'s rules, drawn once. -/
+def labelledOnce [Monad G] [RandomChoice G] [Fail G] [FailWith Nat G] [Pick G] : G Nat :=
+  Pick.pick [
+    (2, fun _ => do
+      let n := (← RandomChoice.choose 0 2 (by omega)).down.val
+      if n = 0 then Fail.fail else if n = 1 then FailWith.failWith 1 else pure n),
+    (1, fun _ => do
+      if (← RandomChoice.choose 0 1 (by omega)).down.val = 0 then FailWith.failWith 2 else Fail.fail),
+    (3, fun _ => do
+      let n := (← RandomChoice.choose 0 3 (by omega)).down.val
+      if n = 0 then Fail.fail else if n = 1 then FailWith.failWith 1 else pure (n + 10))]
+
+/-- Each outcome's probability, `none` for a refutation, which at `ExceptT ε WFinite` is what the
+entries leave of `1`. -/
+def outcomes [DecidableEq ε] (g : ExceptT ε WFinite Nat) : List (Option (Except ε Nat) × Rat) :=
+  let es := (WFinite.entries? g.run).getD []
+  WFinite.dist (((none, 1 - es.foldl (fun s (_, w) => s + w) 0) ::
+    es.map fun (r, w) => (some r, w)).filter (·.2 != 0))
+
+/-- The same, read off the search enumerated: an entry per path. -/
+def searchOutcomes [DecidableEq ε] (g : ExceptT ε (OptionT WFinite) Nat) :
+    List (Option (Except ε Nat) × Rat) :=
+  WFinite.dist ((WFinite.entries? g.run.run).getD [])
+
+/-- The same distribution, in any order. -/
+def sameDist [BEq β] (l₁ l₂ : List (β × Rat)) : Bool := l₁.length == l₂.length && l₁.all l₂.contains
+
+-- At `WFinite`, the search's distribution, labels and refutation included.
+#guard sameDist (outcomes (undecided (G := ExceptT Unit WFinite)))
+  (searchOutcomes (undecided (G := ExceptT Unit (OptionT WFinite))))
+#guard sameDist (outcomes (decided (G := ExceptT Unit WFinite)))
+  (searchOutcomes (decided (G := ExceptT Unit (OptionT WFinite))))
+#guard sameDist (outcomes (labelled (G := ExceptT Nat WFinite)))
+  (searchOutcomes (labelled (G := ExceptT Nat (OptionT WFinite))))
+#guard sameDist (outcomes (labelledOnce (G := ExceptT Nat WFinite)))
+  (searchOutcomes (labelledOnce (G := ExceptT Nat (OptionT WFinite))))
+-- Refuted only if every rule is: `1/3 * 1/2 * 1/4`.
+#guard (outcomes (labelled (G := ExceptT Nat WFinite))).lookup none == some (1/24)
+
+-- An entry per outcome, where the search has one per path.
+#guard (WFinite.entries? (undecided (G := ExceptT Unit WFinite)).run) == some [(Except.error (), 1)]
+#guard (WFinite.entries? (decided (G := ExceptT Unit WFinite)).run) == some [(Except.ok 7, 1)]
+#guard (WFinite.entries? (labelled (G := ExceptT Nat WFinite)).run) == some
+  [(.ok 2, 7/30), (.ok 12, 13/60), (.ok 13, 13/60), (.error 1, 1/8), (.error 2, 1/6)]
+#guard (WFinite.entries? (labelled (G := ExceptT Nat (OptionT WFinite))).run.run).map List.length ==
+  some 492
+
 end Backtracking
 
 /-! ## Memoized tiers -/

@@ -129,14 +129,16 @@ theorem runWith_eq_undef {ys : List (Nat × WFinite α)} {r : Fin ys.length → 
     (h : ys[i].2 = .undef) : runWith ys r = .undef :=
   Finite.flatten_eq_undef (List.mem_ofFn.mpr ⟨i, by simp only [h]; rfl⟩)
 
-/-- Weighting the branches by anything they determine is monotone in them: a branch `undef` on the
-left makes the left `undef`, and otherwise the branches are the same. -/
-theorem runWith_runBranches_mono (r : ∀ ys : List (Nat × WFinite α), Fin ys.length → ℚ≥0)
+/-- Anything the branches' results determine, `undef` where one of them is, is monotone in the
+branches: a branch `undef` on the left makes the left `undef`, and otherwise the branches are the
+same. -/
+theorem runBranches_mono {β : Type} (F : List (Nat × WFinite α) → WFinite β)
+    (hF : ∀ ys (i : Fin ys.length), ys[i].2 = .undef → F ys = .undef)
     {gs₁ gs₂ : List (Nat × (Unit → WFinite α))} (h : gs₁ ⊑ gs₂) :
-    runWith (runBranches gs₁) (r _) ⊑ runWith (runBranches gs₂) (r _) := by
+    F (runBranches gs₁) ⊑ F (runBranches gs₂) := by
   by_cases hu : ∃ i : Fin (runBranches gs₁).length, (runBranches gs₁)[i].2 = .undef
   · obtain ⟨i, hi⟩ := hu
-    rw [runWith_eq_undef hi]
+    rw [hF _ i hi]
     exact FlatOrder.rel.bot
   · push Not at hu
     suffices hys : runBranches gs₁ = runBranches gs₂ by rw [hys]; exact PartialOrder.rel_refl
@@ -152,6 +154,12 @@ theorem runWith_runBranches_mono (r : ∀ ys : List (Nat × WFinite α), Fin ys.
       rcases Finite.eq_undef_or_eq (hg ()) with h' | h'
       · exact absurd h' hi
       · rw [h']
+
+/-- Weighting the branches by anything they determine is monotone in them. -/
+theorem runWith_runBranches_mono (r : ∀ ys : List (Nat × WFinite α), Fin ys.length → ℚ≥0)
+    {gs₁ gs₂ : List (Nat × (Unit → WFinite α))} (h : gs₁ ⊑ gs₂) :
+    runWith (runBranches gs₁) (r _) ⊑ runWith (runBranches gs₂) (r _) :=
+  runBranches_mono (fun ys => runWith ys (r ys)) (fun _ _ hi => runWith_eq_undef hi) h
 
 instance instMonoBacktrack : MonoBacktrack WFinite where
   backtrack_mono h := runWith_runBranches_mono reach h
