@@ -1,0 +1,107 @@
+/-
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Harrison Goldstein
+-/
+module
+
+public import Basalt.Enum.Weighted
+
+/-!
+# Graded Enumeration
+
+Two ways to bucket a generator's outputs, neither asking anything of the generator.
+
+* **By size**, for a sized generator: `WithSize G`, bucket `n` being what it produces at size `n`,
+  the size its author reads with `sized`. Under exact sizing (`Sized.pay`/`splitBind`/`done`) these
+  are FEAT's tiers; under a size that biases choices, `WithSize WFinite`'s buckets are the
+  distributions drawn from at each size.
+* **By cost**, for any generator: `CostGraded G`, bucket `n` being what it produces in exactly `n`
+  choices — `SPMF.Cost`'s notion of cost, indexed rather than tagged.
+
+`CostGraded G` is FEAT's convolution over any enumeration interpretation `G`: `bind` takes, for
+every way to split the cost `n`, `x` at `k` and its continuation at `n - k`, and unions them; `pure`
+costs nothing and a `choose` exactly one. The split has to be a union without weights — every split,
+each path keeping its own weight — so `G` supplies one (`Union`). Only an enumeration has such a
+thing: a random interpretation cannot take both branches, and building the split from `choose`
+would make it a random choice, weighting every path by `1 / (n + 1)` per split. (That is what
+`Sized.splitBind` does, rightly: written into a generator, the random split is the program.)
+`CostGraded Finite` is the cost-graded enumeration, and `CostGraded WFinite` the same with each
+path's probability.
+
+Indexed, not tagged: a tagged `Finite (α × Nat)` is the whole enumeration at once, `undef` for a
+generator with an infinite support, whereas tier `n` here depends only on smaller tiers, so every
+tier is finite and defined for a geometric list or `genType`. A tier is `undef` only where the
+generator recurses without choosing: a generator that is not productive.
+-/
+
+@[expose] public section
+
+open Lean.Order RandomChoice
+
+namespace Basalt
+
+/-- A union without weights: both sides, every entry as it was. What an enumeration has and a random
+interpretation does not. -/
+class Union (G : Type → Type) where
+  union : G α → G α → G α
+
+/-- The monotonicity `Union` needs for a `partial_fixpoint` through `CostGraded`. -/
+class MonoUnion (G : Type → Type) [Union G] [∀ α, PartialOrder (G α)] where
+  union_mono {x₁ x₂ y₁ y₂ : G α} : x₁ ⊑ x₂ → y₁ ⊑ y₂ → Union.union x₁ y₁ ⊑ Union.union x₂ y₂
+
+instance : Union Finite := ⟨Finite.union⟩
+instance : MonoUnion Finite := ⟨Finite.union_mono⟩
+instance : Union WFinite := ⟨Finite.union⟩
+instance : MonoUnion WFinite := ⟨Finite.union_mono⟩
+
+/-- `G`, graded by the number of choices a run makes. -/
+def CostGraded (G : Type → Type) (α : Type) : Type := Nat → G α
+
+namespace CostGraded
+
+variable {G : Type → Type} {α β : Type}
+
+/-- The union over every split of `n`: `x` at `k`, its continuation at `n - k`. -/
+def bind [Monad G] [Fail G] [Union G] (x : CostGraded G α) (f : α → CostGraded G β) :
+    CostGraded G β := fun n =>
+  (List.range (n + 1)).foldr (fun k acc => Union.union (x k >>= fun a => f a (n - k)) acc) Fail.fail
+
+instance [Monad G] [Fail G] [Union G] : Monad (CostGraded G) where
+  pure a n := if n = 0 then pure a else Fail.fail
+  bind := CostGraded.bind
+
+/-- Every value of the range, for exactly one choice. -/
+instance [Monad G] [Fail G] [RandomChoice G] : RandomChoice (CostGraded G) where
+  choose lo hi h n := if n = 1 then RandomChoice.choose lo hi h else Fail.fail
+
+instance [Fail G] : Fail (CostGraded G) := ⟨fun _ => Fail.fail⟩
+
+instance [Gen G] : Inhabited (CostGraded G α) := ⟨fun _ => default⟩
+
+instance instCCPO [Gen G] : CCPO (CostGraded G α) := inferInstanceAs (CCPO (Nat → G α))
+
+theorem foldr_union_mono [Gen G] [Union G] [MonoUnion G] {z : G β} {l : List Nat}
+    {f₁ f₂ : Nat → G β} (h : ∀ k, f₁ k ⊑ f₂ k) :
+    l.foldr (fun k acc => Union.union (f₁ k) acc) z ⊑ l.foldr (fun k acc => Union.union (f₂ k) acc) z := by
+  induction l with
+  | nil => exact PartialOrder.rel_refl
+  | cons k l ih => exact MonoUnion.union_mono (h k) ih
+
+instance [Gen G] [Fail G] [Union G] [MonoUnion G] : MonoBind (CostGraded G) where
+  bind_mono_left h _ := foldr_union_mono fun k => MonoBind.bind_mono_left (h k)
+  bind_mono_right h _ := foldr_union_mono fun _ => MonoBind.bind_mono_right fun a => h a _
+
+/-- The entries of cost exactly `n`, if defined. -/
+def tier? (x : CostGraded Finite α) (n : Nat) : Option (List α) := (x n).toList?
+
+/-- How many entries (paths) cost exactly `n`. -/
+def card? (x : CostGraded Finite α) (n : Nat) : Option Nat := (x n).card?
+
+/-- The paths costing at most `b`, with their probabilities, if every tier up to `b` is defined. -/
+def upTo? (x : CostGraded WFinite α) (b : Nat) : Option (List (α × Rat)) :=
+  ((List.range (b + 1)).mapM fun n => WFinite.entries? (x n)).map List.flatten
+
+end CostGraded
+
+end Basalt

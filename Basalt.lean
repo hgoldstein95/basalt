@@ -6,6 +6,8 @@ Authors: Harrison Goldstein
 module
 
 public import Basalt.Combinators
+public import Basalt.Enum
+public import Basalt.Fail
 public import Basalt.Gen
 public import Basalt.GenRel
 public import Basalt.GenRel.Basic
