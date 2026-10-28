@@ -8,13 +8,14 @@ module
 public import Mathlib.Algebra.Field.Rat
 public import Basalt.Backtrack
 public import Basalt.Enum.Weighted
+public import Basalt.Pick
 
 /-!
 # Backtracking at `WFinite`
 
 The exact distribution of `backtrack`: each branch of positive weight run once, its entries weighted
 by the probability that the search reaches it. Running the search here instead would list an entry
-per order of retries; this lists one per entry of a branch.
+per order of retries; this lists one per entry of a branch. `pick` is the same with one draw.
 -/
 
 @[expose] public section
@@ -90,15 +91,27 @@ def reach (ys : List (Nat × WFinite α)) (i : Fin ys.length) : ℚ≥0 :=
   Backtrack.mixDP (fun j => if j = i then 1 else 0) 0
     (List.ofFn fun j : Fin ys.length => (ys[j].1, failMass ys[j].2, j))
 
-/-- Each branch's entries, weighted by the probability that the search reaches it. -/
-def backtrackRun (ys : List (Nat × WFinite α)) : WFinite α :=
+/-- Each branch's entries, weighted by `r` of it. -/
+def runWith (ys : List (Nat × WFinite α)) (r : Fin ys.length → ℚ≥0) : WFinite α :=
   Finite.flatten (List.ofFn fun i : Fin ys.length =>
-    Finite.map (fun q => (q.1, (reach ys i : ℚ) * q.2)) ys[i].2)
+    Finite.map (fun q => (q.1, (r i : ℚ) * q.2)) ys[i].2)
+
+/-- Each branch's entries, weighted by the probability that the search reaches it. -/
+def backtrackRun (ys : List (Nat × WFinite α)) : WFinite α := runWith ys (reach ys)
+
+/-- The probability that one draw picks branch `i`: the search's, with fuel for one. -/
+def pickReach (ys : List (Nat × WFinite α)) (i : Fin ys.length) : ℚ≥0 :=
+  Backtrack.mix (fun j => if j = i then 1 else 0) 0 1
+    (List.ofFn fun j : Fin ys.length => (ys[j].1, failMass ys[j].2, j))
 
 /-- The search's distribution: an entry per entry of a branch of positive weight, `undef` if one
 is. -/
 instance instBacktrack : Backtrack WFinite where
   backtrack gs := backtrackRun (runBranches gs)
+
+/-- The draw's distribution: each branch's entries weighted by its share of the weight. -/
+instance instPick : Pick WFinite where
+  pick gs := runWith (runBranches gs) (pickReach (runBranches gs))
 
 end WFinite
 
@@ -112,31 +125,39 @@ namespace WFinite
 
 variable {α : Type}
 
-theorem backtrackRun_eq_undef {ys : List (Nat × WFinite α)} {i : Fin ys.length}
-    (h : ys[i].2 = .undef) : backtrackRun ys = .undef :=
+theorem runWith_eq_undef {ys : List (Nat × WFinite α)} {r : Fin ys.length → ℚ≥0} {i : Fin ys.length}
+    (h : ys[i].2 = .undef) : runWith ys r = .undef :=
   Finite.flatten_eq_undef (List.mem_ofFn.mpr ⟨i, by simp only [h]; rfl⟩)
 
+/-- Weighting the branches by anything they determine is monotone in them: a branch `undef` on the
+left makes the left `undef`, and otherwise the branches are the same. -/
+theorem runWith_runBranches_mono (r : ∀ ys : List (Nat × WFinite α), Fin ys.length → ℚ≥0)
+    {gs₁ gs₂ : List (Nat × (Unit → WFinite α))} (h : gs₁ ⊑ gs₂) :
+    runWith (runBranches gs₁) (r _) ⊑ runWith (runBranches gs₂) (r _) := by
+  by_cases hu : ∃ i : Fin (runBranches gs₁).length, (runBranches gs₁)[i].2 = .undef
+  · obtain ⟨i, hi⟩ := hu
+    rw [runWith_eq_undef hi]
+    exact FlatOrder.rel.bot
+  · push Not at hu
+    suffices hys : runBranches gs₁ = runBranches gs₂ by rw [hys]; exact PartialOrder.rel_refl
+    refine List.ext_getElem (by simp [runBranches, h.1]) fun i h₁ h₂ => ?_
+    have hi := hu ⟨i, h₁⟩
+    simp only [runBranches, List.length_map] at h₁ h₂
+    obtain ⟨hw, hg⟩ := h.2 i h₁ h₂
+    simp only [runBranches, List.getElem_map, Fin.getElem_fin] at hi ⊢
+    rw [hw] at hi ⊢
+    by_cases hw0 : gs₂[i].1 = 0
+    · simp [hw0]
+    · simp only [hw0, ↓reduceIte] at hi ⊢
+      rcases Finite.eq_undef_or_eq (hg ()) with h' | h'
+      · exact absurd h' hi
+      · rw [h']
+
 instance instMonoBacktrack : MonoBacktrack WFinite where
-  backtrack_mono {_ gs₁ gs₂} h := by
-    show backtrackRun (runBranches gs₁) ⊑ backtrackRun (runBranches gs₂)
-    by_cases hu : ∃ i : Fin (runBranches gs₁).length, (runBranches gs₁)[i].2 = .undef
-    · obtain ⟨i, hi⟩ := hu
-      rw [backtrackRun_eq_undef hi]
-      exact FlatOrder.rel.bot
-    · push Not at hu
-      suffices hys : runBranches gs₁ = runBranches gs₂ by rw [hys]; exact PartialOrder.rel_refl
-      refine List.ext_getElem (by simp [runBranches, h.1]) fun i h₁ h₂ => ?_
-      have hi := hu ⟨i, h₁⟩
-      simp only [runBranches, List.length_map] at h₁ h₂
-      obtain ⟨hw, hg⟩ := h.2 i h₁ h₂
-      simp only [runBranches, List.getElem_map, Fin.getElem_fin] at hi ⊢
-      rw [hw] at hi ⊢
-      by_cases hw0 : gs₂[i].1 = 0
-      · simp [hw0]
-      · simp only [hw0, ↓reduceIte] at hi ⊢
-        rcases Finite.eq_undef_or_eq (hg ()) with h' | h'
-        · exact absurd h' hi
-        · rw [h']
+  backtrack_mono h := runWith_runBranches_mono reach h
+
+instance instMonoPick : MonoPick WFinite where
+  pick_mono h := runWith_runBranches_mono pickReach h
 
 end WFinite
 

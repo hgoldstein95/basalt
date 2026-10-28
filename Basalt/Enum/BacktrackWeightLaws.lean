@@ -641,20 +641,20 @@ theorem ofNNRat_failMass {y : WFinite α} (hd : y ≠ .undef) (hn : Finite.Nonne
         exact_mod_cast hn i]
     simp
 
-theorem nonneg_backtrackRun {ys : List (Nat × WFinite α)} (hn : ∀ i : Fin ys.length,
-    Finite.Nonneg ys[i].2) : Finite.Nonneg (backtrackRun ys) :=
+theorem nonneg_runWith {ys : List (Nat × WFinite α)} (r : Fin ys.length → ℚ≥0)
+    (hn : ∀ i : Fin ys.length, Finite.Nonneg ys[i].2) : Finite.Nonneg (runWith ys r) :=
   Finite.nonneg_flatten fun z hz => by
     obtain ⟨i, rfl⟩ := List.mem_ofFn.mp hz
-    exact Finite.nonneg_scale (by exact_mod_cast (reach ys i).2) (hn i)
+    exact Finite.nonneg_scale (by exact_mod_cast (r i).2) (hn i)
 
-/-- Each branch's expectation, weighted by the probability that the search reaches it. -/
-theorem expect_backtrackRun {ys : List (Nat × WFinite α)} (hd : backtrackRun ys ≠ .undef)
-    (hn : ∀ i : Fin ys.length, Finite.Nonneg ys[i].2) (g : α → ℝ≥0∞) :
-    Finite.expect (backtrackRun ys) g =
-      ∑ i : Fin ys.length, ofNNRat (reach ys i) * Finite.expect ys[i].2 g := by
-  rw [backtrackRun, Finite.expect_flatten hd, List.map_ofFn, List.sum_ofFn]
+/-- Each branch's expectation, weighted by `r` of it. -/
+theorem expect_runWith {ys : List (Nat × WFinite α)} {r : Fin ys.length → ℚ≥0}
+    (hd : runWith ys r ≠ .undef) (hn : ∀ i : Fin ys.length, Finite.Nonneg ys[i].2) (g : α → ℝ≥0∞) :
+    Finite.expect (runWith ys r) g =
+      ∑ i : Fin ys.length, ofNNRat (r i) * Finite.expect ys[i].2 g := by
+  rw [runWith, Finite.expect_flatten hd, List.map_ofFn, List.sum_ofFn]
   exact Finset.sum_congr rfl fun i _ =>
-    Finite.expect_scale (by exact_mod_cast (reach ys i).2) (hn i) g
+    Finite.expect_scale (by exact_mod_cast (r i).2) (hn i) g
 
 /-- The probability of reaching a branch, read in `ℝ≥0∞`, is the search's. -/
 theorem ofNNRat_reach (ys : List (Nat × WFinite α)) (i : Fin ys.length) :
@@ -667,13 +667,27 @@ theorem ofNNRat_reach (ys : List (Nat × WFinite α)) (i : Fin ys.length) :
   simp only [Function.comp]
   split <;> simp
 
-/-- The mixture of related branches is related to the search over them. -/
-theorem weighsSome_backtrackRun {ys : List (Nat × WFinite α)}
-    {gs : List (Nat × (Unit → OptionT SPMF α))} (hlen : ys.length = gs.length)
+/-- The probability of one draw picking a branch, read in `ℝ≥0∞`, is the search's with fuel `1`. -/
+theorem ofNNRat_pickReach (ys : List (Nat × WFinite α)) (i : Fin ys.length) :
+    ofNNRat (pickReach ys i) = Backtrack.mix (fun j => if j = i then 1 else 0) 0 1
+      (List.ofFn fun j : Fin ys.length => (ys[j].1, ofNNRat (failMass ys[j].2), j)) := by
+  rw [pickReach, Backtrack.map_mix ofNNRat ofNNRat_natCast_inv, List.map_ofFn, map_zero]
+  congr 1
+  funext j
+  simp only [Function.comp]
+  split <;> simp
+
+/-- Related branches, weighted by the probabilities that a search with `fuel` reaches them, are
+related to that search over them. -/
+theorem weighsSome_runWith {ys : List (Nat × WFinite α)}
+    {gs : List (Nat × (Unit → OptionT SPMF α))} (fuel : Nat) (r : Fin ys.length → ℚ≥0)
+    (hreach : ∀ i, ofNNRat (r i) = Backtrack.mix (fun j => if j = i then 1 else 0) 0 fuel
+      (List.ofFn fun j : Fin ys.length => (ys[j].1, ofNNRat (failMass ys[j].2), j)))
+    (hlen : ys.length = gs.length)
     (hw : ∀ i (h : i < ys.length), ys[i].1 = (gs[i]'(hlen ▸ h)).1)
     (hz : ∀ i (h : i < ys.length), ys[i].1 = 0 → ys[i].2 = Finite.empty)
     (hr : ∀ i (h : i < ys.length), ys[i].1 ≠ 0 → WeighsSome ys[i].2 ((gs[i]'(hlen ▸ h)).2 ())) :
-    WeighsSome (backtrackRun ys) (Backtrack.search gs.length gs) := fun hd => by
+    WeighsSome (runWith ys r) (Backtrack.search fuel gs) := fun hd => by
   have hdef : ∀ i : Fin ys.length, ys[i].2 ≠ .undef := fun i =>
     Finite.map_ne_undef (Finite.flatten_ne_undef hd _ (List.mem_ofFn.mpr ⟨i, rfl⟩))
   have hn : ∀ i : Fin ys.length, Finite.Nonneg ys[i].2 := fun i => by
@@ -704,21 +718,21 @@ theorem weighsSome_backtrackRun {ys : List (Nat × WFinite α)}
       simp
     · simp only [h0, ↓reduceIte]
       exact (hfail ⟨k, hk⟩ h0).symm
-  have hsearch : ∀ G : Option α → ℝ≥0∞, SPMF.expect (Backtrack.search gs.length gs).run G =
-      Backtrack.mix (fun j => ∑' a, ((σ j) ()).run (some a) * G (some a)) (G none) ys.length
+  have hsearch : ∀ G : Option α → ℝ≥0∞, SPMF.expect (Backtrack.search fuel gs).run G =
+      Backtrack.mix (fun j => ∑' a, ((σ j) ()).run (some a) * G (some a)) (G none) fuel
         dsP := fun G => by
-    rw [Backtrack.expect_search, hbd, Backtrack.mix_reindex, ← hlen]
+    rw [Backtrack.expect_search, hbd, Backtrack.mix_reindex]
     rfl
-  have hout : ∀ g, Finite.expect (backtrackRun ys) g =
-      Backtrack.mix (fun j => Finite.expect ys[j].2 g) 0 ys.length dsP := fun g => by
-    rw [expect_backtrackRun hd hn, Backtrack.mix_eq_sum _ 0]
-    simp only [ofNNRat_reach, zero_mul, add_zero]
+  have hout : ∀ g, Finite.expect (runWith ys r) g =
+      Backtrack.mix (fun j => Finite.expect ys[j].2 g) 0 fuel dsP := fun g => by
+    rw [expect_runWith hd hn, Backtrack.mix_eq_sum _ 0]
+    simp only [hreach, zero_mul, add_zero]
     exact Finset.sum_congr rfl fun i _ => mul_comm _ _
   have hmem : ∀ d ∈ dsP, 0 < d.1 → ∃ j : Fin ys.length, ys[j].1 ≠ 0 ∧ d = (ys[j].1, ofNNRat (failMass ys[j].2), j) :=
     fun d hd hp => by
       obtain ⟨j, rfl⟩ := List.mem_ofFn.mp hd
       exact ⟨j, Nat.pos_iff_ne_zero.mp hp, rfl⟩
-  refine ⟨nonneg_backtrackRun hn, fun g => ?_, ?_⟩
+  refine ⟨nonneg_runWith r hn, fun g => ?_, ?_⟩
   · rw [hout g, Backtrack.mix_congr (v' := fun j => ∑' a, ((σ j) ()).run (some a) * g a) 0 _ _
       fun d hd hp => ?_, SPMF.tsum_some_eq_expect, hsearch]
     · rfl
@@ -747,16 +761,18 @@ theorem _root_.GenRel.Weighted.getElem {M N : Type → Type} {α : Type} {R : �
     | zero => exact ⟨rfl, h⟩
     | succ i => exact ih i (by simpa using h') (by simpa using h₂)
 
-/-- The mixture at `WFinite` has the distribution of the search at `OptionT SPMF`, when their
-branches are related weight for weight. -/
-@[gen_rule]
-theorem WeighsSome.backtrack {α : Type} {gs' : List (Nat × (Unit → WFinite α))}
-    {gs : List (Nat × (Unit → OptionT SPMF α))} (hs : GenRel.Weighted @WeighsSome gs' gs) :
-    WeighsSome (Backtrack.backtrack gs') (Backtrack.backtrack gs) := by
+/-- Related branches, weighted by the probabilities that a search with `fuel` reaches them, are
+related to that search, the branches of weight `0` not run. -/
+theorem WFinite.weighsSome_runBranches {α : Type} {gs' : List (Nat × (Unit → WFinite α))}
+    {gs : List (Nat × (Unit → OptionT SPMF α))} (hs : GenRel.Weighted @WeighsSome gs' gs)
+    (fuel : Nat) (r : Fin (WFinite.runBranches gs').length → ℚ≥0)
+    (hreach : ∀ i, WFinite.ofNNRat (r i) = Backtrack.mix (fun j => if j = i then 1 else 0) 0 fuel
+      (List.ofFn fun j : Fin (WFinite.runBranches gs').length =>
+        ((WFinite.runBranches gs')[j].1, WFinite.ofNNRat (WFinite.failMass (WFinite.runBranches gs')[j].2), j))) :
+    WeighsSome (WFinite.runWith (WFinite.runBranches gs') r) (Backtrack.search fuel gs) := by
   have hlen : gs'.length = gs.length := by simpa using congrArg List.length hs.weights
   have hw := hs.getElem
-  show WeighsSome (WFinite.backtrackRun (WFinite.runBranches gs')) (Backtrack.search gs.length gs)
-  refine WFinite.weighsSome_backtrackRun (by simp [WFinite.runBranches, hlen])
+  refine WFinite.weighsSome_runWith fuel r hreach (by simp [WFinite.runBranches, hlen])
     (fun i h => ?_) (fun i h h0 => ?_) (fun i h h0 => ?_)
   · simp only [WFinite.runBranches, List.getElem_map]
     exact (hw i _ _).1
@@ -766,5 +782,25 @@ theorem WeighsSome.backtrack {α : Type} {gs' : List (Nat × (Unit → WFinite �
   · simp only [WFinite.runBranches, List.getElem_map] at h0 ⊢
     simp only [h0, ↓reduceIte]
     exact (hw i _ _).2
+
+/-- The mixture at `WFinite` has the distribution of the search at `OptionT SPMF`, when their
+branches are related weight for weight. -/
+@[gen_rule]
+theorem WeighsSome.backtrack {α : Type} {gs' : List (Nat × (Unit → WFinite α))}
+    {gs : List (Nat × (Unit → OptionT SPMF α))} (hs : GenRel.Weighted @WeighsSome gs' gs) :
+    WeighsSome (Backtrack.backtrack gs') (Backtrack.backtrack gs) := by
+  have hlen : (WFinite.runBranches gs').length = gs.length := by
+    simpa [WFinite.runBranches] using congrArg List.length hs.weights
+  show WeighsSome (WFinite.runWith _ _) (Backtrack.search gs.length gs)
+  exact WFinite.weighsSome_runBranches hs _ _ fun i => by
+    rw [WFinite.ofNNRat_reach]
+    exact congrArg (Backtrack.mix _ _ · _) hlen
+
+/-- Each branch weighted by its share of the weight has the distribution of the draw. -/
+@[gen_rule]
+theorem WeighsSome.pick {α : Type} {gs' : List (Nat × (Unit → WFinite α))}
+    {gs : List (Nat × (Unit → OptionT SPMF α))} (hs : GenRel.Weighted @WeighsSome gs' gs) :
+    WeighsSome (Pick.pick gs') (Pick.pick gs) :=
+  WFinite.weighsSome_runBranches hs 1 _ (WFinite.ofNNRat_pickReach _)
 
 end Basalt

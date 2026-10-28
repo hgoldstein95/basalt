@@ -27,20 +27,13 @@ class Pick (G : Type → Type) where
 
 namespace Pick
 
-open Backtrack RandomChoice
+open Backtrack
 
 variable {G : Type → Type} {α : Type}
 
-/-- The draw, with failure observed as `none`. -/
-def draw [Monad G] [RandomChoice G] (gs : List (Nat × (Unit → OptionT G α))) : OptionT G α :=
-  OptionT.mk do
-    let n ← choose 0 (sumWeights gs - 1) (Nat.zero_le _)
-    match pickDrop gs n.down.val with
-    | none => pure none
-    | some (_, g, _) => (g ()).run
-
-/-- Where failure is `none`, the draw itself. -/
-instance instOptionT [Monad G] [RandomChoice G] : Pick (OptionT G) := ⟨draw⟩
+/-- Where failure is `none`, the search with fuel for one branch: a draw by weight, and on failure
+no retry. -/
+instance instOptionT [Monad G] [RandomChoice G] : Pick (OptionT G) := ⟨fun gs => search 1 gs⟩
 
 /-- At an enumeration, the branches of positive weight, side by side: what `backtrack` is there. -/
 instance instFinite : Pick Finite := ⟨fun gs => Backtrack.backtrack gs⟩
@@ -78,15 +71,7 @@ instance instMonoFinite : MonoPick Finite where
   pick_mono h := MonoBacktrack.backtrack_mono (G := Finite) h
 
 instance instMonoOptionT {G : Type → Type} [Gen G] : MonoPick (OptionT G) where
-  pick_mono {_ gs₁ gs₂} h := by
-    show draw gs₁ ⊑ draw gs₂
-    unfold draw
-    refine choose_bind_mono (G := G) (by rw [sumWeights_eq_of_rel h]) fun n _ _ => ?_
-    rcases pickDrop_rel h n with ⟨h₁, h₂⟩ | ⟨k, g₁, g₂, r₁, r₂, h₁, h₂, hg, _⟩
-    · simp only [h₁, h₂]
-      exact PartialOrder.rel_refl
-    · simp only [h₁, h₂]
-      exact hg ()
+  pick_mono h := search_mono 1 h
 
 instance instMonoWithSize {G : Type → Type} [Gen G] [Pick G] [MonoPick G] :
     MonoPick (WithSize G) where

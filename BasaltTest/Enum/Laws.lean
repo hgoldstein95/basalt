@@ -123,4 +123,7 @@ theorem picked_costEnumeratesSome :
 theorem digits_weighsSome : WeighsSome (digits (G := WFinite)) (digits (G := OptionT SPMF)) := by
   walk fixpoint
 
+theorem picked_weighsSome : WeighsSome (picked (G := WFinite)) (picked (G := OptionT SPMF)) := by
+  walk fixpoint
+
 end EnumLawTest

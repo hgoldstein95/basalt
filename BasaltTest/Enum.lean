@@ -132,6 +132,26 @@ def coins [Monad G] [RandomChoice G] [Fail G] [Backtrack G] : G Nat :=
 #guard ((WFinite.entries? (coins (G := WFinite))).getD []).foldl (fun s (_, w) => s + w) 0 ==
   1 - 1 / 2 ^ 10
 
+-- `pick` at `WFinite`: each branch weighted by its share, failure the weight left over.
+#guard WFinite.entries? (drawn (G := WFinite)) == some [(1, 3/8), (2, 3/8), (3, 1/4)]
+
+/-- `failing`'s rules, drawn once: no retry, so it fails more often. -/
+def failingOnce [Monad G] [RandomChoice G] [Fail G] [Pick G] : G Nat :=
+  Pick.pick [
+    (2, fun _ => do
+      let n := (← RandomChoice.choose 0 2 (by omega)).down.val
+      if n = 0 then Fail.fail else pure n),
+    (1, fun _ => Fail.fail),
+    (3, fun _ => do
+      if (← RandomChoice.choose 0 1 (by omega)).down.val = 0 then Fail.fail else pure 5)]
+
+open Basalt.Examples.Enum.Local in
+#guard byValue (distOf (failingOnce (G := WFinite))) ==
+  byValue (failAndDist (failingOnce (G := OptionT WFinite))).2
+open Basalt.Examples.Enum.Local in
+#guard 1 - ((WFinite.entries? (failingOnce (G := WFinite))).getD []).foldl (fun s (_, w) => s + w) 0 ==
+  (failAndDist (failingOnce (G := OptionT WFinite))).1
+
 end Backtracking
 
 /-! ## Memoized tiers -/

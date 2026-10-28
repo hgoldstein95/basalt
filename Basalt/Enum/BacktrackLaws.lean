@@ -150,23 +150,9 @@ variable {α : Type}
 /-- What `pick` can succeed with is what its branches of positive weight can. -/
 theorem mem_support_pick_iff (gs : List (Nat × (Unit → OptionT SPMF α))) (a : α) :
     some a ∈ (pick gs : OptionT SPMF α).run.support ↔
-      ∃ p ∈ gs, 0 < p.1 ∧ some a ∈ (p.2 ()).run.support := by
-  change some a ∈ (draw gs).run.support ↔ _
-  constructor
-  · intro h
-    simp only [draw, OptionT.run_mk, SPMF.mem_support_bind_iff] at h
-    obtain ⟨n, _, h⟩ := h
-    split at h
-    · simp at h
-    · rename_i k g rest hpick
-      obtain ⟨hm, hk, _⟩ := pickDrop_some hpick
-      exact ⟨(k, g), hm, hk, h⟩
-  · rintro ⟨p, hp, hk, h⟩
-    obtain ⟨n, hn, rest, hpick⟩ := exists_pickDrop hp hk
-    simp only [draw, OptionT.run_mk, SPMF.mem_support_bind_iff]
-    refine ⟨ULift.up ⟨n, Nat.zero_le _, by omega⟩, by simp, ?_⟩
-    simp only [hpick]
-    exact h
+      ∃ p ∈ gs, 0 < p.1 ∧ some a ∈ (p.2 ()).run.support :=
+  ⟨mem_support_search 1 gs a, fun ⟨p, hp, hk, h⟩ =>
+    mem_support_search_of_branch 1 gs p hp hk Nat.one_pos a h⟩
 
 end Pick
 

@@ -101,40 +101,6 @@ theorem mem_support_search_cost_of_branch : ∀ (fuel : Nat)
 
 end Backtrack
 
-namespace Pick
-
-open Backtrack
-
-variable {α : Type}
-
-/-- A success of the draw costs exactly one more than a success of a branch of positive weight. -/
-theorem mem_support_pick_cost (gs : List (Nat × (Unit → OptionT SPMF.Cost α))) (a : α) (n : Nat)
-    (h : (some a, n) ∈ (pick gs : OptionT SPMF.Cost α).run.support) :
-    ∃ p ∈ gs, 0 < p.1 ∧ ∃ c, (some a, c) ∈ (p.2 ()).run.support ∧ c + 1 ≤ n := by
-  change (some a, n) ∈ (draw gs).run.support at h
-  simp only [draw, OptionT.run_mk, SPMF.Cost.mem_support_bind_iff] at h
-  obtain ⟨i, n₁, n₂, hi, h, rfl⟩ := h
-  rw [SPMF.Cost.mem_support_choose_iff] at hi
-  subst hi
-  split at h
-  · simp at h
-  · rename_i k g rest hpick
-    obtain ⟨hm, hk, _⟩ := pickDrop_some hpick
-    exact ⟨(k, g), hm, hk, n₂, h, by omega⟩
-
-/-- A success of a branch of positive weight is a success of the draw for one more choice. -/
-theorem mem_support_pick_cost_of_branch (gs : List (Nat × (Unit → OptionT SPMF.Cost α)))
-    (p : Nat × (Unit → OptionT SPMF.Cost α)) (hp : p ∈ gs) (hk : 0 < p.1) (a : α) (c : Nat)
-    (h : (some a, c) ∈ (p.2 ()).run.support) :
-    (some a, c + 1) ∈ (pick gs : OptionT SPMF.Cost α).run.support := by
-  change (some a, c + 1) ∈ (draw gs).run.support
-  obtain ⟨n, hn, rest, hpick⟩ := exists_pickDrop hp hk
-  simp only [draw, OptionT.run_mk, SPMF.Cost.mem_support_bind_iff]
-  refine ⟨ULift.up ⟨n, Nat.zero_le _, by omega⟩, 1, c, by simp, ?_, by omega⟩
-  simp only [hpick]
-  exact h
-
-end Pick
 
 /-! ## Tiers at `CostGraded Finite` -/
 
@@ -444,6 +410,7 @@ theorem CostEnumeratesSome.pick {α : Type} {gs' : List (Nat × (Unit → CostGr
     {gs : List (Nat × (Unit → OptionT SPMF.Cost α))}
     (hs : GenRel.Weighted @CostEnumeratesSome gs' gs) :
     CostEnumeratesSome (Pick.pick gs') (Pick.pick gs) :=
-  union hs (Pick.mem_support_pick_cost gs) (Pick.mem_support_pick_cost_of_branch gs)
+  union hs (Backtrack.mem_support_search_cost 1 gs) fun p hp hk =>
+    Backtrack.mem_support_search_cost_of_branch 1 gs p hp hk Nat.one_pos
 
 end Basalt
