@@ -171,6 +171,11 @@ def decided [Monad G] [RandomChoice G] [Fail G] [FailWith Unit G] [Backtrack G] 
 #guard ((decided (G := ExceptT Unit (OptionT Basalt.Finite))).run.run.toList?).map
   (·.all (· == some (Except.ok 7))) == some true
 #guard (decided (G := ExceptT Unit Basalt.Finite)).run.toList? == some [Except.error (), Except.ok 7]
+-- Graded by cost, the label and the success each cost the pick alone: tier `1` lists both.
+#guard (List.range 3).map (undecided (G := ExceptT Unit (CostGraded Basalt.Finite))).run.tier? ==
+  [some [], some [Except.error ()], some []]
+#guard (List.range 3).map (decided (G := ExceptT Unit (CostGraded Basalt.Finite))).run.tier? ==
+  [some [], some [Except.error (), Except.ok 7], some []]
 
 end Backtracking
 

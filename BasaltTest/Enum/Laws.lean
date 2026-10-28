@@ -151,4 +151,11 @@ theorem hasTypeT_enumeratesWith (τ : Ty) (n : Nat) :
   | zero => unfold hasTypeT; walk
   | succ n ih => unfold hasTypeT; walk [ih .nat]
 
+theorem hasTypeT_costEnumeratesWith (τ : Ty) (n : Nat) :
+    CostEnumeratesWith (hasTypeT (G := ExceptT Unit (CostGraded Basalt.Finite)) τ n)
+      (hasTypeT (G := ExceptT Unit (OptionT SPMF.Cost)) τ n) := by
+  induction n generalizing τ with
+  | zero => unfold hasTypeT; walk
+  | succ n ih => unfold hasTypeT; walk [ih .nat]
+
 end EnumLawTest

@@ -8,6 +8,7 @@ module
 public import Basalt.Enum.Finite
 public import Basalt.Enum.Weighted
 public import Basalt.Enum.Graded
+public import Basalt.Enum.GradedWith
 public import Basalt.Enum.Memo
 public import Basalt.Enum.Tabled
 public import Basalt.Enum.Local
@@ -20,6 +21,7 @@ public import Basalt.Enum.BacktrackCostLaws
 public import Basalt.Enum.WeightedBacktrack
 public import Basalt.Enum.BacktrackWeightLaws
 public import Basalt.Enum.BacktrackWithLaws
+public import Basalt.Enum.BacktrackWithCostLaws
 public import Basalt.Enum.MemoLaws
 public import Basalt.Enum.TabledLaws
 public import Basalt.Sized
@@ -45,7 +47,8 @@ Failure is `Fail.fail`, read as `∅` here (`Basalt.Fail`); weighted backtrackin
 `Backtrack.backtrack`, and a weighted draw without retry `Pick.pick`, both read as the union of their
 branches (`Basalt.Backtrack`, `Basalt.Pick`), and `backtrack` at `WFinite` as each branch weighted by
 the probability that the search reaches it (`Basalt.Enum.WeightedBacktrack`); over failures that say
-why (`FailWith`), the search retries past them and the union lists them (`Basalt.BacktrackWith`);
+why (`FailWith`), the search retries past them and the union lists them (`Basalt.BacktrackWith`),
+at `CostGraded` one tier up (`Basalt.Enum.GradedWith`);
 FEAT's exact sizing is
 `Sized.pay`, `Sized.splitBind` and `Sized.done` (`Basalt.Sized`).
 -/
