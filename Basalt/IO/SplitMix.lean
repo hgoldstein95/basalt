@@ -68,5 +68,7 @@ abbrev WordModel (σ : Type) := StateT σ Option
 instance : Inhabited (WordModel σ α) := ⟨fun _ => none⟩
 
 /-- A draw is SplitMix's range reduction on the source's words. -/
-instance [WordSource σ] : RandomChoice (WordModel σ) where
-  choose := chooseVia fun s => some (WordSource.next s)
+instance [WordSource σ] : RandomChoice (WordModel σ) :=
+  .ofChoose (chooseVia fun s => some (WordSource.next s))
+
+instance [WordSource σ] : RandomChoice.LawfulPick (WordModel σ) := ⟨fun _ _ _ => rfl⟩

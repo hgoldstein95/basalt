@@ -42,6 +42,27 @@ theorem GenRel.Weighted.weights {gs' : List (Nat × (Unit → M α))}
   | nil => rfl
   | cons _ _ ih => simp [ih]
 
+theorem GenRel.Weighted.length_eq {gs' : List (Nat × (Unit → M α))}
+    {gs : List (Nat × (Unit → N α))} (hs : Weighted @R gs' gs) : gs'.length = gs.length := by
+  simpa using congrArg List.length hs.weights
+
+theorem GenRel.Weighted.weight_eq {gs' : List (Nat × (Unit → M α))}
+    {gs : List (Nat × (Unit → N α))} (hs : Weighted @R gs' gs) (i : Nat) (h' : i < gs'.length)
+    (h : i < gs.length) : (gs'[i]'h').1 = (gs[i]'h).1 := by
+  induction hs generalizing i with
+  | nil => simp at h
+  | cons _ _ ih =>
+    cases i with
+    | zero => rfl
+    | succ i => exact ih i _ _
+
+theorem GenRel.Weighted.forall₂ {gs' : List (Nat × (Unit → M α))}
+    {gs : List (Nat × (Unit → N α))} (hs : Weighted @R gs' gs) :
+    List.Forall₂ (fun g' g => R (g' ()) (g ())) (gs'.map Prod.snd) (gs.map Prod.snd) := by
+  induction hs with
+  | nil => exact .nil
+  | cons hg _ ih => exact .cons hg ih
+
 end weighted
 
 namespace GenRel
@@ -147,20 +168,21 @@ theorem permutationOf (xs : List α) : R (permutationOf xs) (permutationOf xs) :
     exact h.bind (fun ⟨_, _⟩ => h.bind (fun ⟨_, _, _⟩ => h.pure _)
       (h.map _ (h.choose _ _ _))) ih
 
-theorem frequencyChain {gs' : List (Nat × (Unit → M α))} {gs : List (Nat × (Unit → N α))}
-    (hs : Weighted @R gs' gs) (acc n : Nat) :
-    R (frequencyChain gs' acc n) (frequencyChain gs acc n) := by
-  induction hs generalizing acc with
-  | nil => exact h.default _
-  | cons hg _ ih => exact h.ite (fun _ => hg) fun _ => ih _
+/-- `pick` is its draw at both monads. -/
+@[gen_rel_rule]
+theorem pick [RandomChoice.LawfulPick M] [RandomChoice.LawfulPick N] (n : Nat) (w : Fin n → Nat)
+    (hw : ∃ i, 0 < w i) : R (RandomChoice.pick n w hw) (RandomChoice.pick n w hw) := by
+  rw [RandomChoice.LawfulPick.pick_eq, RandomChoice.LawfulPick.pick_eq]
+  exact h.bind (fun _ => h.pure _) (h.choose _ _ _)
 
 @[gen_rel_rule]
-theorem frequency {gs' : List (Nat × (Unit → M α))} {gs : List (Nat × (Unit → N α))}
+theorem frequency [RandomChoice.LawfulPick M] [RandomChoice.LawfulPick N]
+    {gs' : List (Nat × (Unit → M α))} {gs : List (Nat × (Unit → N α))}
     {h' : 0 < (gs'.map Prod.fst).sum} {hw : 0 < (gs.map Prod.fst).sum}
     (hs : Weighted @R gs' gs) : R (frequency gs' h') (frequency gs hw) := by
-  rw [frequency_eq_chain gs' h' ((gs.map Prod.fst).sum - 1) (by rw [hs.weights]),
-    frequency_eq_chain gs hw _ rfl]
-  unfold chooseNat
-  exact h.bind (fun _ => h.frequencyChain hs 0 _) (h.map _ (h.choose _ _ _))
+  rw [frequency_eq_chain gs' h' gs.length hs.length_eq (fun i => gs[i].1)
+      fun i => (hs.weight_eq i.val _ _).symm,
+    frequency_eq_chain gs hw gs.length rfl (fun i => gs[i].1) fun _ => rfl]
+  exact h.bind (fun _ => h.oneOfChain hs.forall₂ 0 _) (h.pick _ _ _)
 
 end GenRel

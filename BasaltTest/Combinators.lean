@@ -151,7 +151,7 @@ example : (frequency! [(1, fun _ => Pure.pure 0), (3, fun _ => Pure.pure 1)] : S
 #guard_msgs in
 #check (oneOf! [fun _ => pure 0, fun _ => pure 1] : SPMF Nat)
 
-/-- Weights that are not literals are summed as `frequencyChain` unfolds them. -/
+/-- Weights that are not literals reach `pick` as written. -/
 def weighted [Gen G] (b : Nat) : G Nat :=
   frequency! [(1, fun _ => pure 0), (b, fun _ => pure 1), (b + 2, fun _ => pure 2)]
     (by simp)

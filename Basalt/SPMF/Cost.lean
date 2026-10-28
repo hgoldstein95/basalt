@@ -74,10 +74,11 @@ instance instMonoBind : MonoBind SPMF.Cost where
 
 end CCPO
 
-noncomputable instance instRandomChoice : RandomChoice SPMF.Cost where
-  choose lo hi h := by
+noncomputable instance instRandomChoice : RandomChoice SPMF.Cost := .ofChoose fun lo hi h => by
     exact SPMF.bind (choose lo hi h : SPMF (ULift {x : Nat // lo ≤ x ∧ x ≤ hi}))
       fun n => SPMF.pure (n, 1)
+
+instance : RandomChoice.LawfulPick SPMF.Cost := ⟨fun _ _ _ => rfl⟩
 
 instance instLawfulMonad : LawfulMonad SPMF.Cost := LawfulMonad.mk' _
   (id_map := fun x => by

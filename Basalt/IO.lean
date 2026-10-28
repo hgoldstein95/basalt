@@ -26,10 +26,11 @@ initialize ioGen : SplitMix.Gen ← do SplitMix.Gen.new (← SplitMix.newIO)
 
 /-- `IO` is an instance of `RandomChoice` via `SplitMix.Gen.randNat`, whose result carries its own
 bound, so the draw needs no clamp. -/
-instance : RandomChoice IO where
-  choose lo hi h := do
+instance : RandomChoice IO := .ofChoose fun lo hi h => do
     let ⟨x, hx⟩ ← ioGen.randNat lo hi
     pure (ULift.up ⟨x, by omega⟩)
+
+instance : RandomChoice.LawfulPick IO := ⟨fun _ _ _ => rfl⟩
 
 /-- What running at `IO` means: `ioGen`'s state threaded purely, drawn from as `ioGen` is. -/
 abbrev IOModel := WordModel SplitMix

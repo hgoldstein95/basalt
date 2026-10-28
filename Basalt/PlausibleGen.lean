@@ -45,8 +45,7 @@ instance : MonoBind (Except Plausible.GenError) where
 
 /-! ### RandomChoice for Plausible.Gen -/
 
-instance : RandomChoice Plausible.Gen where
-  choose lo hi h := do
+instance : RandomChoice Plausible.Gen := .ofChoose fun lo hi h => do
     let v ← Plausible.Gen.choose Nat lo hi h
     pure (ULift.up v)
 

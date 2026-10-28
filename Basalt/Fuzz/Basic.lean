@@ -68,8 +68,7 @@ def readNat (s : FuzzState) (n : Nat) : Nat × FuzzState := Id.run do
   return (acc, st)
 
 /-- `choose` consumes `bytesFor (hi - lo + 1)` bytes and reduces them into `[lo, hi]`. Total. -/
-instance : RandomChoice FuzzGen where
-  choose lo hi h := do
+instance : RandomChoice FuzzGen := .ofChoose fun lo hi h => do
     let s ← get
     let range := hi - lo + 1
     let (raw, s') := readNat s (bytesFor range)

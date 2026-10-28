@@ -153,8 +153,7 @@ theorem card_Icc_eq (lo hi : Nat) (h : lo ≤ hi) :
     (Finset.Icc lo hi).card = hi - lo + 1 := by
   rw [Nat.card_Icc]; omega
 
-noncomputable instance : RandomChoice SPMF where
-  choose lo hi h := by
+noncomputable instance : RandomChoice SPMF := .ofChoose fun lo hi h => by
     let n : ℕ := hi - lo + 1
     refine ⟨fun _ => 1 / n, ?pf⟩
     have hn : n ≠ 0 := Nat.add_one_ne_zero _
@@ -165,6 +164,8 @@ noncomputable instance : RandomChoice SPMF where
       _ ≤ 1 := le_rfl
 
 end operations
+
+instance : RandomChoice.LawfulPick SPMF := ⟨fun _ _ _ => rfl⟩
 
 section operation_uses
 

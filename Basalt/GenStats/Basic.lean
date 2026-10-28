@@ -66,8 +66,7 @@ instance : MonoBind (Except Error) where
     | ok a => exact h a
 
 /-- `choose` decrements the fuel, counts the choice, and advances the RNG. -/
-instance : RandomChoice StatGen where
-  choose lo hi h := do
+instance : RandomChoice StatGen := .ofChoose fun lo hi h => do
     let s ← get
     if s.fuel == 0 then
       throw .outOfFuel

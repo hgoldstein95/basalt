@@ -27,11 +27,14 @@ def myGen [Gen G] : G α := ...
 | `GenStats.StatGen` | seeded, fuel-guarded execution that counts choices (drives `#genstats`) |
 | `Fuzz.FuzzGen` | choices read from a byte buffer, so a coverage-guided fuzzer drives generation |
 
-`RandomChoice.choose` is the only source of randomness; every combinator (`elements`, `oneOf`,
-`frequency`, `listOf`, …) is built on it. Recursive generators are defined by
+`RandomChoice.choose`, a uniform draw, and `RandomChoice.pick`, a weighted choice of an index, are the
+only sources of randomness. `frequency` is built on `pick`, and every other combinator (`elements`,
+`oneOf`, `listOf`, …) on `choose`. An interpretation that reads weights as more than a draw, such as
+an enumeration, sees each weighted choice whole. Every interpretation a proof reads is
+`RandomChoice.LawfulPick`: its `pick` is its `choose` below the total weight. Recursive generators are defined by
 `partial_fixpoint` over the `CCPO`. A choice between literal branches is written `oneOf! [g₀, g₁, …]`
 or `frequency! [(w₀, g₀), …]`: it runs as a chain of tests on the drawn index, allocating no list of
-branches, while every proof sees the plain `oneOf` / `frequency` (`Basalt/Combinators.lean`).
+branches or weights, while every proof sees the plain `oneOf` / `frequency` (`Basalt/Combinators.lean`).
 
 A generator that branches on a size adds a `[Sized G]` constraint and reads it with `getSize` or
 `Sized.sized`, shrinking it for recursive calls with `Sized.resize` (plus `[MonoSized G]` when the
