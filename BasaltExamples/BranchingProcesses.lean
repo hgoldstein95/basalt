@@ -259,7 +259,8 @@ def Con'.args : Con' → Nat
   | .nodeB => 1
 
 /-- `genDragen` as a branching process. -/
-noncomputable def dragenSpec : BranchingProcess.Spec Unit Con' := ⟨fun _ => (), Con'.prob, fun _ => Con'.args⟩
+noncomputable def dragenSpec : BranchingProcess.Spec Unit Con' :=
+  ⟨fun _ => (), Con'.prob, fun _ => Con'.args⟩
 
 @[simp] theorem dragenSpec_prob (c : Con') : dragenSpec.prob c = c.prob := rfl
 @[simp] theorem dragenSpec_args (v : Unit) (c : Con') : dragenSpec.args v c = c.args := rfl
@@ -310,7 +311,9 @@ theorem genDragen.expect_count (c : Con') (n : Nat) :
 theorem dragenSpec_level (k : Nat) : dragenSpec.level () k () = (13 / 10) ^ k := by
   induction k with
   | zero => simp [dragenSpec.level_zero]
-  | succ k ih => rw [dragenSpec.level_succ, Fintype.sum_unique, dragenSpec_meanTypes]; simp [ih, pow_succ, mul_comm]
+  | succ k ih =>
+    rw [dragenSpec.level_succ, Fintype.sum_unique, dragenSpec_meanTypes]
+    simp [ih, pow_succ, mul_comm]
 
 /-- §4 reports 21.322 `NodeA`s at size `10`; the expectation is `21.3097486415`. -/
 theorem dragen_nodeA_ten : dragenSpec.predicted () .nodeA 10 = 42619497283 / 2000000000 := by
@@ -400,25 +403,26 @@ def Ctor.args (v : Fin 2) : Ctor → Nat
   | _ => 0
 
 /-- `genT1` and `genT2` as a branching process. -/
-noncomputable def fig8Spec : BranchingProcess.Spec (Fin 2) Ctor := ⟨Ctor.ty, Ctor.prob, Ctor.args⟩
+noncomputable def mutualSpec : BranchingProcess.Spec (Fin 2) Ctor := ⟨Ctor.ty, Ctor.prob, Ctor.args⟩
 
-@[simp] theorem fig8Spec_ty (c : Ctor) : fig8Spec.ty c = c.ty := rfl
-@[simp] theorem fig8Spec_prob (c : Ctor) : fig8Spec.prob c = c.prob := rfl
-@[simp] theorem fig8Spec_args (v : Fin 2) (c : Ctor) : fig8Spec.args v c = c.args v := rfl
+@[simp] theorem mutualSpec_ty (c : Ctor) : mutualSpec.ty c = c.ty := rfl
+@[simp] theorem mutualSpec_prob (c : Ctor) : mutualSpec.prob c = c.prob := rfl
+@[simp] theorem mutualSpec_args (v : Fin 2) (c : Ctor) : mutualSpec.args v c = c.args v := rfl
 
 /-- The matrix §6 gives for `T1` and `T2`: `[[p_B, p_B], [p_D, 0]]`. -/
-theorem fig8Spec_meanTypes : fig8Spec.meanTypes = !![1 / 2, 1 / 2; 2 / 3, 0] := by
+theorem mutualSpec_meanTypes : mutualSpec.meanTypes = !![1 / 2, 1 / 2; 2 / 3, 0] := by
   ext i j
   fin_cases i <;> fin_cases j <;>
-    simp [BranchingProcess.Spec.meanTypes, Finset.univ, Fintype.elems, Ctor.ty, Ctor.prob, Ctor.args]
+    simp [BranchingProcess.Spec.meanTypes, Finset.univ, Fintype.elems, Ctor.ty, Ctor.prob,
+      Ctor.args]
 
 /-- Each constructor's expected count is at most its prediction. -/
 theorem genT12.expect_count_le (n : Nat) :
-    (∀ c, SPMF.expect (genT1 n) (fun t => (t.count c : ℝ≥0∞)) ≤ fig8Spec.predicted 0 c n) ∧
-    (∀ c, SPMF.expect (genT2 n) (fun t => (t.count c : ℝ≥0∞)) ≤ fig8Spec.predicted 1 c n) := by
+    (∀ c, SPMF.expect (genT1 n) (fun t => (t.count c : ℝ≥0∞)) ≤ mutualSpec.predicted 0 c n) ∧
+    (∀ c, SPMF.expect (genT2 n) (fun t => (t.count c : ℝ≥0∞)) ≤ mutualSpec.predicted 1 c n) := by
   induction n with
   | zero =>
-    refine ⟨fun c => ?_, fun c => ?_⟩ <;> rw [SPMF.expect_eq_obs, fig8Spec.predicted_zero]
+    refine ⟨fun c => ?_, fun c => ?_⟩ <;> rw [SPMF.expect_eq_obs, mutualSpec.predicted_zero]
     · conv_lhs => rw [genT1]
       walk
       cases c <;> simp [T1.count, BranchingProcess.Spec.terminal, Ctor.ty, Ctor.args]
@@ -427,7 +431,7 @@ theorem genT12.expect_count_le (n : Nat) :
       cases c <;> simp [T2.count, BranchingProcess.Spec.terminal, Ctor.ty, Ctor.args]
   | succ n ih =>
     refine ⟨fun c => ?_, fun c => ?_⟩ <;>
-      rw [SPMF.expect_eq_obs, fig8Spec.predicted_succ, fig8Spec_meanTypes]
+      rw [SPMF.expect_eq_obs, mutualSpec.predicted_succ, mutualSpec_meanTypes]
     · have h1 := ih.1 c
       have h2 := ih.2 c
       rw [SPMF.expect_eq_obs] at h1 h2
@@ -443,13 +447,13 @@ theorem genT12.expect_count_le (n : Nat) :
       all_goals (apply le_of_eq; simp only [div_eq_mul_inv]; ring)
 
 theorem genT12.le_expect_count (n : Nat) :
-    (∀ c k, k + fig8Spec.predicted 0 c n ≤
+    (∀ c k, k + mutualSpec.predicted 0 c n ≤
       SPMF.expectObs.spec (genT1 n : SPMF T1) (fun t => k + (t.count c : ℝ≥0∞))) ∧
-    (∀ c k, k + fig8Spec.predicted 1 c n ≤
+    (∀ c k, k + mutualSpec.predicted 1 c n ≤
       SPMF.expectObs.spec (genT2 n : SPMF T2) (fun t => k + (t.count c : ℝ≥0∞))) := by
   induction n with
   | zero =>
-    refine ⟨fun c k => ?_, fun c k => ?_⟩ <;> rw [fig8Spec.predicted_zero]
+    refine ⟨fun c k => ?_, fun c k => ?_⟩ <;> rw [mutualSpec.predicted_zero]
     · conv_rhs => rw [genT1]
       walk
       cases c <;> simp [T1.count, BranchingProcess.Spec.terminal, Ctor.ty, Ctor.args]
@@ -457,7 +461,7 @@ theorem genT12.le_expect_count (n : Nat) :
       walk
       cases c <;> simp [T2.count, BranchingProcess.Spec.terminal, Ctor.ty, Ctor.args]
   | succ n ih =>
-    refine ⟨fun c k => ?_, fun c k => ?_⟩ <;> rw [fig8Spec.predicted_succ, fig8Spec_meanTypes]
+    refine ⟨fun c k => ?_, fun c k => ?_⟩ <;> rw [mutualSpec.predicted_succ, mutualSpec_meanTypes]
     · conv_rhs => rw [genT1]
       walk [ih.1 c, ih.2 c]
       conv_lhs => rw [show k = k * 2 * 2⁻¹ from
@@ -474,8 +478,8 @@ theorem genT12.le_expect_count (n : Nat) :
 /-- **Theorem 1 for Figure 8**: each constructor's expected count is the prediction from the mean
 matrix of types. -/
 theorem genT12.expect_count (n : Nat) :
-    (∀ c, SPMF.expect (genT1 n) (fun t => (t.count c : ℝ≥0∞)) = fig8Spec.predicted 0 c n) ∧
-    (∀ c, SPMF.expect (genT2 n) (fun t => (t.count c : ℝ≥0∞)) = fig8Spec.predicted 1 c n) := by
+    (∀ c, SPMF.expect (genT1 n) (fun t => (t.count c : ℝ≥0∞)) = mutualSpec.predicted 0 c n) ∧
+    (∀ c, SPMF.expect (genT2 n) (fun t => (t.count c : ℝ≥0∞)) = mutualSpec.predicted 1 c n) := by
   refine ⟨fun c => le_antisymm ((genT12.expect_count_le n).1 c) ?_,
     fun c => le_antisymm ((genT12.expect_count_le n).2 c) ?_⟩
   · simpa [SPMF.expect_eq_obs] using (genT12.le_expect_count n).1 c 0
