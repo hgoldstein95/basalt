@@ -131,4 +131,6 @@ theorem genRel_enumeratesSome : GenRel Finite (OptionT SPMF) @EnumeratesSome whe
   choose := EnumeratesSome.choose
   admissible := EnumeratesSome.admissible
 
+attribute [gen_rule] EnumeratesSome.fail EnumeratesSome.seq
+
 end Basalt

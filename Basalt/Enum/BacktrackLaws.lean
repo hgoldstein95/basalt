@@ -28,12 +28,6 @@ variable {α β : Type}
 
 /-! ## `pickDrop` -/
 
-@[simp] theorem sumWeights_nil : sumWeights ([] : List (Nat × β)) = 0 := rfl
-
-@[simp] theorem sumWeights_cons (p : Nat × β) (rest : List (Nat × β)) :
-    sumWeights (p :: rest) = p.1 + sumWeights rest := by
-  simp [sumWeights]
-
 /-- A selected entry is a member of positive weight, and the rest are members. -/
 theorem pickDrop_some : ∀ {gs : List (Nat × β)} {n k : Nat} {g : β} {rest : List (Nat × β)},
     pickDrop gs n = some (k, g, rest) → (k, g) ∈ gs ∧ 0 < k ∧ ∀ p ∈ rest, p ∈ gs
@@ -112,7 +106,7 @@ theorem mem_support_backtrack_iff (gs : List (Nat × (Unit → OptionT SPMF α))
 /-! ## Entries at `Finite` -/
 
 private theorem mem_filterMap_branch {gs : List (Nat × (Unit → Finite α))} {x : Finite α} :
-    x ∈ gs.filterMap (fun (w, g) => if w = 0 then none else some (g ())) ↔
+    x ∈ gs.filterMap (fun p => if p.1 = 0 then none else some (p.2 ())) ↔
       ∃ p ∈ gs, 0 < p.1 ∧ p.2 () = x := by
   simp only [List.mem_filterMap]
   constructor
@@ -147,6 +141,7 @@ end Backtrack
 
 /-- The union at `Finite` lists exactly what the search at `OptionT SPMF` can succeed with, when
 their branches are related weight for weight. -/
+@[gen_rule]
 theorem EnumeratesSome.backtrack {α : Type} {gs' : List (Nat × (Unit → Finite α))}
     {gs : List (Nat × (Unit → OptionT SPMF α))} (hs : GenRel.Weighted @EnumeratesSome gs' gs) :
     EnumeratesSome (Backtrack.backtrack gs') (Backtrack.backtrack gs) := fun hd a => by
