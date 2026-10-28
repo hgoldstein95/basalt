@@ -123,7 +123,8 @@ definition, and the definition is right here to run.
     support — [Basalt/Enum/Laws.lean](Basalt/Enum/Laws.lean); probabilities —
     [Basalt/Enum/WeightLaws.lean](Basalt/Enum/WeightLaws.lean); cost tiers —
     [Basalt/Enum/CostLaws.lean](Basalt/Enum/CostLaws.lean); successes of a generator that can
-    `fail` — [Basalt/Enum/FailLaws.lean](Basalt/Enum/FailLaws.lean).
+    `fail` — [Basalt/Enum/FailLaws.lean](Basalt/Enum/FailLaws.lean), and of weighted backtracking,
+    read as a union at `Finite` — [Basalt/Enum/BacktrackLaws.lean](Basalt/Enum/BacktrackLaws.lean).
   - An open-recursion step (`KeyedStep`, `PolyStep`) is not a `Gen` term, so the walk cannot prove
     its laws: they are built from per-construct lemmas — memoization in
     [Basalt/Enum/MemoLaws.lean](Basalt/Enum/MemoLaws.lean), tabling in
@@ -131,7 +132,9 @@ definition, and the definition is right here to run.
     termination, so no fixpoint induction proves it; prove it by induction on the measure
     (`*_defined` in [Basalt/Enum/Finite.lean](Basalt/Enum/Finite.lean), `fix_defined` in
     [Basalt/Enum/Memo.lean](Basalt/Enum/Memo.lean)).
-  - `Fail` is [Basalt/Fail.lean](Basalt/Fail.lean); FEAT-style exact sizing (`Sized.pay`,
+  - `Fail` is [Basalt/Fail.lean](Basalt/Fail.lean); `Backtrack`, a choice among branches that a
+    search retries and an enumeration unions, is [Basalt/Backtrack.lean](Basalt/Backtrack.lean);
+    FEAT-style exact sizing (`Sized.pay`,
     `splitBind`, `done`) is [Basalt/Sized.lean](Basalt/Sized.lean).
   - Worked instances, end to end with memoization: [BasaltExamples/Enum/BST.lean](BasaltExamples/Enum/BST.lean)
     and [BasaltExamples/Enum/STLC.lean](BasaltExamples/Enum/STLC.lean); the rest of

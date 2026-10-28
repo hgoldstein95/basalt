@@ -5,6 +5,7 @@ Authors: Harrison Goldstein
 -/
 module
 
+public import Basalt.Backtrack
 public import Basalt.Combinators
 public import Basalt.Enum
 public import Basalt.Fail

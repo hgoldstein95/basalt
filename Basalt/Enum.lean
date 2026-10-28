@@ -15,9 +15,11 @@ public import Basalt.Enum.Laws
 public import Basalt.Enum.WeightLaws
 public import Basalt.Enum.CostLaws
 public import Basalt.Enum.FailLaws
+public import Basalt.Enum.BacktrackLaws
 public import Basalt.Enum.MemoLaws
 public import Basalt.Enum.TabledLaws
 public import Basalt.Sized
+public import Basalt.Backtrack
 
 /-!
 # Enumeration
@@ -34,6 +36,7 @@ read as everything it can produce rather than one random value.
 * `Basalt.Enum.Tabled`: the support of a recursion with no measure, finite whenever it is.
 * `Basalt.Enum.Local`: enumerating a sub-generator inside a generator.
 
-Failure is `Fail.fail`, read as `∅` here (`Basalt.Fail`); FEAT's exact sizing is `Sized.pay`,
-`Sized.splitBind` and `Sized.done` (`Basalt.Sized`).
+Failure is `Fail.fail`, read as `∅` here (`Basalt.Fail`); weighted backtracking is
+`Backtrack.backtrack`, read as the union of its branches (`Basalt.Backtrack`); FEAT's exact sizing is
+`Sized.pay`, `Sized.splitBind` and `Sized.done` (`Basalt.Sized`).
 -/

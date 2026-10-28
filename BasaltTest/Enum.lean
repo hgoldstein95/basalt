@@ -39,6 +39,38 @@ generator closed another way. All small enough to run on every build.
 
 open Basalt
 
+/-! ## Backtracking -/
+
+namespace Backtracking
+
+/-- A choice among rules: one weighted branch per rule, `fail` where a rule does not apply. -/
+def rules [Monad G] [RandomChoice G] [Fail G] [Backtrack G] (n : Nat) : G Nat :=
+  Backtrack.backtrack
+    [(3, fun _ => pickFrom [1, 2]), (0, fun _ => pure 9), (1, fun _ => if n = 0 then Fail.fail else pure 3)]
+
+-- The union: each branch's values once, the weight-0 branch never.
+#guard (rules (G := Basalt.Finite) 1).toList? == some [1, 2, 3]
+#guard (rules (G := Basalt.Finite) 0).toList? == some [1, 2]
+
+-- The search, enumerated: an entry per unit of weight.
+#guard (rules (G := OptionT Basalt.Finite) 1).run.toList? ==
+  some [some 1, some 2, some 1, some 2, some 1, some 2, some 3]
+
+example (n : Nat) : EnumeratesSome (rules (G := Basalt.Finite) n) (rules (G := OptionT SPMF) n) :=
+  EnumeratesSome.backtrack (.cons (EnumeratesSome.pickFrom _) (.cons (EnumeratesSome.pure _)
+    (.cons (genRel_enumeratesSome.ite (fun _ => EnumeratesSome.fail) fun _ => EnumeratesSome.pure _)
+      .nil)))
+
+/-- The same at a size: each branch reads it. -/
+def sizedRules [Monad G] [RandomChoice G] [Fail G] [Sized G] [Backtrack G] : G Nat :=
+  Sized.sized fun n =>
+    Backtrack.backtrack [(1, fun _ => pure n), (1, fun _ => if n = 0 then Fail.fail else pure (n + 10))]
+
+#guard ((sizedRules (G := WithSize Basalt.Finite)).run 2).toList? == some [2, 12]
+#guard ((sizedRules (G := WithSize Basalt.Finite)).run 0).toList? == some [0]
+
+end Backtracking
+
 /-! ## Memoized tiers -/
 
 namespace Compositions
