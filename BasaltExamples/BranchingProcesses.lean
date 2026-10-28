@@ -200,8 +200,12 @@ theorem genMegaDeTH.expect_nodes (n : Nat) :
   refine le_antisymm (genMegaDeTH.expect_nodes_le n) ?_
   simpa [SPMF.expect_eq_obs] using genMegaDeTH.le_expect_nodes n 0
 
-/-- The expected no. of `node`s when `size = 10` is 15 / 32 (`genMegaDeTH.expect_nodes`). -/
-theorem megaNodes_ten : megaNodes 10 = 15 / 32 := by
+/-- §3 predicts "an expected number of `Node` constructors up to level 10 of 0.4997" for this
+generator at size `10`. It generates `15/32 = 0.46875`: halving the size leaves four levels that can
+hold a `node`, where the prediction counts eleven. -/
+theorem genMegaDeTH.expect_nodes_ten :
+    SPMF.expect (genMegaDeTH 10) (fun t => (t.nodes : ℝ≥0∞)) = 15 / 32 := by
+  rw [genMegaDeTH.expect_nodes]
   simp [megaNodes]
   basify
   norm_num
@@ -315,19 +319,22 @@ theorem dragenSpec_level (k : Nat) : dragenSpec.level () k () = (13 / 10) ^ k :=
     rw [dragenSpec.level_succ, Fintype.sum_unique, dragenSpec_meanTypes]
     simp [ih, pow_succ, mul_comm]
 
-/-- §4 reports 21.322 `NodeA`s at size `10`; the expectation is `21.3097486415`. -/
-theorem dragen_nodeA_ten : dragenSpec.predicted () .nodeA 10 = 42619497283 / 2000000000 := by
+/-- The paper's closed form for `NodeA` (equation 9): `pNodeA · Σ_{k<n} m^k`, with mean offspring
+`m = 13/10`. -/
+theorem genDragen.expect_nodeA (n : Nat) :
+    SPMF.expect (genDragen n) (fun t => (t.count .nodeA : ℝ≥0∞)) =
+      5 / 10 * ∑ k ∈ Finset.range n, (13 / 10) ^ k := by
+  rw [genDragen.expect_count]
   simp [BranchingProcess.Spec.predicted, BranchingProcess.Spec.terminal, Con'.args, Con'.prob,
-    dragenSpec_level, Finset.sum_range_succ]
-  basify
-  norm_num
+    dragenSpec_level]
 
-/-- §4 reports 12.813 `NodeB`s at size `10`; the expectation is `12.7858491849`. -/
-theorem dragen_nodeB_ten : dragenSpec.predicted () .nodeB 10 = 127858491849 / 10000000000 := by
+/-- The paper's closed form for `NodeB`: `pNodeB · Σ_{k<n} m^k`. -/
+theorem genDragen.expect_nodeB (n : Nat) :
+    SPMF.expect (genDragen n) (fun t => (t.count .nodeB : ℝ≥0∞)) =
+      3 / 10 * ∑ k ∈ Finset.range n, (13 / 10) ^ k := by
+  rw [genDragen.expect_count]
   simp [BranchingProcess.Spec.predicted, BranchingProcess.Spec.terminal, Con'.args, Con'.prob,
-    dragenSpec_level, Finset.sum_range_succ]
-  basify
-  norm_num
+    dragenSpec_level]
 
 /-! ## Mutually recursive types (§6) -/
 
