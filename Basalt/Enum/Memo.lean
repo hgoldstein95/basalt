@@ -24,8 +24,8 @@ values are data, like `Finite`, does the sharing save work.
   is an ordinary total function, as fast as a mutable table, because the table is used linearly
   and Lean updates it in place.
 
-Not yet proved: `memoPure` is `fix`, key for key. It relates one generic step at two
-interpretations, so it is proved per generator, as every relation between interpretations is.
+That `memoPure` is `fix`, key for key, is `KeyedStep.memoPure_eq` (`Basalt.Enum.MemoLaws`), given
+a step that relates itself between the two interpretations.
 -/
 
 @[expose] public section

@@ -26,7 +26,8 @@ stops growing; it runs out of fuel, and says so.
 Only the table's entries need `BEq`; within a step, values are a plain list. Each round recomputes
 every key (naive evaluation), which wants to become semi-naive before it meets a large relation.
 
-Not yet proved: a complete run is the support, key for key.
+That a complete run is the support, key for key, is `PolyStep.supports_eq`
+(`Basalt.Enum.TabledLaws`).
 -/
 
 @[expose] public section
