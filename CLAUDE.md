@@ -116,6 +116,40 @@ definition, and the definition is right here to run.
   [Basalt/Walk/ExpectedCost.lean](Basalt/Walk/ExpectedCost.lean), pinned by
   [BasaltTest/Walk/ExpectedCost.lean](BasaltTest/Walk/ExpectedCost.lean). The practical entries are
   WORKFLOW.md's Recipes 3 and 5.
+- **Enumeration** — interpretations of `Gen` that take every value of a `choose`; the overview of
+  each and where it lives is [Basalt/Enum.lean](Basalt/Enum.lean)'s module docstring.
+  - Their laws relate a run to an `SPMF` meaning. Those registered `@[walk_rel]` are proved per
+    generator by `walk fixpoint` and pinned by [BasaltTest/Enum/Laws.lean](BasaltTest/Enum/Laws.lean):
+    support — [Basalt/Enum/Laws.lean](Basalt/Enum/Laws.lean); probabilities —
+    [Basalt/Enum/WeightLaws.lean](Basalt/Enum/WeightLaws.lean); cost tiers —
+    [Basalt/Enum/CostLaws.lean](Basalt/Enum/CostLaws.lean); successes of a generator that can
+    `fail` — [Basalt/Enum/FailLaws.lean](Basalt/Enum/FailLaws.lean), and of weighted backtracking,
+    read as a union at `Finite` — [Basalt/Enum/BacktrackLaws.lean](Basalt/Enum/BacktrackLaws.lean),
+    or at `CostGraded Finite`, complete only up to cost — [Basalt/Enum/BacktrackCostLaws.lean](Basalt/Enum/BacktrackCostLaws.lean);
+    probabilities of both, failure included — [Basalt/Enum/BacktrackWeightLaws.lean](Basalt/Enum/BacktrackWeightLaws.lean);
+    with failures that say why (`FailWith`), successes exact and labels over-approximated —
+    [Basalt/Enum/BacktrackWithLaws.lean](Basalt/Enum/BacktrackWithLaws.lean), graded by cost —
+    [Basalt/Enum/BacktrackWithCostLaws.lean](Basalt/Enum/BacktrackWithCostLaws.lean), and at `WFinite` every
+    outcome's probability exact — [Basalt/Enum/BacktrackWithWeightLaws.lean](Basalt/Enum/BacktrackWithWeightLaws.lean).
+  - An open-recursion step (`KeyedStep`, `PolyStep`) is not a `Gen` term, so the walk cannot prove
+    its laws: they are built from per-construct lemmas — memoization in
+    [Basalt/Enum/MemoLaws.lean](Basalt/Enum/MemoLaws.lean), tabling in
+    [Basalt/Enum/TabledLaws.lean](Basalt/Enum/TabledLaws.lean). Definedness (`≠ .undef`) is
+    termination, so no fixpoint induction proves it; prove it by induction on the measure
+    (`*_defined` in [Basalt/Enum/Finite.lean](Basalt/Enum/Finite.lean), `fix_defined` in
+    [Basalt/Enum/Memo.lean](Basalt/Enum/Memo.lean)).
+  - `Fail` is [Basalt/Fail.lean](Basalt/Fail.lean); `Backtrack`, a choice among branches that a
+    search retries and an enumeration unions, is [Basalt/Backtrack.lean](Basalt/Backtrack.lean), and
+    `Pick`, the same choice without retry, [Basalt/Pick.lean](Basalt/Pick.lean); both over
+    labelled failures (`FailWith`, carried by `ExceptT` — [Basalt/ExceptT.lean](Basalt/ExceptT.lean)),
+    [Basalt/BacktrackWith.lean](Basalt/BacktrackWith.lean);
+    FEAT-style exact sizing (`Sized.pay`,
+    `splitBind`, `done`) is [Basalt/Sized.lean](Basalt/Sized.lean).
+  - Worked instances, end to end with memoization: [BasaltExamples/Enum/BST.lean](BasaltExamples/Enum/BST.lean)
+    and [BasaltExamples/Enum/STLC.lean](BasaltExamples/Enum/STLC.lean); the rest of
+    [BasaltExamples/Enum/](BasaltExamples/Enum/) shows one interpretation each. Run output is pinned by
+    [BasaltTest/Enum.lean](BasaltTest/Enum.lean). Unproved explorations are in
+    [Basalt/Experiments/](Basalt/Experiments/).
 - **`@[tunable]`** — the contract (emitted declarations, weight/depth rules) is
   [Basalt/Tuning/Attr.lean](Basalt/Tuning/Attr.lean)'s module docstring;
   [BasaltTest/Tuning.lean](BasaltTest/Tuning.lean) is the full tour.
