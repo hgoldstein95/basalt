@@ -13,7 +13,7 @@ public import Basalt.Enum.CostLaws
 
 `CostEnumeratesSome y x` relates a cost-graded enumeration to a search at `OptionT SPMF.Cost`:
 every entry of tier `n` is a success of cost `n`, and every success is listed at a tier no costlier.
-It is a `GenRel` (`genRel_costEnumeratesSome`) with rules for `fail`, `<*>` and `backtrack`; it is
+It is a `GenRel` (`genRel_costEnumeratesSome`) with rules for `fail`, `<*>`, `backtrack` and `pick`; it is
 not `CostEnumerates`, because a search that fails some branches before succeeding with another pays
 for them, and that cost is not a tier.
 -/
@@ -100,6 +100,41 @@ theorem mem_support_search_cost_of_branch : ∀ (fuel : Nat)
     exact ⟨some a, c, 0, h, by simp, rfl⟩
 
 end Backtrack
+
+namespace Pick
+
+open Backtrack
+
+variable {α : Type}
+
+/-- A success of the draw costs exactly one more than a success of a branch of positive weight. -/
+theorem mem_support_pick_cost (gs : List (Nat × (Unit → OptionT SPMF.Cost α))) (a : α) (n : Nat)
+    (h : (some a, n) ∈ (pick gs : OptionT SPMF.Cost α).run.support) :
+    ∃ p ∈ gs, 0 < p.1 ∧ ∃ c, (some a, c) ∈ (p.2 ()).run.support ∧ c + 1 ≤ n := by
+  change (some a, n) ∈ (draw gs).run.support at h
+  simp only [draw, OptionT.run_mk, SPMF.Cost.mem_support_bind_iff] at h
+  obtain ⟨i, n₁, n₂, hi, h, rfl⟩ := h
+  rw [SPMF.Cost.mem_support_choose_iff] at hi
+  subst hi
+  split at h
+  · simp at h
+  · rename_i k g rest hpick
+    obtain ⟨hm, hk, _⟩ := pickDrop_some hpick
+    exact ⟨(k, g), hm, hk, n₂, h, by omega⟩
+
+/-- A success of a branch of positive weight is a success of the draw for one more choice. -/
+theorem mem_support_pick_cost_of_branch (gs : List (Nat × (Unit → OptionT SPMF.Cost α)))
+    (p : Nat × (Unit → OptionT SPMF.Cost α)) (hp : p ∈ gs) (hk : 0 < p.1) (a : α) (c : Nat)
+    (h : (some a, c) ∈ (p.2 ()).run.support) :
+    (some a, c + 1) ∈ (pick gs : OptionT SPMF.Cost α).run.support := by
+  change (some a, c + 1) ∈ (draw gs).run.support
+  obtain ⟨n, hn, rest, hpick⟩ := exists_pickDrop hp hk
+  simp only [draw, OptionT.run_mk, SPMF.Cost.mem_support_bind_iff]
+  refine ⟨ULift.up ⟨n, Nat.zero_le _, by omega⟩, 1, c, by simp, ?_, by omega⟩
+  simp only [hpick]
+  exact h
+
+end Pick
 
 /-! ## Tiers at `CostGraded Finite` -/
 
@@ -360,18 +395,19 @@ attribute [gen_rule] CostEnumeratesSome.fail CostEnumeratesSome.seq
 
 /-! ## Backtracking -/
 
-
-/-- Tier `n + 1` of the union lists the successes of each branch of positive weight at cost `n`,
-which the search reaches by picking that branch first; a success after other branches failed is
-listed at the tier of its own branch's cost, which is cheaper. -/
-@[gen_rule]
-theorem CostEnumeratesSome.backtrack {α : Type} {gs' : List (Nat × (Unit → CostGraded Finite α))}
-    {gs : List (Nat × (Unit → OptionT SPMF.Cost α))}
-    (hs : GenRel.Weighted @CostEnumeratesSome gs' gs) :
-    CostEnumeratesSome (Backtrack.backtrack gs') (Backtrack.backtrack gs) := by
+/-- The union of the branches, one tier up, lists a cost-graded `x` complete up to cost, when every
+success of `x` costs more than a success of a branch of positive weight, and every such success is
+one of `x`'s for one more choice. -/
+theorem CostEnumeratesSome.union {α : Type} {gs' : List (Nat × (Unit → CostGraded Finite α))}
+    {gs : List (Nat × (Unit → OptionT SPMF.Cost α))} {x : OptionT SPMF.Cost α}
+    (hs : GenRel.Weighted @CostEnumeratesSome gs' gs)
+    (hup : ∀ a n, (some a, n) ∈ x.run.support →
+      ∃ p ∈ gs, 0 < p.1 ∧ ∃ c, (some a, c) ∈ (p.2 ()).run.support ∧ c + 1 ≤ n)
+    (hdown : ∀ p ∈ gs, 0 < p.1 → ∀ a c, (some a, c) ∈ (p.2 ()).run.support →
+      (some a, c + 1) ∈ x.run.support) :
+    CostEnumeratesSome (Backtrack.backtrack gs') x := by
   have hy (n : Nat) : (Backtrack.backtrack gs' : CostGraded Finite α) (n + 1) =
       CostGraded.backtrackTier gs' n := rfl
-  have hx : (Backtrack.backtrack gs : OptionT SPMF.Cost α) = Backtrack.search gs.length gs := rfl
   refine ⟨fun n a ha => ?_, fun n a hx' hd => ?_⟩
   · cases n with
     | zero => exact absurd ha (Finite.not_mem_empty a)
@@ -380,11 +416,8 @@ theorem CostEnumeratesSome.backtrack {α : Type} {gs' : List (Nat × (Unit → C
       obtain ⟨p', hp', hk, ha⟩ :=
         (CostGraded.mem_backtrackTier (Finite.ne_undef_of_mem ha) a).mp ha
       obtain ⟨g, hg, hr⟩ := hs.exists_right hp'
-      rw [hx]
-      exact Backtrack.mem_support_search_cost_of_branch _ gs _ hg hk (List.length_pos_of_mem hg) a
-        n (hr.1 n a ha)
-  · rw [hx] at hx'
-    obtain ⟨p, hp, hk, c, hpa, hc⟩ := Backtrack.mem_support_search_cost _ gs a n hx'
+      exact hdown _ hg hk a n (hr.1 n a ha)
+  · obtain ⟨p, hp, hk, c, hpa, hc⟩ := hup a n hx'
     obtain ⟨g', hg', hr⟩ := hs.exists_left hp
     have hdef (m : Nat) (hm : m + 1 ≤ n) : CostGraded.backtrackTier gs' m ≠ .undef :=
       hy m ▸ hd (m + 1) hm
@@ -393,5 +426,24 @@ theorem CostEnumeratesSome.backtrack {α : Type} {gs' : List (Nat × (Unit → C
     refine ⟨m + 1, by omega, ?_⟩
     rw [hy, CostGraded.mem_backtrackTier (hdef m (by omega))]
     exact ⟨(p.1, g'), hg', hk, ha⟩
+
+/-- Tier `n + 1` of the union lists the successes of each branch of positive weight at cost `n`,
+which the search reaches by picking that branch first; a success after other branches failed is
+listed at the tier of its own branch's cost, which is cheaper. -/
+@[gen_rule]
+theorem CostEnumeratesSome.backtrack {α : Type} {gs' : List (Nat × (Unit → CostGraded Finite α))}
+    {gs : List (Nat × (Unit → OptionT SPMF.Cost α))}
+    (hs : GenRel.Weighted @CostEnumeratesSome gs' gs) :
+    CostEnumeratesSome (Backtrack.backtrack gs') (Backtrack.backtrack gs) :=
+  union hs (Backtrack.mem_support_search_cost _ gs) fun p hp hk =>
+    Backtrack.mem_support_search_cost_of_branch _ gs p hp hk (List.length_pos_of_mem hp)
+
+/-- With no retry, the draw reaches each success at exactly one more than its branch's cost. -/
+@[gen_rule]
+theorem CostEnumeratesSome.pick {α : Type} {gs' : List (Nat × (Unit → CostGraded Finite α))}
+    {gs : List (Nat × (Unit → OptionT SPMF.Cost α))}
+    (hs : GenRel.Weighted @CostEnumeratesSome gs' gs) :
+    CostEnumeratesSome (Pick.pick gs') (Pick.pick gs) :=
+  union hs (Pick.mem_support_pick_cost gs) (Pick.mem_support_pick_cost_of_branch gs)
 
 end Basalt

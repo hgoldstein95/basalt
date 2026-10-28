@@ -93,6 +93,9 @@ partial_fixpoint
   [some 0, some 1, some 0, some 2, some 0, some 4]
 #guard (bits (G := CostGraded Basalt.Finite)).tier? 3 == some [[true], [false]]
 
+#guard (List.range 4).map (drawn (G := CostGraded Basalt.Finite)).tier? ==
+  [some [], some [3], some [1, 2], some []]
+
 end Backtracking
 
 /-! ## Memoized tiers -/

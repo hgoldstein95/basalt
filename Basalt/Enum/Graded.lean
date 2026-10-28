@@ -7,6 +7,7 @@ module
 
 public import Basalt.Backtrack
 public import Basalt.Enum.Weighted
+public import Basalt.Pick
 
 /-!
 # Graded Enumeration
@@ -106,6 +107,11 @@ instance instBacktrack [Fail G] [Union G] : Backtrack (CostGraded G) where
     | 0 => Fail.fail
     | n + 1 => backtrackTier gs n
 
+/-- The same tiers as `backtrack`: the draw costs one choice, and its branch what it costs. With no
+retry, the tiers are exact for `pick`; `CostEnumeratesSome` asks only that they be complete up to
+cost. -/
+instance instPick [Fail G] [Union G] : Pick (CostGraded G) := ⟨fun gs => Backtrack.backtrack gs⟩
+
 section monotonicity
 
 attribute [local instance] List.instPartialOrderPointwise instPartialOrderConstFst
@@ -129,6 +135,9 @@ instance instMonoBacktrack [Gen G] [Fail G] [Union G] [MonoUnion G] :
   backtrack_mono h
     | 0 => PartialOrder.rel_refl
     | n + 1 => backtrackTier_mono n h
+
+instance instMonoPick [Gen G] [Fail G] [Union G] [MonoUnion G] : MonoPick (CostGraded G) where
+  pick_mono h := MonoBacktrack.backtrack_mono (G := CostGraded G) h
 
 end monotonicity
 

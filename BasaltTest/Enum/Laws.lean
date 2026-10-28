@@ -110,4 +110,8 @@ theorem digits_costEnumeratesSome :
     CostEnumeratesSome (digits (G := CostGraded Basalt.Finite)) (digits (G := OptionT SPMF.Cost)) := by
   walk fixpoint
 
+theorem picked_costEnumeratesSome :
+    CostEnumeratesSome (picked (G := CostGraded Basalt.Finite)) (picked (G := OptionT SPMF.Cost)) := by
+  walk fixpoint
+
 end EnumLawTest
