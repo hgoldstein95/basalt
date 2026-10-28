@@ -583,12 +583,20 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
       let some gs ← tryFact leaves goal e | failure
       namePremises none (← goal.getType) gs
     if let some gs := r then return some (← rest gs)
+  -- A hypothesis whose bridge fails is reported only if no later one closes the leaf.
+  let mut err : Option Exception := none
   for decl in ← getLCtx do
     unless decl.isImplementationDetail do
       unless ← isProp decl.type do continue
       unless mentionsHead (← instantiateMVars decl.type) do continue
-      if let some gs ← tryFact leaves goal decl.toExpr then
+      let saved ← saveState
+      let r ← try tryFact leaves goal decl.toExpr catch ex => do
+        saved.restore
+        if err.isNone then err := some ex
+        pure none
+      if let some gs := r then
         return some (← rest (← namePremises none (← goal.getType) gs))
+  if let some ex := err then throw ex
   return none
 
 /-- Why each of `extras` that does not elaborate at `goal` does not, for the error of a leaf nothing

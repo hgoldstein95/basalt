@@ -394,7 +394,7 @@ induction on the seed instead of `walk fixpoint`. State it under every added con
 `1` satisfies; unfold one step (`conv_rhs => rw [<GEN>]`) and `walk [ih]`, which shifts `k` at each
 draw. `SPMF.le_expect_add` (`Basalt/Walk/Mass.lean`) states a callee's bound that way from its mass,
 and `le_antisymm` with the upper bound at `k = 0` gives the equation. Worked instances:
-`genDragen.expect_countA`, `genMegaDeTH.expect_nodes`, and `genT12.expect_count`, for a pair of
+`genDragen.expect_count`, `genMegaDeTH.expect_nodes`, and `genT12.expect_count`, for a pair of
 mutually recursive generators, which `walk fixpoint` does not induct over (`BranchingProcesses.lean`).
 
 **A termination probability below `1`** is the quantity `1`, bounded above this way, and bounded

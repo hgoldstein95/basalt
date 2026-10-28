@@ -129,6 +129,14 @@ example (g : SPMF Nat) (h : SPMF.expectObs.spec g (fun n => (n : ℝ≥0∞)) �
   rw [SPMF.expect_eq_obs]
   walk [h]
 
+-- A hypothesis in context that fails is passed over for a later one that closes the leaf.
+example (g : SPMF Nat) (_h₁ : SPMF.expectObs.spec g (fun n => (n : ℝ≥0∞)) ≤ 1)
+    (h₂ : SPMF.expectObs.spec g (fun n => 2 * (n : ℝ≥0∞)) ≤ 2) :
+    SPMF.expect (g >>= fun n => pure (2 * n) : SPMF Nat) (fun n => (n : ℝ≥0∞)) ≤ 2 := by
+  rw [SPMF.expect_eq_obs]
+  walk
+  simp
+
 -- The cookbook's expectation bound is this walk followed by arithmetic: `Tree.genBST.expect_size_le`
 -- (`BST.lean`).
 

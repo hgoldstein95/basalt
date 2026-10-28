@@ -266,4 +266,12 @@ example (g : SPMF Nat) (h : ∀ k, k + 1 ≤ SPMF.expectObs.spec g fun n => k + 
   trace_state
   norm_num
 
+-- A callee's lower bound is stated that way from its mass by `SPMF.le_expect_add`.
+example (g : SPMF Nat) (hm : 1 ≤ SPMF.expectObs.spec g fun _ => 1)
+    (hx : 1 ≤ SPMF.expectObs.spec g fun n => (n : ℝ≥0∞)) :
+    2 ≤ SPMF.expectObs.spec (do let x ← g; let y ← g; pure (x + y) : SPMF Nat)
+      (fun n => (n : ℝ≥0∞)) := by
+  walk [SPMF.le_expect_add hm hx]
+  norm_num
+
 end MassBoundTest

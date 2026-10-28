@@ -38,11 +38,9 @@ theorem SPMF.expect_le_add_of_le {x : SPMF α} {h p : α → ℝ≥0∞} {k B : 
   exact add_le_add (mul_le_of_le_one_left' (SPMF.mass_le_one x)) hx
 
 /-- A bound `B` on `x`'s mass bounds the expectation of a constant `d` by `d * B`, since
-`expect x (fun _ => d) = d * mass x`; the upper-bound dual of `SPMF.le_expect_of_le`. The walk uses it
-at a draw whose continuation has a constant bound that is not `1` plus a constant, which
-`SPMF.expect_le_add_of_le` cannot take. At present only upper bounds on the mass of a generator that
-may not terminate need it — the termination probabilities of `BasaltExamples/BranchingProcesses.lean`
-— because a mass of `1` makes `d * B` no better than the bound `d` on its own. -/
+`expect x (fun _ => d) = d * mass x`: the upper-bound dual of `SPMF.le_expect_of_le`, for a draw whose
+continuation's bound is a constant that is not `1` plus one. It improves on the bound `d` alone only
+when the mass may be below `1`. -/
 @[obs_leaf]
 theorem SPMF.expect_le_mul_of_le {x : SPMF α} {p : α → ℝ≥0∞} {d B : ℝ≥0∞}
     (hx : SPMF.expectObs.spec x (fun _ => 1) ≤ B) (hp : ∀ a, p a = d) :
