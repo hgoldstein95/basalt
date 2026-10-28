@@ -126,4 +126,29 @@ theorem digits_weighsSome : WeighsSome (digits (G := WFinite)) (digits (G := Opt
 theorem picked_weighsSome : WeighsSome (picked (G := WFinite)) (picked (G := OptionT SPMF)) := by
   walk fixpoint
 
+/-- `hasType` truncated as derived code is: at size `0` the recursive rule fails with a label, so a
+search looks elsewhere and a checker does not mistake it for a refutation. -/
+def hasTypeT [Gen G] [Fail G] [FailWith Unit G] [Backtrack G] (τ : Ty) : Nat → G Expr
+  | 0 => Backtrack.backtrack [
+      (1, fun _ => match τ with | .nat => do return .lit (← digit) | _ => Fail.fail),
+      (1, fun _ => match τ with
+        | .bool => do let n ← digit; if n ≠ 0 then pure (.isPos n) else Fail.fail
+        | _ => Fail.fail),
+      (1, fun _ => match τ with | .nat => FailWith.failWith () | _ => Fail.fail)]
+  | size + 1 => Backtrack.backtrack [
+      (1, fun _ => match τ with | .nat => do return .lit (← digit) | _ => Fail.fail),
+      (1, fun _ => match τ with
+        | .bool => do let n ← digit; if n ≠ 0 then pure (.isPos n) else Fail.fail
+        | _ => Fail.fail),
+      (size + 1, fun _ => match τ with
+        | .nat => Expr.add <$> hasTypeT .nat size <*> hasTypeT .nat size
+        | _ => Fail.fail)]
+
+theorem hasTypeT_enumeratesWith (τ : Ty) (n : Nat) :
+    EnumeratesWith (hasTypeT (G := ExceptT Unit Basalt.Finite) τ n)
+      (hasTypeT (G := ExceptT Unit (OptionT SPMF)) τ n) := by
+  induction n generalizing τ with
+  | zero => unfold hasTypeT; walk
+  | succ n ih => unfold hasTypeT; walk [ih .nat]
+
 end EnumLawTest

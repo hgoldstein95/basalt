@@ -152,6 +152,26 @@ open Basalt.Examples.Enum.Local in
 #guard 1 - ((WFinite.entries? (failingOnce (G := WFinite))).getD []).foldl (fun s (_, w) => s + w) 0 ==
   (failAndDist (failingOnce (G := OptionT WFinite))).1
 
+/-! ### Failures that say why -/
+
+/-- A rule that refutes and a rule that could not decide. -/
+def undecided [Monad G] [RandomChoice G] [Fail G] [FailWith Unit G] [Backtrack G] : G Nat :=
+  Backtrack.backtrack [(1, fun _ => Fail.fail), (1, fun _ => FailWith.failWith ())]
+
+/-- The same, with a rule that succeeds. -/
+def decided [Monad G] [RandomChoice G] [Fail G] [FailWith Unit G] [Backtrack G] : G Nat :=
+  Backtrack.backtrack
+    [(1, fun _ => Fail.fail), (1, fun _ => FailWith.failWith ()), (1, fun _ => pure 7)]
+
+-- The search ends with the label, never refuted: some branch could not decide.
+#guard ((undecided (G := ExceptT Unit (OptionT Basalt.Finite))).run.run.toList?).map
+  (·.all (· == some (Except.error ()))) == some true
+-- With a rule that succeeds, the search retries past the label and always succeeds; the union
+-- still lists the label, which says only that some branch could not decide.
+#guard ((decided (G := ExceptT Unit (OptionT Basalt.Finite))).run.run.toList?).map
+  (·.all (· == some (Except.ok 7))) == some true
+#guard (decided (G := ExceptT Unit Basalt.Finite)).run.toList? == some [Except.error (), Except.ok 7]
+
 end Backtracking
 
 /-! ## Memoized tiers -/

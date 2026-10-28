@@ -6,8 +6,10 @@ Authors: Harrison Goldstein
 module
 
 public import Basalt.Backtrack
+public import Basalt.BacktrackWith
 public import Basalt.Combinators
 public import Basalt.Enum
+public import Basalt.ExceptT
 public import Basalt.Fail
 public import Basalt.Gen
 public import Basalt.GenRel

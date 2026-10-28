@@ -126,7 +126,9 @@ definition, and the definition is right here to run.
     `fail` — [Basalt/Enum/FailLaws.lean](Basalt/Enum/FailLaws.lean), and of weighted backtracking,
     read as a union at `Finite` — [Basalt/Enum/BacktrackLaws.lean](Basalt/Enum/BacktrackLaws.lean),
     or at `CostGraded Finite`, complete only up to cost — [Basalt/Enum/BacktrackCostLaws.lean](Basalt/Enum/BacktrackCostLaws.lean);
-    probabilities of both, failure included — [Basalt/Enum/BacktrackWeightLaws.lean](Basalt/Enum/BacktrackWeightLaws.lean).
+    probabilities of both, failure included — [Basalt/Enum/BacktrackWeightLaws.lean](Basalt/Enum/BacktrackWeightLaws.lean);
+    with failures that say why (`FailWith`), successes exact and labels over-approximated —
+    [Basalt/Enum/BacktrackWithLaws.lean](Basalt/Enum/BacktrackWithLaws.lean).
   - An open-recursion step (`KeyedStep`, `PolyStep`) is not a `Gen` term, so the walk cannot prove
     its laws: they are built from per-construct lemmas — memoization in
     [Basalt/Enum/MemoLaws.lean](Basalt/Enum/MemoLaws.lean), tabling in
@@ -136,7 +138,9 @@ definition, and the definition is right here to run.
     [Basalt/Enum/Memo.lean](Basalt/Enum/Memo.lean)).
   - `Fail` is [Basalt/Fail.lean](Basalt/Fail.lean); `Backtrack`, a choice among branches that a
     search retries and an enumeration unions, is [Basalt/Backtrack.lean](Basalt/Backtrack.lean), and
-    `Pick`, the same choice without retry, [Basalt/Pick.lean](Basalt/Pick.lean);
+    `Pick`, the same choice without retry, [Basalt/Pick.lean](Basalt/Pick.lean); both over
+    labelled failures (`FailWith`, carried by `ExceptT` — [Basalt/ExceptT.lean](Basalt/ExceptT.lean)),
+    [Basalt/BacktrackWith.lean](Basalt/BacktrackWith.lean);
     FEAT-style exact sizing (`Sized.pay`,
     `splitBind`, `done`) is [Basalt/Sized.lean](Basalt/Sized.lean).
   - Worked instances, end to end with memoization: [BasaltExamples/Enum/BST.lean](BasaltExamples/Enum/BST.lean)

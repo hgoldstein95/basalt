@@ -19,6 +19,11 @@ a generator that never fails never asks for it. What failure *is* is up to the i
 * At an enumeration it is `∅`: nothing to enumerate, which keeps the enumeration's counts and its
   products cheap (`Basalt/Enum`).
 
+`FailWith ε` is a failure that is not a refutation, `e : ε` saying why (out of fuel, say); it is
+data, an `.error` at `ExceptT ε G` (`Basalt/ExceptT.lean`), so a search can retry past it and a
+checker need not mistake it for "no". Raising only: there is no catch, which at an enumeration would
+turn a label the union keeps into a value the distribution never produces.
+
 Not `Alternative`: its `<|>` is union at an enumeration and left-biased fallback at `OptionT`, so a
 generator using it would enumerate values its distribution never produces. Choice between branches
 goes through `choose` (`pickFrom`, `branches`), which every interpretation reads the same way.
@@ -30,6 +35,11 @@ goes through `choose` (`pickFrom`, `branches`), which every interpretation reads
 class Fail (G : Type → Type) where
   /-- No value here. -/
   fail : G α
+
+/-- A generator monad in which a branch can fail without refuting: out of fuel, say, so a search
+should look elsewhere and not conclude there is nothing. `e` says why. -/
+class FailWith (ε : Type) (G : Type → Type) where
+  failWith : ε → G α
 
 instance [Monad G] : Fail (OptionT G) := ⟨failure⟩
 
