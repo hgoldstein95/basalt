@@ -165,7 +165,7 @@ noncomputable instance : RandomChoice SPMF := .ofChoose fun lo hi h => by
 
 end operations
 
-instance : RandomChoice.LawfulPick SPMF := ⟨fun _ _ _ => rfl⟩
+instance : RandomChoice.LawfulPick SPMF := ⟨fun _ _ _ _ _ => rfl⟩
 
 section operation_uses
 

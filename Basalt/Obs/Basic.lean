@@ -46,8 +46,8 @@ theorem map_coin {G : Type → Type v} {W : Type → Type w}
   simp only [coin, O.map_bind, O.map_choose, O.map_ite, O.map_pure]
 
 /-- `pick` is its draw on both sides, so an observation keeps it. -/
-theorem map_pick [LawfulPick G] [LawfulPick W] (n : Nat) (w : Fin n → Nat) (h : ∃ i, 0 < w i) :
-    O.spec (pick n w h) = pick n w h := by
+theorem map_pick [LawfulPick G] [LawfulPick W] (n : Nat) (w : Fin n → Nat) (t : Nat)
+    (s : Nat → Nat) (h : Picks w t s) : O.spec (pick n w t s h) = pick n w t s h := by
   rw [LawfulPick.pick_eq, LawfulPick.pick_eq, pickVia, pickVia, O.map_bind, O.map_choose]
   congr 1
   funext k

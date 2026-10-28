@@ -171,7 +171,8 @@ theorem permutationOf (xs : List α) : R (permutationOf xs) (permutationOf xs) :
 /-- `pick` is its draw at both monads. -/
 @[gen_rel_rule]
 theorem pick [RandomChoice.LawfulPick M] [RandomChoice.LawfulPick N] (n : Nat) (w : Fin n → Nat)
-    (hw : ∃ i, 0 < w i) : R (RandomChoice.pick n w hw) (RandomChoice.pick n w hw) := by
+    (t : Nat) (s : Nat → Nat) (hp : RandomChoice.Picks w t s) :
+    R (RandomChoice.pick n w t s hp) (RandomChoice.pick n w t s hp) := by
   rw [RandomChoice.LawfulPick.pick_eq, RandomChoice.LawfulPick.pick_eq]
   exact h.bind (fun _ => h.pure _) (h.choose _ _ _)
 
@@ -180,9 +181,11 @@ theorem frequency [RandomChoice.LawfulPick M] [RandomChoice.LawfulPick N]
     {gs' : List (Nat × (Unit → M α))} {gs : List (Nat × (Unit → N α))}
     {h' : 0 < (gs'.map Prod.fst).sum} {hw : 0 < (gs.map Prod.fst).sum}
     (hs : Weighted @R gs' gs) : R (frequency gs' h') (frequency gs hw) := by
+  have hp := RandomChoice.Picks.canonical (exists_pos_of_weights (w := fun i => gs[i].1) hw rfl
+    fun _ => rfl)
   rw [frequency_eq_chain gs' h' gs.length hs.length_eq (fun i => gs[i].1)
-      fun i => (hs.weight_eq i.val _ _).symm,
-    frequency_eq_chain gs hw gs.length rfl (fun i => gs[i].1) fun _ => rfl]
-  exact h.bind (fun _ => h.oneOfChain hs.forall₂ 0 _) (h.pick _ _ _)
+      (fun i => (hs.weight_eq i.val _ _).symm) _ _ hp,
+    frequency_eq_chain gs hw gs.length rfl (fun i => gs[i].1) (fun _ => rfl) _ _ hp]
+  exact h.bind (fun _ => h.oneOfChain hs.forall₂ 0 _) (h.pick _ _ _ _ _)
 
 end GenRel

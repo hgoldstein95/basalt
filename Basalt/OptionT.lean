@@ -20,7 +20,7 @@ open Lean.Order RandomChoice
 instance instRandomChoiceOptionT {G : Type → Type} [Monad G] [RandomChoice G] :
     RandomChoice (OptionT G) where
   choose lo hi h := OptionT.lift (RandomChoice.choose lo hi h)
-  pick n w h := OptionT.lift (RandomChoice.pick n w h)
+  pick n w t s h := OptionT.lift (RandomChoice.pick n w t s h)
 
 instance instGenOptionT {G : Type → Type} [Gen G] : Gen (OptionT G) where
   instInhabited := fun _ => inferInstance

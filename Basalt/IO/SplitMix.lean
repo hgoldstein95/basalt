@@ -71,4 +71,4 @@ instance : Inhabited (WordModel σ α) := ⟨fun _ => none⟩
 instance [WordSource σ] : RandomChoice (WordModel σ) :=
   .ofChoose (chooseVia fun s => some (WordSource.next s))
 
-instance [WordSource σ] : RandomChoice.LawfulPick (WordModel σ) := ⟨fun _ _ _ => rfl⟩
+instance [WordSource σ] : RandomChoice.LawfulPick (WordModel σ) := ⟨fun _ _ _ _ _ => rfl⟩

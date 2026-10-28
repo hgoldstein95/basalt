@@ -67,7 +67,7 @@ instance instMonadLiftWithSize : MonadLift G (WithSize G) := ⟨WithSize.lift⟩
 
 instance instRandomChoiceWithSize [RandomChoice G] : RandomChoice (WithSize G) where
   choose lo hi h := fun _ => RandomChoice.choose lo hi h
-  pick n w h := fun _ => RandomChoice.pick n w h
+  pick n w t s h := fun _ => RandomChoice.pick n w t s h
 
 instance instGenWithSize [Gen G] : Gen (WithSize G) where
   instInhabited := fun α => inferInstanceAs (Inhabited (Nat → G α))

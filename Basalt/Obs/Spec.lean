@@ -138,7 +138,7 @@ instance : LawfulMonad (WP m) := LawfulMonad.mk' _
 
 instance : RandomChoice (WP m) := .ofChoose fun lo hi _ post => m.mix lo hi post
 
-instance : RandomChoice.LawfulPick (WP m) := ⟨fun _ _ _ => rfl⟩
+instance : RandomChoice.LawfulPick (WP m) := ⟨fun _ _ _ _ _ => rfl⟩
 
 theorem choose_bind_apply {lo hi : Nat} {h : lo ≤ hi}
     (k : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → WP m α) (post : α → Ω) :
@@ -205,7 +205,7 @@ instance : LawfulMonad (WPC m) := LawfulMonad.mk' _
 
 instance : RandomChoice (WPC m) := .ofChoose fun lo hi _ post => m.mix lo hi fun a => post a 1
 
-instance : RandomChoice.LawfulPick (WPC m) := ⟨fun _ _ _ => rfl⟩
+instance : RandomChoice.LawfulPick (WPC m) := ⟨fun _ _ _ _ _ => rfl⟩
 
 theorem choose_bind_apply {lo hi : Nat} {h : lo ≤ hi}
     (k : ULift.{u} {x : Nat // lo ≤ x ∧ x ≤ hi} → WPC m α) (post : α → Nat → Ω) :
