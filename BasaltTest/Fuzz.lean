@@ -196,3 +196,36 @@ the same order and build the same tree. -/
 just the left spine. -/
 /-- info: agree: (((. 3 .) 5 .) 9 (. 10 (. 11 .))) -/
 #guard_msgs in #eval IO.println (agreeOn [1, 8, 1, 4, 1, 2, 0, 0, 0, 1, 12, 1, 10, 0, 0, 0])
+
+/-! ## `RecordGen` replays at `FuzzGen`
+
+A run at `RecordGen` must decode, at `FuzzGen`, to the same outcome while reading exactly the bytes
+it recorded: what a hybrid campaign's seed (`fuzz-run/README.md`) relies on. `readNat_recordDraw`
+proves it per draw; this checks whole runs, over ranges that take one byte, several bytes, a range
+that is a power of 256, and a bignum. -/
+
+/-- A property whose failure message shows every value drawn, so "same outcome" is "same values". -/
+private def propRecorded [Gen G] : PropM G Unit := do
+  let a ← generate (chooseNat 0 199)
+  let b ← generate (chooseNat 3 70000)
+  let c ← generate (chooseNat 0 255)
+  let d ← generate (chooseNat 5 5)
+  let e ← generate (chooseNat (2 ^ 70) (2 ^ 70 + 2 ^ 65))
+  let t ← generate (BST.Tree.genBST 0 100)
+  check false s!"{a} {b} {c} {d} {e} {reprStr t}"
+
+/-- Of `n` recorded runs from `seed`, how many replay with a different outcome or read a different
+number of bytes than were recorded. -/
+private def replayMismatches (n : Nat) (seed : UInt64) : Nat := Id.run do
+  let mut g := SplitMix.ofSeed seed
+  let mut bad := 0
+  for _ in [0:n] do
+    let (outcome, bytes, g') := runRecord propRecorded g
+    g := g'
+    let r := runOne propRecorded bytes
+    if renderOutcome r.outcome != renderOutcome outcome || r.cursor != bytes.size then
+      bad := bad + 1
+  return bad
+
+/-- info: 0 -/
+#guard_msgs in #eval IO.println (replayMismatches 500 2026)

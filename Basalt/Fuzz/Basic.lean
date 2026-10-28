@@ -45,29 +45,27 @@ instance : Inhabited (FuzzGen α) :=
   ⟨fun _ => none⟩
 
 /-- Bits needed to distinguish `k` outcomes (0 when `k ≤ 1`). -/
-def bitsFor (k : Nat) : Nat :=
+@[expose] def bitsFor (k : Nat) : Nat :=
   if k ≤ 1 then 0 else (k - 1).log2 + 1
 
 /-- Bytes needed to distinguish `k` outcomes: the smallest count covering `bitsFor k`. Reading the
 *fewest* bytes per range keeps a tight, mutation-friendly map from input bytes to choices. -/
-def bytesFor (k : Nat) : Nat := (bitsFor k + 7) / 8
+@[expose] def bytesFor (k : Nat) : Nat := (bitsFor k + 7) / 8
 
 /-- Read one byte, advancing the cursor. Past the end of the buffer, read `0`: the buffer is
 zero-extended rather than exhausted, which is what keeps `choose` total. The cursor still advances, so
 the overshoot survives as the run's `deficit`. -/
-def readByte (s : FuzzState) : UInt8 × FuzzState :=
+@[expose] def readByte (s : FuzzState) : UInt8 × FuzzState :=
   let b := if s.cursor < s.buffer.size then s.buffer.get! s.cursor else 0
   (b, { s with cursor := s.cursor + 1 })
 
+/-- Read `n` more bytes big-endian onto `acc`, advancing the cursor. -/
+@[expose] def readNatFrom (acc : Nat) (s : FuzzState) : Nat → Nat × FuzzState
+  | 0 => (acc, s)
+  | n + 1 => let (b, s') := readByte s; readNatFrom (acc * 256 + b.toNat) s' n
+
 /-- Read `n` bytes big-endian as a `Nat`, advancing the cursor (zero-filling past end-of-buffer). -/
-def readNat (s : FuzzState) (n : Nat) : Nat × FuzzState := Id.run do
-  let mut acc := 0
-  let mut st := s
-  for _ in [0:n] do
-    let (b, st') := readByte st
-    acc := acc * 256 + b.toNat
-    st := st'
-  return (acc, st)
+@[expose] def readNat (s : FuzzState) (n : Nat) : Nat × FuzzState := readNatFrom 0 s n
 
 /-- `choose` consumes `bytesFor (hi - lo + 1)` bytes and reduces them into `[lo, hi]`. Total. -/
 instance : RandomChoice FuzzGen where
