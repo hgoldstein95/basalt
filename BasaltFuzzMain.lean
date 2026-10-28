@@ -33,8 +33,8 @@ def propThreshold [Gen G] : PropM G Unit :=
 /-- The property registry, selected by the first non-flag CLI argument. `bst-*` are the worked BST
 demo (`BasaltFuzz/BuggyBST.lean`): the `-buggy-*` ones have real bugs every backend can find,
 and the others must never fail. `chain-*` and `long-*` are the staged microbenchmarks
-(`BasaltFuzz/Staged.lean`), the one place the backends differ by orders of magnitude;
-`long-*` is the one whose difficulty is buffer length, so it is where `--grow` is measured.
+(`BasaltFuzz/Staged.lean`), the one place the backends differ by orders of magnitude; `long-*`
+is the one whose difficulty is buffer length.
 
 Each entry is a `Property`, so one registry serves every backend; `fun _ =>` is the explicit `G`
 binder it asks for. -/

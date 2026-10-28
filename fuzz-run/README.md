@@ -38,8 +38,10 @@ the end of the buffer it reads `0`. Both properties matter: `choose` is total, a
 is deterministic, which is what coverage-guided mutation relies on.
 
 The buffer is finite and a generator's appetite is not, so a run can outrun its bytes. The cursor is
-not clamped, so how far it overshot survives as the `FuzzResult.deficit` — the one thing the fuzzer
-can be told about the zeros it did not supply; see [Extending the buffer](#extending-the-buffer).
+not clamped, so a run reports how many bytes it read (`FuzzResult.cursor`, past the end included) and
+how many of those it was not given (`FuzzResult.deficit`, the cursor past the input's length);
+[`--truncate`](#truncation) cuts an input
+to its cursor before mutating it.
 
 ### The C bridge (`Basalt/Fuzz/native.c`, `Basalt/Fuzz/Runner.lean`)
 
@@ -50,18 +52,18 @@ can be told about the zeros it did not supply; see [Extending the buffer](#exten
  │   go builds  run : ByteArray → IO UInt8  and hands it to the bridge ──┐   │
  │                                                                      ▼   │
  │ RandomChoice FuzzGen          ┌──── C bridge (Basalt/Fuzz/native.c) ────┐ │
- │  choose reads bytes from      │ basalt_fuzz_go(run, argv, grow):        │ │
+ │  choose reads bytes from      │ basalt_fuzz_go(run, argv, truncate):    │ │
  │  FuzzState.buffer/cursor,     │   store run in a global slot            │ │
  │  reading 0 past end-of-buf    │   LLVMFuzzerRunDriver(argc, argv, cb)   │ │
  │      ▲  pure Option state     │ cb = LLVMFuzzerTestOneInput(Data,Size):◀┼─┼┐
  │ FuzzGen α =                   │   arr := ByteArray copy of (Data,Size)  │ ││
  │  StateT FuzzState Option      │   code := run arr        (: IO UInt8)   │ ││
  │      │                        │   1 → (Lean printed it) abort()         │ ││
- │      └─ deficit ──────────────┼─▶ basalt_fuzz_note_deficit(deficit)     │ ││
+ │      └─ cursor ───────────────┼─▶ basalt_fuzz_note_cursor(cursor)       │ ││
  │                               │   2 → return -1 (discard) ; else 0      │ ││
  │                               │ LLVMFuzzerCustomMutator(Data,Size,Max): │ ││
- │                               │   if `grow` and Data ran short: append  │ ││
- │                               │   `deficit` zeros, then LLVMFuzzerMutate│ ││
+ │                               │   --truncate: cut Data to the cursor    │ ││
+ │                               │   its run read; then LLVMFuzzerMutate   │ ││
  │                               │   (the default suite, which it replaces)│ ││
  │                               └─────────────────────────────────────────┘ ││
  └──────────────────────────────────────────────────────────────────────────┘│
@@ -174,6 +176,10 @@ headers the C bridge needs, the C++ runtime, and which driver entry point to cal
 platform is likely to need nothing. Where a machine's toolchain defeats detection, put overrides in
 `fuzz-run/env.sh` (git-ignored, sourced first) — `env.example.sh` documents every knob.
 
+The same script builds another package's fuzz executable — one that requires Basalt and links
+`@fuzz-run/obj/link.rsp` as `basalt-fuzz` does — from that package's root; the variables it takes are
+documented at its head.
+
 If no toolchain-provided runtime is found — the macOS case, since neither Apple's clang nor Lean's
 vendored clang ships one — the build calls `get-libfuzzer.sh`, which builds the archive from
 compiler-rt's standalone `lib/fuzzer` source into `fuzz-run/vendor/` (a sparse ~1MB checkout, a few
@@ -182,8 +188,8 @@ seconds, once). Instrumentation itself needs nothing extra.
 ## Run
 
 ```bash
-fuzz-run/basalt-fuzz [--backend=fuzz|io|plausible] <property> [-runs=N] [-discard_ratio=N] [libFuzzer args...]
-fuzz-run/basalt-fuzz <property> [--grow]           # fuzz backend only, see below
+fuzz-run/basalt-fuzz [--backend=fuzz|io|plausible|io-cov] <property> [-runs=N] [-discard_ratio=N] [libFuzzer args...]
+fuzz-run/basalt-fuzz <property> --truncate                 # fuzz backend only, see below
 fuzz-run/basalt-fuzz replay <property> <file>      # reproduce a saved input, no fuzzer
 ```
 
@@ -200,7 +206,7 @@ Properties (see `BasaltFuzzMain.lean` and `BasaltFuzz/`):
 | `bst-delete` | `delete` agrees with the list model `toList.erase` — never fails |
 | `bst-buggy-delete` | a `delete` that silently drops keys; the output is still a valid BST, so only the model comparison catches it |
 | `chain-2`/`-3`/`-4` | the staged microbenchmark — a bug behind `n` nested guards |
-| `long-16`/`-32`/`-64` | the mirror image: a run of `n` elements where each position accepts half the byte values, so what binds is the buffer's *length* — the benchmark for [Extending the buffer](#extending-the-buffer) |
+| `long-16`/`-32`/`-64` | the mirror image: a run of `n` elements where each position accepts half the byte values, so what binds is the buffer's *length* |
 
 Useful libFuzzer flags: `-runs=N` (bounded campaign), `-max_len=N` (input size),
 `-artifact_prefix=./` (where crashing inputs are written), a positional dir for a seed/growing
@@ -208,9 +214,8 @@ corpus. The random backends read `-runs=N` from the same spelling, plus `-discar
 discard budget (`Basalt/PBT/Driver.lean`), and ignore the rest — under `fuzz`, libFuzzer owns the
 loop, so a discarded input is a `-1` return and neither budget applies.
 
-`--grow` is Basalt's own and is consumed before libFuzzer sees the command line; everything else is
-forwarded verbatim, and libFuzzer rejects a flag it does not know. It is off by default and measurement
-does not support turning it on ([Extending the buffer](#extending-the-buffer)).
+`--backend=` and `--truncate` are Basalt's own and are consumed before libFuzzer sees the command line;
+everything else is forwarded verbatim, and libFuzzer rejects a flag it does not know.
 
 ## Backends
 
@@ -222,13 +227,23 @@ guided fuzzer or under a plain random sampler; `--backend=` picks the interpreta
 | `fuzz` (default) | `Fuzz.FuzzGen` | libFuzzer's mutated byte buffer, guided by coverage |
 | `io` | `IO` | SplitMix (`ioGen`) |
 | `plausible` | `Plausible.Gen` | Plausible's `StdGen` |
+| `io-cov` | `IO` | SplitMix, as `io`, with each test's coverage counted as `fuzz` counts it: the control arm of a coverage comparison |
 
-All three come from one registry of `Basalt.PBT.Property` and share `Basalt.PBT`'s failure contract,
+All of them come from one registry of `Basalt.PBT.Property` and share `Basalt.PBT`'s failure contract,
 so their campaigns are directly comparable. Each backend is a `@[basalt_backend]` defined beside its
 interpretation, so `dispatch` offers every one `BasaltFuzzMain` imports without listing them. Every
 backend reads the same registry: a `Property` keeps its monad open, so no property or generator names
 a backend, and each backend's `Gen` instance follows by `inferInstance`. `replay` is fuzz-only,
 because a saved artifact *is* a `FuzzGen` byte buffer and has no meaning as a PRNG state.
+
+**Coverage over a campaign.** libFuzzer reports one campaign-wide edge count, which includes
+Basalt's own plumbing, and that differs between backends. With `BASALT_COV_OUT=<file>`, `fuzz` and
+`io-cov` write every edge of the instrumented code as `<offset> <first run>` at exit (`0`: never hit;
+the offset is from the executable base, so `nm` attributes it to a function), and `<file>.time` the
+elapsed milliseconds at every 1000th run: coverage as a function of tests and of time, restricted to
+whichever functions the comparison is about. Both read the same SanitizerCoverage counters of the same
+binary, cleared before each test: libFuzzer clears them for `fuzz`, and `io-cov` itself, in place of
+libFuzzer's loop, which a random campaign has no use for and would pay for in time.
 
 ### How fast each backend finds a bug
 
@@ -277,126 +292,61 @@ trials is variance in a geometric distribution, not a distributional difference.
 argument for the interpretation-polymorphic design: the choice is per-bug, and it costs a flag rather
 than a rewrite.
 
-## Extending the buffer
+## Truncation
 
-A generator can ask for more bytes than the input has, and `readByte` gives it `0`. That keeps
-`choose` total, but it leaves the fuzzer with a blind spot: **the zeros are not in the input**, so no
-byte mutator can reach the positions that produced them. They become reachable only if some
-length-extending mutation happens to lengthen the input, and then they arrive random rather than `0`,
-discontinuously.
+`--truncate` cuts an input to the bytes its run read before libFuzzer mutates it, so that the
+mutation lands on bytes the run used (`basalt_truncate`, in `native.c`'s custom mutator). The cut
+input runs exactly as the uncut one did, since `readByte` reads `0` past the end; the same idea is
+Zest's `gc()`. Only the input just run is cut: `Fuzzer::MutateAndTestOne` mutates one buffer in
+place for up to `-mutate_depth` (5) steps, running each, so a mid-chain input is the run that just
+happened, while the input a chain starts from comes from the corpus with no run at hand. The run
+report counts the inputs cut and the bytes each lost on average.
 
-`--grow` attempts to close the gap by materializing the zeros *before* mutating. It is **off by
-default**, because measurement does not support it helping — read [How much growth
-helps](#how-much-growth-helps) before building on this. The run reports how far it overshot
-(`FuzzResult.deficit`), `basalt_fuzz_note_deficit` hands the count to the C side, and the next time
-`LLVMFuzzerCustomMutator` is called on those same bytes it appends that many zeros and then mutates
-the extended buffer. Zeros are what make the extension free of meaning — reading past the end yields
-`0`, and reading a stored `0` yields `0` — so the buffer that gets mutated decodes to exactly the
-value the short one did, and its tail is a real region libFuzzer's suite can reach. Four things
-about it are worth knowing:
+It is off by default because it cuts both ways. Where progress means getting the frontier byte's
+*value* right (`chain-n`: the run stops at the first wrong byte), a dead tail only dilutes the
+mutations. But the tail is dead only for the run that happened: once a mutation changes an earlier
+byte the run reads on into it, and where progress means a *longer* run (`long-n`: it ends at a
+terminator), the tail is the material the next run needs. `fuzz-run/compare-settings.sh`, 300 campaigns
+per cell, `-len_control=0 -max_len=65536`, Amazon Linux 2023 x86_64:
 
-- **It is necessarily run → observe → grow-and-mutate.** The mutator cannot be asked for bytes
-  mid-run: `Data` is immutable while the callback is on the stack, and by the time libFuzzer calls the
-  mutator no generator is in flight.
-- **Growth requires an exact match on the bytes that ran short**, which is why `native.c` keeps a
-  *copy* of the starved input rather than a deficit counter. `Fuzzer::MutateAndTestOne` (verified
-  against llvmorg-22.1.8) mutates one buffer in place for up to `-mutate_depth` (5) iterations, so a
-  mid-round mutator call is on exactly the bytes that just ran — but iteration 0 of every round
-  follows `ChooseUnitToMutate` and a `memcpy` of an arbitrary corpus unit, where the previous run's
-  deficit belongs to a buffer that is already gone. Extending *that* one would be harmful rather
-  than merely wasteful: its tail is a region its own generator never asked for, so a mutation
-  landing there dilutes the input for nothing. The size test rejects almost all of those on one
-  integer compare, and the `memcmp` runs only when the sizes agree. Measured on `long-16`, growth
-  fires on ~94% of starved runs, so the round-boundary case it declines is the small one.
-- **The append is end-anchored, and nothing holds it afterwards.** libFuzzer's own `Mutate_CopyPart`
-  also extends a buffer, but it inserts at a random offset, which re-aligns every subsequent `choose`
-  and scrambles the whole generated value. Appending leaves every existing draw meaning exactly what it
-  meant, so a run that reached stage `k` still reaches stage `k`. The mutation that follows may erase
-  the tail it was just handed; that is intended — one growth makes the position exist, it does not
-  legislate the result.
-- **`-max_len` is the ceiling on how large a structure can be built**, so `--grow` raises it when you
-  pass none (libFuzzer's own default derives it from the seed corpus, which is 4096 at a cold start;
-  `splitFlags` in `Basalt/Fuzz/Runner.lean` sets the replacement). A run that wants more bytes at the
-  cap is counted and reported as `at the -max_len cap`.
+| property | budget | off | `--truncate` |
+|---|---|---|---|
+| `chain-2` | 500 runs | 27.7% ±2.6 | **40.0%** ±2.8 |
+| `chain-3` | 1,000 | 42.7% ±2.9 | **61.7%** ±2.8 |
+| `chain-4` | 1,200 | 47.3% ±2.9 | **61.3%** ±2.8 |
+| `long-16` | 3,000 | **68.3%** ±2.7 | 53.7% ±2.9 |
 
-What growth cannot do is make the extended form *the* corpus entry: libFuzzer's corpus admission rule
-rejects an equivalent-but-longer input ([Limitations](#limitations-and-future-work)). A starved input
-stays in the corpus in its short form, and growth only biases the mutations made of it while it is the
-buffer in hand. This is the setting's real limit, not an implementation gap.
+On three real targets (Cedar, lean-mc and Strata; the BasaltBench repository) it made no significant
+difference to coverage or to injected faults found.
+
+**Why the buffer is not extended instead.** A run that reads past the end gets zeros that are not in
+the input, so no byte mutation reaches the positions that produced them. Materializing them before
+mutating was measured not to help — on `long-16`/`-32`/`-64`, 31.4% found against
+28.2% with it, 1,800 trials — because a zero is a stopping value for most decoders (the first branch of
+a `frequency`, an empty structure), so growth plants the value the generator least wants at the
+frontier, where libFuzzer's own insertion would have put a random byte; and libFuzzer cannot keep the
+extended form as the corpus entry ([Limitations](#limitations-and-future-work)).
 
 Defining a custom mutator has two consequences libFuzzer imposes: it *replaces* the default mutation
-suite for the whole campaign (hence the `LLVMFuzzerMutate` delegation on every other path), and it
-makes libFuzzer drop its `-len_control` length ramp. With `--grow` off there is no length decision for
-the mutator to make, so `splitFlags` puts libFuzzer's own default ramp back, leaving the default
-campaign the one measured in the backend table above. An explicit `-len_control=N` always wins, which
-is how the two settings below are compared under one length regime.
+suite for the whole campaign (hence the `LLVMFuzzerMutate` delegation), and it makes libFuzzer drop its
+`-len_control` length ramp. Basalt keeps the ramp off and raises `-max_len` to 64 KB (`withDefaults`,
+`Basalt/Fuzz/Runner.lean`), so an input can grow as long as its generator reads; an explicit flag
+always wins. The ramp holds mutations to a few bytes until short inputs stop finding anything, which
+costs a generator whose progress is length and buys some search on `chain-n`; at the budgets of the
+table above, 300 campaigns per cell:
 
-### How much growth helps
-
-Not measurably, which is why it is off by default. The data below is the reason, and it is worth
-reading before trying to improve the mechanism, because the obvious explanations are not the ones that
-survived a measurement.
-
-**Runs-to-first-counterexample cannot settle this, and that is a result in itself.** It is the natural
-metric and `MODE=median fuzz-run/compare-grow.sh` still reports it, but the distribution is heavy-tailed
-enough that repeated passes over *the same binary* disagree in sign. Read the reversal, not the
-levels:
-
-| property | 15 trials (off / grow) | 61 trials (off / grow) |
-|---|---|---|
-| `long-16` | 3,432 / **2,998** | **2,840** / 3,187 |
-| `long-32` | **30,085** / 56,867 | 37,923 / **30,611** |
-| `long-64` | **61,704** / 121,990 | 151,136 / **93,615** |
-
-Every property reverses. The 15-trial pass says growth loses 2x at 32 and 64; the 61-trial pass says it
-wins 1.2x and 1.6x. Any conclusion drawn from a table of this shape is a coin flip.
-
-**So `compare-grow.sh` measures a success rate at a fixed run budget instead.** That is a binomial:
-its error bar is `sqrt(p(1-p)/n)`, and two cells are directly comparable. The budgets are fixed in
-`compare-grow.sh`, and both cells of a row run the same budget. 300 trials per cell, macOS arm64
-(M-series), `-len_control=0 -max_len=65536` for both:
-
-| property | budget | `--grow` off | `--grow` |
+| property | budget | no ramp (the default) | `-len_control=100` |
 |---|---|---|---|
-| `long-16` | 3,000 runs | **46.7%** ±2.9 | 35.3% ±2.8 |
-| `long-32` | 30,000 | 21.3% ±2.4 | 20.0% ±2.3 |
-| `long-64` | 120,000 | 26.3% ±2.5 | **29.3%** ±2.6 |
+| `chain-3` | 1,000 runs | 41.7% ±2.8 | 50.0% ±2.9 |
+| `chain-4` | 1,200 | 53.3% ±2.9 | 66.3% ±2.7 |
+| `long-16` | 3,000 | **62.3%** ±2.8 | 24.3% ±2.5 |
 
-**Pooled over all 1,800 trials: 31.4% without growth against 28.2% with it — 3.2 points worse,
-z = 1.4, p = 0.15.** Only `long-16` is decisive on its own, and `long-64` falls the other way, so what
-the data supports is "no benefit", with the penalty attributable to `long-16` alone.
-
-**What penalty there is is attributable to the zeros, not to the appending.** Filling the extension
-with mutator-chosen bytes instead of zeros erases it: with that fill, `long-32` at 30,000 runs scored
-50.3% without growth against 50.0% with — a dead heat. Read the difference, not the level. Two things
-follow, and
-together they are the answer to "can the buffer be extended in a way libFuzzer benefits from":
-
-- **Zero is neutral to the fuzzer but not to the decoder.** For `propLong`, `0` *is* a terminator, so
-  materializing the deficit plants a guaranteed-stopping byte at exactly the frontier position — the
-  one place where libFuzzer's own `InsertByte` would have put a random byte with a 50% chance of
-  *extending* the run. This generalizes badly: in most generators `0` is the stopping or smallest
-  choice (the first branch of a `frequency`, the empty structure from a size draw), so zero-extension
-  systematically installs the value the generator least wants at the position that matters most.
-  Semantics-preserving for the run that already happened is not the same as informative for the
-  mutation that follows.
-- **The deficit carries no information libFuzzer lacks.** Its length mutators already extend inputs,
-  and they choose the byte value at least as well. Knowing the exact demanded length would buy
-  something only if extending to it *stuck* — and that is precisely what the corpus admission rule
-  forbids ([Limitations](#limitations-and-future-work)). Absent that, growth is a worse-informed
-  version of a mutation libFuzzer already makes, which is why the neutral-fill variant lands exactly
-  on the baseline.
-
-`long-n` is built so that *length* is the binding constraint: each position accepts half the byte
-values, so the value of any single byte is cheap to find and what is expensive is having a byte there
-at all (`BasaltFuzz/Staged.lean`). That is the only shape this setting can separate — a property
-whose generator always fits inside its buffer reads nothing past the end, reports no deficit, and runs
-the identical campaign either way. `--grow` therefore costs nothing to leave on for a property that
-never runs short, and the `starved` count in the run report is how you tell which case you are in.
-
-None of this proves the idea cannot work, and the setting is kept so it can be re-measured: run
-`fuzz-run/compare-grow.sh` in both modes after any change to the mechanism, and read a median table
-only against the reversal above.
+**Bound a recursive generator's depth.** Without a ramp nothing holds inputs short, and coverage
+rewards a bigger term — it reaches more hit-count features — so a generator whose recursion only the
+bytes end (a `frequency` with a recursive branch and no fuel) builds terms as large as `-max_len`
+allows, and its tests slow by an order of magnitude. A fuel that bounds the depth, drawn or fixed,
+keeps what a run reads bounded however long the input grows; past that, extra bytes are a tail no
+run reads, which costs nothing.
 
 ## What a run looks like
 
@@ -406,15 +356,14 @@ state, not a buffer.
 
 ```
 $ fuzz-run/basalt-fuzz bst-buggy-insert -runs=2000000 -artifact_prefix=./
-[basalt] starting libFuzzer campaign (grow=false, [-runs=2000000, …, -len_control=100])
-[basalt] -len_control=100 is explicit and overrides libFuzzer's "Disabling -len_control by default"
+[basalt] starting libFuzzer campaign ([-runs=2000000, …, -len_control=0, -max_len=65536])
 ...
 *** BASALT PROPERTY FAILED ***
 counterexample : (BuggyBST.Tree.node (...leaf) 1 (...leaf), 1)
 input bytes    : [239]
 runs           : 18 (0 discarded)
 buffer         : 1 bytes, 3 short
-[basalt] runs 18, starved 10 (max deficit 3 B) [--grow off]
+[basalt] runs 18, starved 10 (max deficit 3 B)
 ==...== ERROR: libFuzzer: deadly signal
 artifact_prefix='./'; Test unit written to ./crash-<sha1>
 ```
@@ -422,12 +371,11 @@ artifact_prefix='./'; Test unit written to ./crash-<sha1>
 The counterexample (`Repr`-rendered, hence fully qualified) is a *valid* BST plus a key it already
 contains; `insertBuggy` lacks the equal-key guard, so it duplicates the key and breaks the invariant.
 
-The `buffer` row and the `[basalt] runs …` line are the [Extending the
-buffer](#extending-the-buffer) report: this input asked for 4 bytes and got 1, and 10 of the 18 runs
-went short. The `[basalt]` line comes from C, on stderr, and is printed at both exits (here past
-`abort()`; on the `-runs`-exhausted path from an `atexit` handler). libFuzzer's own `MS:` lines end
-in `Custom-` in every campaign, `--grow` or not, because the mutator is linked unconditionally and
-delegates.
+The `buffer` row says this input asked for 4 bytes and got 1, and the `[basalt] runs …` line that 10
+of the 18 runs went short (under `--truncate` it also counts the inputs cut). The `[basalt]` line comes
+from C, on stderr, and is printed at both exits (here past `abort()`; on the `-runs`-exhausted path
+from an `atexit` handler). libFuzzer's own `MS:` lines end in `Custom-`, because the mutator is linked
+unconditionally and delegates.
 
 ### Consuming the artifact
 
@@ -445,8 +393,7 @@ This re-runs the property on those bytes (no fuzzer), re-deriving and re-printin
 counterexample — drop the `crash-<sha1>` file into a regression directory as a fixture.
 
 The bytes alone are the whole reproduction, and replay takes no flag: zero-extension is a property of
-`readByte`, not a campaign setting, so an artifact means the same thing however it was produced —
-including one grown by `--grow`, which is already whatever length the failing run read.
+`readByte`, not a campaign setting, so an artifact means the same thing however it was produced.
 
 ## Writing a fuzz target: what coverage guidance can and cannot see
 
@@ -502,9 +449,10 @@ needs. `libstdc++` is not on the default link path either. `env.example.sh` carr
 **Amazon Linux 2023 (x86_64, clang 22 / `compiler-rt22`).** The current-Linux case: `dnf install
 clang22 compiler-rt22`, Lean via `elan`, and no `env.sh` at all. glibc 2.34 is new enough for Lean's
 vendored clang, so no `LEAN_CC` wrapper; its runtime, in the per-triple dir, is used when its major
-matches Lean's clang. The from-source fallback also works here, which is why
-`get-libfuzzer.sh` compiles `-fPIC` unconditionally (`leanc` links a PIE, and a non-PIC runtime
-object fails with `relocation R_X86_64_32 cannot be used against local symbol`).
+matches Lean's clang, and otherwise the from-source fallback builds one with the versioned
+`clang++-22`. That fallback is why `get-libfuzzer.sh` compiles `-fPIC` unconditionally (`leanc` links
+a PIE, and a non-PIC runtime object fails with `relocation R_X86_64_32 cannot be used against local
+symbol`).
 
 **A newer-glibc caveat**, hit on Ubuntu 24.04 (glibc 2.39) rather than on AL2023: glibc ≥ 2.38
 redirects `strtol`/`strtoul` to the ISO C23 symbols `__isoc23_strtol`/`_strtoul`, which the runtime
@@ -520,24 +468,12 @@ it.
 
 ## Limitations and future work
 
-- **One deficit, appended at the end.** The signal is a single count of unmet demand, so a generator
-  that went short *in the middle* of a structure gets its bytes at the end anyway, where a later draw
-  reads them. Anchoring at the end is what keeps every earlier draw's meaning fixed
-  ([Extending the buffer](#extending-the-buffer)), so a per-draw record would have to buy its
-  precision back some other way — most likely a length-prefixed encoding, which is a different
-  interpretation, not a tweak to this one.
-- **Growth is not measured to help, and cannot be undone.** It is off by default because the trials
-  in [How much growth helps](#how-much-growth-helps) find no benefit from it, and what penalty there is
-  traces to zeros being stopping values for most decoders rather than to the appending itself. It is
-  also one-way: growth is capped at `-max_len`, a run blocked by the cap is only counted, and nothing
-  shrinks a buffer that grew past what the property needs — that is libFuzzer's corpus minimization,
-  which never runs on a growth path it found no features for.
 - **A starved corpus entry cannot be canonicalized.** `Fuzzer::RunOne` admits an input only on new
   features; `Corpus::AddFeature` counts a feature new only if unseen or carried by a *smaller* input;
   `Corpus.Replace` requires the replacement to be smaller; and `RereadOutputCorpus` applies the same
   rule to files dropped into the corpus directory. An equivalent-but-longer input is therefore
   unreachable by every route libFuzzer offers, so an interesting-but-starved entry keeps its ghost zeros
-  for the life of the campaign and `--grow` can only bias mutations of it while it is in hand. Doing
+  for the life of the campaign, and extending it can only bias mutations of it while it is in hand. Doing
   better needs a hook libFuzzer does not have — AFL++'s `afl_custom_queue_new_entry` rewrites a saved
   queue entry, and JQF/Zest grows the input mid-run and saves the grown form, both because they own the
   scheduling loop. Inside libFuzzer the way out is not a better mutator but a different encoding: a

@@ -31,8 +31,8 @@ private def renderOutcome : TestOutcome → String
   | .error (.fail r) => s!"fail: {r}"
   | .error .discard => "discard"
 
-/- Most pins care only about the verdict; `renderShort` below adds the deficit where that is the
-point. -/
+/- Most pins care only about the verdict; `renderRead` below adds the bytes read and the deficit where
+those are the point. -/
 private def render (r : FuzzResult) : String := renderOutcome r.outcome
 
 /- A single choice in `[0,9]` consumes one byte and reduces mod 10; the property is `· < 9`. -/
@@ -99,33 +99,33 @@ private def propTwo : PropM FuzzGen Unit := do
 /-- info: discard -/
 #guard_msgs in #eval IO.println (render (runOne propTwo (bytes [5, 5])))
 
-/-! ### The deficit
+/-! ### The cursor and the deficit
 
-How many bytes a run wanted beyond the ones it was given is the whole feedback channel for `--grow`,
-which appends that many zeros. These pin the two facts growth rests on: the count is exact, and
-appending zeros does not change the outcome. -/
+How many bytes a run read is what `--truncate` cuts an input to before mutating it, and how many of
+those it was not given is the run's deficit. These pin the facts truncation rests on: both counts are
+exact, and cutting an input to its cursor does not change its outcome. -/
 
-private def renderShort (r : FuzzResult) : String := s!"{render r} (short {r.deficit})"
+private def renderRead (T : PropM FuzzGen Unit) (input : ByteArray) : String :=
+  let r := runOne T input
+  s!"{render r} (read {r.cursor}, short {r.deficit input.size})"
 
 /- One byte for two draws: the second reads past the end and gets `0`, so the property fails on
-`7 < 0` and reports a deficit of exactly the one byte it went without. -/
-/-- info: fail: x=7, y=0 (short 1) -/
-#guard_msgs in #eval IO.println (renderShort (runOne propTwo (bytes [7])))
+`7 < 0`, having read two bytes and gone without one. -/
+/-- info: fail: x=7, y=0 (read 2, short 1) -/
+#guard_msgs in #eval IO.println (renderRead propTwo (bytes [7]))
 
-/- Materializing that byte is what `--grow` does, and it is semantics-preserving: the same failure,
-now with the byte the fuzzer can mutate actually present in the input. -/
-/-- info: fail: x=7, y=0 (short 0) -/
-#guard_msgs in #eval IO.println (renderShort (runOne propTwo (bytes [7, 0])))
+/- A run that fits inside its buffer reads only what it draws: the tail is dead. -/
+/-- info: fail: x=7, y=3 (read 2, short 0) -/
+#guard_msgs in #eval IO.println (renderRead propTwo (bytes [7, 3, 9, 9, 9]))
 
-/- A run that fits inside its buffer reports no deficit, which is what keeps growth from firing on
-inputs that were never starved. -/
-/-- info: pass (short 0) -/
-#guard_msgs in #eval IO.println (renderShort (runOne propTwo (bytes [3, 7])))
+/- Cut to its cursor, the same input runs the same: what `--truncate` does before a mutation. -/
+/-- info: fail: x=7, y=3 (read 2, short 0) -/
+#guard_msgs in #eval IO.println (renderRead propTwo (bytes [7, 3]))
 
 /- The deficit counts every byte the run went without, not just the first: after `[1, 5]` builds a
 node, `genBST` recurses on both subtrees and each reads a `frequency` byte past the end. -/
-/-- info: pass (short 2) -/
-#guard_msgs in #eval IO.println (renderShort (runOne propBSTsizeNonneg (bytes [1, 5])))
+/-- info: pass (read 4, short 2) -/
+#guard_msgs in #eval IO.println (renderRead propBSTsizeNonneg (bytes [1, 5]))
 
 /-! ### One property, every backend
 

@@ -168,11 +168,14 @@ jobs:
             done
           done
 
-      # `--grow` (fuzz-run/README.md, "Extending the buffer") is deliberately unasserted here. It is
-      # off by default and measured not to help, so a campaign under it does not earn CI time; the
-      # cost of leaving it out is that two silent failures go uncaught — libFuzzer finding no
-      # `LLVMFuzzerCustomMutator` (only `build.sh`'s export check remains), and a growth path that
-      # never fires. `fuzz-run/compare-grow.sh` is where growth is exercised, by hand.
+      # libFuzzer finds the custom mutator by `dlsym`, and a campaign that does not find it runs the
+      # default mutators with no error; only the run report's truncation count shows the difference.
+      - name: --truncate must truncate inputs to what their run read
+        run: |
+          fuzz-run/basalt-fuzz bst-insert --truncate -runs=20000 -max_len=64 > log-trunc.txt 2>&1
+          grep -Eq 'truncated [1-9][0-9]* inputs' log-trunc.txt || {
+            echo "::error::no input was truncated: is LLVMFuzzerCustomMutator exported?"
+            tail -5 log-trunc.txt; exit 1; }
 
       # A campaign reports its verdict *only* through the exit status, so a property name the registry
       # does not know must not exit 0 (`usageError`, Basalt/PBT/Driver.lean): every "this must fail"
