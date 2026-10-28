@@ -5,6 +5,7 @@ Authors: Segev Elazar-Mittelman
 -/
 module
 
+public import Basalt.Backtrack
 public import Basalt.Enum.Weighted
 
 /-!
@@ -91,6 +92,45 @@ theorem foldr_union_mono [Gen G] [Union G] [MonoUnion G] {z : G β} {l : List Na
 instance [Gen G] [Fail G] [Union G] [MonoUnion G] : MonoBind (CostGraded G) where
   bind_mono_left h _ := foldr_union_mono fun k => MonoBind.bind_mono_left (h k)
   bind_mono_right h _ := foldr_union_mono fun _ => MonoBind.bind_mono_right fun a => h a _
+
+/-- The branches of positive weight at cost `n`, unioned: `backtrack`'s tier `n + 1`. -/
+def backtrackTier [Fail G] [Union G] (gs : List (Nat × (Unit → CostGraded G α))) (n : Nat) : G α :=
+  gs.foldr (fun p acc => if p.1 = 0 then acc else Union.union (p.2 () n) acc) Fail.fail
+
+/-- At cost `n + 1`, the branches of positive weight at cost `n`, the pick being one choice; at cost
+`0`, nothing. That is the cost of a search whose first pick succeeds. A search that fails other
+branches first reaches the same values at higher costs, which no tier lists, so the tiers are
+complete only up to cost (`CostEnumeratesSome`). -/
+instance instBacktrack [Fail G] [Union G] : Backtrack (CostGraded G) where
+  backtrack gs
+    | 0 => Fail.fail
+    | n + 1 => backtrackTier gs n
+
+section monotonicity
+
+attribute [local instance] List.instPartialOrderPointwise instPartialOrderConstFst
+
+theorem backtrackTier_mono [Gen G] [Fail G] [Union G] [MonoUnion G] (n : Nat) :
+    ∀ {gs₁ gs₂ : List (Nat × (Unit → CostGraded G α))}, gs₁ ⊑ gs₂ →
+      backtrackTier gs₁ n ⊑ backtrackTier gs₂ n
+  | [], [], _ => PartialOrder.rel_refl
+  | [], _ :: _, h | _ :: _, [], h => absurd (Backtrack.length_eq_of_rel h) (by simp)
+  | (w₁, g₁) :: gs₁, (w₂, g₂) :: gs₂, h => by
+    obtain ⟨⟨hw, hg⟩, ht⟩ := Backtrack.rel_cons_iff.mp h
+    simp only at hw
+    subst hw
+    by_cases hw0 : w₁ = 0
+    · simpa [backtrackTier, hw0] using backtrackTier_mono n ht
+    · simp only [backtrackTier, List.foldr_cons, hw0, ↓reduceIte]
+      exact MonoUnion.union_mono (hg () n) (backtrackTier_mono n ht)
+
+instance instMonoBacktrack [Gen G] [Fail G] [Union G] [MonoUnion G] :
+    MonoBacktrack (CostGraded G) where
+  backtrack_mono h
+    | 0 => PartialOrder.rel_refl
+    | n + 1 => backtrackTier_mono n h
+
+end monotonicity
 
 /-- The entries of cost exactly `n`, if defined. -/
 def tier? (x : CostGraded Finite α) (n : Nat) : Option (List α) := (x n).toList?

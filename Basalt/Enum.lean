@@ -16,6 +16,7 @@ public import Basalt.Enum.WeightLaws
 public import Basalt.Enum.CostLaws
 public import Basalt.Enum.FailLaws
 public import Basalt.Enum.BacktrackLaws
+public import Basalt.Enum.BacktrackCostLaws
 public import Basalt.Enum.MemoLaws
 public import Basalt.Enum.TabledLaws
 public import Basalt.Sized

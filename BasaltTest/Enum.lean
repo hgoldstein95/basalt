@@ -78,6 +78,21 @@ def drawn [Monad G] [RandomChoice G] [Fail G] [Pick G] : G Nat :=
 #guard (drawn (G := OptionT Basalt.Finite)).run.toList? ==
   some [some 1, some 2, some 1, some 2, some 1, some 2, some 3]
 
+-- Graded by cost, tier `n + 1` is each branch's tier `n`: `3` costs the pick alone, `pickFrom`'s
+-- values one draw more.
+#guard (List.range 4).map (rules (G := CostGraded Basalt.Finite) 1).tier? ==
+  [some [], some [3], some [1, 2], some []]
+
+/-- Unbounded recursion through `backtrack`: each bit costs a pick and a draw. -/
+def bits [Gen G] [Fail G] [Backtrack G] [MonoBacktrack G] : G (List Bool) :=
+  Backtrack.backtrack
+    [(1, fun _ => pure []), (1, fun _ => do return (← pickFrom [true, false]) :: (← bits))]
+partial_fixpoint
+
+#guard (List.range 6).map (bits (G := CostGraded Basalt.Finite)).card? ==
+  [some 0, some 1, some 0, some 2, some 0, some 4]
+#guard (bits (G := CostGraded Basalt.Finite)).tier? 3 == some [[true], [false]]
+
 end Backtracking
 
 /-! ## Memoized tiers -/

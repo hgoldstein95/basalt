@@ -15,8 +15,9 @@ public import BasaltExamples.STLC.GenType
 # The Enumeration Laws, Walked
 
 `walk fixpoint` proves `IsEnumerated`, `IsWeighed` and `IsCostEnumerated` construct by construct,
-through `genRel_enumerates`, `genRel_weighs` and `genRel_costEnumerates`, and `EnumeratesSome` for a
-generator that fails and backtracks, through `genRel_enumeratesSome`.
+through `genRel_enumerates`, `genRel_weighs` and `genRel_costEnumerates`, and `EnumeratesSome` and
+`CostEnumeratesSome` for a generator that fails and backtracks, through `genRel_enumeratesSome` and
+`genRel_costEnumeratesSome`.
 -/
 
 @[expose] public section
@@ -96,6 +97,17 @@ partial_fixpoint
 
 theorem picked_enumeratesSome :
     EnumeratesSome (picked (G := Basalt.Finite)) (picked (G := OptionT SPMF)) := by
+  walk fixpoint
+
+theorem hasType_costEnumeratesSome (τ : Ty) (n : Nat) :
+    CostEnumeratesSome (hasType (G := CostGraded Basalt.Finite) τ n)
+      (hasType (G := OptionT SPMF.Cost) τ n) := by
+  induction n generalizing τ with
+  | zero => unfold hasType; walk
+  | succ n ih => unfold hasType; walk [ih .nat]
+
+theorem digits_costEnumeratesSome :
+    CostEnumeratesSome (digits (G := CostGraded Basalt.Finite)) (digits (G := OptionT SPMF.Cost)) := by
   walk fixpoint
 
 end EnumLawTest
