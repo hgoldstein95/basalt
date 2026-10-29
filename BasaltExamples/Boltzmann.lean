@@ -14,8 +14,8 @@ public import Basalt
 The Boltzmann sampler for binary trees (Duchon, Flajolet, Louchard and Schaeffer 2004, Example 2),
 with its leaf probability `p = x / B(x)` as a parameter. Every tree of size `n` gets mass
 `x ^ n / B(x)`, so the sampler is uniform within each size, before and after rejection to a size
-window; its expected size `1 / (2p - 1)`, infinite at the critical `p = 1/2`, is proved by fixpoint
-induction rather than from the generating function.
+window; its expected size `1 / (2p - 1)`, infinite at the critical `p = 1/2`, and its mass
+`p / (1 - p)` below it, are proved by fixpoint induction rather than from the generating function.
 -/
 
 @[expose] public section
@@ -233,7 +233,7 @@ end rejection
 
 section size
 
-private theorem expect_bool (μ : SPMF Bool) (F : Bool → ℝ≥0∞) :
+theorem expect_bool (μ : SPMF Bool) (F : Bool → ℝ≥0∞) :
     expect μ F = μ false * F false + μ true * F true := by
   unfold expect; exact tsum_bool _
 
@@ -245,7 +245,7 @@ theorem expect_genB_step (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (z : SPMF BTree) (f : B
   rw [expect_bind, expect_bool, coin_false hp0 hp1, coin_true hp0 hp1, add_comm]
   simp only [↓reduceIte, Bool.false_eq_true, expect_pure, expect_bind]
 
-private theorem expect_add_const (μ : SPMF α) (f : α → ℝ≥0∞) (c : ℝ≥0∞) :
+theorem expect_add_const (μ : SPMF α) (f : α → ℝ≥0∞) (c : ℝ≥0∞) :
     expect μ (fun a => f a + c) = expect μ f + μ.mass * c := by
   rw [expect_add, expect_const]
 
@@ -351,5 +351,87 @@ theorem genB_expected_size_critical :
   exact zero_ne_one ((ENNReal.add_right_inj hE).1 h)
 
 end size
+
+section supercritical
+
+/-- One unfolding of the mass: `m = x + (1 - x) m²`. -/
+theorem genB_mass_step (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
+    (genB p : SPMF BTree).mass
+      = pr p + (1 - pr p) * (genB p : SPMF BTree).mass ^ 2 := by
+  rw [← expect_one]
+  conv_lhs => rw [genB]
+  rw [expect_genB_step hp0 hp1]
+  simp [expect_const, sq]
+
+private theorem pr_lt_half (hp0 : 0 ≤ p) (hp : p < 1/2) : pr p < 1/2 := by
+  rw [pr_eq_ofReal hp0, half_eq_ofReal]
+  have h : (p : ℝ) < ((1/2 : ℚ) : ℝ) := (Rat.cast_lt (K := ℝ)).2 hp
+  simp only [Rat.cast_div, Rat.cast_one, Rat.cast_ofNat] at h
+  exact (ENNReal.ofReal_lt_ofReal_iff (by norm_num)).2 h
+
+/-- `B = x / (1 - x)` solves `B = x + (1 - x) B²`, the root below `1` when `x < 1/2`. -/
+private theorem small_root {x : ℝ≥0∞} (hx : x < 1/2) :
+    x + (1 - x) * (x / (1 - x)) ^ 2 = x / (1 - x) := by
+  have hx1 : x < 1 := hx.trans (by norm_num)
+  have hy0 : 1 - x ≠ 0 := (tsub_pos_of_lt hx1).ne'
+  have hytop : 1 - x ≠ ⊤ := ENNReal.sub_ne_top ENNReal.one_ne_top
+  have hB : x / (1 - x) * (1 - x) = x := ENNReal.div_mul_cancel hy0 hytop
+  calc x + (1 - x) * (x / (1 - x)) ^ 2 = x / (1 - x) * (1 - x) + x / (1 - x) * x := by
+        rw [hB, sq, ← mul_assoc, mul_comm (1 - x), hB, mul_comm]
+    _ = x / (1 - x) := by rw [← mul_add, tsub_add_cancel_of_le hx1.le, mul_one]
+
+/-- The upper bound, by fixpoint induction: every approximant has mass at most `x / (1 - x)`. -/
+theorem genB_mass_le (hp0 : 0 ≤ p) (hp : p < 1/2) :
+    (genB p : SPMF BTree).mass ≤ pr p / (1 - pr p) := by
+  have hp1 : p ≤ 1 := hp.le.trans (by norm_num)
+  have hx := pr_lt_half hp0 hp
+  rw [← expect_one]
+  refine genB.fixpoint_induct (G := SPMF) p _ (admissible_expect_le _ _) fun z hz => ?_
+  rw [expect_genB_step hp0 hp1]
+  simp only [expect_const, mul_one]
+  calc pr p + (1 - pr p) * (z.mass * z.mass)
+      ≤ pr p + (1 - pr p) * (pr p / (1 - pr p) * (pr p / (1 - pr p))) := by
+        rw [← expect_one] at *; gcongr
+    _ = pr p / (1 - pr p) := by rw [← sq]; exact small_root hx
+
+/-- **Supercritical binary trees**: for `p < 1/2` the sampler halts with probability `p / (1 - p)`,
+the smaller root of its mass equation. Every tree still gets `p ^ (k + 1) (1 - p) ^ k`
+(`genB_apply`), which is `x ^ |t| / B` for `x = √(p (1 - p))` and `B = x / p`, the *larger* root of
+`B = x + x B²` (`genB_boltzmann` holds of either root): the pointwise equations cannot tell the
+two apart, only the least fixed point can. -/
+theorem genB_mass_supercritical (hp0 : 0 ≤ p) (hp : p < 1/2) :
+    (genB p : SPMF BTree).mass = pr p / (1 - pr p) := by
+  have hp1 : p ≤ 1 := hp.le.trans (by norm_num)
+  have hx := pr_lt_half hp0 hp
+  have hle := genB_mass_le hp0 hp
+  have hstep := (genB_mass_step hp0 hp1).symm.le
+  have hx1 : pr p < 1 := hx.trans (by norm_num)
+  have hy0 : 1 - pr p ≠ 0 := (tsub_pos_of_lt hx1).ne'
+  have hB := ENNReal.div_mul_cancel (b := pr p) hy0 (ENNReal.sub_ne_top ENNReal.one_ne_top)
+  have hxx : pr p + pr p < 1 := (ENNReal.add_lt_add hx hx).trans_eq (ENNReal.add_halves 1)
+  have hxy : pr p ≤ 1 - pr p := ENNReal.le_sub_of_add_le_left hx1.ne_top hxx.le
+  have hB1 : pr p / (1 - pr p) ≤ 1 := ENNReal.div_le_of_le_mul (by rwa [one_mul])
+  have hm1 := mass_le_one (genB p : SPMF BTree)
+  clear hy0 hx1 hp0 hp hp1 hx
+  generalize (genB p : SPMF BTree).mass = m at *
+  generalize pr p / (1 - pr p) = B at *
+  generalize pr p = x at *
+  basify
+  rw [max_eq_left (by linarith)] at hstep hB
+  -- `(1-x)(m-1)(m-B) = (1-x)m² - m + x ≤ 0`, with `m < 1`
+  have hBlt : B < 1 := by nlinarith
+  refine le_antisymm hle (not_lt.1 fun hlt => ?_)
+  nlinarith [mul_pos (mul_pos (show (0 : ℝ) < 1 - x by linarith) (sub_pos.2 hlt))
+    (show (0 : ℝ) < 1 - m by linarith)]
+
+/-- **Example 2 at `x = 2/5`**: `B(2/5) = 1/2`, so `p = x / B(x) = 4/5`, and the expected size
+`x B'(x) / B(x) = 1 / (2p - 1)` is `5/3`. -/
+theorem genB_expected_size_two_fifths :
+    expect (genB (4/5) : SPMF BTree) (fun t => (t.size : ℝ≥0∞)) = 5 / 3 := by
+  rw [genB_expected_size (by norm_num) (by norm_num), show pr (4/5) = 4/5 by rw [pr]; norm_num]
+  have h : (2 : ℝ≥0∞) * (4 / 5) - 1 = 3 / 5 := by basify; norm_num
+  rw [h, one_div, ENNReal.inv_div (by simp) (by simp)]
+
+end supercritical
 
 end Boltzmann
