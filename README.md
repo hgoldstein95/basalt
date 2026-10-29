@@ -107,7 +107,7 @@ contract — counterexample on stderr, exit `77` — so campaigns are comparable
 
 ## Build
 
-Lean and Mathlib are pinned in `lean-toolchain` / `lakefile.toml` / `lake-manifest.json`.
+Lean and Mathlib are pinned in `lean-toolchain` / `lakefile.lean` / `lake-manifest.json`.
 
 ```sh
 lake build                # library + examples + tests

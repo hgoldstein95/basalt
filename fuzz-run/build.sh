@@ -4,7 +4,7 @@
 # Authors: Michael Hicks
 
 # Build the opt-in `basalt-fuzz` executable. Lake owns the module closure, the SanitizerCoverage
-# scope (the `BasaltFuzz` library and the executable root, per lakefile.toml), and the link; this
+# scope (the `BasaltFuzz` library and the executable root, per lakefile.lean), and the link; this
 # script owns what Lake's declarative config cannot express — detecting this platform's libFuzzer
 # runtime and C++ runtime, compiling the C bridge, and asserting the properties a wrong answer would
 # otherwise degrade silently. Lean owns `main`, which calls Fuzz.go -> libFuzzer's driver. See
@@ -22,9 +22,9 @@ ROOT=$(pwd)
 # shellcheck source=/dev/null   # optional and git-ignored; nothing to follow
 if [ -f fuzz-run/env.sh ]; then . fuzz-run/env.sh; fi
 
-IR="$ROOT/.lake/build/ir"
+IR="$ROOT/.lake/build-fuzz/ir"
 OUT="$ROOT/fuzz-run/obj"; mkdir -p "$OUT"
-EXE="$ROOT/.lake/build/bin/basalt-fuzz"
+EXE="$ROOT/.lake/build-fuzz/bin/basalt-fuzz"
 
 die() { echo "== $* ==" >&2; exit 1; }
 
@@ -190,7 +190,7 @@ if [ "$UNAME" != "Darwin" ]; then
 fi
 
 # Everything the link needs beyond the Lean closure, handed to Lake through the one static
-# `moreLinkArgs` entry in lakefile.toml. A clang response file is one argument per line; the quoting
+# `moreLinkArgs` entry in lakefile.lean. A clang response file is one argument per line; the quoting
 # is what survives a path containing a space.
 #
 # `-fsanitize=fuzzer-no-link` is deliberately absent: it is a *compile-time* instrumentation flag,
@@ -210,8 +210,13 @@ done
 # keeps the old runtime.
 echo "== lake build basalt-fuzz =="
 rm -f "$EXE" fuzz-run/basalt-fuzz
+# The instrumented build is the `fuzz` configuration, in its own build directory. Lake reuses a cached
+# configuration whatever `-K` says unless `-R` asks it to reconfigure, so reconfigure into it, and
+# back out on exit: left in place, every later `lake` command here (the editor's included) would be a
+# fuzz build.
+trap 'lake -R env true >/dev/null 2>&1 || true' EXIT
 # shellcheck disable=SC2086   # a target list: the split into words is the point
-lake build basalt-fuzz ${EXTRA_LAKE_TARGETS:-} > "$OUT/link.log" 2>&1 || {
+lake -R -K fuzz=true build basalt-fuzz ${EXTRA_LAKE_TARGETS:-} > "$OUT/link.log" 2>&1 || {
   grep -viE 'unused|-Wl' "$OUT/link.log" >&2 || true
   die "lake build FAILED (runtime: $FUZZER_LIB_FLAGS; cxxlib: $CXXLIB_FLAGS)"
 }
@@ -226,7 +231,7 @@ grep -viE 'unused|-Wl|^✔|^info:' "$OUT/link.log" || true
 # The response file Lake writes for its own link names every object it linked, dependency packages
 # included, so it is the ground truth for what got in — both checks below read it rather than the
 # `ir/` tree, which also holds objects left behind by renamed modules that are in no link at all.
-LAKE_RSP="$ROOT/.lake/build/bin/basalt-fuzz.rsp"
+LAKE_RSP="$ROOT/.lake/build-fuzz/bin/basalt-fuzz.rsp"
 [ -f "$LAKE_RSP" ] || die "lake wrote no link response file: cannot verify the closure"
 
 # Mathlib in the link closure. Previously an accidental umbrella import failed the link and so
@@ -237,16 +242,18 @@ fi
 
 # The instrumentation scope, asserted in both directions: every first-party object carries
 # SanitizerCoverage (the `Basalt` and `BasaltFuzz` libraries and the executable root, per the
-# `moreLeancArgs` in lakefile.toml), and no dependency object does — Plausible's and SplitMix's code is
+# `moreLeancArgs` in lakefile.lean), and no dependency object does — Plausible's and SplitMix's code is
 # the `--backend=plausible`/`io` PRNG rather than code under test, and coverage over a PRNG's mixing
 # steps is noise in the feedback. A module claimed by two libraries' globs, or a `moreLeancArgs`
 # dropped from one of them, yields a fuzzer that still runs and still finds the shallow `bst-buggy-*`
 # bugs; what it loses is measured in fuzz-run/README.md, and only a staged benchmark would reveal it.
 instrumented() { [ "$(nm -u "$1" 2>/dev/null | grep -c __sanitizer_cov_8bit_counters_init || true)" -gt 0 ]; }
 first_party=0
+# The packages directory may be a symlink, and the response file names its resolved path.
+PKGS=$(cd "$ROOT/.lake/packages" && pwd -P)
 while IFS= read -r o; do
   case $o in
-    "$ROOT/.lake/packages/"*)
+    "$ROOT/.lake/packages/"* | "$PKGS/"*)
       ! instrumented "$o" || die "${o##*/.lake/build/ir/} is instrumented: coverage over a dependency's PRNG is noise" ;;
     *)
       instrumented "$o" || die "${o#"$IR"/} is not instrumented: check for overlapping library globs"
@@ -260,7 +267,8 @@ done < <(grep -o '"[^"]*\.c\.o\.export"' "$LAKE_RSP" | tr -d '"')
 # `-Wl,-dead_strip` on macOS, and nothing in the program references this symbol, so the export flag
 # in link.rsp is the only thing keeping it. (`nm -g` lists dynamic externals; a hidden symbol shows
 # as `private external`, which `grep` then misses.)
-nm -g "$EXE" 2>/dev/null | grep -q 'T _\?LLVMFuzzerCustomMutator$' \
+# `grep -q` would stop at the first match and SIGPIPE `nm`, which `pipefail` reports as a failure.
+nm -g "$EXE" 2>/dev/null | grep 'T _\?LLVMFuzzerCustomMutator$' >/dev/null \
   || die "LLVMFuzzerCustomMutator is not exported: --grow would silently do nothing"
 
 # The committed entry point stays `fuzz-run/basalt-fuzz`, which every caller (CI, compare-*.sh) uses.
