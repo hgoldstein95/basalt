@@ -5,13 +5,14 @@ Authors: Harrison Goldstein
 -/
 module
 
+import Basalt.Order
 public import Basalt.SPMF.Mass
 
 /-!
 # Expectations of the List Combinators
 
-Event probabilities and expected lengths for `vectorOf` and `listOf`, by induction or fixpoint
-induction over the equations of `Basalt/SPMF/Expect/Obs.lean`.
+Event probabilities and expected lengths for `vectorOf` and `listOf`, and the law of `suchThat`, by
+induction or fixpoint induction over the equations of `Basalt/SPMF/Expect/Obs.lean`.
 -/
 
 @[expose] public section
@@ -160,6 +161,149 @@ theorem expect_listOf_length_le (g : SPMF α) :
     calc g.mass * 2 ≤ 1 * 2 := mul_le_mul_left (mass_le_one g) _
       _ = 2 := by norm_num
 
+/-- `listOf`'s point masses: a geometric length, then independent elements. -/
+theorem listOf_apply (g : SPMF α) (l : List α) :
+    (listOf g : SPMF (List α)) l = (1 / 2) ^ (l.length + 1) * (l.map g).prod := by
+  induction l with
+  | nil =>
+    rw [listOf, oneOfWith_eq, oneOf_apply]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil, pure_apply, ↓reduceIte]
+    rw [bind_bind_pure_apply_of_ne (f := List.cons) _ _ fun _ _ => List.cons_ne_nil _ _]
+    simp
+  | cons a l ih =>
+    rw [listOf, oneOfWith_eq, oneOf_apply]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil, pure_apply, reduceCtorEq, ↓reduceIte]
+    rw [bind_bind_pure_apply_of_injective (f := List.cons) fun _ _ _ _ h => List.cons.inj h, ih]
+    simp only [List.prod_cons, zero_add, add_zero, div_eq_mul_inv, one_mul,
+      show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
+    ring
+
+/-- One unfolding of `listOf`'s mass. -/
+theorem mass_listOf_step (g : SPMF α) :
+    (listOf g : SPMF (List α)).mass
+      = 1 / 2 + 1 / 2 * (g.mass * (listOf g : SPMF (List α)).mass) := by
+  conv_lhs => rw [listOf, oneOfWith_eq, mass_oneOf]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, mass_pure, List.length_cons,
+    List.length_nil, add_zero, mass_bind_tsum, mul_one]
+  rw [ENNReal.tsum_mul_right, ← mass, ← mass, ENNReal.add_div, div_eq_mul_inv, div_eq_mul_inv,
+    show ((0 + 1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num, one_div]
+  ring
+
+/-- One unfolding of an expectation under `listOf`. -/
+theorem expect_listOf_step (g : SPMF α) (f : List α → ℝ≥0∞) :
+    expect (listOf g : SPMF (List α)) f
+      = 1 / 2 * f [] + 1 / 2 * expect g (fun a => expect (listOf g) fun l => f (a :: l)) := by
+  conv_lhs => rw [listOf, oneOfWith_eq, expect_oneOf (List.cons_ne_nil _ _)]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, expect_pure, expect_bind,
+    List.length_cons, List.length_nil, add_zero, div_eq_mul_inv, one_mul,
+    show ((0 + 1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
+  ring
+
 end combinators
+
+section suchThat
+
+open Lean.Order
+
+/-- One round of rejection sampling, with `z` for the retry. -/
+theorem bind_reject_apply (g : SPMF α) (P : α → Bool) (z : SPMF α) (a : α) :
+    (g >>= fun b => if P b then Pure.pure b else z) a
+      = (if P a then g a else 0) + prob g {b | P b = false} * z a := by
+  classical
+  rw [bind_apply, prob_eq_tsum_ite, ← ENNReal.tsum_mul_right]
+  have h : ∀ b, g b * (if P b = true then Pure.pure b else z) a
+      = (if P b = true ∧ a = b then g b else 0)
+        + (if b ∈ {b | P b = false} then g b else 0) * z a := by
+    intro b
+    by_cases hb : P b = true <;> by_cases hab : a = b <;> simp [hb, hab]
+  rw [tsum_congr h, ENNReal.tsum_add]
+  rw [tsum_eq_single a fun b hb => by simp [Ne.symm hb]]
+  by_cases ha : P a = true <;> simp [ha]
+
+/-- What `g` accepts and what it rejects add up to its mass. -/
+theorem prob_accept_add_reject (g : SPMF α) (P : α → Bool) :
+    prob g {b | P b = true} + prob g {b | P b = false} = g.mass := by
+  classical
+  rw [prob_eq_tsum_ite, prob_eq_tsum_ite, ← ENNReal.tsum_add, mass]
+  refine tsum_congr fun b => ?_
+  by_cases hb : P b = true <;> simp [hb]
+
+private theorem accept_le (g : SPMF α) (P : α → Bool) (a : α) :
+    (if P a then g a else 0) + prob g {b | P b = false} ≤ 1 := by
+  classical
+  refine le_trans ?_ ((prob_accept_add_reject g P).le.trans g.mass_le_one)
+  gcongr
+  rw [prob_eq_tsum_ite]
+  refine le_trans ?_ (ENNReal.le_tsum a)
+  by_cases ha : P a = true <;> simp [ha]
+
+private theorem add_one_le_one {A : ℝ≥0∞} (h : A + 1 ≤ 1) : A = 0 :=
+  nonpos_iff_eq_zero.1 ((ENNReal.add_le_add_iff_right ENNReal.one_ne_top).1 (by simpa using h))
+
+/-- Pointwise upper bounds are admissible: the fixpoint induction behind every rejection loop. -/
+theorem admissible_apply_le (c : α → ℝ≥0∞) : admissible fun μ : SPMF α => ∀ a, μ a ≤ c a :=
+  admissible_iff.2 fun _ hc ih a => by
+    rw [csup_apply hc]; exact iSup₂_le fun μ hμ => ih μ hμ a
+
+/-- **A rejection loop's law.** A distribution `r` that keeps `A a` and retries with probability `R`
+(`hfix`), and lies below every function closed under that round (`hlfp`, from fixpoint induction),
+is `A a / (1 - R)`. -/
+theorem rejection_loop_apply {r : SPMF α} {A : α → ℝ≥0∞} {R : ℝ≥0∞} (hAR : ∀ a, A a + R ≤ 1)
+    (hfix : ∀ a, r a = A a + R * r a)
+    (hlfp : ∀ c : α → ℝ≥0∞, (∀ a, A a + R * c a ≤ c a) → ∀ a, r a ≤ c a) (a : α) :
+    r a = A a / (1 - R) := by
+  refine le_antisymm (hlfp _ (fun b => add_mul_div_one_sub_le _ _) a) ?_
+  rcases (le_trans le_add_self (hAR a)).lt_or_eq with hR | hR
+  · refine ENNReal.div_le_of_le_mul ?_
+    have hRs : R * r a ≠ ⊤ :=
+      ENNReal.mul_ne_top (ne_top_of_le_ne_top ENNReal.one_ne_top hR.le) (apply_ne_top _ _)
+    rw [ENNReal.mul_sub (fun _ _ => apply_ne_top _ _), mul_one, mul_comm,
+      ENNReal.eq_sub_of_add_eq hRs (hfix a).symm]
+  · have := hAR a
+    rw [hR] at this
+    simp [add_one_le_one this]
+
+/-- **The conditional law of rejection sampling.** It holds for every `g` and `P`. When `g` always
+rejects, every accepted `g a` is `0` and `0 / 0 = 0`; that case is the one only the least fixed
+point decides. -/
+theorem suchThat_apply (g : SPMF α) (P : α → Bool) (a : α) :
+    (suchThat g P : SPMF α) a
+      = if P a then g a / (1 - prob g {b | P b = false}) else 0 := by
+  have hite : (if P a then g a / (1 - prob g {b | P b = false}) else 0)
+      = (if P a then g a else 0) / (1 - prob g {b | P b = false}) := by cases P a <;> simp
+  rw [hite]
+  refine rejection_loop_apply (accept_le g P) (fun b => ?_) (fun c hc => ?_) a
+  · conv_lhs => rw [suchThat]
+    exact bind_reject_apply g P _ b
+  · refine suchThat.fixpoint_induct (G := SPMF) g P _ (admissible_apply_le c) fun z hz b => ?_
+    rw [bind_reject_apply]
+    exact le_trans (by gcongr; exact hz b) (hc b)
+
+/-- A rejection loop that accepts with probability `0` is `⊥`. -/
+theorem suchThat_eq_bot (g : SPMF α) (P : α → Bool) (hq : prob g {b | P b = true} = 0) :
+    (suchThat g P : SPMF α) = Bot.bot := by
+  classical
+  ext a
+  rw [suchThat_apply]
+  split
+  · have : g a = 0 := by
+      rw [prob_eq_tsum_ite, ENNReal.tsum_eq_zero] at hq
+      simpa [*] using hq a
+    rw [this, ENNReal.zero_div]
+    rfl
+  · rfl
+
+/-- When `g` terminates, the retry rate is `1 - q` and the law is `g a / q`. -/
+theorem suchThat_apply_of_mass (g : SPMF α) (P : α → Bool) (hg : g.mass = 1) (a : α) :
+    (suchThat g P : SPMF α) a = if P a then g a / prob g {b | P b = true} else 0 := by
+  rw [suchThat_apply]
+  have h := prob_accept_add_reject g P
+  rw [hg] at h
+  rw [← h, ENNReal.add_sub_cancel_right]
+  exact (prob_le_mass _ _).trans_lt ((mass_le_one g).trans_lt ENNReal.one_lt_top) |>.ne
+
+end suchThat
 
 end SPMF

@@ -259,6 +259,7 @@ no recursion — including one that only post-processes a callee — is the firs
 | No recursive call | `SPMF.LfpIsOne.one` | `1` |
 | Mean offspring `m < 1` | `SPMF.LfpIsOne.affine (m := m)` | `(1 - m) + m * c` |
 | At most two calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.quadratic (a := _) (b := _) (d := _)` | `a + b * c + d * c ^ 2` |
+| At most three calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.cubic (a := _) (b := _) (d := _) (e := _)` | `a + b * c + d * c ^ 2 + e * c ^ 3` |
 | Shrinking seed, mean offspring `> 1` | `SPMF.LfpIsOne.ranking …` with `mass_fixpoint per_seed` (below) | a function of `c` and the seed |
 
 `m` is weights-on-recursive-branches over total weights, counting each branch once per recursive
