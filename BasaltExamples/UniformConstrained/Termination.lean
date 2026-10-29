@@ -15,7 +15,7 @@ The paper's termination argument for `sizedP` needs `inspectsFst` to be determin
 satisfying the law `inspectsFst p ⇒ not (inspectsFst (p ∘ swap))`" (`LazyOracle.SwapLaw`). This file
 shows that law is not enough — `cycleOracle` satisfies it, and `sizedP` loops on a product of three
 `Pay`-guarded spaces — and that the right-first oracle, the paper's unguided `sizedP p (a *** b)`,
-terminates within `Space.measure s` fuel, which discharges `Theorem2`'s `FuelSuffices`.
+terminates within `Space.measure s` fuel.
 -/
 
 @[expose] public section
@@ -90,17 +90,13 @@ theorem sizedP_cycleOracle_spaceTriple : ∀ (fuel : Nat) (q : (Bool × Bool) ×
     rw [show (spaceBool :*: spaceBool) :*: spaceBool = spaceTriple from rfl, ih fuel (by omega)]
     rfl
 
-/-- So `uniform` never produces a value from `spaceTriple`, whatever the fuel: `FuelSuffices` fails
-for every fuel, and the paper's Theorem 2 has no instance here although every value satisfies the
-predicate. -/
+/-- So `uniform` never produces a value from `spaceTriple`, whatever the fuel, although every value
+satisfies the predicate: the probability of producing one, which `Theorem2` leaves as a factor, is
+`0` here. -/
 theorem uniform_cycleOracle_spaceTriple (fuel : Nat) (k : Nat) (x : (Bool × Bool) × Bool) :
     (uniform cycleOracle fuel (fun _ => true) spaceTriple k : SPMF _) (some x) = 0 := by
   rw [uniform_eq, sizedP_cycleOracle_spaceTriple]
   simp [SPMF.pure_apply]
-
-theorem not_fuelSuffices_cycleOracle_spaceTriple (fuel k : Nat) (q : (Bool × Bool) × Bool → Bool) :
-    ¬ FuelSuffices cycleOracle fuel q spaceTriple k := fun h => by
-  simpa [sizedP_cycleOracle_spaceTriple] using h spaceTriple (.refl _)
 
 /-! ## The right-first oracle terminates
 
@@ -108,7 +104,7 @@ With `inspectsFst` constantly `false`, `sizedP` always expands the *right* opera
 which is the plain `sizedP p (a :*: b) = sizedP p (a *** b)` the paper starts from (Section 3.1)
 before making the order predicate-guided. Weighting the right operand of a product double makes
 every step of `sizedP` decrease `Space.measure`, and residual spaces are never larger than the space
-they came from, so `Space.measure s` fuel suffices for `uniform p s k` at every `k`. -/
+they came from, so `Space.measure s` fuel suffices for `sizedP` on every residual `uniform` meets. -/
 
 /-- A size of a space in which `***` decreases: the right operand of a product counts double. -/
 def Space.measure : {α : Type} → Space α → Nat
@@ -191,34 +187,5 @@ theorem sizedP_of_measure_le (O : LazyOracle) (hO : ∀ {α β : Type} (q : α �
       refine ⟨r, by simp only [sizedP, hO, Bool.false_eq_true, ite_false, hr], fun s' hs' => ?_⟩
       have := hres s' hs'
       omega
-
-/-- `Space.measure s` fuel suffices for `uniform p s k` under a right-first oracle. -/
-theorem fuelSuffices_of_measure_le (O : LazyOracle) (hO : ∀ {α β : Type} (q : α × β → Bool),
-    O.inspectsFst q = false) {α : Type} (p : α → Bool) (s : Space α) (k : Nat) {fuel : Nat}
-    (hle : s.measure ≤ fuel) : FuelSuffices O fuel p s k := by
-  intro t ht
-  -- Every reachable space is at most as large as `s`.
-  suffices h : ∀ s t, Reachable O fuel p k s t → s.measure ≤ fuel → t.measure ≤ fuel by
-    obtain ⟨r, hr, _⟩ := sizedP_of_measure_le O hO fuel p t k (h s t ht hle)
-    simp [hr]
-  intro s t ht
-  induction ht with
-  | refl => exact id
-  | step hr hs' _ ih =>
-    intro hle
-    obtain ⟨r', hr', hres⟩ := sizedP_of_measure_le O hO fuel p _ k hle
-    rw [hr] at hr'
-    cases hr'
-    exact ih ((hres _ hs').trans hle)
-
-/-- **The paper's Theorem 2 holds as stated for a right-first oracle**, with fuel
-`Space.measure s`. -/
-theorem Theorem2_rightFirst [DecidableEq α] (O : LazyOracle) (hO : ∀ {α β : Type}
-    (q : α × β → Bool), O.inspectsFst q = false) (p : α → Bool) (s : Space α) (k : Nat)
-    (hb : 0 < (satisfying p s k).card) (x : α) :
-    (uniform O s.measure p s k : SPMF (Option α)) (some x)
-      = (if p x then ((allOfSize s k).count x : ℝ≥0∞) else 0)
-        / ((satisfying p s k).card : ℝ≥0∞) :=
-  Theorem2 O _ p s k hb (fuelSuffices_of_measure_le O hO p s k le_rfl) x
 
 end UniformConstrained

@@ -10,41 +10,11 @@ public import Mathlib.Algebra.BigOperators.Group.Finset.Sigma
 public import Mathlib.Data.Multiset.Basic
 
 /-!
-# Spaces, finite multisets, and indexing (Claessen–Duregård–Pałka, Section 2)
+# Spaces, finite multisets, and indexing (Sections 2 and 3.1)
 
-This file is a Lean translation of Section 2 of *Generating constrained random data with uniform
-distribution* (Claessen, Duregård and Pałka, JFP 25, 2015). We keep the paper's names wherever
-Lean allows it.
-
-## Main definitions
-
-- `Space` — the paper's `Space a` GADT (Section 2.2), with the paper's constructor spellings
-  available as notation: `:+:`, `:*:`, `:$:`, `Pay`, `Pure`, `Empty`.
-- `FinSet` — the paper's `Set a` type of finite *multisets* (Section 2.3). Renamed to avoid the
-  clash with Lean's `Set`; this is also the name used in the accompanying Haskell code.
-- `FinSet.card` — the paper's `|·|`.
-- `FinSet.indexSet` — the paper's `indexSet` (Section 2.3).
-- `Space.sized` — the paper's `sized` (Section 2.3), extracting the finite multiset of values of a
-  given size out of a space.
-
-## Main results
-
-- `FinSet.card_eq_length_toList` — `|s|` is the length of the occurrence list of `s`.
-- `FinSet.indexSet_eq_getElem?` — `indexSet s` *is* indexing into the occurrence list of `s`. This
-  is the bijectivity of `indexSet` that Section 4 takes as a preliminary: the paper asks us to show
-  `indexSet` is a bijection from `{0 … |s| - 1}` onto the occurrences of `s`, and identifying it
-  with list indexing gives exactly that (`FinSet.indexSet_bijOn`).
-- `Space.card_sized_prod` — the paper's cardinality equation for products,
-  `|(T ⊗ U)ₖ| = ∑_{k₁+k₂=k} |T_{k₁}| |U_{k₂}|`.
-
-## Representing recursive spaces
-
-In Haskell, `spNat = Pay (Pure Zr :+: (Sc :$: spNat))` is a cyclic value. Lean's inductive types are
-well-founded, so a recursive space is instead represented by its family of *finite unfoldings*
-`Nat → Space α` (see `BasaltExamples.UniformConstrained.Examples`). This loses nothing: the
-paper's rule that "all recursion is guarded by at least one `Pay`" means `sized s k` inspects at
-most `k` nested `Pay`s, so the `k`-sized values of a space are already determined by its `k`-th
-unfolding. `Examples.sized_spNat_of_le` and friends make that precise.
+The paper's `Space` (Section 2.2), its finite multisets `FinSet` with `indexSet` and `sized`
+(Section 2.3), and the product-eliminating `***` with Lemma 1 (Section 3.1). `indexSet` is list
+indexing into a multiset's occurrences (`FinSet.indexSet_eq_getElem?`), hence a bijection onto them.
 -/
 
 @[expose] public section
@@ -194,7 +164,6 @@ private theorem length_listProd (xs : List α) (ys : List β) :
   | cons x xs ih => simp [ih, Nat.succ_mul, Nat.add_comm]
 
 /-- `|s|` counts the occurrences of `s`. -/
-@[simp]
 theorem card_eq_length_toList (s : FinSet α) : s.card = s.toList.length := by
   induction s with
   | empty => rfl
@@ -262,7 +231,7 @@ private theorem getElem?_listProd (xs : List α) (ys : List β) (i : Nat) :
 
 /-- **`indexSet` is list indexing.** The paper's Section 4 preliminaries ask for `indexSet` to be a
 bijection onto the occurrences of `s`; this identifies it with `getElem?` on the occurrence list,
-from which bijectivity is immediate (`indexSet_bijOn`). -/
+from which bijectivity is immediate. -/
 theorem indexSet_eq_getElem? (s : FinSet α) (i : Nat) : indexSet s i = s.toList[i]? := by
   induction s generalizing i with
   | empty => rfl
@@ -270,9 +239,9 @@ theorem indexSet_eq_getElem? (s : FinSet α) (i : Nat) : indexSet s i = s.toList
   | union a b iha ihb =>
     rw [indexSet_union, toList_union]
     rcases Nat.lt_or_ge i a.card with h | h
-    · rw [ite_eq_left h, iha, List.getElem?_append_left (by simpa using h)]
-    · rw [ite_eq_right (by omega), ihb, List.getElem?_append_right (by simpa using h)]
-      simp
+    · rw [ite_eq_left h, iha, List.getElem?_append_left (by simpa [card_eq_length_toList] using h)]
+    · rw [ite_eq_right (by omega), ihb, List.getElem?_append_right (by simpa [card_eq_length_toList] using h)]
+      simp [card_eq_length_toList]
   | prod a b iha ihb =>
     rw [indexSet_prod, toList_prod, getElem?_listProd, ← iha, ← ihb,
       ← card_eq_length_toList b]
@@ -286,20 +255,20 @@ theorem indexSet_eq_getElem? (s : FinSet α) (i : Nat) : indexSet s i = s.toList
 /-- In-range indices always hit an occurrence. -/
 theorem indexSet_isSome (s : FinSet α) {i : Nat} (h : i < s.card) :
     (indexSet s i).isSome := by
-  rw [indexSet_eq_getElem?, List.getElem?_eq_getElem (by simpa using h)]
+  rw [indexSet_eq_getElem?, List.getElem?_eq_getElem (by simpa [card_eq_length_toList] using h)]
   rfl
 
 /-- Out-of-range indices miss. -/
 theorem indexSet_eq_none (s : FinSet α) {i : Nat} (h : s.card ≤ i) :
     indexSet s i = none := by
   rw [indexSet_eq_getElem?, List.getElem?_eq_none_iff]
-  simpa using h
+  simpa [card_eq_length_toList] using h
 
 /-- The total form of `indexSet` on in-range indices: the paper's
 `indexSet : {0 … |s| - 1} → s` with the range restriction made a proof obligation rather than a
 partiality. `uniformSet` uses this so no `Option` leaks into the sampler's result type. -/
 def index (s : FinSet α) (i : Nat) (h : i < s.card) : α :=
-  s.toList[i]'(by simpa using h)
+  s.toList[i]'(by simpa [card_eq_length_toList] using h)
 
 theorem indexSet_index (s : FinSet α) (i : Nat) (h : i < s.card) :
     indexSet s i = some (s.index i h) := by

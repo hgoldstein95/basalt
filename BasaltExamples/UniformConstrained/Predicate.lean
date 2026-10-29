@@ -8,66 +8,12 @@ module
 public import BasaltExamples.UniformConstrained.Uniform
 
 /-!
-# Predicate-guided uniform sampling (Sections 3, 3.1, and Lemmas 2–3 of Section 4)
+# Predicate-guided refinement: `sizedP` and Lemmas 2–3 (Figure 2, Sections 3.1 and 4)
 
-This file translates `sizedP` (Figure 2) and Lemmas 2 and 3 about what `sizedP` returns. The
-`uniform` sampler that consumes it, and Theorem 2, are in
-`BasaltExamples.UniformConstrained.Uniformity`.
-
-## Laziness, and how it is modelled here
-
-The paper's `sizedP` is guided by two functions that are *not* definable in Haskell:
-
-- `universal :: (a → Bool) → Maybe Bool` — "`Nothing` if the predicate needs to inspect its argument
-  to yield a result, and `Just True` if the predicate is universally true and `Just False` if it is
-  universally false". The paper: "Implementing `universal` involves applying the predicate to `⊥` and
-  catching the resulting exception… Catching the exception is an impure operation in Haskell, so the
-  function `universal` is also impure (specifically, it breaks monotonicity)."
-- `inspectsFst :: ((a, b) → Bool) → Bool` — "`True` iff `p` evaluates the first component of the
-  pair before the second. Just like `universal`, `inspectsFst` exposes some information of the
-  Haskell runtime, which cannot be observed directly."
-
-Lean has no `⊥`-catching and no evaluation-order reflection, so these cannot be *defined*. Instead
-they are the fields of a structure `LazyOracle`, together with the one property the proofs use:
-
-- `universal_sound` — a `Just b` answer really does mean `p x = b` for every `x`. This is all that
-  `card_sizedP`, Lemma 2, Lemma 3 and Theorem 2 need.
-
-The law the paper states for `inspectsFst` in the Lemma 2 discussion — "`inspectsFst` is required to
-interact in a standard way with functions like `swap`, for example satisfying the law
-`inspectsFst p ⇒ not (inspectsFst (p ∘ swap))`" — is `LazyOracle.SwapLaw`, a separate proposition
-rather than a field. No proof uses it: the paper needs it only for termination, which `fuel`
-replaces here, and `BasaltExamples.UniformConstrained.Termination` shows it is not enough for
-termination anyway. Keeping it separate also lets Section 4.1's racy oracle be stated
-(`BasaltExamples.UniformConstrained.Uniformity`): in Lean's extensional model the law forces
-`inspectsFst p = false` whenever `p ∘ swap = p`, and that example's predicate is symmetric.
-
-## Termination
-
-`sizedP`'s `(:*:)` case recurses through `***`, which is not structural: it re-nests products. The
-paper's proof needs "an external convergence measure where `b *** a` is smaller than `a :*: b`, which
-is a little intricate to construct… The measure consists of three components `(k, r, q)`, ordered
-lexicographically." Rather than reconstruct that measure, `sizedP` here takes an explicit `fuel`
-argument and returns `Option`: `sizedP` runs out of fuel rather than diverging. Every result proved
-below is conditional on `sizedP` returning `some`, which is exactly the content of the paper's
-statements — its Lemma 2 and 3 are also only about invocations that terminate.
-
-## Main definitions
-
-- `LazyOracle` — the abstracted `universal` and `inspectsFst`; `LazyOracle.SwapLaw` — the paper's
-  law for `inspectsFst`.
-- `sizedP` — the paper's Figure 2.
-- `lefts` / `rights` — the `Left`- and `Right`-tagged parts of a `sizedP` result, as multisets. The
-  paper writes these `{x | Left x ∈ …}` and `{s' | Right s' ∈ …}`.
-
-## Main results
-
-- `sizedP_mono` — more fuel never changes a successful result.
-- `card_sizedP` — the paper's key invariant `|sizedP p s k| = |sized s k|`.
-- `Lemma2` — `{x | Left x ∈ sizedP p s k} = {x | x ∈ sized s k, p x}`.
-- `Lemma3` — the residual spaces retain every satisfying value: for `Right s' ∈ sizedP p s k`,
-  `{x | x ∈ sized s' k, p x} = {x | x ∈ sized s k, p x}`. `Lemma3_lt` adds that `sized s' k` is a
-  proper subset of `sized s k`.
+`sizedP` splits the values of a size into those satisfying the predicate and residual spaces that
+exclude failing ones, guided by an abstract `LazyOracle`. Its result has one entry per value
+(`card_sizedP`); its values are exactly the satisfying ones (`Lemma2`), and each residual keeps them
+all while being strictly smaller (`Lemma3`, `Lemma3_lt`).
 -/
 
 @[expose] public section
@@ -80,14 +26,20 @@ open scoped Space
 
 /-! ## The lazy oracles -/
 
-/-- The paper's `universal` and `inspectsFst`, taken as parameters together with the property its
-proofs rely on. See the module docstring for why these cannot be defined in Lean.
+/-- The paper's `universal` and `inspectsFst`, which observe the Haskell runtime:
 
-`universal p` answers `some b` when `p` is constantly `b` without inspecting its argument, and `none`
-when `p` must look at its argument. Only *soundness* is assumed: a `some b` answer is correct.
-Completeness is deliberately not assumed — a `universal` that always answers `none` satisfies this
-structure, and corresponds to `sizedP` never pruning, which is sound but slow. Nothing at all is
-assumed of `inspectsFst`: it only chooses an order, and every order gives the same multisets. -/
+- `universal :: (a → Bool) → Maybe Bool` — "`Nothing` if the predicate need to inspects its argument
+  to yield a result, and `Just True` if the predicate is universally true and `Just False` if is
+  universally false"; implementing it "involves applying the predicate to `⊥` and catching the
+  resulting exception".
+- `inspectsFst :: ((a, b) → Bool) → Bool` — "`True` iff `p` evaluates the first component of the
+  pair before the second".
+
+Lean has no `⊥`-catching and no evaluation-order reflection, so these are parameters. Only the
+soundness of `universal` is assumed — a `some b` answer is correct — and it is all that
+`card_sizedP`, Lemmas 2–3 and Theorem 2 use. A `universal` that always answers `none` qualifies; it
+makes `sizedP` never prune. Nothing is assumed of `inspectsFst`: it only chooses an order, and every
+order gives the same multisets. -/
 structure LazyOracle where
   /-- The paper's `universal :: (a → Bool) → Maybe Bool`. -/
   universal : {α : Type} → (α → Bool) → Option Bool
@@ -101,8 +53,14 @@ namespace LazyOracle
 
 variable (O : LazyOracle)
 
-/-- The paper's stated law for `inspectsFst` (Section 4, Lemma 2 discussion):
-"`inspectsFst p ⇒ not (inspectsFst (p ∘ swap))`". -/
+/-- The paper's stated law for `inspectsFst` (Section 4, Lemma 2 discussion): "`inspectsFst` is
+required to interact in a standard way with functions like `swap`, for example satisfying the law
+`inspectsFst p ⇒ not (inspectsFst (p ∘ swap))`".
+
+It is not a field of `LazyOracle`. The paper needs it only for termination, which `fuel` replaces
+here and which it does not ensure anyway (`cycleOracle_swapLaw`). And since Lean functions are
+extensional, it forces `inspectsFst p = false` whenever `p ∘ swap = p`, which excludes Section 4.1's
+racy oracle (`racyRound_race_TF`). -/
 def SwapLaw : Prop :=
   ∀ {α β : Type} (p : α × β → Bool), O.inspectsFst p = true → O.inspectsFst (p ∘ Prod.swap) = false
 
@@ -159,7 +117,10 @@ sizedP p (Pure a) 0 | p a       = {Left a}
 sizedP _ _ _ = {}
 ```
 
-Returns `none` exactly when the fuel runs out. -/
+Returns `none` exactly when the fuel runs out. The `(:*:)` case recurses through `***`, which is not
+structural, and the paper's measure for it is "a little intricate to construct"; with fuel, every
+result below is conditional on `sizedP` returning `some`, as the paper's Lemmas 2 and 3 are about
+invocations that terminate. -/
 def sizedP (O : LazyOracle) :
     Nat → {α : Type} → (α → Bool) → Space α → Nat → Option (FinSet (α ⊕ Space α))
   | 0, _, _, _, _ => none

@@ -7,39 +7,22 @@ module
 
 public import Basalt.Combinators
 public import Basalt.Laws
+import Basalt.Tactic.MassFixpoint
 public import BasaltExamples.UniformConstrained.Space
 
 /-!
-# Uniform sampling by size, and rejection sampling (Sections 2.3 and 3)
+# Uniform sampling by size, and rejection sampling (Sections 2.3, 3 and Theorem 1)
 
-This file translates the paper's sampling procedures. The paper's `Random` monad — "a monad with the
-only side-effect of generating random values" — is Basalt's `Gen`, so `uniformRange` is `chooseNat`
-and the paper's `Random a` is `G α`.
-
-## Main definitions
-
-- `uniformSet` — the paper's `uniformSet :: Set a → Random a` (Section 2.3), uniform over the
-  occurrences of a non-empty finite multiset. The paper's `error "empty set"` becomes a hypothesis
-  `0 < s.card`, so the Lean version is total.
-- `uniformSized` — the paper's `uniformSized s k = uniformSet (sized s k)`.
-- `uniformFilter` — the paper's rejection sampler (Section 3). Since it may diverge, it is defined
-  by `partial_fixpoint`, which is exactly what Basalt's `Gen` is set up for.
-
-## Main results
-
-- `uniformSet_apply` — `uniformSet s` assigns `a` the probability `count a s / |s|`: it is uniform
-  over the *occurrences* in `s`, as the paper requires.
-- `isAlmostSurelyTerminating_uniformSet` — `uniformSet` terminates (it makes exactly one choice).
-- `uniformFilter_apply` — the recurrence the paper's Theorem 1 proof reasons about.
-- `Theorem1` — **the paper's Theorem 1**: if `b = {x | x ∈ a, p x}` is non-empty, where
-  `a = sized s k`, then `uniformFilter p s k` is uniform over `b`. Concretely, every `x` satisfying
-  `p` is produced with probability `count x a / |b|`, so two values satisfying `p` with the same
-  multiplicity in `a` are equally likely, and the total mass is 1.
+The paper's `Random` monad is Basalt's `Gen`, so its `uniformRange` is `chooseNat`. `uniformSet`
+draws uniformly over the occurrences of a multiset, and the rejection sampler `uniformFilter` is
+`suchThat` over it; Theorem 1 says the latter is uniform over the satisfying occurrences.
 -/
 
 @[expose] public section
 
 open Lean.Order RandomChoice ENNReal
+
+universe u
 
 namespace UniformConstrained
 
@@ -64,83 +47,65 @@ def uniformSet [Gen G] (s : FinSet α) (hne : 0 < s.card) : G α := do
 def uniformSized [Gen G] (s : Space α) (k : Nat) (hne : 0 < (Space.sized s k).card) : G α :=
   uniformSet (Space.sized s k) hne
 
+/-! ### Sums over a uniform index -/
+
+/-- **Binding after a uniform index averages over the indices.** -/
+theorem chooseNat_bind_apply {β : Type} {n : Nat} (hn : 0 < n) (F : Nat → SPMF β) (y : β) :
+    ((chooseNat 0 (n - 1) (Nat.zero_le _) : SPMF Nat) >>= F) y
+      = (∑ i ∈ Finset.range n, F i y) / (n : ℝ≥0∞) :=
+  SPMF.expect_chooseNat_zero hn fun i => F i y
+
+theorem sum_range_getElem?_map {β : Type u} (l : List β) (g : β → ℝ≥0∞) :
+    ∑ i ∈ Finset.range l.length, ((l[i]?).map g).getD 0 = ((l : Multiset β).map g).sum := by
+  induction l with
+  | nil => simp
+  | cons x xs ih =>
+    rw [List.length_cons, Finset.sum_range_succ']
+    simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.map_some, Option.getD_some]
+    rw [ih]
+    show _ = ((x ::ₘ (xs : Multiset β)).map g).sum
+    rw [Multiset.map_cons, Multiset.sum_cons, add_comm]
+
+/-- Summing over the indices of a `FinSet` is summing over its occurrences: `indexSet` is a
+bijection onto them. -/
+theorem sum_range_indexSet_map {β : Type u} (s : FinSet β) (g : β → ℝ≥0∞) :
+    ∑ i ∈ Finset.range s.card, ((s.indexSet i).map g).getD 0 = (s.toMultiset.map g).sum := by
+  simp only [FinSet.indexSet_eq_getElem?, FinSet.card_eq_length_toList]
+  exact sum_range_getElem?_map s.toList g
+
+theorem sum_map_indicator [DecidableEq α] (M : Multiset α) (x : α) :
+    (M.map (fun a => if x = a then (1 : ℝ≥0∞) else 0)).sum = (M.count x : ℝ≥0∞) := by
+  refine Multiset.induction_on M (by simp) fun a s ih => ?_
+  rw [Multiset.map_cons, Multiset.sum_cons, ih, Multiset.count_cons]
+  by_cases h : x = a
+  · simp [h, add_comm]
+  · simp [h]
+
 /-! ### `uniformSet` is uniform over occurrences -/
-
-namespace SPMF
-
-/-- Every index `chooseNat 0 (n-1)` can draw is equiprobable, with probability `1/n`. -/
-theorem chooseNat_apply_of_mem {n : Nat} (hn : 0 < n) {i : Nat} (hi : i < n) :
-    (chooseNat 0 (n - 1) (Nat.zero_le _) : SPMF Nat) i = 1 / (n : ℝ≥0∞) := by
-  unfold chooseNat
-  rw [map_eq_pure_bind, SPMF.bind_apply]
-  rw [tsum_eq_single (⟨⟨i, ⟨Nat.zero_le i, by omega⟩⟩⟩ :
-    ULift {x : Nat // 0 ≤ x ∧ x ≤ n - 1})]
-  · rw [SPMF.choose_apply, SPMF.pure_apply, ite_eq_left rfl, mul_one]
-    congr 2
-    omega
-  · intro m hm
-    have hne : ¬ (i = m.down.val) := fun h => hm (by
-      cases m with
-      | up v => cases v with | mk v hv => cases h; rfl)
-    rw [SPMF.pure_apply, ite_eq_right hne, mul_zero]
-
-end SPMF
 
 /-- **`uniformSet s` is uniform over the occurrences in `s`.** The probability of drawing `a` is its
 multiplicity in `s` divided by `|s|`. This is the statement the paper opens Section 4 with ("it is
 easy to prove that `uniformSet s` is uniform over the occurrences in `s`, by proving that `indexSet`
-is bijective and that `uniformRange` is uniform"): `FinSet.countP_indexSet_eq_count` supplies the
-first half and `SPMF.chooseNat_apply_of_mem` the second. -/
+is bijective and that `uniformRange` is uniform"): `sum_range_indexSet_map` is the first half and
+`chooseNat_bind_apply` the second. -/
 theorem uniformSet_apply [DecidableEq α] (s : FinSet α) (hne : 0 < s.card) (a : α) :
     (uniformSet s hne : SPMF α) a = (s.toMultiset.count a : ℝ≥0∞) / (s.card : ℝ≥0∞) := by
-  classical
+  have hterm : ∀ i ∈ Finset.range s.card,
+      (Pure.pure ((s.indexSet i).getD (s.index 0 hne)) : SPMF α) a
+        = ((s.indexSet i).map fun z => if a = z then (1 : ℝ≥0∞) else 0).getD 0 := by
+    intro i hi
+    rw [s.indexSet_index i (Finset.mem_range.mp hi), Option.getD_some, Option.map_some,
+      Option.getD_some, SPMF.pure_apply]
+    congr
   unfold uniformSet
-  rw [SPMF.bind_apply]
-  -- Only the indices naming `a` contribute, and each contributes `1 / |s|`.
-  have hterm : ∀ i : Nat,
-      (chooseNat 0 (s.card - 1) (Nat.zero_le _) : SPMF Nat) i *
-        (Pure.pure ((s.indexSet i).getD (s.index 0 hne)) : SPMF α) a
-      = if i ∈ (List.range s.card).filter (fun i => s.indexSet i == some a)
-        then 1 / (s.card : ℝ≥0∞) else 0 := by
-    intro i
-    by_cases hi : i < s.card
-    · rw [SPMF.chooseNat_apply_of_mem hne hi, s.indexSet_index i hi]
-      by_cases hxa : a = s.index i hi
-      · rw [Option.getD_some, SPMF.pure_apply, ite_eq_left hxa, mul_one, ite_eq_left
-          (by simp only [List.mem_filter, List.mem_range, beq_iff_eq]
-              exact ⟨hi, by rw [s.indexSet_index i hi, hxa]⟩)]
-      · rw [Option.getD_some, SPMF.pure_apply, ite_eq_right hxa, mul_zero, ite_eq_right]
-        simp only [List.mem_filter, List.mem_range, beq_iff_eq, not_and]
-        intro _ h
-        exact hxa (Option.some_injective _ ((s.indexSet_index i hi).symm.trans h)).symm
-    · have hzero : (chooseNat 0 (s.card - 1) (Nat.zero_le _) : SPMF Nat) i = 0 := by
-        rw [SPMF.apply_eq_zero_iff]
-        unfold chooseNat
-        simp only [SPMF.mem_support_map_iff, not_exists, not_and]
-        intro m _ hm
-        have := m.down.property.2
-        omega
-      rw [hzero, zero_mul, ite_eq_right]
-      simp only [List.mem_filter, List.mem_range, not_and]
-      omega
-  rw [tsum_congr hterm]
-  -- Only the indices naming `a` contribute; each contributes `1 / |s|`.
-  rw [tsum_eq_sum (s := ((List.range s.card).filter (fun i => s.indexSet i == some a)).toFinset)
-    (by intro i hi; rw [ite_eq_right]; simpa using hi)]
-  rw [Finset.sum_congr rfl (fun i hi => ite_eq_left (by simpa using hi))]
-  rw [Finset.sum_const, nsmul_eq_mul, one_div, mul_comm, ← ENNReal.div_eq_inv_mul]
-  -- The number of contributing indices is the multiplicity of `a`.
-  congr 1
-  rw [List.toFinset_card_of_nodup (List.Nodup.filter _ (List.nodup_range)),
-    ← List.countP_eq_length_filter]
-  exact congrArg Nat.cast (s.countP_indexSet_eq_count a)
+  rw [chooseNat_bind_apply hne, Finset.sum_congr rfl hterm, sum_range_indexSet_map,
+    sum_map_indicator]
 
 /-- `uniformSet` makes exactly one random choice, so it terminates. -/
-theorem isAlmostSurelyTerminating_uniformSet [Inhabited α] (s : FinSet α) (hne : 0 < s.card) :
+theorem isAlmostSurelyTerminating_uniformSet (s : FinSet α) (hne : 0 < s.card) :
     IsAlmostSurelyTerminating (uniformSet s hne : SPMF α) := by
   unfold uniformSet
-  rw [IsAlmostSurelyTerminating]
-  rw [SPMF.mass_bind_tsum]
+  rw [IsAlmostSurelyTerminating, SPMF.mass_bind_tsum]
   simp only [SPMF.mass_pure, mul_one]
   exact SPMF.mass_chooseNat 0 (s.card - 1) (Nat.zero_le _)
 
@@ -154,20 +119,18 @@ uniformFilter p s k = do
   if p a then return a else uniformFilter p s k
 ```
 
-This may diverge (the paper: "if there are no values that satisfy the predicate it will never
-terminate"), so it is a `partial_fixpoint` — the reason Basalt's generators live in a CCPO. -/
+That is Basalt's rejection sampler `suchThat`, over `uniformSized s k`. -/
 def uniformFilter [Gen G] (p : α → Bool) (s : Space α) (k : Nat)
-    (hne : 0 < (Space.sized s k).card) : G α := do
-  let a ← uniformSized s k hne
-  if p a then pure a else uniformFilter p s k hne
-partial_fixpoint
+    (hne : 0 < (Space.sized s k).card) : G α :=
+  suchThat (uniformSized s k hne) p
 
 theorem uniformFilter_eq [Gen G] (p : α → Bool) (s : Space α) (k : Nat)
     (hne : 0 < (Space.sized s k).card) :
     (uniformFilter p s k hne : G α)
       = (do let a ← uniformSized s k hne
             if p a then pure a else uniformFilter p s k hne) := by
-  conv_lhs => rw [uniformFilter]
+  unfold uniformFilter
+  conv_lhs => rw [suchThat]
 
 /-! ### Theorem 1: the rejection sampler is uniform
 
@@ -204,6 +167,15 @@ theorem tsum_count [DecidableEq α] (M : Multiset α) :
   rw [← Nat.cast_sum]
   exact congrArg Nat.cast (Multiset.toFinset_sum_count_eq M)
 
+/-- The multiplicities of the satisfying values sum to `|b|`. -/
+theorem tsum_ite_count_eq_card_satisfying [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat) :
+    (∑' x, if p x then ((allOfSize s k).count x : ℝ≥0∞) else 0)
+      = ((satisfying p s k).card : ℝ≥0∞) := by
+  rw [← tsum_count (satisfying p s k)]
+  exact tsum_congr fun x => by
+    rw [satisfying, Multiset.count_filter]
+    by_cases h : p x = true <;> simp [h]
+
 /-- **The acceptance probability is `m / n`.** One draw of `uniformSized s k` satisfies `p` with
 probability `|b| / |a|`, since `p`-satisfying occurrences are exactly `b`. -/
 theorem massAccept [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
@@ -211,14 +183,12 @@ theorem massAccept [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
     (∑' x, if p x then (uniformSized s k hne : SPMF α) x else 0)
       = ((satisfying p s k).card : ℝ≥0∞) / ((allOfSize s k).card : ℝ≥0∞) := by
   classical
-  have hcard : (Space.sized s k).card = (allOfSize s k).card := by
-    rw [FinSet.card_eq_length_toList]; rfl
   have hterm : ∀ x, (if p x then (uniformSized s k hne : SPMF α) x else 0)
       = ((satisfying p s k).count x : ℝ≥0∞) / ((Space.sized s k).card : ℝ≥0∞) := by
     intro x
     rw [uniformSized, uniformSet_apply _ hne x, satisfying, Multiset.count_filter]
     by_cases h : p x = true <;> simp [h]
-  rw [tsum_congr hterm, tsum_div_const, tsum_count, hcard]
+  rw [tsum_congr hterm, tsum_div_const, tsum_count, ← FinSet.card_toMultiset]
 
 /-- The rejection probability is `(n - m) / n`, the paper's `y ∉ b` case. -/
 theorem massReject [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
@@ -226,9 +196,8 @@ theorem massReject [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
     (∑' x, if p x then 0 else (uniformSized s k hne : SPMF α) x)
       = 1 - ((satisfying p s k).card : ℝ≥0∞) / ((allOfSize s k).card : ℝ≥0∞) := by
   classical
-  have hmass : (uniformSized s k hne : SPMF α).mass = 1 := by
-    have : Inhabited α := ⟨(Space.sized s k).index 0 hne⟩
-    exact isAlmostSurelyTerminating_uniformSet _ hne
+  have hmass : (uniformSized s k hne : SPMF α).mass = 1 :=
+    isAlmostSurelyTerminating_uniformSet _ hne
   have hsplit : (∑' x, if p x then (uniformSized s k hne : SPMF α) x else 0)
       + (∑' x, if p x then 0 else (uniformSized s k hne : SPMF α) x)
       = (uniformSized s k hne : SPMF α).mass := by
@@ -252,8 +221,6 @@ theorem uniformFilter_apply [DecidableEq α] (p : α → Bool) (s : Space α) (k
   classical
   conv_lhs => rw [uniformFilter_eq]
   rw [SPMF.bind_apply]
-  have hcard : (Space.sized s k).card = (allOfSize s k).card := by
-    rw [FinSet.card_eq_length_toList]; rfl
   -- Split each summand into its accepting and rejecting parts.
   have hterm : ∀ y, (uniformSized s k hne : SPMF α) y *
       (if p y then (Pure.pure y : SPMF α) else (uniformFilter p s k hne : SPMF α)) x
@@ -267,7 +234,7 @@ theorem uniformFilter_apply [DecidableEq α] (p : α → Bool) (s : Space α) (k
   -- The accepting part contributes only at `y = x`.
   by_cases hx : p x
   · rw [ite_eq_left hx, tsum_eq_single x, ite_eq_left hx, SPMF.pure_apply, ite_eq_left rfl, mul_one,
-      uniformSized, uniformSet_apply _ hne x, hcard]
+      uniformSized, uniformSet_apply _ hne x, ← FinSet.card_toMultiset]
     intro y hy
     by_cases hy' : p y
     · rw [ite_eq_left hy', SPMF.pure_apply, ite_eq_right (fun h => hy h.symm), mul_zero]
@@ -287,10 +254,9 @@ theorem uniformFilter_apply [DecidableEq α] (p : α → Bool) (s : Space α) (k
 "Uniform over `b`" is, as everywhere in the paper, uniform over the *occurrences* of `b`: each
 occurrence gets probability `1/m`, so a value `x` with multiplicity `count x a` in `a` (equivalently,
 in `b`, since `p x`) is produced with probability `count x a / m`. That is the statement proved here.
-Two immediate consequences are recorded below: `uniformFilter` never produces a value failing `p`
-(`Theorem1_sound`), and it terminates almost surely (`Theorem1_terminates`). -/
--- TODO: `Theorem1` is an instance of the exact `suchThat` conditioning lemma being added to Basalt
--- core; restate it through that lemma once it lands.
+Since `uniformFilter` is `suchThat`, this is exact conditioning of `suchThat` at a uniform draw.
+That it never produces a value failing `p`, and that it terminates almost surely, follow from
+`suchThat`'s own lemmas (`Theorem1_sound`, `Theorem1_terminates`). -/
 theorem Theorem1 [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
     (hne : 0 < (Space.sized s k).card) (hb : 0 < (satisfying p s k).card) (x : α) :
     (uniformFilter p s k hne : SPMF α) x
@@ -329,32 +295,24 @@ theorem Theorem1 [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
   rw [ENNReal.eq_div_iff hm0 hmtop, mul_comm]
   exact hRm
 
-/-- **`uniformFilter` is sound**: it never produces a value that fails the predicate. Immediate from
-`Theorem1` — the numerator is `0` when `¬ p x`. -/
-theorem Theorem1_sound [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
-    (hne : 0 < (Space.sized s k).card) (hb : 0 < (satisfying p s k).card) {x : α}
-    (hx : x ∈ SPMF.support (uniformFilter p s k hne : SPMF α)) : p x := by
-  by_contra h
-  rw [SPMF.mem_support_iff, Theorem1 p s k hne hb x, ite_eq_right h, ENNReal.zero_div] at hx
-  exact hx rfl
+/-- **`uniformFilter` is sound**: it never produces a value that fails the predicate, whether or not
+`b` is empty. -/
+theorem Theorem1_sound {p : α → Bool} {s : Space α} {k : Nat} {hne : 0 < (Space.sized s k).card}
+    {x : α} (hx : x ∈ SPMF.support (uniformFilter p s k hne : SPMF α)) : p x :=
+  (SPMF.mem_support_suchThat_iff.mp hx).2
 
-/-- **`uniformFilter` terminates almost surely** when `b` is non-empty: the total mass is `1`, so no
-mass is lost to the rejection loop running forever. This is the other half of what "uniform over `b`"
-asserts — `Theorem1` gives the relative probabilities, this gives that they sum to one. -/
+/-- **`uniformFilter` terminates almost surely** when `b` is non-empty: a draw is rejected with
+probability `1 - m/n < 1`. -/
 theorem Theorem1_terminates [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
     (hne : 0 < (Space.sized s k).card) (hb : 0 < (satisfying p s k).card) :
     IsAlmostSurelyTerminating (uniformFilter p s k hne : SPMF α) := by
-  classical
-  have hm0 : ((satisfying p s k).card : ℝ≥0∞) ≠ 0 := by
-    rw [Ne, Nat.cast_eq_zero]; omega
-  rw [IsAlmostSurelyTerminating, SPMF.mass, tsum_congr (Theorem1 p s k hne hb), tsum_div_const]
-  -- The numerators are the multiplicities of `b`, which sum to `m`.
-  rw [show (∑' x, if p x then ((allOfSize s k).count x : ℝ≥0∞) else 0)
-      = ((satisfying p s k).card : ℝ≥0∞) from by
-    rw [← tsum_count (satisfying p s k)]
-    exact tsum_congr (fun x => by
-      rw [satisfying, Multiset.count_filter]
-      by_cases h : p x = true <;> simp [h])]
-  exact ENNReal.div_self hm0 (ENNReal.natCast_ne_top _)
+  have hm0 : ((satisfying p s k).card : ℝ≥0∞) ≠ 0 := by rw [Ne, Nat.cast_eq_zero]; omega
+  refine SPMF.isAlmostSurelyTerminating_suchThat (r := 1 - ((satisfying p s k).card : ℝ≥0∞)
+    / ((allOfSize s k).card : ℝ≥0∞)) (isAlmostSurelyTerminating_uniformSet _ hne) ?_
+    (ENNReal.sub_lt_self one_ne_top one_ne_zero
+      (ENNReal.div_pos_iff.mpr ⟨hm0, ENNReal.natCast_ne_top _⟩).ne')
+  show SPMF.expect _ _ ≤ _
+  rw [SPMF.expect, ← massReject p s k hne]
+  exact le_of_eq (tsum_congr fun x => by by_cases h : p x <;> simp [h])
 
 end UniformConstrained

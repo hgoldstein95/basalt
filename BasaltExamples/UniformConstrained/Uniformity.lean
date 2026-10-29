@@ -11,9 +11,8 @@ public import BasaltExamples.UniformConstrained.Predicate
 # The predicate-guided sampler `uniform`, Theorem 2, and Section 4.1
 
 `uniform` is the paper's sampler over `sizedP` (Section 3). Its fuel can run out on a residual
-space, so the paper's Theorem 2 is proved in two forms: for every fuel, the output is uniform over
-the satisfying occurrences conditional on producing one (`Theorem2_prop`, `Theorem2_cond`); with
-`FuelSuffices`, exactly as stated (`Theorem2`). Section 4.1's racy oracle shows determinism is needed.
+space, so Theorem 2 is proved conditional on producing a value, for every oracle and fuel
+(`Theorem2`). Section 4.1's racy oracle shows determinism is needed.
 -/
 
 @[expose] public section
@@ -47,50 +46,6 @@ theorem sum_map_sumElim {α : Type u} {β : Type v} (M : Multiset (α ⊕ β)) (
     simp only [Multiset.map_cons, Multiset.sum_cons, Sum.elim_inr, ih]
     rw [add_left_comm]
 
-theorem sum_map_indicator [DecidableEq α] (M : Multiset α) (x : α) :
-    (M.map (fun a => if x = a then (1 : ℝ≥0∞) else 0)).sum = (M.count x : ℝ≥0∞) := by
-  refine Multiset.induction_on M (by simp) fun a s ih => ?_
-  rw [Multiset.map_cons, Multiset.sum_cons, ih, Multiset.count_cons]
-  by_cases h : x = a
-  · simp [h, add_comm]
-  · simp [h]
-
-theorem sum_range_getElem?_map {β : Type u} (l : List β) (g : β → ℝ≥0∞) :
-    ∑ i ∈ Finset.range l.length, ((l[i]?).map g).getD 0 = ((l : Multiset β).map g).sum := by
-  induction l with
-  | nil => simp
-  | cons x xs ih =>
-    rw [List.length_cons, Finset.sum_range_succ']
-    simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.map_some, Option.getD_some]
-    rw [ih]
-    show _ = ((x ::ₘ (xs : Multiset β)).map g).sum
-    rw [Multiset.map_cons, Multiset.sum_cons, add_comm]
-
-/-- Summing over the indices of a `FinSet` is summing over its occurrences. -/
-theorem sum_range_indexSet_map {β : Type u} (s : FinSet β) (g : β → ℝ≥0∞) :
-    ∑ i ∈ Finset.range s.card, ((s.indexSet i).map g).getD 0 = (s.toMultiset.map g).sum := by
-  simp only [FinSet.indexSet_eq_getElem?, FinSet.card_eq_length_toList]
-  exact sum_range_getElem?_map s.toList g
-
-/-- **Binding after a uniform index averages over the indices.** -/
-theorem chooseNat_bind_apply {β : Type} {n : Nat} (hn : 0 < n) (F : Nat → SPMF β) (y : β) :
-    ((chooseNat 0 (n - 1) (Nat.zero_le _) : SPMF Nat) >>= F) y
-      = (∑ i ∈ Finset.range n, F i y) / (n : ℝ≥0∞) := by
-  rw [SPMF.bind_apply, tsum_eq_sum (s := Finset.range n)]
-  · rw [ENNReal.div_eq_inv_mul, Finset.mul_sum]
-    refine Finset.sum_congr rfl fun i hi => ?_
-    rw [SPMF.chooseNat_apply_of_mem hn (Finset.mem_range.mp hi), one_div]
-  · intro i hi
-    have hzero : (chooseNat 0 (n - 1) (Nat.zero_le _) : SPMF Nat) i = 0 := by
-      rw [SPMF.apply_eq_zero_iff]
-      unfold chooseNat
-      simp only [SPMF.mem_support_map_iff, not_exists, not_and]
-      intro m _ hm
-      have := m.down.property.2
-      simp only [Finset.mem_range] at hi
-      omega
-    rw [hzero, zero_mul]
-
 /-! ## `uniform` -/
 
 section UniformDef
@@ -106,8 +61,9 @@ uniform p s k = do
             Right s' → uniform p s' k
 ```
 
-`uniformSet` is inlined as the paper defines it, a uniform index followed by `indexSet`: the multiset
-`sizedP` returns contains spaces, so it lives in `Type 2` and cannot be the result type of `G`. The
+`uniformSet` is inlined as the paper defines it, a uniform index followed by `indexSet`: an element
+of the multiset `sizedP` returns has type `α ⊕ Space α : Type 1`, which `G : Type → Type` cannot
+return. The
 result is `Option α`: `none` when `sizedP` runs out of fuel, and at an empty multiset, where the
 paper's `uniformSet` raises `error "empty set"`. -/
 def uniform (O : LazyOracle) (fuel : Nat) (p : α → Bool) (s : Space α) (k : Nat) :
@@ -199,8 +155,8 @@ theorem card_sized_lt_of_mem_rights {O : LazyOracle} {fuel : Nat} {p : α → Bo
 
 /-- **Theorem 2, for every fuel: running out of fuel never favours one satisfying value.**
 
-Whatever `fuel` is, the probability of each `x` is its multiplicity in `sized s k` times a constant
-`κ` that does not depend on `x` (and is `0` on values failing `p`). Running out of fuel discards a
+Whatever `fuel` is, the probability of each `x` satisfying `p` is its multiplicity in `sized s k`
+times a constant `κ` that does not depend on `x`; values failing `p` have probability `0`. Running out of fuel discards a
 whole residual space at once, and a residual space keeps every satisfying occurrence (Lemma 3), so
 the loss is spread over the satisfying values in proportion to their multiplicities. -/
 theorem Theorem2_prop [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α → Bool)
@@ -235,10 +191,17 @@ theorem Theorem2_prop [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α →
         ite_eq_right (by simpa using hx), ite_eq_right (by simpa using hx), zero_add,
         ENNReal.zero_div]
 
-/-- **Conditional on producing a value, `uniform` is uniform over `b`, for every fuel.** The
-probability of `x` is its share `count x a / m` of the satisfying occurrences, times the probability
-of producing anything at all. -/
-theorem Theorem2_cond [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α → Bool) (s : Space α)
+/-- **Theorem 2 (Claessen–Duregård–Pałka).**
+
+> Consider space `s`, a non-negative size `k`, and a predicate `p`. Let the multiset `a = sized s k`
+> and `b = {x | x ∈ a, p x}`. If `b` is non-empty, then `uniform p s k` is uniform over `b`.
+
+Uniform over the occurrences of `b`, conditional on producing a value: the probability of `x` is its
+share `count x a / m` of the satisfying occurrences, times the probability of producing anything at
+all. This holds for every oracle and every fuel. The paper's proof also takes that probability to be
+`1`, which needs `sizedP` to terminate, and its stated law does not ensure that
+(`uniform_cycleOracle_spaceTriple`). -/
+theorem Theorem2 [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α → Bool) (s : Space α)
     (k : Nat) (hb : 0 < (satisfying p s k).card) (x : α) :
     (uniform O fuel p s k : SPMF (Option α)) (some x)
       = (if p x then ((allOfSize s k).count x : ℝ≥0∞) else 0) / ((satisfying p s k).card : ℝ≥0∞)
@@ -250,100 +213,9 @@ theorem Theorem2_cond [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α →
   -- The total is `m * κ`: the multiplicities of the satisfying values sum to `m`.
   have htot : ∑' y, (uniform O fuel p s k : SPMF (Option α)) (some y)
       = ((satisfying p s k).card : ℝ≥0∞) * κ := by
-    rw [tsum_congr hκ, ← tsum_count (satisfying p s k), ← ENNReal.tsum_mul_right]
-    exact tsum_congr fun y => by
-      rw [satisfying, Multiset.count_filter]
-      by_cases h : p y = true <;> simp [h]
+    rw [tsum_congr hκ, ← tsum_ite_count_eq_card_satisfying, ← ENNReal.tsum_mul_right]
+    exact tsum_congr fun y => by rw [ite_mul, zero_mul]
   rw [htot, hκ, ← mul_assoc, ENNReal.div_mul_cancel hm0 hmtop, ite_mul, zero_mul]
-
-/-! ### The paper's Theorem 2, under enough fuel -/
-
-/-- `Reachable O fuel p k s t`: `uniform` can reach the space `t` from `s`, by a chain of residual
-spaces `Right s' ∈ sizedP p s k` on which `sizedP` succeeded. -/
-inductive Reachable (O : LazyOracle) (fuel : Nat) (p : α → Bool) (k : Nat) :
-    Space α → Space α → Prop where
-  | refl (s : Space α) : Reachable O fuel p k s s
-  | step {s s' t : Space α} {r : FinSet (α ⊕ Space α)} : sizedP O fuel p s k = some r →
-      s' ∈ rights r → Reachable O fuel p k s' t → Reachable O fuel p k s t
-
-/-- **`fuel` suffices for `uniform p s k`**: `sizedP` succeeds on every space `uniform` can reach.
-This is the hypothesis under which the paper's Theorem 2 holds as stated; the paper has it for free
-because its `sizedP` has no fuel and is claimed to terminate (see
-`BasaltExamples.UniformConstrained.Termination` for when it does). -/
-def FuelSuffices (O : LazyOracle) (fuel : Nat) (p : α → Bool) (s : Space α) (k : Nat) : Prop :=
-  ∀ t, Reachable O fuel p k s t → (sizedP O fuel p t k).isSome
-
-theorem FuelSuffices.of_mem_rights {O : LazyOracle} {fuel : Nat} {p : α → Bool} {s : Space α}
-    {k : Nat} (h : FuelSuffices O fuel p s k) {r : FinSet (α ⊕ Space α)}
-    (hr : sizedP O fuel p s k = some r) {s' : Space α} (hs' : s' ∈ rights r) :
-    FuelSuffices O fuel p s' k :=
-  fun t ht => h t (.step hr hs' ht)
-
-/-- **Theorem 2 (Claessen–Duregård–Pałka).**
-
-> Consider space `s`, a non-negative size `k`, and a predicate `p`. Let the multiset `a = sized s k`
-> and `b = {x | x ∈ a, p x}`. If `b` is non-empty, then `uniform p s k` is uniform over `b`.
-
-As in `Theorem1`, uniform over the occurrences: `x` comes out with probability `count x a / m`. The
-extra hypothesis `FuelSuffices` replaces the paper's termination of `sizedP`; without it the
-statement is false, since `uniform` returns `none` when fuel runs out, and `Theorem2_cond` is what
-survives. The proof is the paper's: induction on `n = |a|`, and `1/n + ((n - m)/n)(1/m) = 1/m`. -/
-theorem Theorem2 [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α → Bool) (s : Space α)
-    (k : Nat) (hb : 0 < (satisfying p s k).card) (hfuel : FuelSuffices O fuel p s k) (x : α) :
-    (uniform O fuel p s k : SPMF (Option α)) (some x)
-      = (if p x then ((allOfSize s k).count x : ℝ≥0∞) else 0)
-        / ((satisfying p s k).card : ℝ≥0∞) := by
-  classical
-  induction hn : (Space.sized s k).card using Nat.strong_induction_on generalizing s with
-  | _ n ih =>
-  obtain ⟨r, hr⟩ := Option.isSome_iff_exists.mp (hfuel s (.refl s))
-  -- Every residual keeps `b`, so the hypotheses pass to it, and the induction hypothesis applies.
-  have hres : ∀ s' ∈ rights r, (uniform O fuel p s' k : SPMF (Option α)) (some x)
-      = (if p x then ((allOfSize s k).count x : ℝ≥0∞) else 0)
-        / ((satisfying p s k).card : ℝ≥0∞) := fun s' hs' => by
-    have hsat := Lemma3 O fuel p s k r hr s' hs'
-    rw [ih _ (hn ▸ card_sized_lt_of_mem_rights hr hs') s' (hsat ▸ hb)
-      (hfuel.of_mem_rights hr hs') rfl, hsat]
-    by_cases hx : p x = true
-    · rw [ite_eq_left hx, ite_eq_left hx, count_allOfSize_of_mem_rights hr hs' hx]
-    · rw [ite_eq_right hx, ite_eq_right hx]
-  -- `n - m` residuals, since `|sizedP p s k| = n` and its `m` values are `b` (Lemma 2).
-  have hrights : (rights r).card + (satisfying p s k).card = n := by
-    rw [← hn, ← card_sizedP O fuel p s k r hr, ← card_lefts_add_card_rights,
-      Lemma2 O fuel p s k r hr, add_comm]
-  rw [uniform_apply_some O fuel p s k hr, hn, Multiset.map_congr rfl hres, Multiset.map_const',
-    Multiset.sum_replicate, nsmul_eq_mul]
-  set c : ℝ≥0∞ := if p x then ((allOfSize s k).count x : ℝ≥0∞) else 0
-  set m : ℝ≥0∞ := ((satisfying p s k).card : ℝ≥0∞)
-  have hm0 : m ≠ 0 := by rw [Ne, Nat.cast_eq_zero]; omega
-  have hmtop : m ≠ ⊤ := ENNReal.natCast_ne_top _
-  have hn0 : (n : ℝ≥0∞) ≠ 0 := by rw [Ne, Nat.cast_eq_zero]; omega
-  -- `c + (n - m)(c/m) = n (c/m)`, and dividing by `n` leaves `c/m`.
-  have key : c + ((rights r).card : ℝ≥0∞) * (c / m) = n * (c / m) := by
-    nth_rewrite 1 [show c = m * (c / m) from (ENNReal.mul_div_cancel hm0 hmtop).symm]
-    rw [← add_mul, ← hrights, Nat.cast_add, add_comm]
-  rw [key, mul_comm, ENNReal.mul_div_cancel_right hn0 (ENNReal.natCast_ne_top _)]
-
-/-- **With enough fuel, `uniform` terminates almost surely**: the probabilities of `Theorem2` sum to
-one, so no mass is left on `none`. -/
-theorem Theorem2_terminates [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α → Bool)
-    (s : Space α) (k : Nat) (hb : 0 < (satisfying p s k).card)
-    (hfuel : FuelSuffices O fuel p s k) :
-    IsAlmostSurelyTerminating (uniform O fuel p s k : SPMF (Option α)) := by
-  classical
-  have hm0 : ((satisfying p s k).card : ℝ≥0∞) ≠ 0 := by rw [Ne, Nat.cast_eq_zero]; omega
-  have hsome : ∑' x, (uniform O fuel p s k : SPMF (Option α)) (some x) = 1 := by
-    rw [tsum_congr (Theorem2 O fuel p s k hb hfuel), tsum_div_const]
-    rw [show (∑' x, if p x then ((allOfSize s k).count x : ℝ≥0∞) else 0)
-        = ((satisfying p s k).card : ℝ≥0∞) from by
-      rw [← tsum_count (satisfying p s k)]
-      exact tsum_congr fun x => by
-        rw [satisfying, Multiset.count_filter]
-        by_cases h : p x = true <;> simp [h]]
-    exact ENNReal.div_self hm0 (ENNReal.natCast_ne_top _)
-  refine le_antisymm (SPMF.mass_le_one _) ?_
-  rw [← hsome, SPMF.mass]
-  exact ENNReal.tsum_comp_le_tsum_of_injective (Option.some_injective α) _
 
 /-! ## Section 4.1: a non-deterministic evaluation order breaks uniformity
 
@@ -393,20 +265,6 @@ def racyRound (O : Nat → LazyOracle) (fuel : Nat) (p : α → Bool) (s : Space
 
 end Racy
 
-/-- The two orders index `spacePairB` at size 3 as in the paper's table:
-`(F,F) (F,T) (T,F) (T,T)` forcing the first component first, `(F,F) (T,F) (F,T) (T,T)` forcing the
-second first. -/
-theorem index_spacePairB :
-    ((List.range 4).map fun i =>
-        ((sizedP (orderOracle true) 17 nonDetB spacePairB 3).bind (·.indexSet i)).bind
-          Sum.getLeft?)
-      = [some (false, false), some (false, true), some (true, false), some (true, true)] ∧
-    ((List.range 4).map fun i =>
-        ((sizedP (orderOracle false) 17 nonDetB spacePairB 3).bind (·.indexSet i)).bind
-          Sum.getLeft?)
-      = [some (false, false), some (true, false), some (false, true), some (true, true)] := by
-  decide
-
 /-- One round of `racyRound` at `spacePairB`, as the sum over the four indices. -/
 theorem racyRound_spacePairB_apply (O : Nat → LazyOracle) (y : Option (Bool × Bool)) :
     (racyRound O 17 nonDetB spacePairB 3 : SPMF (Option (Bool × Bool))) y
@@ -420,7 +278,7 @@ theorem racyRound_spacePairB_apply (O : Nat → LazyOracle) (y : Option (Bool ×
 
 /-- What the race returns at each index: the first-component-first order everywhere except at
 index 1. -/
-theorem race_lookup :
+private theorem race_lookup :
     ((List.range 4).map fun i =>
         ((sizedP (race i) 17 nonDetB spacePairB 3).bind (·.indexSet i)).bind Sum.getLeft?)
       = [some (false, false), some (true, false), some (true, false), some (true, true)] := by
