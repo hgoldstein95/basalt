@@ -24,49 +24,6 @@ open scoped ENNReal
 
 namespace Boltzmann
 
-section bind
-
-variable {α β γ : Type}
-
-theorem bind_pure_apply_of_injective {f : α → β} (hf : f.Injective) (x : SPMF α) (a : α) :
-    (x >>= fun a => Pure.pure (f a)) (f a) = x a := by
-  rw [bind_apply, tsum_eq_single a fun b hb => by simp [hf.ne (Ne.symm hb)]]
-  simp
-
-theorem bind_pure_apply_of_ne {f : α → β} (x : SPMF α) {b : β} (hb : ∀ a, f a ≠ b) :
-    (x >>= fun a => Pure.pure (f a)) b = 0 :=
-  ENNReal.tsum_eq_zero.2 fun a => by simp [Ne.symm (hb a)]
-
-theorem bind_bind_pure_apply_of_injective {f : α → β → γ}
-    (hf : ∀ a b a' b', f a b = f a' b' → a = a' ∧ b = b') (x : SPMF α) (y : SPMF β) (a : α)
-    (b : β) : (x >>= fun a => y >>= fun b => Pure.pure (f a b)) (f a b) = x a * y b := by
-  rw [bind_apply, tsum_eq_single a fun a' ha' => ?_]
-  · exact congrArg _ (bind_pure_apply_of_injective (fun b b' h => (hf a b a b' h).2) y b)
-  · rw [bind_pure_apply_of_ne (f := f a') y (b := f a b) fun b' h => ha' (hf _ _ _ _ h).1,
-      mul_zero]
-
-theorem bind_bind_pure_apply_of_ne {f : α → β → γ} (x : SPMF α) (y : SPMF β) {c : γ}
-    (hc : ∀ a b, f a b ≠ c) : (x >>= fun a => y >>= fun b => Pure.pure (f a b)) c = 0 :=
-  ENNReal.tsum_eq_zero.2 fun a => by rw [bind_pure_apply_of_ne y (hc a), mul_zero]
-
-theorem bind3_pure_apply_of_injective {δ : Type} {f : α → β → γ → δ}
-    (hf : ∀ a b c a' b' c', f a b c = f a' b' c' → a = a' ∧ b = b' ∧ c = c') (x : SPMF α)
-    (y : SPMF β) (z : SPMF γ) (a : α) (b : β) (c : γ) :
-    (x >>= fun a => y >>= fun b => z >>= fun c => Pure.pure (f a b c)) (f a b c)
-      = x a * (y b * z c) := by
-  rw [bind_apply, tsum_eq_single a fun a' ha' => ?_]
-  · exact congrArg _ (bind_bind_pure_apply_of_injective (f := f a)
-      (fun b c b' c' h => (hf _ _ _ _ _ _ h).2) y z b c)
-  · rw [bind_bind_pure_apply_of_ne (f := f a') y z (c := f a b c)
-      fun b' c' h => ha' (hf _ _ _ _ _ _ h).1, mul_zero]
-
-theorem bind3_pure_apply_of_ne {δ : Type} {f : α → β → γ → δ} (x : SPMF α) (y : SPMF β)
-    (z : SPMF γ) {d : δ} (hd : ∀ a b c, f a b c ≠ d) :
-    (x >>= fun a => y >>= fun b => z >>= fun c => Pure.pure (f a b c)) d = 0 :=
-  ENNReal.tsum_eq_zero.2 fun a => by rw [bind_bind_pure_apply_of_ne y z (hd a), mul_zero]
-
-end bind
-
 section model
 
 variable {α β : Type}
@@ -167,7 +124,8 @@ def product [Gen G] (ga : G α) (gb : G β) : G (α × β) := do
 /-- **Product**: independent draws give the model of `A × B`, sizes adding. -/
 theorem isBoltzmann_product {ga : SPMF α} {gb : SPMF β} {sa : α → ℕ} {sb : β → ℕ}
     {x A B : ℝ≥0∞} (ha : IsBoltzmann ga sa x A) (hb : IsBoltzmann gb sb x B) (hA : A ≠ ⊤)
-    (hB : B ≠ ⊤) : IsBoltzmann (product ga gb : SPMF (α × β)) (fun c => sa c.1 + sb c.2) x (A * B) := by
+    (hB : B ≠ ⊤) :
+    IsBoltzmann (product ga gb : SPMF (α × β)) (fun c => sa c.1 + sb c.2) x (A * B) := by
   rintro ⟨a, b⟩
   rw [product, bind_bind_pure_apply_of_injective (f := Prod.mk) (fun _ _ _ _ h => Prod.mk.inj h),
     ha, hb, div_eq_mul_inv, div_eq_mul_inv, div_eq_mul_inv, ENNReal.mul_inv (.inr hB) (.inl hA),
@@ -219,22 +177,14 @@ theorem seq_terminates (hq0 : 0 ≤ q) (hq1 : q < 1) {ga : SPMF α}
   have hx1 : pr q < 1 := by
     rw [pr_eq_ofReal hq0]; exact ENNReal.ofReal_lt_one.2 (by exact_mod_cast hq1)
   mass_fixpoint [hg.obs] using SPMF.LfpIsOne.affine (m := pr q) hx1
-  all_goals first
-    | exact q.den_pos
-    | exact (coin_num_bounds hq0 hq1.le).1
-    | exact (coin_num_bounds hq0 hq1.le).2
-    | rw [pr_compl, show ((q.num.toNat : ℕ) : ℝ≥0∞) / q.den = pr q from rfl, mul_one, add_comm]
+  coin_goals q hq0 hq1.le
+  rw [mul_one, add_comm]
 
 end rules
 
 section retry
 
 variable {α : Type}
-
-theorem tsum_option (f : Option α → ℝ≥0∞) : ∑' o, f o = f none + ∑' a, f (some a) := by
-  rw [← (Equiv.optionEquivSumPUnit.{0} α).symm.tsum_eq,
-    Summable.tsum_sum ENNReal.summable ENNReal.summable]
-  simp [add_comm]
 
 /-- The loop under every rejection sampler of §6.1 and §7: draw from `h` until it does not fail. -/
 def retry [Gen G] (h : G (Option α)) : G α := do
@@ -254,7 +204,8 @@ theorem retry_round (h : SPMF (Option α)) (z : SPMF α) (a : α) :
 by the rounds that fail. -/
 theorem retry_apply (h : SPMF (Option α)) (a : α) :
     (retry h : SPMF α) a = h (some a) / (1 - h none) := by
-  refine rejection_loop_apply (A := fun b => h (some b)) (R := h none) (fun b => ?_) (fun b => ?_) (fun c hc => ?_) a
+  refine rejection_loop_apply (A := fun b => h (some b)) (R := h none) (fun b => ?_) (fun b => ?_)
+    (fun c hc => ?_) a
   · calc h (some b) + h none ≤ ∑' o, h o := by
           rw [tsum_option, add_comm]; gcongr; exact ENNReal.le_tsum (f := fun a => h (some a)) b
       _ ≤ 1 := mass_le_one h
@@ -365,8 +316,8 @@ section twoThree
 
 /-! ## Unbalanced 2–3 trees (Example 2)
 
-`U = Z + U² + U³`, only leaves counting, sampled at the critical `ρ_U = 5/27`, where `U(ρ) = 1/3` and
-the branching probabilities are `5/9`, `1/3`, `1/9`. -/
+`U = Z + U² + U³`, only leaves counting, sampled at the critical `ρ_U = 5/27`, where `U(ρ) = 1/3`
+and the branching probabilities are `5/9`, `1/3`, `1/9`. -/
 
 /-- Unbalanced 2–3 trees. -/
 inductive Tree23 where

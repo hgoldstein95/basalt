@@ -161,6 +161,46 @@ theorem expect_listOf_length_le (g : SPMF α) :
     calc g.mass * 2 ≤ 1 * 2 := mul_le_mul_left (mass_le_one g) _
       _ = 2 := by norm_num
 
+/-- `listOf`'s point masses: a geometric length, then independent elements. -/
+theorem listOf_apply (g : SPMF α) (l : List α) :
+    (listOf g : SPMF (List α)) l = (1 / 2) ^ (l.length + 1) * (l.map g).prod := by
+  induction l with
+  | nil =>
+    rw [listOf, oneOfWith_eq, oneOf_apply]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil, pure_apply, ↓reduceIte]
+    rw [bind_bind_pure_apply_of_ne (f := List.cons) _ _ fun _ _ => List.cons_ne_nil _ _]
+    simp
+  | cons a l ih =>
+    rw [listOf, oneOfWith_eq, oneOf_apply]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil, pure_apply, reduceCtorEq, ↓reduceIte]
+    rw [bind_bind_pure_apply_of_injective (f := List.cons) fun _ _ _ _ h => List.cons.inj h, ih]
+    simp only [List.prod_cons, zero_add, add_zero, div_eq_mul_inv, one_mul,
+      show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
+    ring
+
+/-- One unfolding of `listOf`'s mass. -/
+theorem mass_listOf_step (g : SPMF α) :
+    (listOf g : SPMF (List α)).mass
+      = 1 / 2 + 1 / 2 * (g.mass * (listOf g : SPMF (List α)).mass) := by
+  conv_lhs => rw [listOf, oneOfWith_eq, mass_oneOf]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, mass_pure, List.length_cons,
+    List.length_nil, add_zero, mass_bind_tsum, mul_one]
+  rw [ENNReal.tsum_mul_right, ← mass, ← mass, ENNReal.add_div, div_eq_mul_inv, div_eq_mul_inv,
+    show ((0 + 1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num, one_div]
+  ring
+
+/-- One unfolding of an expectation under `listOf`. -/
+theorem expect_listOf_step (g : SPMF α) (f : List α → ℝ≥0∞) :
+    expect (listOf g : SPMF (List α)) f
+      = 1 / 2 * f [] + 1 / 2 * expect g (fun a => expect (listOf g) fun l => f (a :: l)) := by
+  conv_lhs => rw [listOf, oneOfWith_eq, expect_oneOf (List.cons_ne_nil _ _)]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, expect_pure, expect_bind,
+    List.length_cons, List.length_nil, add_zero, div_eq_mul_inv, one_mul,
+    show ((0 + 1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
+  ring
+
 end combinators
 
 section suchThat
@@ -202,18 +242,6 @@ private theorem accept_le (g : SPMF α) (P : α → Bool) (a : α) :
 private theorem add_one_le_one {A : ℝ≥0∞} (h : A + 1 ≤ 1) : A = 0 :=
   nonpos_iff_eq_zero.1 ((ENNReal.add_le_add_iff_right ENNReal.one_ne_top).1 (by simpa using h))
 
-/-- `A + R · A / (1 - R) = A / (1 - R)`: the closed form solves one round. -/
-private theorem solve_round {A R : ℝ≥0∞} (hAR : A + R ≤ 1) :
-    A + R * (A / (1 - R)) = A / (1 - R) := by
-  rcases (le_trans le_add_self hAR).lt_or_eq with hR | rfl
-  · have hD0 : 1 - R ≠ 0 := (tsub_pos_of_lt hR).ne'
-    have hDtop : 1 - R ≠ ⊤ := ENNReal.sub_ne_top ENNReal.one_ne_top
-    calc A + R * (A / (1 - R)) = A / (1 - R) * (1 - R) + A / (1 - R) * R := by
-          rw [ENNReal.div_mul_cancel hD0 hDtop, mul_comm]
-      _ = A / (1 - R) := by rw [← mul_add, tsub_add_cancel_of_le hR.le, mul_one]
-  · obtain rfl : A = 0 := add_one_le_one hAR
-    simp
-
 /-- Pointwise upper bounds are admissible: the fixpoint induction behind every rejection loop. -/
 theorem admissible_apply_le (c : α → ℝ≥0∞) : admissible fun μ : SPMF α => ∀ a, μ a ≤ c a :=
   admissible_iff.2 fun _ hc ih a => by
@@ -226,7 +254,7 @@ theorem rejection_loop_apply {r : SPMF α} {A : α → ℝ≥0∞} {R : ℝ≥0�
     (hfix : ∀ a, r a = A a + R * r a)
     (hlfp : ∀ c : α → ℝ≥0∞, (∀ a, A a + R * c a ≤ c a) → ∀ a, r a ≤ c a) (a : α) :
     r a = A a / (1 - R) := by
-  refine le_antisymm (hlfp _ (fun b => (solve_round (hAR b)).le) a) ?_
+  refine le_antisymm (hlfp _ (fun b => add_mul_div_one_sub_le _ _) a) ?_
   rcases (le_trans le_add_self (hAR a)).lt_or_eq with hR | hR
   · refine ENNReal.div_le_of_le_mul ?_
     have hRs : R * r a ≠ ⊤ :=

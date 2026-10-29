@@ -7,7 +7,7 @@ module
 
 import Mathlib.Tactic.Basify
 public import Basalt
-public import BasaltExamples.Boltzmann.CanouDarrasse
+public import BasaltExamples.Boltzmann.Rules
 
 /-!
 # A Boltzmann Sampler for λ-Terms
@@ -67,7 +67,8 @@ theorem Term.vars_eq (t : Term) : t.vars = t.apps + 1 := by
 theorem Term.size_eq (t : Term) : t.size = t.succs + t.lams + 2 * t.apps := by
   induction t <;> simp only [Term.size, Term.succs, Term.lams, Term.apps, *] <;> omega
 
-/-- Whether every index is bound by one of the `n` enclosing abstractions or one of the term's own. -/
+/-- Whether every index is bound by one of the `n` enclosing abstractions or one of the term's
+own. -/
 def Term.closedUnder : Nat → Term → Bool
   | n, .var k => decide (k < n)
   | n, .lam t => t.closedUnder (n + 1)
@@ -141,7 +142,8 @@ theorem genLam_apply (h : 0 < wi + wl + wa) (hp0 : 0 ≤ pz) (hp1 : pz ≤ 1) (t
 index's `D(x) / L(x)` (so an index `0`'s, `D(x) / L(x) · (1 - x)`, is `1 / L(x)`), and an
 application's `x² L(x)`, each term gets `x ^ |t| / L(x)`. Only these point relations matter, not
 the equation `L = D + x L + x² L²`. -/
-theorem genLam_boltzmann {wi wl wa : ℕ} (h : 0 < wi + wl + wa) (hp0 : 0 ≤ pz) (hp1 : pz ≤ 1) {x L : ℝ≥0∞}
+theorem genLam_boltzmann {wi wl wa : ℕ} (h : 0 < wi + wl + wa) (hp0 : 0 ≤ pz) (hp1 : pz ≤ 1)
+    {x L : ℝ≥0∞}
     (hL0 : L ≠ 0) (hLtop : L ≠ ⊤) (hi : wi / (wi + wl + wa : ℝ≥0∞) * pr pz = L⁻¹)
     (hz : 1 - pr pz = x) (hl : wl / (wi + wl + wa : ℝ≥0∞) = x)
     (ha : wa / (wi + wl + wa : ℝ≥0∞) = x ^ 2 * L) :
@@ -159,12 +161,8 @@ theorem genIdx_terminates (hp0 : 0 < pz) (hp1 : pz ≤ 1) :
     rw [pr_eq_ofReal hp0.le]; exact (ENNReal.ofReal_pos.2 (by exact_mod_cast hp0)).ne'
   mass_fixpoint using SPMF.LfpIsOne.affine (m := 1 - pr pz)
     (ENNReal.sub_lt_self ENNReal.one_ne_top one_ne_zero hx)
-  all_goals first
-    | exact pz.den_pos
-    | exact (coin_num_bounds hp0.le hp1).1
-    | exact (coin_num_bounds hp0.le hp1).2
-    | rw [pr_compl, show ((pz.num.toNat : ℕ) : ℝ≥0∞) / pz.den = pr pz from rfl,
-        ENNReal.sub_sub_cancel ENNReal.one_ne_top (pr_le_one hp0.le hp1), mul_one, add_comm]
+  coin_goals pz hp0.le hp1
+  rw [ENNReal.sub_sub_cancel ENNReal.one_ne_top (pr_le_one hp0.le hp1), mul_one, add_comm]
 
 /-- The printed sampler of §4.1: `boltzmann_index` `R < 0.35700035696434995`, `boltzmann_lambda`
 `R < 0.6525813160382378`, `boltzmann_leaf` `R < 0.7044190409261122`, the decimals read exactly. -/
@@ -208,8 +206,8 @@ theorem paperSampler_not_uniform :
 
 /-! ## Anticipated rejection of open terms
 
-`pickIndex` walks the list of binders above it and fails when it runs out; `ranTypable` then restarts
-from scratch. -/
+`pickIndex` walks the list of binders above it and fails when it runs out; `ranTypable` then
+restarts from scratch. -/
 
 /-- `pickIndex` with `n` binders left: `0` with probability `pz`, else one binder further out. -/
 def genIdxC [Gen G] (pz : Rat) : Nat → G (Option Nat)
@@ -291,7 +289,6 @@ returns exactly `genLam`'s mass, and returns exactly the closed ones. -/
 theorem genClosed_apply (h : 0 < wi + wl + wa) (hp0 : 0 ≤ pz) (hp1 : pz ≤ 1) (t : Term) :
     ∀ n, (genClosed wi wl wa h pz n : SPMF (Option Term)) (some t)
       = if t.closedUnder n then (genLam wi wl wa h pz : SPMF Term) t else 0 := by
-  have hS : ((wi + wl + wa : ℕ) : ℝ≥0∞) = wi + wl + wa := by push_cast; ring
   induction t with
   | var k =>
     intro n
@@ -343,7 +340,8 @@ theorem genLam_terminates (h : 0 < wi + wl + wa) (hwi : 0 < wi) (hwa : wa ≤ wi
     (by rw [ENNReal.div_add_div_same, ENNReal.div_add_div_same, ENNReal.div_self hS0 hStop])
     (by
       rw [← mul_div_assoc, ENNReal.div_add_div_same]
-      exact ENNReal.div_le_of_le_mul (by rw [one_mul]; exact_mod_cast (by omega : wl + 2 * wa ≤ wi + wl + wa)))
+      exact ENNReal.div_le_of_le_mul (by
+        rw [one_mul]; exact_mod_cast (by omega : wl + 2 * wa ≤ wi + wl + wa)))
     (ENNReal.div_pos (by exact_mod_cast hwi.ne') hStop)
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, add_zero, mul_one,
     Nat.cast_add, ← add_assoc, ENNReal.add_div, sq]
@@ -373,7 +371,8 @@ theorem genClosed_terminates (h : 0 < wi + wl + wa) (hwi : 0 < wi) (hwa : wa ≤
     (by rw [ENNReal.div_add_div_same, ENNReal.div_add_div_same, ENNReal.div_self hS0 hStop])
     (by
       rw [← mul_div_assoc, ENNReal.div_add_div_same]
-      exact ENNReal.div_le_of_le_mul (by rw [one_mul]; exact_mod_cast (by omega : wl + 2 * wa ≤ wi + wl + wa)))
+      exact ENNReal.div_le_of_le_mul (by
+        rw [one_mul]; exact_mod_cast (by omega : wl + 2 * wa ≤ wi + wl + wa)))
     (ENNReal.div_pos (by exact_mod_cast hwi.ne') hStop)
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, add_zero, mul_one,
     Nat.cast_add, ← add_assoc]

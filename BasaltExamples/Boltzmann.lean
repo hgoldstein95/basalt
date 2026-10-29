@@ -49,7 +49,8 @@ theorem BTree.size_eq (t : BTree) : t.size = 2 * t.internal + 1 := by
 /-- The probability `coin p` lands `true`. -/
 noncomputable def pr (p : Rat) : ℝ≥0∞ := (p.num.toNat : ℝ≥0∞) / (p.den : ℝ≥0∞)
 
-/-- `Γ B(x)`, with `p = x / B(x)`: a leaf with probability `p`, else a node and two recursive calls. -/
+/-- `Γ B(x)`, with `p = x / B(x)`: a leaf with probability `p`, else a node and two recursive
+calls. -/
 def genB [Gen G] (p : Rat) : G BTree := do
   if ← coin p then return .leaf
   else return .node (← genB p) (← genB p)
@@ -79,18 +80,30 @@ theorem pr_eq_ofReal (hp0 : 0 ≤ p) : pr p = ENNReal.ofReal (p : ℝ) := by
   rw [ENNReal.ofReal_div_of_pos (by positivity), ← hnum, ENNReal.ofReal_natCast,
     ENNReal.ofReal_natCast]
 
-private theorem half_eq_ofReal : (1 / 2 : ℝ≥0∞) = ENNReal.ofReal (1 / 2) := by
-  rw [ENNReal.ofReal_div_of_pos (by norm_num)]; simp
+theorem pr_mono (hq : 0 ≤ q) (h : q ≤ p) : pr q ≤ pr p := by
+  rw [pr_eq_ofReal hq, pr_eq_ofReal (hq.trans h)]
+  exact ENNReal.ofReal_le_ofReal (by exact_mod_cast h)
 
-theorem half_le_pr (hp : 1/2 ≤ p) : 1/2 ≤ pr p := by
-  rw [pr_eq_ofReal (le_trans (by norm_num) hp), half_eq_ofReal]
-  exact ENNReal.ofReal_le_ofReal (by simpa using (Rat.cast_le (K := ℝ)).2 hp)
+theorem pr_strictMono (hq : 0 ≤ q) (h : q < p) : pr q < pr p := by
+  rw [pr_eq_ofReal hq, pr_eq_ofReal (hq.trans h.le)]
+  exact (ENNReal.ofReal_lt_ofReal_iff (by exact_mod_cast hq.trans_lt h)).2 (by exact_mod_cast h)
 
-theorem half_lt_pr (hp : 1/2 < p) : 1/2 < pr p := by
-  rw [pr_eq_ofReal (le_trans (by norm_num) hp.le), half_eq_ofReal]
-  have h : ((1/2 : ℚ) : ℝ) < (p : ℝ) := (Rat.cast_lt (K := ℝ)).2 hp
-  simp only [Rat.cast_div, Rat.cast_one, Rat.cast_ofNat] at h
-  exact (ENNReal.ofReal_lt_ofReal_iff (lt_trans (by norm_num) h)).2 h
+theorem pr_half : pr (1/2) = 1/2 := by rw [pr]; norm_num
+
+theorem half_le_pr (hp : 1/2 ≤ p) : 1/2 ≤ pr p := pr_half ▸ pr_mono (by norm_num) hp
+
+theorem half_lt_pr (hp : 1/2 < p) : 1/2 < pr p := pr_half ▸ pr_strictMono (by norm_num) hp
+
+theorem pr_lt_half (hp0 : 0 ≤ p) (hp : p < 1/2) : pr p < 1/2 := pr_half ▸ pr_strictMono hp0 hp
+
+/-- Closes the side goals `mass_fixpoint` leaves about a draw from `coin p`, given `0 ≤ p` and
+`p ≤ 1`, and states the coin's two probabilities as `pr p` and `1 - pr p` in the goal it leaves. -/
+macro "coin_goals " p:term:max hp0:term:max hp1:term:max : tactic =>
+  `(tactic| all_goals first
+    | exact ($p).den_pos
+    | exact (coin_num_bounds $hp0 $hp1).1
+    | exact (coin_num_bounds $hp0 $hp1).2
+    | rw [pr_compl, show ((($p).num.toNat : ℕ) : ℝ≥0∞) / ($p).den = pr $p from rfl])
 
 end coin
 
@@ -167,11 +180,8 @@ theorem genB_terminates (hp : 1/2 ≤ p) (hp1 : p ≤ 1) :
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := pr p) (b := 0) (d := 1 - pr p)
     (by rw [add_zero, add_tsub_cancel_of_le hx1])
     (by basify; rw [max_eq_left (by linarith)]; linarith) (lt_of_lt_of_le (by norm_num) hx)
-  all_goals first
-    | exact p.den_pos
-    | exact (coin_num_bounds hp0 hp1).1
-    | exact (coin_num_bounds hp0 hp1).2
-    | rw [pr_compl, show ((p.num.toNat : ℕ) : ℝ≥0∞) / p.den = pr p from rfl]; simp [sq]
+  coin_goals p hp0 hp1
+  simp [sq]
 
 end mass
 
@@ -244,10 +254,6 @@ theorem expect_genB_step (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (z : SPMF BTree) (f : B
       = pr p * f .leaf + (1 - pr p) * expect z (fun l => expect z fun r => f (.node l r)) := by
   rw [expect_bind, expect_bool, coin_false hp0 hp1, coin_true hp0 hp1, add_comm]
   simp only [↓reduceIte, Bool.false_eq_true, expect_pure, expect_bind]
-
-theorem expect_add_const (μ : SPMF α) (f : α → ℝ≥0∞) (c : ℝ≥0∞) :
-    expect μ (fun a => f a + c) = expect μ f + μ.mass * c := by
-  rw [expect_add, expect_const]
 
 /-- The expected size of a node whose subtrees are drawn from `μ`. -/
 private theorem expect_node_size (μ : SPMF BTree) :
@@ -362,12 +368,6 @@ theorem genB_mass_step (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
   conv_lhs => rw [genB]
   rw [expect_genB_step hp0 hp1]
   simp [expect_const, sq]
-
-private theorem pr_lt_half (hp0 : 0 ≤ p) (hp : p < 1/2) : pr p < 1/2 := by
-  rw [pr_eq_ofReal hp0, half_eq_ofReal]
-  have h : (p : ℝ) < ((1/2 : ℚ) : ℝ) := (Rat.cast_lt (K := ℝ)).2 hp
-  simp only [Rat.cast_div, Rat.cast_one, Rat.cast_ofNat] at h
-  exact (ENNReal.ofReal_lt_ofReal_iff (by norm_num)).2 h
 
 /-- `B = x / (1 - x)` solves `B = x + (1 - x) B²`, the root below `1` when `x < 1/2`. -/
 private theorem small_root {x : ℝ≥0∞} (hx : x < 1/2) :

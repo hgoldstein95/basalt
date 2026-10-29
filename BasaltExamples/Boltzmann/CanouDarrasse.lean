@@ -28,8 +28,8 @@ namespace Boltzmann.CanouDarrasse
 
 /-! ## Ternary trees: `T = Z + T × T × T`
 
-Fig. 1's grammar puts the atom `Z` only at leaves, so `|t|` counts leaves, though §3.2 says "the size
-of a tree is its number of nodes". At `ρ = 2√3/9`, `T(ρ) = 1/√3` and the leaf probability is
+Fig. 1's grammar puts the atom `Z` only at leaves, so `|t|` counts leaves, though §3.2 says "the
+size of a tree is its number of nodes". At `ρ = 2√3/9`, `T(ρ) = 1/√3` and the leaf probability is
 `ρ / T(ρ) = 2/3`. -/
 
 /-- Ternary trees. -/
@@ -59,20 +59,6 @@ def genTernary [Gen G] (p : Rat) : G TTree := do
   else return .node (← genTernary p) (← genTernary p) (← genTernary p)
 partial_fixpoint
 
-private theorem node3_apply_leaf (μ : SPMF TTree) :
-    (μ >>= fun a => μ >>= fun b => μ >>= fun c => Pure.pure (TTree.node a b c)) .leaf = 0 :=
-  ENNReal.tsum_eq_zero.2 fun a => by
-    rw [bind_bind_pure_apply_of_ne (f := TTree.node a) _ _ fun _ _ => TTree.noConfusion, mul_zero]
-
-private theorem node3_apply_node (μ : SPMF TTree) (a b c : TTree) :
-    (μ >>= fun a => μ >>= fun b => μ >>= fun c => Pure.pure (TTree.node a b c)) (.node a b c)
-      = μ a * (μ b * μ c) := by
-  rw [bind_apply, tsum_eq_single a fun a' ha' => ?_]
-  · rw [bind_bind_pure_apply_of_injective (f := TTree.node a) fun _ _ _ _ h => by
-      injection h with _ h1 h2; exact ⟨h1, h2⟩]
-  · rw [bind_bind_pure_apply_of_ne (f := TTree.node a') _ _ fun _ _ h => by
-      injection h with h0; exact ha' h0, mul_zero]
-
 /-- A tree with `k` internal nodes, so `2k + 1` leaves, has mass `p ^ (2k + 1) (1 - p) ^ k`. -/
 theorem genTernary_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (t : TTree) :
     (genTernary p : SPMF TTree) t = pr p ^ t.size * (1 - pr p) ^ t.internal := by
@@ -80,12 +66,13 @@ theorem genTernary_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (t : TTree) :
   | leaf =>
     rw [genTernary, bind_apply, tsum_bool]
     simp only [Bool.false_eq_true, ↓reduceIte, coin_false hp0 hp1, coin_true hp0 hp1]
-    rw [node3_apply_leaf]
+    rw [bind3_pure_apply_of_ne (f := TTree.node) _ _ _ fun _ _ _ => TTree.noConfusion]
     simp [TTree.size, TTree.internal]
   | node a b c iha ihb ihc =>
     rw [genTernary, bind_apply, tsum_bool]
     simp only [Bool.false_eq_true, ↓reduceIte, coin_false hp0 hp1, coin_true hp0 hp1]
-    rw [node3_apply_node, iha, ihb, ihc]
+    rw [bind3_pure_apply_of_injective (f := TTree.node) (fun _ _ _ _ _ _ h => TTree.node.inj h),
+      iha, ihb, ihc]
     simp only [pure_apply, reduceCtorEq, ↓reduceIte, mul_zero, add_zero, TTree.size,
       TTree.internal]
     ring
@@ -125,14 +112,6 @@ theorem genTernary_singular_apply (t : TTree) :
   congr 2
   basify; norm_num
 
-theorem pr_mono (hq : 0 ≤ q) (h : q ≤ p) : pr q ≤ pr p := by
-  rw [pr_eq_ofReal hq, pr_eq_ofReal (hq.trans h)]
-  exact ENNReal.ofReal_le_ofReal (by exact_mod_cast h)
-
-theorem pr_strictMono (hq : 0 ≤ q) (h : q < p) : pr q < pr p := by
-  rw [pr_eq_ofReal hq, pr_eq_ofReal (hq.trans h.le)]
-  exact (ENNReal.ofReal_lt_ofReal_iff (by exact_mod_cast hq.trans_lt h)).2 (by exact_mod_cast h)
-
 theorem pr_two_thirds : pr (2/3) = 2/3 := by rw [pr]; norm_num
 
 private theorem one_sub_two_thirds : (1 : ℝ≥0∞) - 2 / 3 = 1 / 3 := by basify; norm_num
@@ -168,12 +147,8 @@ theorem genTernary_terminates (hp : 2/3 ≤ p) (hp1 : p ≤ 1) :
   mass_fixpoint using SPMF.LfpIsOne.cubic (a := pr p) (b := 0) (d := 0) (e := 1 - pr p)
     (by rw [add_zero, add_zero, add_tsub_cancel_of_le hx1])
     (by basify; rw [max_eq_left (by linarith)]; linarith) (lt_of_lt_of_le (by norm_num) hx)
-  all_goals first
-    | exact p.den_pos
-    | exact (coin_num_bounds hp0 hp1).1
-    | exact (coin_num_bounds hp0 hp1).2
-    | rw [pr_compl, show ((p.num.toNat : ℕ) : ℝ≥0∞) / p.den = pr p from rfl]
-      exact le_of_eq (by ring)
+  coin_goals p hp0 hp1
+  exact le_of_eq (by ring)
 
 /-- Below `2/3` the mass is at most `1 / (3 (1 - p))`: by fixpoint induction, as
 `x + (1 - x) t³ ≤ t` at `t = 1 / (3 (1 - x))` with slack `(3 (1 - x) - 1)³ / (27 (1 - x)²)`. -/
@@ -233,14 +208,6 @@ theorem genTernary_double_two_thirds :
   rw [genTernary_terminates_iff (by norm_num) (by norm_num)]
   norm_num
 
-theorem expect_const_add {α : Type} {μ : SPMF α} (hμ : μ.mass = 1) (K : ℝ≥0∞) (f : α → ℝ≥0∞) :
-    expect μ (fun a => K + f a) = K + expect μ f := by
-  rw [expect_add, expect_const, hμ, one_mul]
-
-theorem expect_add_const_of_mass {α : Type} {μ : SPMF α} (hμ : μ.mass = 1) (f : α → ℝ≥0∞)
-    (K : ℝ≥0∞) : expect μ (fun a => f a + K) = expect μ f + K := by
-  rw [expect_add, expect_const, hμ, one_mul]
-
 /-- **Infinite expected size at the singularity** (§3.3: "the mean size of the generated structures
 is infinite. We will never generate an infinite object"): the sampler terminates
 (`genTernary_terminates`), yet `E = 2/3 + E`. -/
@@ -251,13 +218,13 @@ theorem genTernary_expected_size_singular :
   have hstep := expect_genTernary_step (p := 2/3) (by norm_num) (by norm_num)
     (genTernary (2/3)) (fun t => (t.size : ℝ≥0∞))
   rw [← genTernary] at hstep
-  simp only [TTree.size, Nat.cast_add, Nat.cast_one, add_assoc, expect_const_add hm,
-    expect_add_const_of_mass hm] at hstep
+  simp only [TTree.size, Nat.cast_add, Nat.cast_one, add_assoc, expect_const_add,
+    expect_add_const, hm, one_mul, mul_one] at hstep
   generalize expect (genTernary (2/3) : SPMF TTree) (fun t => (t.size : ℝ≥0∞)) = E at hstep ⊢
   rw [pr_two_thirds, one_sub_two_thirds] at hstep
   by_contra hE
   have h : E + 0 = E + 2 / 3 :=
-    calc E + 0 = 2 / 3 * 1 + 1 / 3 * (E + (E + E)) := by rw [add_zero]; exact hstep
+    calc E + 0 = 2 / 3 + 1 / 3 * (E + (E + E)) := by rw [add_zero]; exact hstep
       _ = E * (3 * (1 / 3)) + 2 / 3 := by ring
       _ = E + 2 / 3 := by rw [ENNReal.mul_div_cancel (by norm_num) (by norm_num), mul_one]
   exact absurd ((ENNReal.add_right_inj hE).1 h).symm (by simp)
@@ -329,7 +296,8 @@ theorem genOneTwoW_apply (h : 0 < a + b + c) (t : OTTree) :
       ↓reduceIte]
     rw [bind_pure_apply_of_injective (fun _ _ h => OTTree.unary.inj h), ih,
       bind_bind_pure_apply_of_ne (f := OTTree.binary) _ _ fun _ _ => OTTree.noConfusion]
-    simp only [OTTree.leaves, OTTree.unaries, OTTree.binaries, ENNReal.div_eq_inv_mul, add_zero, Nat.cast_add,
+    simp only [OTTree.leaves, OTTree.unaries, OTTree.binaries, ENNReal.div_eq_inv_mul, add_zero,
+      Nat.cast_add,
       ← add_assoc]
     ring
   | binary l r ihl ihr =>
@@ -339,12 +307,15 @@ theorem genOneTwoW_apply (h : 0 < a + b + c) (t : OTTree) :
     rw [bind_pure_apply_of_ne _ fun _ => OTTree.noConfusion,
       bind_bind_pure_apply_of_injective (f := OTTree.binary) fun _ _ _ _ h => OTTree.binary.inj h,
       ihl, ihr]
-    simp only [OTTree.leaves, OTTree.unaries, OTTree.binaries, ENNReal.div_eq_inv_mul, add_zero, Nat.cast_add,
+    simp only [OTTree.leaves, OTTree.unaries, OTTree.binaries, ENNReal.div_eq_inv_mul, add_zero,
+      Nat.cast_add,
       ← add_assoc]
     ring
 
-/-- At `ρ = 1/3` all three weights are equal; a tree of size `n` has mass `(1/3) ^ n`: the Boltzmann form with `T(ρ) = 1`. -/
-theorem genOneTwo_boltzmann : IsBoltzmann (genOneTwoW 1 1 1 three_pos : SPMF OTTree) OTTree.size (1/3) 1 := by
+/-- At `ρ = 1/3` all three weights are equal; a tree of size `n` has mass `(1/3) ^ n`: the
+Boltzmann form with `T(ρ) = 1`. -/
+theorem genOneTwo_boltzmann :
+    IsBoltzmann (genOneTwoW 1 1 1 three_pos : SPMF OTTree) OTTree.size (1/3) 1 := by
   intro t
   rw [genOneTwoW_apply, div_one, OTTree.size_eq, pow_add, pow_add]
   norm_num
@@ -412,17 +383,17 @@ theorem genOneTwo_terminates :
 /-- **Infinite expected size at the singularity**: unfolded once, `E = 1 + E`. -/
 theorem genOneTwo_expected_size :
     expect (genOneTwoW 1 1 1 three_pos : SPMF OTTree) (fun t => (t.size : ℝ≥0∞)) = ⊤ := by
-  have hm := genOneTwo_terminates
+  have hm : (genOneTwoW 1 1 1 three_pos : SPMF OTTree).mass = 1 := genOneTwo_terminates
   have hstep : expect (genOneTwoW 1 1 1 three_pos : SPMF OTTree) (fun t => (t.size : ℝ≥0∞))
       = expect (genOneTwoW 1 1 1 three_pos : SPMF OTTree) (fun t => (t.size : ℝ≥0∞)) := rfl
   conv_rhs at hstep => rw [genOneTwoW]
   rw [frequencyWith_eq, expect_frequency] at hstep
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, expect_bind, expect_pure,
-    OTTree.size, Nat.cast_add, Nat.cast_one, add_assoc, expect_const_add hm,
-    expect_add_const_of_mass hm] at hstep
+    OTTree.size, Nat.cast_add, Nat.cast_one, add_assoc, expect_const_add, expect_add_const, hm,
+    one_mul, mul_one] at hstep
   generalize expect (genOneTwoW 1 1 1 three_pos : SPMF OTTree) (fun t => (t.size : ℝ≥0∞)) = E
     at hstep ⊢
-  rw [show (1 * 1 + (1 * (E + 1) + (1 * (E + (E + 1)) + 0)) : ℝ≥0∞) = 3 * (E + 1) by ring,
+  rw [show (1 + (E + (1 + (E + (E + (1 + 0))))) : ℝ≥0∞) = 3 * (E + 1) by ring,
     show (1 + (1 + (1 + ((0 : ℕ) : ℝ≥0∞))) : ℝ≥0∞) = 3 by norm_num,
     mul_comm, mul_div_assoc, ENNReal.div_self (by norm_num) (by norm_num), mul_one] at hstep
   by_contra hE
@@ -518,7 +489,8 @@ section ceil
 variable {α β : Type}
 
 /-- A ceiled draw, relabelled by `g`, at a relabelled value. -/
-theorem ceil_map_apply {x : SPMF (Option (α × Nat))} {f : Option (α × Nat) → SPMF (Option (β × Nat))}
+theorem ceil_map_apply {x : SPMF (Option (α × Nat))}
+    {f : Option (α × Nat) → SPMF (Option (β × Nat))}
     {g : α → β} (hg : g.Injective) (hnone : f none = Pure.pure none)
     (hsome : ∀ s k, f (some (s, k)) = Pure.pure (some (g s, k))) (s : α) (k : Nat) :
     (x >>= f) (some (g s, k)) = x (some (s, k)) := by
@@ -662,20 +634,14 @@ theorem genOTCeil_apply (h : 0 < a + b + c) (t : OTTree) :
         (by intros; exact OTTree.noConfusion),
       ceil_bind_apply (g := OTTree.binary) (fun _ _ _ _ h => OTTree.binary.inj h) (by rfl)
         (by intros; rfl) (by intros; rfl) (by intros; rfl),
-      tsum_eq_single (j - l.size) fun k1 hk1 => by rw [ihl, ite_eq_right_iff.2 fun h => absurd h (by omega), zero_mul], ihl,
+      tsum_eq_single (j - l.size) fun k1 hk1 => by
+        rw [ihl, ite_eq_right_iff.2 fun h => absurd h (by omega), zero_mul],
+      ihl,
       ihr, genOneTwoW_binary]
     simp only [pure_apply, Option.some.injEq, Prod.mk.injEq, reduceCtorEq, false_and, ↓reduceIte,
       mul_zero, zero_add, Nat.cast_add, ← add_assoc, and_true]
     split_ifs with h1 h2 h3 h3 <;> simp only [OTTree.size] at * <;>
       first | omega | simp | (simp only [div_eq_mul_inv]; ring)
-
-theorem mass_bind_of_mass_one {α β : Type} {x : SPMF α} {f : α → SPMF β}
-    (hf : ∀ a, x a ≠ 0 → (f a).mass = 1) : (x >>= f).mass = x.mass := by
-  rw [mass_bind_tsum, mass]
-  refine tsum_congr fun a => ?_
-  by_cases ha : x a = 0
-  · rw [ha, zero_mul]
-  · rw [hf a ha, mul_one]
 
 /-- The ceiled sampler always halts: the budget shrinks on every call. -/
 theorem genOTCeil_mass (h : 0 < a + b + c) (k : Nat) :
@@ -816,7 +782,7 @@ theorem prob_ceiledOT_size (lo hi m : Nat) :
   rw [tsum_congr this, ENNReal.tsum_mul_right]
   split_ifs <;> simp [tsum_size_eq]
 
-/-- **"A measurable bias towards smaller sized trees"** (§3.1), on the window `[3, 5]`: sizes `3`,
+/-- **"A measurable bias towards smaller sized trees"** (§3), on the window `[3, 5]`: sizes `3`,
 `4`, `5` come out with probabilities `6/13`, `4/13`, `3/13`, though uniform within each size
 (`ceiledOT_uniform`). -/
 theorem ceiledOT_bias :
@@ -863,25 +829,6 @@ private theorem prod_map_eq {f : GTree → ℝ≥0∞} :
     simp only [List.length_cons, List.map_cons, List.sum_cons, pow_succ, pow_add]
     ring
 
-/-- `listOf`'s point masses: a geometric length, then independent elements. -/
-theorem listOf_apply {α : Type} (g : SPMF α) (l : List α) :
-    (listOf g : SPMF (List α)) l = (1 / 2) ^ (l.length + 1) * (l.map g).prod := by
-  induction l with
-  | nil =>
-    rw [listOf, oneOfWith_eq, oneOf_apply]
-    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
-      List.length_nil, pure_apply, ↓reduceIte]
-    rw [bind_bind_pure_apply_of_ne (f := List.cons) _ _ fun _ _ => List.cons_ne_nil _ _]
-    simp
-  | cons a l ih =>
-    rw [listOf, oneOfWith_eq, oneOf_apply]
-    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
-      List.length_nil, pure_apply, reduceCtorEq, ↓reduceIte]
-    rw [bind_bind_pure_apply_of_injective (f := List.cons) fun _ _ _ _ h => List.cons.inj h, ih]
-    simp only [List.prod_cons, zero_add, add_zero, div_eq_mul_inv, one_mul,
-      show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
-    ring
-
 /-- Fig. 3's `GTree ()`: a node, then a geometric number of independent subtrees. -/
 def genGeneral [Gen G] : G GTree := do
   return .node (← listOf genGeneral)
@@ -906,15 +853,6 @@ theorem genGeneral_apply : ∀ t : GTree, (genGeneral : SPMF GTree) t = 2 * (1 /
             simp; norm_num]
           ring
 
-theorem mass_listOf_step {α : Type} (g : SPMF α) :
-    (listOf g : SPMF (List α)).mass = 1 / 2 + 1 / 2 * (g.mass * (listOf g : SPMF (List α)).mass) := by
-  conv_lhs => rw [listOf, oneOfWith_eq, mass_oneOf]
-  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, mass_pure, List.length_cons,
-    List.length_nil, add_zero, mass_bind_tsum, mul_one]
-  rw [ENNReal.tsum_mul_right, ← mass, ← mass, ENNReal.add_div, div_eq_mul_inv, div_eq_mul_inv,
-    show ((0 + 1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num, one_div]
-  ring
-
 /-- **Terminates almost surely**: the mass satisfies `m = 1/2 + m²/2`, whose only root in `[0, 1]`
 is the double root `1` of the critical case — here the unfolding alone decides. -/
 theorem genGeneral_terminates : IsAlmostSurelyTerminating (genGeneral : SPMF GTree) := by
@@ -931,20 +869,11 @@ theorem genGeneral_terminates : IsAlmostSurelyTerminating (genGeneral : SPMF GTr
   basify
   nlinarith [sq_nonneg (m - 1)]
 
-theorem expect_listOf_step {α : Type} (g : SPMF α) (f : List α → ℝ≥0∞) :
-    expect (listOf g : SPMF (List α)) f
-      = 1 / 2 * f [] + 1 / 2 * expect g (fun a => expect (listOf g) fun l => f (a :: l)) := by
-  conv_lhs => rw [listOf, oneOfWith_eq, expect_oneOf (List.cons_ne_nil _ _)]
-  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, expect_pure, expect_bind,
-    List.length_cons, List.length_nil, add_zero, div_eq_mul_inv, one_mul,
-    show ((0 + 1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
-  ring
-
 /-- **Infinite expected size**: with `S` the expected size of the children, `E = S + 1` and
 `S = (E + S) / 2`. -/
 theorem genGeneral_expected_size :
     expect (genGeneral : SPMF GTree) (fun t => (t.size : ℝ≥0∞)) = ⊤ := by
-  have hm := genGeneral_terminates
+  have hm : (genGeneral : SPMF GTree).mass = 1 := genGeneral_terminates
   have hL : (listOf genGeneral : SPMF (List GTree)).mass = 1 := by
     rw [← hm]; conv_rhs => rw [genGeneral]
     exact mass_bind_pure.symm
@@ -954,11 +883,11 @@ theorem genGeneral_expected_size :
     conv_lhs => rw [genGeneral]
     rw [expect_bind]
     simp only [expect_pure, GTree.size_node, Nat.cast_add, Nat.cast_one]
-    rw [expect_add_const_of_mass hL]
+    rw [expect_add_const, hL, one_mul]
   have hS : S = 1 / 2 * (expect (genGeneral : SPMF GTree) (fun t => (t.size : ℝ≥0∞)) + S) := by
     conv_lhs => simp only [S]; rw [expect_listOf_step]
     simp only [List.map_nil, List.sum_nil, Nat.cast_zero, mul_zero, zero_add, List.map_cons,
-      List.sum_cons, Nat.cast_add, expect_const_add hL, expect_add_const_of_mass hm]
+      List.sum_cons, Nat.cast_add, expect_const_add, expect_add_const, hL, hm, one_mul]
     rfl
   rw [hE] at hS ⊢
   by_contra htop

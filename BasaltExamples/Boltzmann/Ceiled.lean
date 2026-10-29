@@ -6,7 +6,7 @@ Authors: Ernest Ng
 module
 
 public import Basalt
-public import BasaltExamples.Boltzmann
+public import BasaltExamples.Boltzmann.Rules
 
 /-!
 # Ceiled Rejection Sampling of Binary Trees
@@ -24,8 +24,9 @@ open scoped ENNReal
 
 namespace Boltzmann
 
-/-- `Γ B_{<k}`: `genB` with a budget of `k` atoms, the paper's global counter `K` made a parameter.
-It gives up (`none`) as soon as the tree would exceed the budget, and returns the budget left. -/
+/-- The paper's `Γ B_{<k}`: `genB` with a budget of `k` atoms, its global counter `K` made a
+parameter. It keeps trees of at most `k` atoms, gives up (`none`) as soon as the tree would exceed
+the budget, and returns the budget left. -/
 def genBCeil [Gen G] (p : Rat) (k : Nat) : G (Option (BTree × Nat)) := do
   if k = 0 then return none
   if ← coin p then return some (.leaf, k - 1)
@@ -37,12 +38,15 @@ def genBCeil [Gen G] (p : Rat) (k : Nat) : G (Option (BTree × Nat)) := do
     | some (r, k'') => return some (.node l r, k'')
 partial_fixpoint
 
-/-- `ν_B(x; n, ε)`: `repeat γ := Γ B_{<hi} until γ ≠ ⊥ ∧ |γ| ≥ lo`. -/
-def ceiled [Gen G] (p : Rat) (lo hi : Nat) : G BTree := do
+/-- One round of `ν_B`: a ceiled draw, kept if it reaches the lower bound. -/
+def roundB [Gen G] (p : Rat) (lo hi : Nat) : G (Option BTree) := do
   match ← genBCeil p hi with
-  | some (t, _) => if lo ≤ t.size then return t else ceiled p lo hi
-  | none => ceiled p lo hi
-partial_fixpoint
+  | some (t, _) => return if lo ≤ t.size then some t else none
+  | none => return none
+
+/-- `ν_B(x; n, ε)`: `repeat γ := Γ B_{<hi} until γ ≠ ⊥ ∧ |γ| ≥ lo`. -/
+def ceiled [Gen G] (p : Rat) (lo hi : Nat) : G BTree :=
+  retry (roundB p lo hi)
 
 /-- Run to the end, the ceiled sampler gives `genB`'s mass to each tree that fits the budget. -/
 theorem genBCeil_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (t : BTree) :
@@ -105,76 +109,31 @@ theorem genBCeil_mass (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (k : Nat) : (genBCeil p k 
   simp only [Nat.add_one_ne_zero, ↓reduceIte, Nat.add_sub_cancel]
   rw [mass_bind_tsum, tsum_bool]
   simp only [Bool.false_eq_true, ↓reduceIte, coin_false hp0 hp1, coin_true hp0 hp1, mass_pure,
-    mul_one, mass_bind_tsum]
-  have hinner : ∀ o, (genBCeil p j : SPMF _) o * (match o with
-      | none => (Pure.pure none : SPMF (Option (BTree × Nat)))
-      | some (l, k') => (genBCeil p k' >>= fun o' => match o' with
-        | none => Pure.pure none
-        | some (r, k'') => Pure.pure (some (BTree.node l r, k'')))).mass
-      = (genBCeil p j : SPMF _) o := by
-    rintro (_ | ⟨l, k1⟩)
-    · simp
-    · by_cases hk : k1 = j - l.size ∧ l.size ≤ j
-      · have hm : (genBCeil p k1 >>= fun o' => match o' with
-            | none => (Pure.pure none : SPMF (Option (BTree × Nat)))
-            | some (r, k'') => Pure.pure (some (BTree.node l r, k''))).mass = 1 := by
-          rw [mass_bind_tsum, ← ih k1 (by omega), mass]
-          refine tsum_congr fun o' => ?_
-          rcases o' with _ | ⟨r, k2⟩ <;> simp
-        rw [hm, mul_one]
-      · rw [genBCeil_apply hp0 hp1, ite_eq_right_iff.2 fun h => absurd ⟨h.2, h.1⟩ hk, zero_mul]
-  rw [tsum_congr hinner, ← mass, ih j (by omega), mul_one, tsub_add_cancel_of_le (pr_le_one hp0 hp1)]
+    mul_one]
+  rw [mass_bind_of_mass_one ?_, ih j (by omega), mul_one,
+    tsub_add_cancel_of_le (pr_le_one hp0 hp1)]
+  rintro (_ | ⟨l, k'⟩) hne
+  · simp
+  · have hk : k' ≤ j := by
+      rw [genBCeil_apply hp0 hp1] at hne
+      by_contra hk
+      exact hne (ite_eq_right_iff.2 fun h => absurd h (by omega))
+    rw [mass_bind_of_mass_one (by rintro (_ | ⟨r, k''⟩) _ <;> simp), ih k' (by omega)]
 
-/-- What one round of `ceiled` keeps at `t`. -/
-noncomputable def ceilKeep (lo : Nat) : Option (BTree × Nat) → BTree → ℝ≥0∞
-  | some (t', _), t => if lo ≤ t'.size ∧ t' = t then 1 else 0
-  | none, _ => 0
-
-/-- Whether one round of `ceiled` retries. -/
-def ceilRetry (lo : Nat) : Option (BTree × Nat) → Bool
-  | some (t', _) => !decide (lo ≤ t'.size)
-  | none => true
-
-/-- One round of `ceiled`, with `z` for the retry. -/
-theorem ceiled_round (h : SPMF (Option (BTree × Nat))) (lo : Nat) (z : SPMF BTree) (t : BTree) :
-    (h >>= fun o => match o with
-      | some (t', _) => if lo ≤ t'.size then Pure.pure t' else z
-      | none => z) t
-      = (∑' o, h o * ceilKeep lo o t) + prob h {o | ceilRetry lo o = true} * z t := by
-  classical
-  rw [bind_apply, prob_eq_tsum_ite, ← ENNReal.tsum_mul_right, ← ENNReal.tsum_add]
-  refine tsum_congr fun o => ?_
-  rcases o with _ | ⟨t', k⟩
-  · simp [ceilKeep, ceilRetry]
-  · by_cases ht : t' = t
-    · subst ht
-      by_cases hlo : lo ≤ t'.size <;> simp [ceilKeep, ceilRetry, hlo]
-    · by_cases hlo : lo ≤ t'.size <;> simp [ceilKeep, ceilRetry, hlo, ht, Ne.symm ht]
-
-/-- What the ceiled sampler keeps adds up, with what it retries, to its mass. -/
-theorem ceilKeep_add_retry (h : SPMF (Option (BTree × Nat))) (lo : Nat) :
-    (∑' t, ∑' o, h o * ceilKeep lo o t) + prob h {o | ceilRetry lo o = true} = h.mass := by
-  classical
-  rw [ENNReal.tsum_comm, prob_eq_tsum_ite, ← ENNReal.tsum_add, mass]
-  refine tsum_congr fun o => ?_
-  rw [ENNReal.tsum_mul_left]
-  rcases o with _ | ⟨t', k⟩
-  · simp [ceilKeep, ceilRetry]
-  · by_cases hlo : lo ≤ t'.size <;> simp [ceilKeep, ceilRetry, hlo]
-
-/-- The ceiled sampler keeps exactly `genB`'s mass on each tree in the window. -/
-theorem ceilKeep_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) (t : BTree) :
-    ∑' o, (genBCeil p hi : SPMF _) o * ceilKeep lo o t
+/-- One round keeps each tree in the window with `genB`'s mass. -/
+theorem roundB_some (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) (t : BTree) :
+    (roundB p lo hi : SPMF _) (some t)
       = if window lo hi t then (genB p : SPMF BTree) t else 0 := by
-  rw [tsum_eq_single (some (t, hi - t.size)) fun o ho => ?_]
-  · rw [genBCeil_apply hp0 hp1]
-    by_cases hlo : lo ≤ t.size <;> by_cases hhi : t.size ≤ hi <;> simp [ceilKeep, window, hlo, hhi]
-  · rcases o with _ | ⟨t', k⟩
-    · simp [ceilKeep]
-    · by_cases ht : t' = t
-      · subst ht
-        rw [genBCeil_apply hp0 hp1, ite_eq_right_iff.2 fun h => absurd (by rw [h.2]) ho, zero_mul]
-      · simp [ceilKeep, ht]
+  rw [roundB, bind_apply, tsum_option, ENNReal.tsum_prod', tsum_eq_single t fun t' ht' =>
+    ENNReal.tsum_eq_zero.2 fun k => by dsimp only; split_ifs <;> simp [Ne.symm ht'],
+    tsum_eq_single (hi - t.size) fun k hk => by
+      rw [genBCeil_apply hp0 hp1, ite_eq_right_iff.2 fun h => absurd h (by omega), zero_mul]]
+  simp only [pure_apply, reduceCtorEq, ↓reduceIte, mul_zero, zero_add, genBCeil_apply hp0 hp1]
+  by_cases h1 : lo ≤ t.size <;> by_cases h2 : t.size ≤ hi <;> simp [window, h1, h2]
+
+theorem roundB_mass (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) :
+    (roundB p lo hi : SPMF _).mass = 1 := by
+  rw [roundB, mass_bind_of_mass_one (by rintro (_ | ⟨t, k⟩) _ <;> simp), genBCeil_mass hp0 hp1]
 
 /-- **The law of the ceiled rejection sampler**, for every `p`: `genB` conditioned on the window. -/
 theorem ceiled_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) (t : BTree) :
@@ -182,30 +141,20 @@ theorem ceiled_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) (t : BTree) :
       = (if window lo hi t then (genB p : SPMF BTree) t else 0)
         / prob (genB p : SPMF BTree) {t | window lo hi t = true} := by
   classical
-  set h := (genBCeil p hi : SPMF _)
-  set R := prob h {o | ceilRetry lo o = true}
-  have hsum := ceilKeep_add_retry h lo
-  rw [genBCeil_mass hp0 hp1] at hsum
-  have hAR : ∀ t, (∑' o, h o * ceilKeep lo o t) + R ≤ 1 := fun t =>
-    (add_le_add (ENNReal.le_tsum (f := fun t => ∑' o, h o * ceilKeep lo o t) t) le_rfl).trans
-      hsum.le
-  have hD : 1 - R = prob (genB p : SPMF BTree) {t | window lo hi t = true} := by
-    rw [← hsum, ENNReal.add_sub_cancel_right (ne_top_of_le_ne_top ENNReal.one_ne_top
-      (hsum ▸ le_add_self)), prob_eq_tsum_ite]
-    exact tsum_congr fun t => ceilKeep_apply hp0 hp1 lo hi t
-  rw [← hD, ← ceilKeep_apply hp0 hp1 lo hi t]
-  refine rejection_loop_apply hAR (fun b => ?_) (fun c hc => ?_) t
-  · conv_lhs => rw [ceiled]
-    exact ceiled_round h lo _ b
-  · refine ceiled.fixpoint_induct (G := SPMF) p lo hi _ (admissible_apply_le c) fun z hz b => ?_
-    refine le_trans (le_of_eq (ceiled_round h lo z b)) ?_
-    exact le_trans (by gcongr; exact hz b) (hc b)
+  have hsum := roundB_mass hp0 hp1 lo hi
+  rw [mass, tsum_option] at hsum
+  have hQ : 1 - (roundB p lo hi : SPMF _) none
+      = prob (genB p : SPMF BTree) {t | window lo hi t = true} := by
+    rw [← hsum, ENNReal.add_sub_cancel_left (apply_ne_top _ _), prob_eq_tsum_ite]
+    exact tsum_congr fun t => by rw [roundB_some hp0 hp1]; simp
+  rw [ceiled, retry_apply, hQ, roundB_some hp0 hp1]
 
 /-- **Ceiled rejection = straight rejection**, when `genB` terminates. -/
 theorem ceiled_eq_suchThat (hp : 1/2 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) :
     (ceiled p lo hi : SPMF BTree) = suchThat (genB p) (window lo hi) := by
   ext t
-  rw [ceiled_apply (le_trans (by norm_num) hp) hp1, suchThat_apply_of_mass _ _ (genB_terminates hp hp1)]
+  rw [ceiled_apply (le_trans (by norm_num) hp) hp1,
+    suchThat_apply_of_mass _ _ (genB_terminates hp hp1)]
   split <;> simp
 
 /-- The ceiled sampler terminates for every `0 < p < 1`, with no termination of `genB` assumed,
