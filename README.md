@@ -137,6 +137,9 @@ fuzz-run/basalt-fuzz <property> [libFuzzer args...]  # run a campaign
 fuzz-run/basalt-fuzz replay <property> <file>        # reproduce a saved crash input
 ```
 
+In a file, `#fuzz prop` runs a campaign for `prop` from the editor and reports a counterexample on the
+command (`Basalt/Fuzz/Command.lean`).
+
 The same executable also runs a property under the random interpretations (`--backend=io` or
 `--backend=plausible`). `fuzz-run/README.md` is the whole story: the design, the demo properties,
 the failure model, the supported platforms, and how fast each backend finds a bug.

@@ -189,6 +189,10 @@ fuzz-run/basalt-fuzz <property> [--grow]           # fuzz backend only, see belo
 fuzz-run/basalt-fuzz replay <property> <file>      # reproduce a saved input, no fuzzer
 ```
 
+From a dependent's file, `#fuzz prop` (`Basalt/Fuzz/Command.lean`, which owns how) builds a fuzz
+executable for `prop` in `.lake/fuzz`, runs it as a child process, and reports a counterexample as an
+error on the command. It needs this build's bridge and runtime, so run `build.sh` once first.
+
 Properties (see `BasaltFuzzMain.lean` and `BasaltFuzz/`):
 
 | property | expectation |
@@ -557,7 +561,8 @@ it.
   FuzzChick shows the trade-off, which is that you can return a value only if you own the loop. The
   clean way to have both is a subprocess model: a Lean parent spawns a libFuzzer child that aborts
   like bolero, and reconstructs a `TestOutcome` from the child's exit code, artifact, and stderr.
-  Cost is a process boundary. (An in-process `setjmp`/`longjmp` return path works but leaves no
+  Cost is a process boundary. `#fuzz` is that model's editor half: it reads the child's report back,
+  but as a message, not a `TestOutcome`. (An in-process `setjmp`/`longjmp` return path works but leaves no
   artifact and must `_exit` past libFuzzer's `atexit` handlers.)
 - **No value-level shrinking.** Today this relies on libFuzzer's byte-level minimization
   (`-minimize_crash=1`) and reports the first counterexample. A Basalt value-level shrinker would
