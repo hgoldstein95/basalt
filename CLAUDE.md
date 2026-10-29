@@ -143,7 +143,7 @@ definition, and the definition is right here to run.
   — [fuzz-run/README.md](fuzz-run/README.md) owns the design, the per-platform build contract, and
   the measured comparison between backends. This is the repo's only FFI and native-link config. A
   generator or property to be fuzzed goes in `BasaltFuzz/`. The SanitizerCoverage scope is set in
-  `lakefile.toml` and asserted by `fuzz-run/build.sh`; do not narrow it without re-running the
+  `lakefile.lean`, under its `fuzz` option, and asserted by `fuzz-run/build.sh`; do not narrow it without re-running the
   measurement fuzz-run/README.md records. The default build type-checks these modules but emits no
   C, so a change to the *native* half (bridge, runtime detection, link) is caught only by
   `fuzz-run/build.sh` and the `basalt-fuzz` CI workflow; a drift from the proved `genBST` is caught
@@ -256,4 +256,4 @@ definition, and the definition is right here to run.
 - `BasaltExamples/` files are cookbook entries: a generator plus proofs of the correctness
   properties that apply to it, nothing else — no `#eval`/`#guard_msgs`. Anything pinned or run
   for effect belongs in `BasaltTest/`; nothing built has a `sorry`.
-- Lean toolchain is pinned in `lean-toolchain`; deps in `lakefile.toml` / `lake-manifest.json`.
+- Lean toolchain is pinned in `lean-toolchain`; deps in `lakefile.lean` / `lake-manifest.json`.

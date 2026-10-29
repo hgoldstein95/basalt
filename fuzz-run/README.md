@@ -91,7 +91,7 @@ Lean's default backend emits one C file per module under `.lake/build/ir/`, and 
 a compile-time flag on that C. **Lake owns the closure and the scope.** `basalt-fuzz` is an ordinary
 `lean_exe`, so Lake derives the link closure from imports; the instrumentation scope is
 `-fsanitize=fuzzer-no-link` in the `moreLeancArgs` of the `Basalt` and `BasaltFuzz` libraries and of
-the executable root (`lakefile.toml`). That is every first-party object in the closure and nothing
+the executable root (`lakefile.lean`), under its `fuzz` option. That is every first-party object in the closure and nothing
 else: the Lean runtime and stdlib are linked uninstrumented, and so are Plausible's `Gen`/`Random` and
 SplitMix, which are the `--backend=plausible`/`io` PRNGs rather than code under test (coverage over a
 PRNG's mixing steps is noise in the feedback). Partial coverage still guides libFuzzer.
@@ -105,13 +105,21 @@ captures the live per-property code; what the `Basalt` library adds is the plumb
 specializations *call into* — `Basalt/Fuzz/`'s buffer reads, `Combinators.lean`'s loop bodies — which
 is what tells libFuzzer that a generator got one iteration further.
 
+**Only a fuzz build is instrumented.** The flags apply only under Lake's `fuzz` option, which also
+moves the build to `.lake/build-fuzz`. So an ordinary build, and a dependent's executable that links
+Basalt, gets plain objects (instrumented ones would leave it without the SanitizerCoverage runtime and
+fail to link), and the two builds never overwrite each other. A dependent turns the option on for
+Basalt with `require basalt … with NameMap.empty.insert `fuzz "true"`. In Basalt's own workspace
+`build.sh` reconfigures into it (`lake -R -K fuzz=true`) and back out on exit: without `-R`, Lake
+reuses its cached configuration whatever `-K` says, and says nothing.
+
 `build.sh` supplies what Lake's declarative config cannot — this platform's libFuzzer runtime, its C++
 runtime, the compiled C bridge, and three post-link assertions. Each assertion guards a property
 whose violation leaves a *working* fuzzer that searches badly rather than a build error: no Mathlib in
 Lake's link response file, the instrumentation scope in both directions (every first-party object in
 that response file references `__sanitizer_cov_8bit_counters_init`; no dependency object does), and
 `LLVMFuzzerCustomMutator` still exported past `-Wl,-dead_strip`. The response file read is Lake's own,
-so the scope check covers exactly what was linked: `.lake/build/ir/` additionally holds objects left
+so the scope check covers exactly what was linked: `.lake/build-fuzz/ir/` additionally holds objects left
 behind by renamed modules, which enter no link and whose flags say nothing.
 
 ### What the instrumentation scope buys
@@ -159,7 +167,7 @@ all: the sancov compile and the native link happen only when `basalt-fuzz` is re
 ## Build
 
 ```bash
-fuzz-run/build.sh          # lake build basalt-fuzz, plus the bridge, the runtime, and the assertions
+fuzz-run/build.sh          # the fuzz build of basalt-fuzz, plus the bridge, the runtime, and the assertions
 ```
 
 Runs with no arguments on the platforms in [Platforms](#platforms) below. The script detects the C
@@ -566,8 +574,8 @@ it.
   bridging lemma is the tidy version).
 - **Narrower instrumentation, other engines.** The scope is per *library*, so the choice above is
   all-or-nothing for `Basalt`: a target that wanted its plumbing uninstrumented (for the 25% of
-  throughput) while keeping it for a length-bound generator cannot have both from `lakefile.toml`.
-  Per-target instrumentation scope would want a Lean-side `lakefile.lean` and a facet override. The
+  throughput) while keeping it for a length-bound generator cannot have both from library settings.
+  Per-target instrumentation scope would want a facet override in `lakefile.lean`. The
   `RandomChoice FuzzGen` core is engine-agnostic — crowbar shows the same cursor drives AFL — so an
   AFL or honggfuzz backend changes only the C bridge.
 
