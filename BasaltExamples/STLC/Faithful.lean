@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Tactic.Faithful
-import BasaltExamples.STLC.Termination
+module
+
+public import Basalt.Tactic.Faithful
+public import BasaltExamples.STLC.Termination
 
 /-!
 # Faithfulness for `genTerm`
@@ -12,6 +14,10 @@ import BasaltExamples.STLC.Termination
 `genTerm` and `genZero` are faithful. `genZero` is defined by structural recursion, so its
 relations are walked under an induction of their own.
 -/
+
+@[expose] public section
+
+namespace STLC
 
 theorem genZero.faithful : IsFaithful (genZero Γ τ) where
   terminates := genZero.terminates
@@ -26,3 +32,5 @@ theorem genZero.faithful : IsFaithful (genZero Γ τ) where
 
 theorem genTerm.faithful : IsFaithful (genTerm Γ τ) := by
   faithful_fixpoint [genTerm.terminates, genZero.faithful, genType.faithful]
+
+end STLC

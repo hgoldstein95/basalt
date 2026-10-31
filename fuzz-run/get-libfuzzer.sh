@@ -7,7 +7,7 @@
 #
 # Needed where the toolchain's clang can instrument (`-fsanitize=fuzzer-no-link`) but ships no
 # runtime to link against. That is always macOS (Apple's clang has no libFuzzer at all, and Lean's
-# vendored clang 22 ships only `libclang_rt.osx.a`), and any Linux without a system compiler-rt
+# vendored clang ships only `libclang_rt.osx.a`), and any Linux without a system compiler-rt
 # fuzzer archive (e.g. a runner with clang but no `libclang-rt`/`compiler-rt` runtimes package).
 # compiler-rt's `lib/fuzzer` is standalone C++17 by design (it has its own `build.sh`), so building
 # it needs no LLVM checkout or CMake.
@@ -19,7 +19,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-LLVM_TAG="${LLVM_TAG:-llvmorg-22.1.8}"      # pinned; any >= 12 exposes LLVMFuzzerRunDriver
+LLVM_TAG="${LLVM_TAG:-llvmorg-23.1.3}"      # pinned; any >= 12 exposes LLVMFuzzerRunDriver
 VENDOR="$(pwd)/vendor"
 SRC="$VENDOR/fuzzer-src"
 OUT="$VENDOR/libFuzzerNoMain.a"

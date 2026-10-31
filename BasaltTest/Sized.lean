@@ -3,7 +3,13 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+public import Basalt
+meta import Basalt
+
+
+@[expose] public section
 
 open RandomChoice
 

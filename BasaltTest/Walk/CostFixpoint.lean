@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
-import BasaltExamples.Heap
-import BasaltExamples.SortedList.BySorting
+module
+
+public import Basalt
+public import BasaltExamples.BST
+public import BasaltExamples.Heap
+public import BasaltExamples.SortedList.BySorting
 
 /-!
 # The Cost Fixpoint Contract
@@ -14,6 +16,8 @@ import BasaltExamples.SortedList.BySorting
 Pins the step `walk fixpoint` leaves on `SPMF.Cost.alwaysObs.spec`: the recursive function named
 after the generator, `ih` over the arguments its recursive calls change, and the walk's residuals.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 

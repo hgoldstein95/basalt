@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import BasaltExamples.STLC.Syntax
+module
+
+public import BasaltExamples.STLC.Syntax
 
 /-!
 # Shrinking STLC Terms
@@ -11,6 +13,10 @@ import BasaltExamples.STLC.Syntax
 `shrinkTerm` proposes structurally smaller terms, each well-typed in the context of the term it
 shrinks.
 -/
+
+@[expose] public section
+
+namespace STLC
 
 /-- Produces structurally smaller terms. Each candidate stays well-typed in the
     same context, but its type may change (see `shrinkTerm_sound`). -/
@@ -53,3 +59,5 @@ theorem shrinkTerm_sound :
       exists .Fun τ τ2'
       apply Typing.TAbs
       assumption
+
+end STLC

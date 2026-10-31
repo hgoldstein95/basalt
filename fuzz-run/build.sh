@@ -66,7 +66,7 @@ fi
 #   2. A toolchain `libclang_rt.fuzzer_no_main*.a` whose clang major MATCHES the instrumenting clang.
 #   3. fuzz-run/vendor/libFuzzerNoMain.a, built from compiler-rt source by ./get-libfuzzer.sh, pinned
 #      to Lean's clang major — so it is version-matched too (macOS; and any Linux whose only system
-#      runtime is a different clang, e.g. `ubuntu-latest`'s clang 16 vs Lean's clang 22).
+#      runtime is a different clang, e.g. `ubuntu-latest`).
 #   4. Last resort: a version-*mismatched* system runtime, with a warning (see below).
 # `fuzzer_no_main` (not `fuzzer`) is required: we provide LLVMFuzzerTestOneInput and call the driver
 # ourselves from Lean's `main`.
@@ -79,7 +79,7 @@ fi
 if [ -z "${FUZZER_LIB_FLAGS+x}" ]; then
   arch=$(uname -m)
   # The major of the clang `leanc` actually drives — via `$CC`, so it honors LEAN_CC (on the Amazon
-  # Linux 2 box this is the system clang 11, not Lean's vendored 22). $CC emits __clang_major__.
+  # Linux 2 box this is the system clang 11, not Lean's vendored one). $CC emits __clang_major__.
   instr_major=$(echo | $CC -dM -E - 2>/dev/null | sed -n 's/^#define __clang_major__ \([0-9][0-9]*\).*/\1/p')
 
   # Two runtime-dir layouts coexist: the legacy `.../lib/linux/libclang_rt.fuzzer_no_main-<arch>.a`
@@ -223,28 +223,37 @@ grep -viE 'unused|-Wl|^✔|^info:' "$OUT/link.log" || true
 # searches badly, so none of them shows up as a build error on its own.
 # ---------------------------------------------------------------------------------------------
 
+# The response file Lake writes for its own link names every object it linked, dependency packages
+# included, so it is the ground truth for what got in — both checks below read it rather than the
+# `ir/` tree, which also holds objects left behind by renamed modules that are in no link at all.
+LAKE_RSP="$ROOT/.lake/build/bin/basalt-fuzz.rsp"
+[ -f "$LAKE_RSP" ] || die "lake wrote no link response file: cannot verify the closure"
+
 # Mathlib in the link closure. Previously an accidental umbrella import failed the link and so
 # fenced itself; now that Lake derives the closure it would simply build Mathlib into the fuzzer.
-# The response file Lake writes for its own link names every object it linked, dependency packages
-# included, so it is the ground truth for what got in.
-LAKE_RSP="$ROOT/.lake/build/bin/basalt-fuzz.rsp"
-if [ -f "$LAKE_RSP" ] && grep -qi 'packages/mathlib' "$LAKE_RSP"; then
+if grep -qi 'packages/mathlib' "$LAKE_RSP"; then
   die "Mathlib entered the fuzz link closure: import the narrowest module, not an umbrella"
 fi
 
-# The instrumentation scope, asserted in both directions: every object of the `BasaltFuzz` library
-# and the executable root carries SanitizerCoverage, and no `Basalt/` library object does. A module
-# claimed by two libraries' globs, or a `moreLeancArgs` dropped from the executable, yields a fuzzer
-# whose coverage feedback is missing the code under test — it still runs, and still finds the shallow
-# `bst-buggy-*` bugs, so only a staged benchmark (`chain-4`) would ever reveal it.
+# The instrumentation scope, asserted in both directions: every first-party object carries
+# SanitizerCoverage (the `Basalt` and `BasaltFuzz` libraries and the executable root, per the
+# `moreLeancArgs` in lakefile.toml), and no dependency object does — Plausible's and SplitMix's code is
+# the `--backend=plausible`/`io` PRNG rather than code under test, and coverage over a PRNG's mixing
+# steps is noise in the feedback. A module claimed by two libraries' globs, or a `moreLeancArgs`
+# dropped from one of them, yields a fuzzer that still runs and still finds the shallow `bst-buggy-*`
+# bugs; what it loses is measured in fuzz-run/README.md, and only a staged benchmark would reveal it.
 instrumented() { [ "$(nm -u "$1" 2>/dev/null | grep -c __sanitizer_cov_8bit_counters_init || true)" -gt 0 ]; }
-for o in "$IR"/BasaltFuzz/*.c.o.export "$IR/BasaltFuzzMain.c.o.export"; do
-  [ -f "$o" ] || die "no object for ${o#"$IR"/}: did a module leave the BasaltFuzz library?"
-  instrumented "$o" || die "${o#"$IR"/} is not instrumented: check for overlapping library globs"
-done
+first_party=0
 while IFS= read -r o; do
-  ! instrumented "$o" || die "${o#"$IR"/} is instrumented: coverage must stay off Basalt's plumbing"
-done < <(find "$IR/Basalt" -name '*.c.o.export')
+  case $o in
+    "$ROOT/.lake/packages/"*)
+      ! instrumented "$o" || die "${o##*/.lake/build/ir/} is instrumented: coverage over a dependency's PRNG is noise" ;;
+    *)
+      instrumented "$o" || die "${o#"$IR"/} is not instrumented: check for overlapping library globs"
+      first_party=$((first_party + 1)) ;;
+  esac
+done < <(grep -o '"[^"]*\.c\.o\.export"' "$LAKE_RSP" | tr -d '"')
+[ "$first_party" -gt 1 ] || die "only $first_party first-party object(s) linked: has the closure changed shape?"
 
 # libFuzzer finds the custom mutator with `dlsym(RTLD_DEFAULT, ...)`, and a lookup that fails is
 # silent: the campaign runs the default mutators and `--grow` does nothing. Lake's link adds

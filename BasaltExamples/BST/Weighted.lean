@@ -3,22 +3,22 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.BST
+module
+
+import Mathlib.Tactic.Basify
+public import Basalt
+public import BasaltExamples.BST
 
 /-!
 # Weighted Binary Search Trees
 
-`Tree.genWeightedBST` is a `frequency`-weighted, `@[tunable]` variant of `genBST`
-(`BasaltExamples/BST`) that makes `node` five times as likely as `leaf`. It produces the same trees
-with the same cost bound; only the distribution differs.
-
-Unlike `genBST`, this weighting is *supercritical* under the crude branching bound (`node` has
-probability `5/6`, so mean offspring is `5/6 · 2 = 5/3 > 1`), so no `LfpIsOne.quadratic` certificate
-applies. Termination instead goes through a ranking function on the seed `(lo, hi)`, exploiting the
-fact that the interval genuinely shrinks. The machinery (`bstLevel`, `bstRank`) lives here since it
-is used nowhere else, instantiated at recursion weight `w = 5/6` and drift `ε = 1/6`.
+A `frequency`-weighted, `@[tunable]` variant of `genBST` (`BasaltExamples/BST`): the same trees with
+the same cost bound, but a distribution under which the crude branching bound is supercritical, so
+no `LfpIsOne.quadratic` certificate applies. Termination goes through a ranking function on the
+shrinking seed `(lo, hi)` instead (`bstLevel`, `bstRank`).
 -/
+
+@[expose] public section
 
 open RandomChoice
 open SPMF
@@ -68,7 +68,8 @@ private theorem levelOp_bstLevel (w : ℝ≥0∞) : LevelOp (bstLevel w) := by
     simp only [bstLevel, Pi.add_apply]
     split
     · simp
-    · simp only [add_add_add_comm, Finset.sum_add_distrib, ← ENNReal.div_add_div_same, mul_add]
+    · rw [← mul_add, ENNReal.div_add_div_same, ← Finset.sum_add_distrib]
+      simp only [add_add_add_comm]
   · -- smul
     intro r e
     funext p
@@ -113,8 +114,7 @@ private theorem genWeightedBST_drift (p : Int × Int) :
       simp only [ne_eq, Nat.cast_eq_zero]
       omega
     rw [hcast, mul_div_assoc, ENNReal.mul_div_cancel hne0 (ENNReal.natCast_ne_top _)]
-    ennreal_to_real
-    ennreal_to_real at hrank1
+    basify
     linarith
 
 theorem Tree.genWeightedBST.terminates : IsAlmostSurelyTerminating (Tree.genWeightedBST lo hi) := by
@@ -136,7 +136,7 @@ theorem Tree.genWeightedBST.terminates : IsAlmostSurelyTerminating (Tree.genWeig
   -- Split off the leaf branch, then the union bound over the pivot and over the two children.
   calc _ ≤ 5 / 6 * (1 - (∑ x ∈ Finset.Icc lo hi, c (lo, x - 1) * c (x + 1, hi))
           / (((hi - lo + 1).toNat : ℕ) : ℝ≥0∞)) :=
-        ENNReal.one_sub_le_mul_one_sub (w := 1 / 6) (by ennreal_to_real; norm_num) (by finiteness)
+        ENNReal.one_sub_le_mul_one_sub (w := 1 / 6) (by basify; norm_num) (by finiteness)
           (by rw [show ((1 + 5 : ℕ) : ℝ≥0∞) = 6 by norm_num, ENNReal.add_div,
             ENNReal.mul_div_right_comm])
     _ ≤ 5 / 6 * ((∑ x ∈ Finset.Icc lo hi, (1 - c (lo, x - 1) * c (x + 1, hi)))

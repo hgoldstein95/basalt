@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Walk.Average
+module
+
+public import Basalt.Walk.Average
 
 /-!
 # Walking Expectation Bounds
@@ -12,6 +14,8 @@ What the walk needs of an upper bound `SPMF.expectObs.spec g f ≤ B`: how a fac
 sub-generator closes a leaf, the rules of the list combinators and of `suchThat`, and the
 admissibility `walk fixpoint` inducts with.
 -/
+
+@[expose] public section
 
 open ENNReal RandomChoice
 

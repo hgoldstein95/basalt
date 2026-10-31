@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbNat
-import BasaltExamples.SortedList
-import BasaltTest.OptionGen
+module
+
+public import Basalt
+public import BasaltExamples.ArbNat
+public import BasaltExamples.SortedList
+public import BasaltTest.OptionGen
 
 /-!
 # The Mass Walk Contract
@@ -16,6 +18,8 @@ Pins what `walk` leaves behind on a lower bound on a generator's mass,
 `@[gen_rule]` rule per combinator and walked through the unfolding of any other definition, and the
 message for a generator that has neither.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat ENNReal
 

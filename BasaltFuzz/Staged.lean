@@ -3,25 +3,21 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Combinators
-import Basalt.PBT.Property
+module
+
+public import Basalt.Combinators
+public import Basalt.PBT.Property
 
 /-!
 # A microbenchmark that separates the backends
 
-`BasaltFuzz/BuggyBST.lean`'s bugs are all *shallow* — one unlucky draw exposes them, so every
-backend finds them in tens of runs and a comparison measures nothing. This module is the opposite
-case and exists only to be measured: a bug behind a chain of guards, the shape a real bug takes
-behind a parser, a magic value, or a sequence of state transitions, but synthetic so the depth is a
-knob. Two shapes, differing in what a stage costs — a specific byte value (`propChain`) or merely a
-byte (`propLong`) — so one measures search and the other buffer length.
-`fuzz-run/compare-backends.sh` and `fuzz-run/compare-grow.sh` run the comparisons and
-`fuzz-run/README.md` records them.
-
-Do not add an import that reaches Mathlib (the `Basalt` umbrella does): the `basalt-fuzz` executable
-links this module, and the failure is a native link error from `fuzz-run/build.sh`, not from
-`lake build`.
+A bug behind a chain of guards, synthetic so the depth is a knob, where `BasaltFuzz/BuggyBST.lean`'s
+bugs are all shallow and every backend finds them quickly. A stage costs a specific byte value in
+`propChain` and merely a byte in `propLong`, so one measures search and the other buffer length;
+`fuzz-run/README.md` records both comparisons.
 -/
+
+@[expose] public section
 
 namespace Staged
 
@@ -35,9 +31,8 @@ abbrev needle : Nat := 7
 draws hit, so a blind sampler needs them at once (`256⁻ⁿ`), while a coverage-guided one banks each
 newly-reached guard as coverage and mutates onward from that input, paying roughly `n · 256`.
 
-Do not drop the `break`: it is what nests the guards. Without it every input draws all `n` bytes and
-reaches every stage, so no new coverage distinguishes a partial match and the benchmark quietly
-degrades to blind search for every backend. -/
+Do not drop the `break`: it nests the guards. Without it every input reaches every stage, so no
+coverage distinguishes a partial match and the benchmark silently degrades to blind search. -/
 def propChain [Gen G] (n : Nat) : PropM G Unit := do
   let mut ok := 0
   for _ in [0:n] do

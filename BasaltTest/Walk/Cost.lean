@@ -3,10 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbChar
-import BasaltExamples.ArbNat
-import BasaltTest.OptionGen
+module
+
+public import Basalt
+public import BasaltExamples.ArbChar
+public import BasaltExamples.ArbNat
+public import BasaltTest.OptionGen
 
 /-!
 # The Cost Walk Contract
@@ -14,6 +16,8 @@ import BasaltTest.OptionGen
 Pins what `walk` leaves behind on `SPMF.Cost.alwaysObs.spec` — one arithmetic goal per path through
 the generator, named after it — and the messages for a sub-generator nothing bounds.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat ArbChar
 

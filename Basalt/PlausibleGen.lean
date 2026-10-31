@@ -3,20 +3,19 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Plausible.Gen
-import Basalt.Gen
+module
+
+public import Plausible.Gen
+public import Basalt.Gen
 
 /-!
 # Plausible Gen as a Basalt Generator
 
-This file establishes that Plausible's `Gen` monad is an instance of Basalt's `Gen` typeclass.
-This allows generators written polymorphically over Basalt's `Gen` class to be instantiated at
-Plausible's `Gen` for executable property-based testing.
-
-## Main Definitions
-
-- `Gen Plausible.Gen` — The `Gen` instance for Plausible's `Gen` monad.
+The `Gen` instance for Plausible's `Gen` monad, so a generator written over Basalt's `Gen` runs at
+Plausible's for executable property-based testing.
 -/
+
+@[expose] public section
 
 open Lean.Order
 

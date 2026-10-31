@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Termination
+module
+
+public import Basalt.SPMF.Termination
 
 /-!
 # Ranking-Function Termination
@@ -13,6 +15,8 @@ whose expected value drops by `ε` under a level operator `SPMF.LevelOp` forces 
 bound's least fixed point to `1`. The union bounds that discharge its deficit condition live here
 too.
 -/
+
+@[expose] public section
 
 open ENNReal
 
@@ -136,13 +140,6 @@ end level_op
 end SPMF
 
 namespace ENNReal
-
-private theorem list_prod_le_one {xs : List ℝ≥0∞} (h : ∀ x ∈ xs, x ≤ 1) : xs.prod ≤ 1 := by
-  induction xs with
-  | nil => simp
-  | cons x xs ih =>
-    rw [List.prod_cons]
-    exact mul_le_one' (h x List.mem_cons_self) (ih fun y hy => h y (List.mem_cons_of_mem x hy))
 
 /-- **The union bound**: the chance that some element of a product falls short of 1 is at most the
 sum of the individual shortfalls. Applied to generator masses: the chance that some child diverges

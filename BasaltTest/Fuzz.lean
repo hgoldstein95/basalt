@@ -3,10 +3,14 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Combinators
-import Basalt.Fuzz.Runner
-import BasaltExamples.BST
-import BasaltFuzz.BuggyBST
+module
+
+public import Basalt.Combinators
+public import Basalt.Fuzz.Runner
+meta import Basalt.Fuzz.Runner
+public import BasaltExamples.BST
+meta import BasaltExamples.BST
+public import BasaltFuzz.BuggyBST
 
 /-!
 # `FuzzGen` regression tests
@@ -14,6 +18,8 @@ import BasaltFuzz.BuggyBST
 Deterministic checks of the byte → choice mapping, run purely (no fuzzer): `runOne` on fixed byte
 arrays must produce fixed outcomes. Pins the contract that a corpus byte maps to a specific choice.
 -/
+
+@[expose] public section
 
 open Basalt.Fuzz Basalt.PBT RandomChoice
 
@@ -144,7 +150,7 @@ private def propAnyBackend : Property := fun _ => do
 
 /-! ### The fuzz target's `genBST` is the proved one
 
-`Fuzz/BuggyBST.lean` restates `BasaltExamples/BST`'s `Tree.genBST` rather than importing it, because
+`BasaltFuzz/BuggyBST.lean` restates `BasaltExamples/BST`'s `Tree.genBST` rather than importing it, because
 that import would pull Mathlib into the executable's link closure (`fuzz-run/README.md`). The copy's
 claim — that the fuzzed generator is the one proved sound, complete, terminating, and cost-bounded —
 holds only while the two agree, so these pins make a drift a build failure: both are

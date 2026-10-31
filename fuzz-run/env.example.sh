@@ -39,4 +39,4 @@
 # export FUZZER_LIB_SEARCH="/opt/llvm/lib/clang/18/lib/linux"   # extra dirs searched for the runtime
 # export BRIDGE_INCLUDES="-isystem /usr/include"                # libc headers for native.c
 # export FUZZ_CXX=clang++             # C++ compiler get-libfuzzer.sh builds the runtime with
-# export LLVM_TAG=llvmorg-22.1.8      # compiler-rt version get-libfuzzer.sh fetches
+# export LLVM_TAG=llvmorg-X.Y.Z      # compiler-rt version get-libfuzzer.sh fetches

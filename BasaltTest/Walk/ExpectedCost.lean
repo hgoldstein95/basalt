@@ -3,14 +3,18 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.AllTwoTree
+module
+
+public import Basalt
+public import BasaltExamples.AllTwoTree
 
 /-!
 # The Expected-Cost Walk Contract
 
 Pins the arithmetic goal `walk` leaves on an upper bound `SPMF.Cost.expectObs.spec g f ≤ B`.
 -/
+
+@[expose] public section
 
 open RandomChoice ENNReal AllTwoTree
 
@@ -103,7 +107,7 @@ example (hm : 1 ≤ SPMF.Cost.expectObs.spec (genTree : SPMF.Cost Tree) fun _ _ 
   exact le_of_eq (by ring)
 
 -- The cookbook's expected-cost bounds are this walk followed by arithmetic, with the source's bound
--- passed as a fact: `Tree.genBSTByFiltering.cost` (`BST/ByFiltering.lean`); its lower bound is
--- `AllTwoTree.genTree.not_expected_cost_bounded` (`AllTwoTree.lean`).
+-- passed as a fact: `Tree.genBSTByFiltering.expected_cost_bounded` (`BST/ByFiltering.lean`); its
+-- lower bound is `AllTwoTree.genTree.not_expected_cost_bounded` (`AllTwoTree.lean`).
 
 end ExpectedCostTest

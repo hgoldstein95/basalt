@@ -75,14 +75,14 @@ jobs:
     # the runtime's `__isoc23_strtol`/`_strtoul` references, absent from leanc's older-baseline libc,
     # are supplied by fuzz-run/isoc23_compat.c.
     #
-    # `ubuntu-latest` does ship a system runtime, but from a clang several majors below the clang 22
-    # that instruments. Rather than trust that skew, `fuzz-run/build.sh` selects a *version-matched*
-    # runtime: it will bypass the mismatched system archive and build one from source via
-    # `get-libfuzzer.sh` (needs `clang++`, present here; the build needs `-fPIC`), pinned to the
-    # instrumenting clang's major. So this leg exercises the matched-from-source path; both the
-    # matched-system and matched-from-source paths were validated by hand on AL2023. The `chain-4`
-    # step remains the backstop: if coverage feedback ever failed to reach the runtime, only it —
-    # not the shallow-bug steps — would notice.
+    # `ubuntu-latest` does ship a system runtime, but from a clang several majors below Lean's.
+    # Rather than trust that skew, `fuzz-run/build.sh` selects a *version-matched* runtime: it will
+    # bypass the mismatched system archive and build one from source via `get-libfuzzer.sh` (needs
+    # `clang++`, present here; the build needs `-fPIC`), pinned to the instrumenting clang's major.
+    # So this leg exercises the matched-from-source path; both the matched-system and
+    # matched-from-source paths were validated by hand on AL2023. The `chain-4` step remains the
+    # backstop: if coverage feedback ever failed to reach the runtime, only it — not the shallow-bug
+    # steps — would notice.
     # `fail-fast: false` is deliberate: a failure here must not hide a passing macOS leg.
     strategy:
       fail-fast: false

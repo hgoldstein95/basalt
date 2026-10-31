@@ -3,20 +3,24 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Cost
-import Basalt.SPMF.CostErasure
-import Basalt.SPMF.Expect.Obs
-import Basalt.SPMF.Termination
+module
+
+public import Basalt.SPMF.Cost
+public import Basalt.SPMF.CostErasure
+public import Basalt.SPMF.Expect.Obs
+public import Basalt.SPMF.Termination
 
 /-!
 # Generator Correctness Properties
 
-The basic, mostly orthogonal, correctness properties a PBT generator may have, as plain predicates
-— there is no bundle: which of them apply depends on the generator, and you prove the ones that do.
+The basic, mostly orthogonal, correctness properties a PBT generator may have, as plain predicates:
+which of them apply depends on the generator, and you prove the ones that do.
 Each but the bundle `IsSoundAndComplete` and `IsCostFaithful`, which relates two interpretations,
 is defined in the form a reader checks, and restated by `<Law>.iff_obs` on an observation, the form
 a walk proves; `<Law>.obs` restates a fact for passing to one.
 -/
+
+@[expose] public section
 
 open scoped ENNReal
 

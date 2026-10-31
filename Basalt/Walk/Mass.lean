@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Mass
-import Basalt.Walk.Average
-import Basalt.Walk.Entry
+module
+
+public import Basalt.SPMF.Mass
+public import Basalt.Walk.Average
+public import Basalt.Walk.Entry
 
 /-!
 # Walking Mass Bounds
@@ -14,6 +16,8 @@ What the walk needs of a lower bound `c ≤ SPMF.expectObs.spec g f`, which at `
 bound on `g`'s mass and so the structural half of a termination proof: how a fact about a
 sub-generator's mass closes a leaf, and the rules of the list combinators.
 -/
+
+@[expose] public section
 
 open ENNReal RandomChoice
 

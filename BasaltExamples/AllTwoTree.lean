@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+public import Basalt
 
 /-!
 # Trees of All Twos
@@ -15,8 +17,11 @@ the *same* shape:
   is **critical**. It still terminates almost surely, but no finite bound holds of its expected
   cost (`genTree.not_expected_cost_bounded`), which is one choice per constructor.
 - `genWeightedTree` uses `frequency` to make the leaf branch twice as likely (mean offspring `2/3`),
-  making it **subcritical**, with expected cost at most `3` (`genWeightedTree.cost`).
+  making it **subcritical**, with expected cost at most `3`
+  (`genWeightedTree.expected_cost_bounded`).
 -/
+
+@[expose] public section
 
 open RandomChoice
 
@@ -69,7 +74,6 @@ theorem genTree.sound_complete : IsSoundAndComplete genTree Tree.isAllTwos := by
 
 theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genTree.cost_bounded : IsCostBounded genTree Tree.cost := by
@@ -113,14 +117,14 @@ partial_fixpoint
 
 theorem genWeightedTree.terminates : IsAlmostSurelyTerminating genWeightedTree := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 2 / 3) (b := 0) (d := 1 / 3)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genWeightedTree.faithful : IsFaithful genWeightedTree := by
   faithful_fixpoint [genWeightedTree.terminates]
 
 /-- One choice per constructor, `1 / (1 - 2/3) = 3` of them on average. -/
-theorem genWeightedTree.cost : IsExpectedCostBounded (genWeightedTree : SPMF.Cost Tree) 3 := by
+theorem genWeightedTree.expected_cost_bounded :
+    IsExpectedCostBounded (genWeightedTree : SPMF.Cost Tree) 3 := by
   rw [IsExpectedCostBounded.iff_obs]
   walk fixpoint
   norm_num

@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Mass
+module
+
+public import Basalt.SPMF.Mass
 
 /-!
 # Expectations of the List Combinators
@@ -11,6 +13,8 @@ import Basalt.SPMF.Mass
 Event probabilities and expected lengths for `vectorOf` and `listOf`, by induction or fixpoint
 induction over the equations of `Basalt/SPMF/Expect/Obs.lean`.
 -/
+
+@[expose] public section
 
 open RandomChoice NNReal ENNReal
 

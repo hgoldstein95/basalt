@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.PBT.Property
+module
+
+public import Basalt.PBT.Property
 
 /-!
 # The `FuzzGen` interpretation
@@ -14,6 +16,8 @@ from it to select each value, and coverage of the generator and the property gui
 ("parametric fuzzing"). Because `choose` is total, a whole fuzzer input is a pure function
 `ByteArray → FuzzResult` (`runOne`).
 -/
+
+public section
 
 namespace Basalt.Fuzz
 

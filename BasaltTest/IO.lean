@@ -3,20 +3,29 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.IO
-import Basalt.PBT.Property
-import BasaltExamples.ArbChar
-import BasaltExamples.ArbList
-import BasaltExamples.ArbNat
-import BasaltExamples.ArbString
-import BasaltExamples.BST
-import BasaltExamples.BST.Weighted
-import BasaltExamples.Heap
+module
 
-/-! # Exercising `IO` Interpretations
+public import Basalt.IO
+public import Basalt.PBT.Property
+public import BasaltExamples.ArbChar
+public import BasaltExamples.ArbList
+meta import BasaltExamples.ArbList
+public import BasaltExamples.ArbNat
+public import BasaltExamples.ArbString
+meta import BasaltExamples.ArbString
+public import BasaltExamples.BST
+public import BasaltExamples.BST.Weighted
+meta import BasaltExamples.BST.Weighted
+public import BasaltExamples.Heap
+meta import BasaltExamples.Heap
+
+/-!
+# Exercising `IO` Interpretations
 
 Samples from `IO` generators, just to make sure that the interpretations are relatively reasonable.
 -/
+
+@[expose] public section
 
 /-- Run `gen` in `IO` `n` times purely for effect, then report the (deterministic) count. -/
 def exercise (n : Nat) (gen : IO α) : IO Unit := do

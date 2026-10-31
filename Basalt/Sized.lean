@@ -3,7 +3,9 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Gen
+module
+
+public import Basalt.Gen
 
 /-!
 # Size-Parameterized Generators
@@ -12,6 +14,8 @@ import Basalt.Gen
 to any generator monad `G`; `OptionT` preserves both. `MonoSized` is the side condition that lets
 `sized` and `resize` appear in the body of a `partial_fixpoint`.
 -/
+
+@[expose] public section
 
 open Lean.Order
 

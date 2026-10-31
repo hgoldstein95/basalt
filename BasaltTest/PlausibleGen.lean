@@ -3,16 +3,23 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import BasaltExamples.ArbNat
-import BasaltExamples.ArbString
-import BasaltExamples.BST
-import BasaltExamples.Heap
+module
+
+public import BasaltExamples.ArbNat
+public import BasaltExamples.ArbString
+meta import BasaltExamples.ArbString
+public import BasaltExamples.BST
+meta import BasaltExamples.BST
+public import BasaltExamples.Heap
+meta import BasaltExamples.Heap
 
 /-!
 # Exercising the `Plausible.Gen` Interpretation
 
 Samples from generators at `Plausible.Gen`, just to make sure the interpretation runs.
 -/
+
+@[expose] public section
 
 /- `genBST` can be run in `PlausibleGen`. -/
 #guard_msgs(drop info) in

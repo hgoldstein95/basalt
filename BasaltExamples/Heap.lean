@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.ArbNat
+module
+
+public import Basalt
+public import BasaltExamples.ArbNat
 
 /-!
 # Min-Heaps
@@ -16,6 +18,8 @@ recursing on *two* children makes the mean offspring exactly `1`, so this is a *
 generator: almost surely terminating, with no finite bound on its expected cost
 (`Tree.genHeap.not_expected_cost_bounded`).
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 
@@ -80,7 +84,6 @@ theorem Tree.genHeap.sound_complete :
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   mass_fixpoint [Nat.arbitrary.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/

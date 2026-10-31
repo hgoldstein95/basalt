@@ -3,10 +3,14 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Michael Hicks
 -/
-import Basalt.Combinators
-import Basalt.Fuzz.Runner
-import BasaltFuzz.BuggyBST
-import BasaltFuzz.Staged
+module
+
+public import Basalt.Combinators
+public import Basalt.Fuzz.Runner
+public import Basalt.IO.Backend
+public import Basalt.PlausibleGen.Backend
+public import BasaltFuzz.BuggyBST
+public import BasaltFuzz.Staged
 
 /-!
 # `basalt-fuzz` executable entry point
@@ -15,6 +19,8 @@ Lean owns `main`: `PBT.dispatch` selects a named property and a backend and runs
 module and everything it imports must stay Mathlib-free, since the executable links whatever it
 imports; it is built by `fuzz-run/build.sh`, never by the default `lake build`.
 -/
+
+@[expose] public section
 
 open Basalt.Fuzz Basalt.PBT RandomChoice
 
@@ -48,9 +54,9 @@ def properties : List (String × Property) :=
     ("long-32",              fun _ => Staged.propLong 32),
     ("long-64",              fun _ => Staged.propLong 64) ]
 
-/-- `dispatch`'s default backend is the first one registered, which is `io` — Basalt's own backends
-are registered by the import. This executable is a fuzzer, so it moves `fuzzBackend` to the front
-rather than listing the backends: anything else tagged `@[basalt_backend]` is still offered. -/
+/-- `dispatch`'s default backend is the first one registered, which depends on import order. This
+executable is a fuzzer, so it moves `fuzzBackend` to the front rather than listing the backends:
+anything else tagged `@[basalt_backend]` is still offered. -/
 def main (args : List String) : IO Unit :=
   let (fuzz, others) := (registered_backends% : List Backend).partition (·.name == fuzzBackend.name)
   dispatch "basalt-fuzz" properties args (fuzz ++ others)

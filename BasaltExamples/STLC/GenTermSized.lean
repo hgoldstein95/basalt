@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.STLC.GenTerm
+module
+
+public import Basalt
+public import BasaltExamples.STLC.GenTerm
 
 /-!
 # Sized Well-Typed STLC Terms
@@ -13,6 +15,10 @@ import BasaltExamples.STLC.GenTerm
 It is sound at every size and complete in the limit, and it makes at most `termCost n` choices on
 every run. Its leaves are variables wherever one fits, and its weights favor applications.
 -/
+
+@[expose] public section
+
+namespace STLC
 
 open RandomChoice
 
@@ -316,3 +322,5 @@ theorem genTermSized.complete (h : Typing Γ e τ) :
       ⟨τ1, hty, e1, hN1 n (by omega), e2, hN2 n (by omega), rfl⟩
     rw [SPMF.mem_support_iff_may]; unfold genTermSized; walk
     all_goals split <;> simp only [happ, or_true]
+
+end STLC

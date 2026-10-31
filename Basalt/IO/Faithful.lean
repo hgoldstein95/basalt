@@ -3,9 +3,11 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.IO.Approx
-import Basalt.IO.Laws
-import Basalt.IO.Stream
+module
+
+public import Basalt.IO.Approx
+public import Basalt.IO.Laws
+public import Basalt.IO.Stream
 
 /-!
 # From `IO` to `SPMF`
@@ -13,6 +15,8 @@ import Basalt.IO.Stream
 A generator is proved correct at `SPMF` and run at `IO`. `idealized_faithful` is the chain between
 the two: what the library proves of it, and the premises it takes.
 -/
+
+@[expose] public section
 
 open Lean.Order
 

@@ -3,27 +3,23 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.SPMF.Support
-import Basalt.Walk.Attr
+module
+
+public import Basalt.SPMF.Support
+public import Basalt.Walk.Attr
 
 /-!
 # Walking Soundness
 
 What the walk needs of `SPMF.alwaysObs`, on which `IsSoundFor g P` is `alwaysObs.spec g P`: how a
-fact about a sub-generator closes a leaf, the rules of the list combinators and of `suchThat`, and
-the admissibility `walk fixpoint` inducts with.
+fact about a sub-generator closes a leaf and the rules of the list combinators and of `suchThat`.
 -/
+
+@[expose] public section
 
 open RandomChoice
 
 namespace SPMF
-
-open Lean.Order in
-theorem alwaysObs.admissible (P : α → Prop) : admissible fun x : SPMF α => alwaysObs.spec x P := by
-  intro c hc ih a ha
-  rw [mem_support_csup hc] at ha
-  obtain ⟨x, hxc, hxa⟩ := ha
-  exact ih x hxc a hxa
 
 /-! ## Leaves
 
@@ -60,13 +56,13 @@ theorem le_always_listOfMaxLength {n : Nat} (hg : alwaysObs.spec g R) :
 @[gen_rule]
 theorem le_always_listOf (hg : alwaysObs.spec g R) :
     (∀ xs, (∀ x ∈ xs, R x) → p xs) ≤ alwaysObs.spec (listOf g) p :=
-  fun h xs hxs => h xs fun x hx => hg x (mem_support_listOf.mp hxs x hx)
+  fun h xs hxs => h xs fun x hx => hg x (mem_support_listOf_iff.mp hxs x hx)
 
 @[gen_rule]
 theorem le_always_nonEmptyListOf (hg : alwaysObs.spec g R) :
     (∀ xs, (xs ≠ [] ∧ ∀ x ∈ xs, R x) → p xs) ≤ alwaysObs.spec (nonEmptyListOf g) p :=
   fun h xs hxs =>
-    have hxs := mem_support_nonEmptylistOf.mp hxs
+    have hxs := mem_support_nonEmptyListOf_iff.mp hxs
     h xs ⟨hxs.1, fun x hx => hg x (hxs.2 x hx)⟩
 
 end generatorArgument
@@ -77,14 +73,14 @@ theorem le_always_suchThat {α : Type} {g : SPMF α} {p : α → Bool} {R post :
     (hg : alwaysObs.spec g R) :
     (∀ a, (R a ∧ p a = true) → post a) ≤ alwaysObs.spec (suchThat g p) post :=
   fun h a ha =>
-    have ha := mem_support_suchThat.mp ha
+    have ha := mem_support_suchThat_iff.mp ha
     h a ⟨hg a ha.1, ha.2⟩
 
 /-- With no fact about `g`, what `p` accepts. -/
 @[gen_rule]
 theorem le_always_suchThat_accept {α : Type} {g : SPMF α} {p : α → Bool} {post : α → Prop} :
     (∀ a, p a = true → post a) ≤ alwaysObs.spec (suchThat g p) post :=
-  fun h a ha => h a (mem_support_suchThat.mp ha).2
+  fun h a ha => h a (mem_support_suchThat_iff.mp ha).2
 
 /-- `permutationOf` produces every permutation of its list, and its subtype says so: there is no
 support law to bridge. -/

@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt.Combinators
-import BasaltExamples.ArbNat
+module
+
+public import Basalt.Combinators
+public import BasaltExamples.ArbNat
 
 /-!
 # Leftist Heaps
@@ -15,6 +17,8 @@ generator builds both children independently and then puts the higher-rank one o
 `if` is the only difference from `genHeap` — including in the termination proof, which is
 **critical** in the same way and the same text.
 -/
+
+@[expose] public section
 
 open RandomChoice ArbNat
 
@@ -111,17 +115,16 @@ theorem Tree.genLeftistOfRank.sound_complete :
 theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist lo) := by
   mass_fixpoint [Nat.arbitrary.terminates.obs]
     using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem Tree.genLeftist.faithful : IsFaithful (Tree.genLeftist lo) := by
   faithful_fixpoint [Tree.genLeftist.terminates, Nat.arbitrary.faithful]
 
-theorem Tree.genLeftistOfRank.ideal [WordSource σ] (src : IdealSource σ) :
+theorem Tree.genLeftistOfRank.below [WordSource σ] (src : IdealSource σ) :
     src.Below (Tree.genLeftistOfRank lo k) (Tree.genLeftistOfRank lo k) := by
   walk fixpoint [Nat.arbitrary.faithful.below]
 
-theorem Tree.genLeftistOfRank.io :
+theorem Tree.genLeftistOfRank.approx :
     IOModel.Approx (Tree.genLeftistOfRank lo k) (Tree.genLeftistOfRank lo k) := by
   walk fixpoint [Nat.arbitrary.faithful.approx]
 

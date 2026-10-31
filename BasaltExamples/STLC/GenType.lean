@@ -3,8 +3,10 @@ Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein & Ernest Ng
 -/
-import Basalt
-import BasaltExamples.STLC.Syntax
+module
+
+public import Basalt
+public import BasaltExamples.STLC.Syntax
 
 /-!
 # Arbitrary STLC Types
@@ -14,7 +16,11 @@ critical, like `AllTwoTree.genTree`: almost surely terminating, with no finite b
 cost (`genType.not_expected_cost_bounded`).
 -/
 
+@[expose] public section
+
 open RandomChoice
+
+namespace STLC
 
 /-- Generates an arbitrary type. -/
 def genType [Gen G] : G Ty :=
@@ -40,7 +46,6 @@ theorem genType.sound_complete : IsSoundAndComplete genType (fun _ => True) := b
 
 theorem genType.terminates : IsAlmostSurelyTerminating genType := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-    (by ennreal_to_real; norm_num) (by ennreal_to_real; norm_num) (by norm_num)
   simp [sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genType.cost_bounded : IsCostBounded genType Ty.size := by
@@ -64,3 +69,5 @@ theorem genType.not_expected_cost_bounded {B : ℝ≥0∞} (hB : B ≠ ⊤) :
   norm_num
   rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num)]
   exact le_of_eq (by ring)
+
+end STLC

@@ -3,7 +3,10 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
+module
+
+import Mathlib.Tactic.Basify
+public import Basalt
 
 /-!
 # The `match` Congruence Contract
@@ -12,6 +15,8 @@ Pins how the walk enters a `match` (`Basalt/Walk/Match.lean`): the lemma it gene
 the bound it makes a `match` in each algebra, the cases a residual `match` is split into, and the
 `match` it does not enter.
 -/
+
+@[expose] public section
 
 open RandomChoice
 
@@ -115,8 +120,8 @@ example : SPMF.expect (genPred : SPMF Nat) (fun n => n) ≤ 2 := by
   rw [SPMF.expect_eq_obs]
   walk
   trace_state
-  simp [Finset.sum_Icc_succ_top]
-  ennreal_to_real
+  norm_num [Finset.sum_Icc_succ_top]
+  basify
   norm_num
 
 /-! Overlapping patterns: a later alternative knows the earlier ones did not match. -/

@@ -3,9 +3,12 @@ Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Harrison Goldstein
 -/
-import Basalt
-import BasaltExamples.STLC.Cost
-import BasaltExamples.STLC.GenTermSized
+module
+
+import Mathlib.Tactic.Basify
+public import Basalt
+public import BasaltExamples.STLC.Cost
+public import BasaltExamples.STLC.GenTermSized
 
 /-!
 # Comparing `genTerm` and `genTermSized`
@@ -15,6 +18,10 @@ uninteresting terms are ones that are *trivial* (a literal under abstractions) a
 *useless* (ones that do not use the variables they create).  This file compares `genTerm` and
 `genTermSized` along these lines.
 -/
+
+@[expose] public section
+
+namespace STLC
 
 open RandomChoice
 open scoped ENNReal
@@ -91,7 +98,7 @@ theorem genTerm.prob_trivial_bool_of_var (h : varsWithType Γ .Bool ≠ []) :
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
     List.length_nil, genZero.prob_trivial, genBool.prob_trivial, prob_trivial_app,
     prob_trivial_elements]
-  ennreal_to_real; norm_num
+  norm_num; basify; norm_num
 
 theorem genTerm.prob_trivial_closed_fun :
     SPMF.prob (genTerm [] (.Fun .Bool .Bool)) trivialTerms = 1 / 2 := by
@@ -102,7 +109,7 @@ theorem genTerm.prob_trivial_closed_fun :
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
     List.length_nil, genZero.prob_trivial, prob_trivial_app, prob_trivial_abs,
     genTerm.prob_trivial_bool_of_var (Γ := [.Bool]) (by decide)]
-  ennreal_to_real; norm_num
+  norm_num; basify; norm_num
 
 /-- At every context and type, a quarter of `genTerm`'s terms or more are trivial: its `genZero`
 branch is always one of at most four. -/
@@ -122,7 +129,7 @@ theorem genTermSized.prob_trivial_bool (h : varsWithType Γ .Bool = []) :
   rw [SPMF.prob_frequency]
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, genBool.prob_trivial,
     prob_trivial_app]
-  ennreal_to_real; norm_num
+  basify; norm_num
 
 theorem genTermSized.prob_trivial_bool_of_var (h : varsWithType Γ .Bool ≠ []) :
     SPMF.prob (genTermSized (n + 1) Γ .Bool) trivialTerms = 1 / 7 := by
@@ -131,7 +138,7 @@ theorem genTermSized.prob_trivial_bool_of_var (h : varsWithType Γ .Bool ≠ [])
   rw [SPMF.prob_frequency]
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, genBool.prob_trivial,
     prob_trivial_app, prob_trivial_elements]
-  ennreal_to_real; norm_num
+  basify; norm_num
 
 theorem genTermSized.prob_trivial_closed_fun :
     SPMF.prob (genTermSized (n + 2) [] (.Fun .Bool .Bool)) trivialTerms = 1 / 21 := by
@@ -141,15 +148,15 @@ theorem genTermSized.prob_trivial_closed_fun :
   rw [SPMF.prob_frequency]
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, prob_trivial_app,
     prob_trivial_abs, genTermSized.prob_trivial_bool_of_var (Γ := [.Bool]) (by decide)]
-  ennreal_to_real; norm_num
+  norm_num; basify; norm_num
 
 theorem genTermSized.prob_trivial_le_third :
     SPMF.prob (genTermSized (n + 1) Γ τ) trivialTerms ≤ 1 / 3 := by
   cases τ with
   | Bool =>
     by_cases h : varsWithType Γ .Bool = []
-    · rw [genTermSized.prob_trivial_bool h]; ennreal_to_real; norm_num
-    · rw [genTermSized.prob_trivial_bool_of_var h]; ennreal_to_real; norm_num
+    · rw [genTermSized.prob_trivial_bool h]; basify; norm_num
+    · rw [genTermSized.prob_trivial_bool_of_var h]; basify; norm_num
   | Fun τ1 τ2 =>
     have hq := SPMF.prob_le_one (genTermSized n (τ1 :: Γ) τ2) trivialTerms
     rw [genTermSized]
@@ -158,10 +165,8 @@ theorem genTermSized.prob_trivial_le_third :
         prob_trivial_abs, prob_trivial_elements]
     all_goals
       generalize SPMF.prob (genTermSized n (τ1 :: Γ) τ2) trivialTerms = q at hq ⊢
-      have hq' := hq
-      ennreal_to_real at hq'
-      ennreal_to_real
       norm_num
+      basify
       linarith
 
 /-- From size `2` on, at most a fifth of `genTermSized`'s terms are trivial, at every context and
@@ -172,7 +177,7 @@ theorem genTermSized.prob_trivial_le :
   | Bool =>
     by_cases h : varsWithType Γ .Bool = []
     · rw [genTermSized.prob_trivial_bool h]
-    · rw [genTermSized.prob_trivial_bool_of_var h]; ennreal_to_real; norm_num
+    · rw [genTermSized.prob_trivial_bool_of_var h]; basify; norm_num
   | Fun τ1 τ2 =>
     have hq := genTermSized.prob_trivial_le_third (n := n) (Γ := τ1 :: Γ) (τ := τ2)
     rw [genTermSized]
@@ -182,10 +187,8 @@ theorem genTermSized.prob_trivial_le :
     all_goals
       generalize SPMF.prob (genTermSized (n + 1) (τ1 :: Γ) τ2) trivialTerms = q at hq ⊢
       have hq1 : q ≤ 1 := hq.trans (by norm_num)
-      have hq' := hq
-      ennreal_to_real at hq'
-      ennreal_to_real
       norm_num
+      basify
       linarith
 
 /-! ## Useless abstractions -/
@@ -249,7 +252,7 @@ theorem genTerm.half_le_prob_useless :
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
     List.length_nil, prob_useless_app, prob_useless_abs, zero_add, add_zero]
   rw [show ((0 + 1 + 1 + 1 : ℕ) : ℝ≥0∞) = 3 by norm_num]
-  calc (1 : ℝ≥0∞) / 2 = (1 + 1 / 2) / 3 := by ennreal_to_real; norm_num
+  calc (1 : ℝ≥0∞) / 2 = (1 + 1 / 2) / 3 := by clear hzero hbody; basify; norm_num
     _ ≤ _ := by gcongr
 
 theorem genTermSized.prob_not_mentions_le :
@@ -283,7 +286,7 @@ theorem genTermSized.prob_useless_le :
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, prob_useless_app,
     prob_useless_abs]
   calc _ ≤ ((4 : ℕ) * 0 + ((2 : ℕ) * (5 / 7) + 0)) / ((4 + (2 + 0) : ℕ) : ℝ≥0∞) := by gcongr
-    _ = 5 / 21 := by ennreal_to_real; norm_num
+    _ = 5 / 21 := by clear hbody; norm_num; basify; norm_num
 
 /-! ## Cost -/
 
@@ -294,3 +297,5 @@ theorem genTerm.not_cost_bounded (N : Nat) : ¬ IsCostBounded (genTerm Γ τ) (f
   refine genTerm.not_expected_cost_bounded (Γ := Γ) (τ := τ) (B := N) (by simp) ?_
   exact (IsExpectedCostBounded.of_costBounded genTerm.cost_faithful h).mono
     (SPMF.expect_le_of_support fun _ _ => le_rfl)
+
+end STLC
