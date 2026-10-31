@@ -7,7 +7,7 @@ module
 
 import Mathlib.Tactic.Basify
 public import Basalt
-public import BasaltExamples.Boltzmann.Rules
+public import BasaltExamples.Boltzmann.DuchonEtAlRules
 
 /-!
 # Singular Boltzmann Samplers for Trees

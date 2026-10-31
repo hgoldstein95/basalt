@@ -6,7 +6,7 @@ Authors: Ernest Ng
 module
 
 public import Basalt
-public import BasaltExamples.Boltzmann
+public import BasaltExamples.Boltzmann.DuchonEtAlBoltzmann
 
 /-!
 # Boltzmann Samplers' Construction Rules

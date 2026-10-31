@@ -6,12 +6,12 @@ Authors: Ernest Ng
 module
 
 public import Basalt
-public import BasaltExamples.Boltzmann.Rules
+public import BasaltExamples.Boltzmann.DuchonEtAlRules
 
 /-!
 # Ceiled Rejection Sampling of Binary Trees
 
-The ceiled rejection sampler of Duchon et al. (2004, §7) for `genB` (`BasaltExamples/Boltzmann`):
+The ceiled rejection sampler of Duchon et al. (2004, §7) for `genB` (`DuchonEtAlBoltzmann`):
 each draw is interrupted as soon as it exceeds the window's upper end. For every `p` it has `genB`'s
 law conditioned on the window, and it terminates whether or not `genB` does; when `genB` terminates
 it equals straight rejection (`ceiled_eq_suchThat`).

@@ -7,7 +7,7 @@ module
 
 import Mathlib.Tactic.Basify
 public import Basalt
-public import BasaltExamples.Boltzmann.Rules
+public import BasaltExamples.Boltzmann.DuchonEtAlRules
 
 /-!
 # A Boltzmann Sampler for λ-Terms
@@ -24,7 +24,7 @@ interleaved unification is not modelled; `retry_eq_suchThat` is the statement it
 open RandomChoice SPMF
 open scoped ENNReal
 
-namespace Boltzmann.Lambda
+namespace Boltzmann.BendkowskiEtAl
 
 /-- De Bruijn terms, `L = D | λL | L L` with `D = 0 | S(D)` (§3.1). -/
 inductive Term where
@@ -409,4 +409,4 @@ theorem paperSampler_retry :
       = suchThat (paperSampler : SPMF Term) (Term.closedUnder 0) :=
   retry_genClosed _ (by norm_num) (by norm_num) (by norm_num) (by norm_num)
 
-end Boltzmann.Lambda
+end Boltzmann.BendkowskiEtAl
