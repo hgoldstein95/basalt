@@ -4,7 +4,7 @@
 # Authors: Michael Hicks
 
 # Build the opt-in `basalt-fuzz` executable. Lake owns the module closure, the SanitizerCoverage
-# scope (the `BasaltFuzz` library and the executable root, per lakefile.toml), and the link; this
+# scope (`fuzzLeancArgs` in lakefile.lean, on under `-Kfuzz`), and the link; this
 # script owns what Lake's declarative config cannot express — detecting this platform's libFuzzer
 # runtime and C++ runtime, compiling the C bridge, and asserting the properties a wrong answer would
 # otherwise degrade silently. Lean owns `main`, which calls Fuzz.go -> libFuzzer's driver. See
@@ -190,7 +190,7 @@ if [ "$UNAME" != "Darwin" ]; then
 fi
 
 # Everything the link needs beyond the Lean closure, handed to Lake through the one static
-# `moreLinkArgs` entry in lakefile.toml. A clang response file is one argument per line; the quoting
+# `moreLinkArgs` entry in lakefile.lean. A clang response file is one argument per line; the quoting
 # is what survives a path containing a space.
 #
 # `-fsanitize=fuzzer-no-link` is deliberately absent: it is a *compile-time* instrumentation flag,
@@ -208,10 +208,16 @@ done
 # so editing the response file alone leaves the previous binary reported as up to date. Deleting the
 # output is what forces the relink; a rebuild after switching `FUZZER_LIB_FLAGS` otherwise silently
 # keeps the old runtime.
+#
+# `-Kfuzz=1` turns the instrumentation on (lakefile.lean, `fuzzLeancArgs`). Lake reads `-K` options
+# only when it elaborates the lakefile, and otherwise reuses the configuration it cached, so `-R` is
+# what makes the option take effect. The option then stays in that cache until the next `lake -R`,
+# which is harmless: only this executable asks for Basalt's C objects, and a package that requires
+# Basalt never sees the option.
 echo "== lake build basalt-fuzz =="
 rm -f "$EXE" fuzz-run/basalt-fuzz
 # shellcheck disable=SC2086   # a target list: the split into words is the point
-lake build basalt-fuzz ${EXTRA_LAKE_TARGETS:-} > "$OUT/link.log" 2>&1 || {
+lake -R -Kfuzz=1 build basalt-fuzz ${EXTRA_LAKE_TARGETS:-} > "$OUT/link.log" 2>&1 || {
   grep -viE 'unused|-Wl' "$OUT/link.log" >&2 || true
   die "lake build FAILED (runtime: $FUZZER_LIB_FLAGS; cxxlib: $CXXLIB_FLAGS)"
 }
@@ -236,12 +242,13 @@ if grep -qi 'packages/mathlib' "$LAKE_RSP"; then
 fi
 
 # The instrumentation scope, asserted in both directions: every first-party object carries
-# SanitizerCoverage (the `Basalt` and `BasaltFuzz` libraries and the executable root, per the
-# `moreLeancArgs` in lakefile.toml), and no dependency object does — Plausible's and SplitMix's code is
-# the `--backend=plausible`/`io` PRNG rather than code under test, and coverage over a PRNG's mixing
-# steps is noise in the feedback. A module claimed by two libraries' globs, or a `moreLeancArgs`
-# dropped from one of them, yields a fuzzer that still runs and still finds the shallow `bst-buggy-*`
-# bugs; what it loses is measured in fuzz-run/README.md, and only a staged benchmark would reveal it.
+# SanitizerCoverage (the `Basalt` and `BasaltFuzz` libraries and the executable root, per
+# `fuzzLeancArgs` in lakefile.lean), and no dependency object does — Plausible's and SplitMix's code
+# is the `--backend=plausible`/`io` PRNG rather than code under test, and coverage over a PRNG's
+# mixing steps is noise in the feedback. A module claimed by two libraries' globs, or a
+# `moreLeancArgs` dropped from one of them, yields a fuzzer that still runs and still finds the
+# shallow `bst-buggy-*` bugs; what it loses is measured in fuzz-run/README.md, and only a staged
+# benchmark would reveal it.
 instrumented() { [ "$(nm -u "$1" 2>/dev/null | grep -c __sanitizer_cov_8bit_counters_init || true)" -gt 0 ]; }
 first_party=0
 while IFS= read -r o; do

@@ -4,7 +4,7 @@
 
 # Guards `basalt-fuzz` on macOS and Linux. `lake build` elaborates the `BasaltFuzz` library but never
 # emits its C, instruments it, or links the fuzzer runtime (fuzz-run/README.md), so a change to
-# `Basalt/Gen.lean`, `fuzz-run/build.sh`, `lakefile.toml`'s fuzz targets, or the toolchain pin can
+# `Basalt/Gen.lean`, `fuzz-run/build.sh`, `lakefile.lean`'s fuzz targets, or the toolchain pin can
 # break the executable with every other CI job green. That is what this workflow is for. The two platforms take
 # *different* branches through `fuzz-run/build.sh` (driver entry point, runtime source, C++
 # library), so only a matrix covers both.
@@ -32,7 +32,7 @@ on:
       - 'BasaltFuzz/**'
       - 'BasaltFuzzMain.lean'
       - 'fuzz-run/**'
-      - 'lakefile.toml'
+      - 'lakefile.lean'
       - 'lake-manifest.json'
       - 'lean-toolchain'
       - '.github/workflows/fuzz_build.yml'
@@ -42,7 +42,7 @@ on:
       - 'BasaltFuzz/**'
       - 'BasaltFuzzMain.lean'
       - 'fuzz-run/**'
-      - 'lakefile.toml'
+      - 'lakefile.lean'
       - 'lake-manifest.json'
       - 'lean-toolchain'
       - '.github/workflows/fuzz_build.yml'
