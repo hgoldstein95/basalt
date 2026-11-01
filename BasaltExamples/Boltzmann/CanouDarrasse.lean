@@ -16,7 +16,7 @@ The three tree samplers of Canou and Darrasse, "Fast and Sound Random Generation
 Testing and Benchmarking in Objective Caml" (ML '09, Figs. 1–3), run at the singularity `x = ρ`,
 where every branching probability is rational and every sampler is critical: each is uniform within
 a size, terminates almost surely, and has infinite expected size. Their abort-and-retry sampler
-(§3.3) is uniform within a size and biased towards small sizes.
+(§3.3) is uniform within a size.
 -/
 
 @[expose] public section
@@ -28,8 +28,7 @@ namespace Boltzmann.CanouDarrasse
 
 /-! ## Ternary trees: `T = Z + T × T × T`
 
-Fig. 1's grammar puts the atom `Z` only at leaves, so `|t|` counts leaves, though §3.2 says "the
-size of a tree is its number of nodes". At `ρ = 2√3/9`, `T(ρ) = 1/√3` and the leaf probability is
+Fig. 1's grammar puts the atom `Z` only at leaves, so `|t|` counts leaves. At `ρ = 2√3/9`, `T(ρ) = 1/√3` and the leaf probability is
 `ρ / T(ρ) = 2/3`. -/
 
 /-- Ternary trees. -/
@@ -184,8 +183,7 @@ theorem genTernary_mass_le (hp0 : 0 ≤ p) (hp : p < 2/3) :
         nlinarith [pow_nonneg (sub_nonneg.2 ht1) 3]
 
 /-- **The knife edge** (§3.3): with leaf probability `p`, the ternary sampler terminates almost
-surely exactly when `p ≥ 2/3`. Canou and Darrasse compute `ρ` in floating point; a rounding of
-`ρ / T(ρ)` below `2/3` — the double nearest `2/3` is below it — makes the sampler supercritical. -/
+surely exactly when `p ≥ 2/3`. -/
 theorem genTernary_terminates_iff (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
     IsAlmostSurelyTerminating (genTernary p : SPMF TTree) ↔ 2/3 ≤ p := by
   refine ⟨fun h => not_lt.1 fun hp => ?_, fun hp => genTernary_terminates hp hp1⟩
@@ -200,13 +198,6 @@ theorem genTernary_terminates_iff (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
   have hle := genTernary_mass_le hp0 hp
   rw [h] at hle
   exact absurd hle (not_le.2 (ENNReal.inv_lt_one.2 h3))
-
-/-- The double nearest `2/3`, `6004799503160661 / 2⁵³`, is below `2/3`, so a sampler that uses it
-loses mass. -/
-theorem genTernary_double_two_thirds :
-    ¬ IsAlmostSurelyTerminating (genTernary (6004799503160661 / 2 ^ 53) : SPMF TTree) := by
-  rw [genTernary_terminates_iff (by norm_num) (by norm_num)]
-  norm_num
 
 /-- **Infinite expected size at the singularity** (§3.3: "the mean size of the generated structures
 is infinite. We will never generate an infinite object"): the sampler terminates
@@ -324,11 +315,8 @@ theorem genOneTwo_boltzmann :
 def UniformWithinSize (μ : SPMF OTTree) : Prop :=
   ∀ s t : OTTree, s.size = t.size → μ s = μ t
 
-/-- **Exact uniformity needs exact weights.** The weighted one-two sampler is uniform within each
-size exactly when `b² = a c` (or it never halts, `a = 0`). Fig. 3's three thresholds, `x / T(x)` and
-`(x + U(x)) / T(x)`, are floating-point numbers; nothing makes the rounded unary probability the
-geometric mean of the other two, so the floating-point sampler is only approximately uniform
-(Duchon et al. 2004, §5). At `ρ`, `a = b = c`. -/
+/-- The weighted one-two sampler is uniform within each size exactly when `b² = a c` (or it never
+halts, `a = 0`); at `ρ`, `a = b = c`. -/
 theorem genOneTwoW_uniform_iff (h : 0 < a + b + c) :
     UniformWithinSize (genOneTwoW a b c h : SPMF OTTree) ↔ a = 0 ∨ b ^ 2 = a * c := by
   set S : ℝ≥0∞ := a + b + c
@@ -398,85 +386,6 @@ theorem genOneTwo_expected_size :
     mul_comm, mul_div_assoc, ENNReal.div_self (by norm_num) (by norm_num), mul_one] at hstep
   by_contra hE
   exact absurd ((ENNReal.add_right_inj hE).1 (hstep.symm.trans (add_zero E).symm)) one_ne_zero
-
-/-- One-two trees, by their top constructor. -/
-def OTTree.equiv : OTTree ≃ Unit ⊕ (OTTree ⊕ OTTree × OTTree) where
-  toFun
-    | .leaf => .inl ()
-    | .unary t => .inr (.inl t)
-    | .binary l r => .inr (.inr (l, r))
-  invFun
-    | .inl _ => .leaf
-    | .inr (.inl t) => .unary t
-    | .inr (.inr (l, r)) => .binary l r
-  left_inv t := by cases t <;> rfl
-  right_inv x := by rcases x with _ | _ | ⟨_, _⟩ <;> rfl
-
-/-- `c_n`, the number of one-two trees of size `n` (the Motzkin numbers, shifted). -/
-noncomputable def count (n : Nat) : ℝ≥0∞ := ∑' t : OTTree, if t.size = n then 1 else 0
-
-theorem OTTree.size_pos (t : OTTree) : 0 < t.size := by cases t <;> simp [OTTree.size]
-
-theorem count_zero : count 0 = 0 :=
-  ENNReal.tsum_eq_zero.2 fun t => by simp [(OTTree.size_pos t).ne']
-
-private theorem ite_add_eq (a b n : Nat) :
-    (if a + b = n then (1 : ℝ≥0∞) else 0)
-      = ∑ p ∈ Finset.antidiagonal n, (if a = p.1 then 1 else 0) * (if b = p.2 then 1 else 0) := by
-  by_cases h : a + b = n
-  · rw [ite_eq_left_iff.2 fun h' => absurd h h', Finset.sum_eq_single (a, b)]
-    · simp
-    · intro p _ hp
-      by_cases h1 : a = p.1
-      · have : b = p.2 := by have := Finset.mem_antidiagonal.1 ‹_›; omega
-        exact absurd (Prod.ext h1.symm this.symm) hp
-      · simp [h1]
-    · intro hab; exact absurd (Finset.mem_antidiagonal.2 h) hab
-  · rw [ite_eq_right_iff.2 fun h' => absurd h' h]
-    refine (Finset.sum_eq_zero fun p hp => ?_).symm
-    have := Finset.mem_antidiagonal.1 hp
-    by_cases h1 : a = p.1 <;> by_cases h2 : b = p.2 <;> simp [h1, h2]; omega
-
-/-- The recursion for `c_n`: a leaf, a unary node over a tree of size `n`, or a binary node over two
-trees whose sizes add to `n`. -/
-theorem count_succ (n : Nat) :
-    count (n + 1) = (if n = 0 then 1 else 0) + count n
-      + ∑ p ∈ Finset.antidiagonal n, count p.1 * count p.2 := by
-  unfold count
-  rw [← OTTree.equiv.symm.tsum_eq, Summable.tsum_sum ENNReal.summable ENNReal.summable,
-    Summable.tsum_sum ENNReal.summable ENNReal.summable, add_assoc]
-  congr 1
-  · simp [OTTree.equiv, OTTree.size]
-  congr 1
-  · simp [OTTree.equiv, OTTree.size]
-  simp only [OTTree.equiv, Equiv.coe_fn_symm_mk, OTTree.size, Nat.add_right_cancel_iff]
-  simp_rw [ite_add_eq]
-  rw [Summable.tsum_finsetSum fun _ _ => ENNReal.summable]
-  refine Finset.sum_congr rfl fun p _ => ?_
-  rw [ENNReal.tsum_prod', ← ENNReal.tsum_mul_right]
-  simp_rw [← ENNReal.tsum_mul_left]
-
-theorem count_one : count 1 = 1 := by rw [count_succ]; simp [count_zero]
-theorem count_two : count 2 = 1 := by
-  rw [count_succ]; simp [Finset.Nat.antidiagonal_succ, count_zero, count_one]
-theorem count_three : count 3 = 2 := by
-  rw [count_succ]; simp [Finset.Nat.antidiagonal_succ, count_zero, count_one, count_two]; norm_num
-theorem count_four : count 4 = 4 := by
-  rw [count_succ]
-  simp [Finset.Nat.antidiagonal_succ, count_zero, count_one, count_two, count_three]; norm_num
-theorem count_five : count 5 = 9 := by
-  rw [count_succ]
-  simp [Finset.Nat.antidiagonal_succ, count_zero, count_one, count_two, count_three, count_four]
-  norm_num
-
-/-- **(2.3) for one-two trees**: size `n` has probability `c_n ρ^n / T(ρ) = c_n / 3^n`. §3.3 prints
-`c_n xⁿ ρ⁻ⁿ` instead, which at the singular `x = ρ` is `c_n` itself: at `n = 4` it would give the
-size the "probability" `4`. The correct value is `4/81`; the asymptotic `n^{-3/2} (x/ρ)ⁿ` the paper
-derives from it is unaffected. -/
-theorem prob_size_four :
-    prob (genOneTwoW 1 1 1 three_pos : SPMF OTTree) {t | t.size = 4} = 4 / 81 := by
-  rw [genOneTwo_boltzmann.prob_size, ← count, count_four, div_one]
-  basify; norm_num
 
 /-! ### Abort and retry (§3.3)
 
@@ -736,73 +645,11 @@ theorem ceiledOT_terminates {lo hi : Nat} (hlo : 1 ≤ lo) (hle : lo ≤ hi) :
   simp_rw [ceiledOT_apply, div_eq_mul_inv]
   rw [ENNReal.tsum_mul_right, hQsum, ENNReal.mul_inv_cancel hQ0 hQtop]
 
-private theorem tsum_size_eq (m : Nat) :
-    (∑' t : OTTree, if t.size = m then (genOneTwoW 1 1 1 three_pos : SPMF OTTree) t else 0)
-      = count m * (1 / 3) ^ m := by
-  rw [count, ← ENNReal.tsum_mul_right]
-  refine tsum_congr fun t => ?_
-  by_cases ht : t.size = m <;> simp [ht, genOneTwo_boltzmann t]
-
-theorem prob_window_three_five :
-    prob (genOneTwoW 1 1 1 three_pos : SPMF OTTree) {t | window 3 5 t = true} = 13 / 81 := by
-  classical
-  rw [prob_eq_tsum_ite]
-  have : ∀ t : OTTree, (if t ∈ {t | window 3 5 t = true}
-      then (genOneTwoW 1 1 1 three_pos : SPMF OTTree) t else 0)
-      = (if t.size = 3 then (genOneTwoW 1 1 1 three_pos : SPMF OTTree) t else 0)
-        + (if t.size = 4 then (genOneTwoW 1 1 1 three_pos : SPMF OTTree) t else 0)
-        + (if t.size = 5 then (genOneTwoW 1 1 1 three_pos : SPMF OTTree) t else 0) := fun t => by
-    simp only [Set.mem_ofPred_eq, window, decide_eq_true_eq]
-    by_cases h3 : t.size = 3 <;> by_cases h4 : t.size = 4 <;> by_cases h5 : t.size = 5 <;>
-      simp [h3, h4, h5]
-    all_goals (intros; omega)
-  rw [tsum_congr this, ENNReal.tsum_add, ENNReal.tsum_add, tsum_size_eq, tsum_size_eq,
-    tsum_size_eq, count_three, count_four, count_five]
-  basify; norm_num
-
-/-- The probability that abort-and-retry returns size `m`: `c_m ρ^m`, renormalized over the
-window. -/
-theorem prob_ceiledOT_size (lo hi m : Nat) :
-    prob (ceiledOT 1 1 1 three_pos lo hi : SPMF OTTree) {t | t.size = m}
-      = (if lo ≤ m ∧ m ≤ hi then count m * (1 / 3) ^ m else 0)
-        / prob (genOneTwoW 1 1 1 three_pos : SPMF OTTree) {t | window lo hi t = true} := by
-  classical
-  rw [prob_eq_tsum_ite]
-  simp_rw [ceiledOT_apply, div_eq_mul_inv]
-  have : ∀ t : OTTree, (if t ∈ {t : OTTree | t.size = m} then
-      (if window lo hi t = true then (genOneTwoW 1 1 1 three_pos : SPMF OTTree) t else 0) *
-        (prob (genOneTwoW 1 1 1 three_pos : SPMF OTTree) {t | window lo hi t = true})⁻¹ else 0)
-      = (if lo ≤ m ∧ m ≤ hi then
-          (if t.size = m then (genOneTwoW 1 1 1 three_pos : SPMF OTTree) t else 0) else 0) *
-        (prob (genOneTwoW 1 1 1 three_pos : SPMF OTTree) {t | window lo hi t = true})⁻¹ :=
-    fun t => by
-      by_cases ht : t.size = m
-      · subst ht; simp [window]
-      · simp [ht]
-  rw [tsum_congr this, ENNReal.tsum_mul_right]
-  split_ifs <;> simp [tsum_size_eq]
-
-/-- **"A measurable bias towards smaller sized trees"** (§3), on the window `[3, 5]`: sizes `3`,
-`4`, `5` come out with probabilities `6/13`, `4/13`, `3/13`, though uniform within each size
-(`ceiledOT_uniform`). -/
-theorem ceiledOT_bias :
-    prob (ceiledOT 1 1 1 three_pos 3 5 : SPMF OTTree) {t | t.size = 3} = 6 / 13
-      ∧ prob (ceiledOT 1 1 1 three_pos 3 5 : SPMF OTTree) {t | t.size = 4} = 4 / 13
-      ∧ prob (ceiledOT 1 1 1 three_pos 3 5 : SPMF OTTree) {t | t.size = 5} = 3 / 13 := by
-  simp only [prob_ceiledOT_size, prob_window_three_five, count_three, count_four, count_five]
-  refine ⟨?_, ?_, ?_⟩ <;> norm_num <;>
-    (rw [← ENNReal.toReal_eq_toReal_iff'
-      (by simp [ENNReal.div_eq_top, ENNReal.mul_eq_top, ENNReal.pow_eq_top_iff])
-      (by simp [ENNReal.div_eq_top])]; simp [ENNReal.toReal_div]; norm_num)
-
 /-! ## General trees: `T = Z × Seq(T)`
 
 At `ρ = 1/4`, `T(ρ) = 1/2`, so the number of children is geometric with parameter `1/2`: exactly the
 length law of Basalt's `listOf`. The sampler is the naive recursive generator `node <$> listOf gen`.
-
-Fig. 1 writes `T = Z × F, F = Seq(T)` and Fig. 2 `F(z) = 1 / (1 - T(z))`; §3.1's dictionary instead
-translates `Seq(A)` to `z / (1 - A(z))`, counting the sequence itself as an atom, which would give
-`T = z² / (1 - T)` and a different `ρ`. Figs. 2–3 are the consistent reading. -/
+-/
 
 /-- General plane trees. -/
 inductive GTree where

@@ -104,19 +104,6 @@ theorem isBoltzmann_union (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {ga : SPMF α} {gb : S
   · rw [union_inr hp0 hp1, hpA, union_shares hA hB hAB, hb, Sum.elim_inr, mul_comm,
       ENNReal.div_mul_div_cancel hB0 hB]
 
-/-- **The probability of the second branch is `B(x) / C(x)`.** The paper prints
-`ℙ_{C,x}(γ ∈ B) = A(x) / C(x)` (p. 585), a typo: the two differ whenever `A(x) ≠ B(x)`. -/
-theorem prob_union_inr (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {ga : SPMF α} {gb : SPMF β}
-    {A B : ℝ≥0∞} (hA : A ≠ ⊤) (hB : B ≠ ⊤) (hAB : A + B ≠ 0) (hpA : pr p = A / (A + B))
-    (hgb : gb.mass = 1) :
-    prob (union p ga gb : SPMF (α ⊕ β)) (Set.range Sum.inr) = B / (A + B) := by
-  classical
-  rw [prob_eq_tsum_ite, Summable.tsum_sum ENNReal.summable ENNReal.summable]
-  simp only [Set.mem_range, reduceCtorEq, exists_false, ↓reduceIte, tsum_zero, Sum.inr.injEq,
-    exists_eq, zero_add]
-  simp_rw [union_inr hp0 hp1]
-  rw [ENNReal.tsum_mul_left, ← mass, hgb, mul_one, hpA, union_shares hA hB hAB]
-
 /-- `C = A × B`: a pair of independent draws (3.5). -/
 def product [Gen G] (ga : G α) (gb : G β) : G (α × β) := do
   return (← ga, ← gb)

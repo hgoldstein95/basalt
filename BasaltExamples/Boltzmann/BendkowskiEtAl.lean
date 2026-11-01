@@ -5,7 +5,6 @@ Authors: Ernest Ng
 -/
 module
 
-import Mathlib.Tactic.Basify
 public import Basalt
 public import BasaltExamples.Boltzmann.DuchonEtAlRules
 
@@ -169,40 +168,6 @@ theorem genIdx_terminates (hp0 : 0 < pz) (hp1 : pz ≤ 1) :
 def paperSampler [Gen G] : G Term :=
   genLam 35700035696434995 29558095907388785 34741868396176220 (by norm_num)
     (7044190409261122 / 10 ^ 16)
-
-/-- **The printed constants are not exactly uniform.** `λλλ.2` and `λλλλλ.0`, both closed and
-simply typed of size `5`, differ in probability: uniformity needs a successor's probability,
-`1 - 0.7044190409261122`, to equal an abstraction's, `0.6525813160382378 - 0.35700035696434995`, and
-the two decimals differ in the 17th digit. Duchon et al. (§5) anticipate this: truncated constants
-"must deviate (slightly) from uniformity". -/
-theorem paperSampler_not_uniform :
-    (paperSampler : SPMF Term) (.lam (.lam (.lam (.var 2))))
-      < (paperSampler : SPMF Term) (.lam (.lam (.lam (.lam (.lam (.var 0)))))) := by
-  rw [paperSampler, genLam_apply _ (by norm_num) (by norm_num),
-    genLam_apply _ (by norm_num) (by norm_num)]
-  simp only [Term.vars, Term.succs, Term.lams, Term.apps, pow_one, pow_zero, mul_one]
-  rw [show pr (7044190409261122 / 10 ^ 16) = 3522095204630561 / 5000000000000000 by
-    rw [pr]; norm_num]
-  norm_num
-  have hq : (1 - 3522095204630561 / 5000000000000000 : ℝ≥0∞)
-      < 29558095907388785 / 100000000000000000 := by
-    rw [← ENNReal.toReal_lt_toReal (by finiteness) (by finiteness),
-      ENNReal.toReal_sub_of_le (ENNReal.div_le_of_le_mul (by norm_num)) (by simp)]
-    simp
-    norm_num
-  have hA0 : (35700035696434995 / 100000000000000000 * (3522095204630561 / 5000000000000000)
-      : ℝ≥0∞) ≠ 0 := by simp
-  have hAt : (35700035696434995 / 100000000000000000 * (3522095204630561 / 5000000000000000)
-      : ℝ≥0∞) ≠ ⊤ := by finiteness
-  have hw0 : (29558095907388785 / 100000000000000000 : ℝ≥0∞) ≠ 0 := by simp
-  have hwt : (29558095907388785 / 100000000000000000 : ℝ≥0∞) ≠ ⊤ := by finiteness
-  generalize (1 - 3522095204630561 / 5000000000000000 : ℝ≥0∞) = q at hq ⊢
-  generalize (29558095907388785 / 100000000000000000 : ℝ≥0∞) = w at hq hw0 hwt ⊢
-  generalize (35700035696434995 / 100000000000000000 * (3522095204630561 / 5000000000000000)
-    : ℝ≥0∞) = A at hA0 hAt ⊢
-  rw [mul_assoc, show w ^ 5 = w ^ 2 * w ^ 3 by ring]
-  exact ENNReal.mul_lt_mul_right hA0 hAt (ENNReal.mul_lt_mul_left (pow_ne_zero _ hw0)
-    (ENNReal.pow_ne_top hwt) (ENNReal.pow_lt_pow_left two_ne_zero hq))
 
 /-! ## Anticipated rejection of open terms
 
