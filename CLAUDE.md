@@ -107,7 +107,7 @@ definition, and the definition is right here to run.
   [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean); how many independent
   draws see a shape (geometric and coupon-collector bounds) —
   [Basalt/SPMF/Expect/Draws.lean](Basalt/SPMF/Expect/Draws.lean), instantiated for STLC by
-  [BasaltExamples/STLC/Coverage.lean](BasaltExamples/STLC/Coverage.lean); what the walk needs
+  [BasaltExamples/STLC/NumDraws.lean](BasaltExamples/STLC/NumDraws.lean); what the walk needs
   of an expectation bound — [Basalt/Walk/Expect.lean](Basalt/Walk/Expect.lean), pinned by
   [BasaltTest/Walk/Expect.lean](BasaltTest/Walk/Expect.lean). The practical entry for a bound is
   WORKFLOW.md's Recipe 4.
