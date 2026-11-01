@@ -53,20 +53,6 @@ namespace LazyOracle
 
 variable (O : LazyOracle)
 
-/-- The paper's stated law for `inspectsFst` (Section 4, Lemma 2 discussion): "`inspectsFst` is
-required to interact in a standard way with functions like `swap`, for example satisfying the law
-`inspectsFst p ⇒ not (inspectsFst (p ∘ swap))`".
-
-It is not a field of `LazyOracle`. The paper needs it only for termination, which `fuel` replaces
-here and which it does not ensure anyway (`cycleOracle_swapLaw`). And since Lean functions are
-extensional, it forces `inspectsFst p = false` whenever `p ∘ swap = p`, which excludes Section 4.1's
-racy oracle (`racyRound_race_TF`). -/
-def SwapLaw : Prop :=
-  ∀ {α β : Type} (p : α × β → Bool), O.inspectsFst p = true → O.inspectsFst (p ∘ Prod.swap) = false
-
-theorem universal_true {α : Type} {p : α → Bool} (h : O.universal p = some true) (x : α) :
-    p x = true := O.universal_sound p true h x
-
 theorem universal_false {α : Type} {p : α → Bool} (h : O.universal p = some false) (x : α) :
     p x = false := O.universal_sound p false h x
 
@@ -151,55 +137,6 @@ def sizedP (O : LazyOracle) :
     | .pure a, 0 => some (if p a then .single (.inl a) else .single (.inr .empty))
     | .pure _, _ + 1 => some .empty
     | .empty, _ => some .empty
-
-/-- **More fuel never changes a `some` answer.** `sizedP` only fails by running out of fuel, so a run
-that succeeds with `fuel` succeeds identically with any larger fuel. -/
-theorem sizedP_succ_of_eq_some (O : LazyOracle) : ∀ (fuel : Nat) {α : Type} (p : α → Bool)
-    (s : Space α) (k : Nat) (r : FinSet (α ⊕ Space α)), sizedP O fuel p s k = some r →
-    sizedP O (fuel + 1) p s k = some r := by
-  intro fuel
-  induction fuel with
-  | zero => intro _ p s k r h; simp [sizedP] at h
-  | succ fuel ih =>
-    intro α p s k r h
-    match s, k, h with
-    | .empty, _, h | .pure _, 0, h | .pure _, _ + 1, h | .pay _, 0, h => simpa [sizedP] using h
-    | .pay a, k + 1, h =>
-      simp only [sizedP, Option.map_eq_some_iff] at h
-      rw [sizedP, Option.map_eq_some_iff]
-      obtain ⟨r', hr', rfl⟩ := h
-      exact ⟨r', ih p a k r' hr', rfl⟩
-    | .union a b, k, h =>
-      simp only [sizedP] at h
-      rw [sizedP]
-      split at h
-      · rename_i sa sb hsa hsb
-        rw [ih p a k sa hsa, ih p b k sb hsb]
-        exact h
-      · simp at h
-    | .fmap f a, k, h =>
-      simp only [sizedP] at h
-      rw [sizedP]
-      split at h
-      · rename_i hu; rw [ite_eq_left hu]; exact h
-      · rename_i hu
-        rw [ite_eq_right hu]
-        obtain ⟨r', hr', rfl⟩ := Option.map_eq_some_iff.mp h
-        rw [ih _ a k r' hr']
-        rfl
-    | .prod a b, k, h =>
-      simp only [sizedP] at h
-      rw [sizedP]
-      split at h
-      · rename_i hi; rw [ite_eq_left hi]; exact ih _ _ k r h
-      · rename_i hi; rw [ite_eq_right hi]; exact ih _ _ k r h
-
-theorem sizedP_mono (O : LazyOracle) {fuel fuel' : Nat} (hle : fuel ≤ fuel') {α : Type}
-    {p : α → Bool} {s : Space α} {k : Nat} {r : FinSet (α ⊕ Space α)}
-    (h : sizedP O fuel p s k = some r) : sizedP O fuel' p s k = some r := by
-  induction hle with
-  | refl => exact h
-  | step _ ih => exact sizedP_succ_of_eq_some O _ p s k r ih
 
 /-! ### `|sizedP p s k| = |sized s k|`
 
@@ -304,21 +241,6 @@ private theorem filterMap_getRight?_replicate (n : Nat) (b : β) :
     rw [Multiset.replicate_succ, Multiset.filterMap_cons_some Sum.getRight? _ _ (b := b) rfl, ih,
       Multiset.replicate_succ]
 
-/-- The `Left`s and the `Right`s together account for every occurrence. Used in Theorem 2 to turn
-`|sizedP p s k| = n` and `|lefts| = m` into `|rights| = n - m`. -/
-theorem card_filterMap_getLeft?_add_getRight? (M : Multiset (α ⊕ β)) :
-    (M.filterMap Sum.getLeft?).card + (M.filterMap Sum.getRight?).card = M.card := by
-  refine Multiset.induction_on M (by simp) fun a s ih => ?_
-  cases a with
-  | inl y =>
-    rw [Multiset.filterMap_cons_some Sum.getLeft? _ _ (b := y) rfl,
-      Multiset.filterMap_cons_none (f := Sum.getRight?) _ _ rfl]
-    simp only [Multiset.card_cons]; omega
-  | inr y =>
-    rw [Multiset.filterMap_cons_none (f := Sum.getLeft?) _ _ rfl,
-      Multiset.filterMap_cons_some Sum.getRight? _ _ (b := y) rfl]
-    simp only [Multiset.card_cons]; omega
-
 end SumHelpers
 
 /-- `applyE` is exactly `Sum.map` of `f` and `f :$: ·`. -/
@@ -378,11 +300,6 @@ theorem applyE_eq_sumMap {α β : Type} (f : α → β) :
     rights (r.fmap (applyE f)) = (rights r).map (Space.fmap f) := by
   simp only [rights, FinSet.toMultiset_fmap, applyE_eq_sumMap,
     filterMap_getRight?_map_sumMap _ f (Space.fmap f)]
-
-/-- The cardinality split, for `sizedP` results: `|lefts r| + |rights r| = |r|`. -/
-theorem card_lefts_add_card_rights {α : Type} (r : FinSet (α ⊕ Space α)) :
-    (lefts r).card + (rights r).card = r.card := by
-  rw [lefts, rights, card_filterMap_getLeft?_add_getRight?, FinSet.card_toMultiset]
 
 /-! ## Lemma 2: `sizedP` finds exactly the satisfying values
 

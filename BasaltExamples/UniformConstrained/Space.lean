@@ -157,12 +157,6 @@ def toMultiset (s : FinSet α) : Multiset α := (s.toList : Multiset α)
 @[simp] theorem toList_replicateSet (n : Nat) (a : α) :
     (FinSet.replicateSet n a).toList = List.replicate n a := rfl
 
-private theorem length_listProd (xs : List α) (ys : List β) :
-    (xs.flatMap fun x => ys.map fun y => (x, y)).length = xs.length * ys.length := by
-  induction xs with
-  | nil => simp
-  | cons x xs ih => simp [ih, Nat.succ_mul, Nat.add_comm]
-
 /-- `|s|` counts the occurrences of `s`. -/
 theorem card_eq_length_toList (s : FinSet α) : s.card = s.toList.length := by
   induction s with
@@ -275,30 +269,6 @@ theorem indexSet_index (s : FinSet α) (i : Nat) (h : i < s.card) :
   rw [indexSet_eq_getElem?]
   exact List.getElem?_eq_getElem _
 
-/-- **`indexSet` realizes multiplicities: it is a bijection onto the occurrences of `s`.**
-
-This is the Section 4 preliminary "`indexSet` is bijective". Because a `FinSet` is a *multiset*, the
-bijection is onto occurrences rather than onto values — the paper is explicit that "uniform over
-`s`" means uniform over the occurrences in `s`. The usable form of that statement is this one: of
-the `|s|` valid indices, exactly `count a s` of them name `a`. With the index drawn uniformly from
-`{0 … |s| - 1}`, this says `uniformSet s` returns `a` with probability `count a s / |s|`, i.e. it is
-uniform over occurrences. -/
-theorem countP_indexSet_eq_count [DecidableEq α] (s : FinSet α) (a : α) :
-    ((List.range s.card).countP (fun i => indexSet s i == some a)) = s.toMultiset.count a := by
-  have key : ∀ l : List α,
-      ((List.range l.length).countP (fun i => l[i]? == some a)) = l.count a := by
-    intro l
-    induction l with
-    | nil => simp
-    | cons x xs ih =>
-      rw [List.length_cons, List.range_succ_eq_map, List.countP_cons, List.countP_map,
-        List.count_cons]
-      simp only [List.getElem?_cons_zero, Function.comp_def, List.getElem?_cons_succ]
-      rw [ih]
-      by_cases h : x = a <;> simp [h]
-  simp only [indexSet_eq_getElem?, card_eq_length_toList, toMultiset, Multiset.coe_count]
-  exact key s.toList
-
 end FinSet
 
 /-! ## Extracting the values of a given size -/
@@ -341,32 +311,6 @@ def sized : Space α → Nat → FinSet α
     sized (f :$: a) k = .fmap f (sized a k) := rfl
 theorem sized_prod (a : Space α) (b : Space β) (k : Nat) :
     sized (a :*: b) k = sizedProd (sized a) (sized b) 0 (k + 1) := rfl
-
-/-- `|·|` of `sizedProd`: a sum of products of cardinalities. -/
-theorem card_sizedProd (fa : Nat → FinSet α) (fb : Nat → FinSet β) (k₁ n : Nat) :
-    (sizedProd fa fb k₁ n).card = ∑ i ∈ Finset.range n, (fa (k₁ + i)).card * (fb (n - 1 - i)).card := by
-  induction n generalizing k₁ with
-  | zero => simp [sizedProd]
-  | succ n ih =>
-    rw [sizedProd, FinSet.card_union, FinSet.card_prod, ih, Finset.sum_range_succ']
-    simp only [Nat.add_zero, Nat.add_sub_cancel]
-    rw [Nat.add_comm]
-    congr 1
-    apply Finset.sum_congr rfl
-    intro i _
-    have h : n - 1 - i = n - (i + 1) := by omega
-    have h' : k₁ + 1 + i = k₁ + (i + 1) := by omega
-    rw [h, h']
-
-/-- The paper's cardinality equation for products (Section 2.1):
-`|(T ⊗ U)ₖ| = ∑_{k₁+k₂=k} |T_{k₁}| |U_{k₂}|`. -/
-theorem card_sized_prod (a : Space α) (b : Space β) (k : Nat) :
-    (sized (a :*: b) k).card =
-      ∑ k₁ ∈ Finset.range (k + 1), (sized a k₁).card * (sized b (k - k₁)).card := by
-  rw [sized_prod, card_sizedProd]
-  apply Finset.sum_congr rfl
-  intro i hi
-  simp only [Nat.zero_add, Nat.add_sub_cancel]
 
 /-- `sized (a :*: b) k` as a multiset: the paper's `⨄_{k₁+k₂=k} sized a k₁ × sized b k₂`. -/
 theorem toMultiset_sized_prod (a : Space α) (b : Space β) (k : Nat) :

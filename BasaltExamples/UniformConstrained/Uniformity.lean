@@ -8,11 +8,11 @@ module
 public import BasaltExamples.UniformConstrained.Predicate
 
 /-!
-# The predicate-guided sampler `uniform`, Theorem 2, and Section 4.1
+# The predicate-guided sampler `uniform` and Theorem 2 (Sections 3 and 4)
 
 `uniform` is the paper's sampler over `sizedP` (Section 3). Its fuel can run out on a residual
 space, so Theorem 2 is proved conditional on producing a value, for every oracle and fuel
-(`Theorem2`). Section 4.1's racy oracle shows determinism is needed.
+(`Theorem2`).
 -/
 
 @[expose] public section
@@ -199,8 +199,7 @@ theorem Theorem2_prop [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α →
 Uniform over the occurrences of `b`, conditional on producing a value: the probability of `x` is its
 share `count x a / m` of the satisfying occurrences, times the probability of producing anything at
 all. This holds for every oracle and every fuel. The paper's proof also takes that probability to be
-`1`, which needs `sizedP` to terminate, and its stated law does not ensure that
-(`uniform_cycleOracle_spaceTriple`). -/
+`1`, which needs `sizedP` to terminate; that is not assumed here. -/
 theorem Theorem2 [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α → Bool) (s : Space α)
     (k : Nat) (hb : 0 < (satisfying p s k).card) (x : α) :
     (uniform O fuel p s k : SPMF (Option α)) (some x)
@@ -216,101 +215,5 @@ theorem Theorem2 [DecidableEq α] (O : LazyOracle) (fuel : Nat) (p : α → Bool
     rw [tsum_congr hκ, ← tsum_ite_count_eq_card_satisfying, ← ENNReal.tsum_mul_right]
     exact tsum_congr fun y => by rw [ite_mul, zero_mul]
   rw [htot, hκ, ← mul_assoc, ENNReal.div_mul_cancel hm0 hmtop, ite_mul, zero_mul]
-
-/-! ## Section 4.1: a non-deterministic evaluation order breaks uniformity
-
-"Even so, there is a more subtle problem with non-deterministic evaluation order – it may cause
-biased distribution of the generated data." The paper's predicate `nonDetB` is constantly `True`,
-but asks a racy `oracle :: IO Bool` which component to force first; the race makes the answer depend
-on the drawn index. A `LazyOracle` is a fixed function, so the race is modelled by drawing the index
-first and then choosing the oracle from it (`racyRound`). Since `nonDetB` accepts everything, one
-round of `uniform` is the whole run.
-
-The racy oracle cannot satisfy `LazyOracle.SwapLaw`: `nonDetB ∘ swap = nonDetB`, so the law forces
-`inspectsFst nonDetB = false`. In Lean the example therefore lies outside the paper's law, which is
-why the law is not a field of `LazyOracle`. -/
-
-/-- The paper's `spaceBool = Pay (Pure False :+: Pure True)`. -/
-def spaceBool : Space Bool := .pay (.pure false :+: .pure true)
-
-/-- The paper's `spacePairB = Pay ((,) :$: spaceBool :*: spaceBool)`. Lean's `:*:` already builds
-pairs, so the `(,) :$:` is not needed. -/
-def spacePairB : Space (Bool × Bool) := .pay (spaceBool :*: spaceBool)
-
-/-- The paper's `nonDetB`: its value is always `True`; only its evaluation order is
-non-deterministic, and that lives in the oracle. -/
-def nonDetB : Bool × Bool → Bool := fun _ => true
-
-/-- An oracle that never prunes and always forces the first component first (`b = true`) or the
-second first (`b = false`). -/
-def orderOracle (b : Bool) : LazyOracle where
-  universal _ := none
-  inspectsFst _ := b
-  universal_sound := by intro _ _ _ h; cases h
-
-/-- The paper's race: "if the index is 1 then `oracle` returns `False`, otherwise it returns
-`True`". -/
-def race (i : Nat) : LazyOracle := orderOracle (i != 1)
-
-section Racy
-
-variable {G : Type → Type} [Gen G]
-
-/-- One round of `uniform` in which the oracle may depend on the drawn index: draw `i`, run
-`sizedP` with the oracle `O i`, and return the value at index `i`, if it is one. -/
-def racyRound (O : Nat → LazyOracle) (fuel : Nat) (p : α → Bool) (s : Space α) (k : Nat) :
-    G (Option α) := do
-  let i ← chooseNat 0 ((Space.sized s k).card - 1)
-  pure (((sizedP (O i) fuel p s k).bind (·.indexSet i)).bind Sum.getLeft?)
-
-end Racy
-
-/-- One round of `racyRound` at `spacePairB`, as the sum over the four indices. -/
-theorem racyRound_spacePairB_apply (O : Nat → LazyOracle) (y : Option (Bool × Bool)) :
-    (racyRound O 17 nonDetB spacePairB 3 : SPMF (Option (Bool × Bool))) y
-      = (∑ i ∈ Finset.range 4, if y = ((sizedP (O i) 17 nonDetB spacePairB 3).bind
-          (·.indexSet i)).bind Sum.getLeft? then 1 else 0) / 4 := by
-  have hcard : (Space.sized spacePairB 3).card = 4 := by decide
-  unfold racyRound
-  rw [chooseNat_bind_apply (by omega : 0 < (Space.sized spacePairB 3).card), hcard]
-  simp only [SPMF.pure_apply, Nat.cast_ofNat]
-  exact congrArg (· / 4) (Finset.sum_congr rfl fun i _ => by congr)
-
-/-- What the race returns at each index: the first-component-first order everywhere except at
-index 1. -/
-private theorem race_lookup :
-    ((List.range 4).map fun i =>
-        ((sizedP (race i) 17 nonDetB spacePairB 3).bind (·.indexSet i)).bind Sum.getLeft?)
-      = [some (false, false), some (true, false), some (true, false), some (true, true)] := by
-  decide
-
-/-- **Section 4.1: the race makes `(True, False)` twice as likely as it should be…** It comes out
-at indices 1 and 2. -/
-theorem racyRound_race_TF :
-    (racyRound race 17 nonDetB spacePairB 3 : SPMF (Option (Bool × Bool))) (some (true, false))
-      = 1 / 2 := by
-  rw [racyRound_spacePairB_apply]
-  simp only [Finset.sum_range_succ, Finset.sum_range_zero]
-  have h := race_lookup
-  simp only [List.range_succ, List.range_zero, List.map_cons, List.map_nil,
-    List.nil_append, List.cons_append, List.cons.injEq] at h
-  obtain ⟨h0, h1, h2, h3, -⟩ := h
-  rw [h0, h1, h2, h3]
-  norm_num
-  rw [show (4 : ℝ≥0∞) = 2 * 2 by norm_num, ENNReal.div_eq_inv_mul, ENNReal.mul_inv (by simp) (by simp),
-    mul_assoc, ENNReal.inv_mul_cancel (by simp) (by simp), mul_one]
-
-/-- **…and `(False, True)` is never produced**, although it satisfies `nonDetB`. -/
-theorem racyRound_race_FT :
-    (racyRound race 17 nonDetB spacePairB 3 : SPMF (Option (Bool × Bool))) (some (false, true))
-      = 0 := by
-  rw [racyRound_spacePairB_apply]
-  simp only [Finset.sum_range_succ, Finset.sum_range_zero]
-  have h := race_lookup
-  simp only [List.range_succ, List.range_zero, List.map_cons, List.map_nil,
-    List.nil_append, List.cons_append, List.cons.injEq] at h
-  obtain ⟨h0, h1, h2, h3, -⟩ := h
-  rw [h0, h1, h2, h3]
-  norm_num
 
 end UniformConstrained

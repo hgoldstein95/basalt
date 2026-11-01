@@ -7,7 +7,6 @@ module
 
 public import Basalt.Combinators
 public import Basalt.Laws
-import Basalt.Tactic.MassFixpoint
 public import BasaltExamples.UniformConstrained.Space
 
 /-!
@@ -254,9 +253,7 @@ theorem uniformFilter_apply [DecidableEq α] (p : α → Bool) (s : Space α) (k
 "Uniform over `b`" is, as everywhere in the paper, uniform over the *occurrences* of `b`: each
 occurrence gets probability `1/m`, so a value `x` with multiplicity `count x a` in `a` (equivalently,
 in `b`, since `p x`) is produced with probability `count x a / m`. That is the statement proved here.
-Since `uniformFilter` is `suchThat`, this is exact conditioning of `suchThat` at a uniform draw.
-That it never produces a value failing `p`, and that it terminates almost surely, follow from
-`suchThat`'s own lemmas (`Theorem1_sound`, `Theorem1_terminates`). -/
+Since `uniformFilter` is `suchThat`, this is exact conditioning of `suchThat` at a uniform draw. -/
 theorem Theorem1 [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
     (hne : 0 < (Space.sized s k).card) (hb : 0 < (satisfying p s k).card) (x : α) :
     (uniformFilter p s k hne : SPMF α) x
@@ -294,25 +291,5 @@ theorem Theorem1 [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
     simpa [ENNReal.div_mul_cancel hn0 hntop] using this
   rw [ENNReal.eq_div_iff hm0 hmtop, mul_comm]
   exact hRm
-
-/-- **`uniformFilter` is sound**: it never produces a value that fails the predicate, whether or not
-`b` is empty. -/
-theorem Theorem1_sound {p : α → Bool} {s : Space α} {k : Nat} {hne : 0 < (Space.sized s k).card}
-    {x : α} (hx : x ∈ SPMF.support (uniformFilter p s k hne : SPMF α)) : p x :=
-  (SPMF.mem_support_suchThat_iff.mp hx).2
-
-/-- **`uniformFilter` terminates almost surely** when `b` is non-empty: a draw is rejected with
-probability `1 - m/n < 1`. -/
-theorem Theorem1_terminates [DecidableEq α] (p : α → Bool) (s : Space α) (k : Nat)
-    (hne : 0 < (Space.sized s k).card) (hb : 0 < (satisfying p s k).card) :
-    IsAlmostSurelyTerminating (uniformFilter p s k hne : SPMF α) := by
-  have hm0 : ((satisfying p s k).card : ℝ≥0∞) ≠ 0 := by rw [Ne, Nat.cast_eq_zero]; omega
-  refine SPMF.isAlmostSurelyTerminating_suchThat (r := 1 - ((satisfying p s k).card : ℝ≥0∞)
-    / ((allOfSize s k).card : ℝ≥0∞)) (isAlmostSurelyTerminating_uniformSet _ hne) ?_
-    (ENNReal.sub_lt_self one_ne_top one_ne_zero
-      (ENNReal.div_pos_iff.mpr ⟨hm0, ENNReal.natCast_ne_top _⟩).ne')
-  show SPMF.expect _ _ ≤ _
-  rw [SPMF.expect, ← massReject p s k hne]
-  exact le_of_eq (tsum_congr fun x => by by_cases h : p x <;> simp [h])
 
 end UniformConstrained
