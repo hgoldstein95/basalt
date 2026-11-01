@@ -10,8 +10,8 @@ public import Basalt.SPMF.Mass
 /-!
 # Expectations of the List Combinators
 
-Event probabilities and expected lengths for `vectorOf` and `listOf`, by induction or fixpoint
-induction over the equations of `Basalt/SPMF/Expect/Obs.lean`.
+Event probabilities and expected lengths for `vectorOf` and `listOf`, and the distribution of
+`suchThat`, by induction or fixpoint induction over the equations of `Basalt/SPMF/Expect/Obs.lean`.
 -/
 
 @[expose] public section
@@ -159,6 +159,88 @@ theorem expect_listOf_length_le (g : SPMF α) :
     rw [expect_const]
     calc g.mass * 2 ≤ 1 * 2 := mul_le_mul_left (mass_le_one g) _
       _ = 2 := by norm_num
+
+/-- How often `g` draws a value that `p` rejects, as the expectation the walk's `suchThat` rules
+bound. -/
+theorem prob_reject_eq_expect (g : SPMF α) (p : α → Bool) :
+    prob g {a | p a = false} = expect g fun a => if p a then 0 else 1 := by
+  unfold prob
+  congr 1
+  funext a
+  by_cases h : p a <;> simp [Set.indicator, h]
+
+/-- How often `g` draws a value that `p` accepts. -/
+theorem prob_accept_eq_expect (g : SPMF α) (p : α → Bool) :
+    prob g {a | p a = true} = expect g fun a => if p a then 1 else 0 := by
+  unfold prob
+  congr 1
+  funext a
+  by_cases h : p a <;> simp [Set.indicator, h]
+
+/-- Every value `g` draws is accepted or rejected. -/
+theorem prob_accept_add_prob_reject (g : SPMF α) (p : α → Bool) :
+    prob g {a | p a = true} + prob g {a | p a = false} = g.mass := by
+  rw [prob_accept_eq_expect, prob_reject_eq_expect, ← expect_add, ← expect_one]
+  congr 1
+  funext a
+  by_cases h : p a <;> simp [h]
+
+/-- Rejection sampling is `g` conditioned on `p`: an accepted value keeps its weight under `g`,
+divided by the chance of acceptance, and a rejected one has none. It needs no hypothesis: when `g`
+never accepts, every accepted value has weight `0` and so does every value of the loop. -/
+theorem suchThat_apply (g : SPMF α) (p : α → Bool) (a : α) :
+    suchThat g p a = if p a then g a / (1 - prob g {b | p b = false}) else 0 := by
+  classical
+  set r := prob g {b | p b = false} with hr
+  set c : ℝ≥0∞ := if p a then g a else 0 with hc
+  have hsplit : ∀ x : ℝ≥0∞,
+      (expect g fun b => (if p a then 1 else 0) * ({a} : Set α).indicator 1 b
+        + x * {b | p b = false}.indicator 1 b) = c + r * x := by
+    intro x
+    rw [expect_add, expect_mul_left, expect_mul_left]
+    change (if p a then 1 else 0) * prob g {a} + x * prob g _ = _
+    rw [prob_singleton, mul_comm x]
+    split <;> simp [*]
+  have hstep : ∀ x : SPMF α,
+      (g >>= fun b => if p b then Pure.pure b else x) a = c + r * x a := by
+    intro x
+    rw [← prob_singleton, prob_bind, ← hsplit]
+    congr 1
+    funext b
+    by_cases hb : p b
+    · rcases eq_or_ne b a with rfl | hba
+      · simp [hb]
+      · simp [hb, hba, hba.symm]
+    · rcases eq_or_ne b a with rfl | hba
+      · simp [hb]
+      · simp [hb, hba]
+  have hS : suchThat g p a = c + r * suchThat g p a := by
+    conv_lhs => rw [suchThat]
+    exact hstep _
+  have hmass : c + r ≤ 1 := by
+    rw [← mul_one r, ← hsplit]
+    refine (expect_mono fun b => ?_).trans ((expect_one g).trans_le (mass_le_one g))
+    rcases eq_or_ne b a with rfl | hba <;> by_cases hb : p b <;> simp [Set.indicator, *]
+  have hgoal : (if p a then g a / (1 - r) else 0) = c / (1 - r) := by
+    split <;> simp [*]
+  rw [hgoal]
+  rcases lt_or_ge r 1 with hr1 | hr1
+  · have hfin : suchThat g p a ≠ ⊤ :=
+      ne_top_of_le_ne_top one_ne_top ((prob_singleton _ a).symm.trans_le (prob_le_one _ _))
+    have hc' : c = (1 - r) * suchThat g p a := by
+      rw [ENNReal.sub_mul fun _ _ => hfin, one_mul]
+      exact ENNReal.eq_sub_of_add_eq (ENNReal.mul_ne_top (ne_top_of_lt hr1) hfin) hS.symm
+    rw [hc']
+    exact (ENNReal.eq_div_iff (tsub_pos_of_lt hr1).ne' (ENNReal.sub_ne_top one_ne_top)).mpr rfl
+  · have hc0 : c = 0 := by
+      have := hmass.trans_eq (zero_add 1).symm
+      exact nonpos_iff_eq_zero.mp (ENNReal.le_of_add_le_add_right one_ne_top
+        (this.trans' (add_le_add_right hr1 c)))
+    rw [hc0, ENNReal.zero_div, ← prob_singleton]
+    refine nonpos_iff_eq_zero.mp (suchThat.fixpoint_induct g p (fun x => prob x {a} ≤ 0)
+      (admissible_expect_le _ 0) fun x ih => ?_)
+    rw [prob_singleton] at ih ⊢
+    rw [hstep x, hc0, nonpos_iff_eq_zero.mp ih, mul_zero, add_zero]
 
 end combinators
 

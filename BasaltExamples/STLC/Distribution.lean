@@ -120,6 +120,28 @@ theorem genTerm.quarter_le_prob_trivial : 1 / 4 ≤ SPMF.prob (genTerm Γ τ) tr
       List.length_nil, genZero.prob_trivial] <;> norm_num
   all_goals rw [← one_div]; exact ENNReal.div_le_div le_self_add (by norm_num)
 
+/-- At every context and type, at most two thirds of `genTerm`'s terms are trivial: an application
+is always one of its three or four branches, and never trivial. The bound is attained at `Bool`
+with no variable in scope (`genTerm.prob_trivial_bool`). -/
+theorem genTerm.prob_trivial_le : SPMF.prob (genTerm Γ τ) trivialTerms ≤ 2 / 3 := by
+  cases τ with
+  | Bool =>
+    by_cases h : varsWithType Γ .Bool = []
+    · rw [genTerm.prob_trivial_bool h]
+    · rw [genTerm.prob_trivial_bool_of_var h]; basify; norm_num
+  | Fun τ1 τ2 =>
+    have hq := SPMF.prob_le_one (genTerm (τ1 :: Γ) τ2) trivialTerms
+    rw [genTerm]
+    split <;> simp only [oneOfWith_eq] <;> rw [SPMF.prob_oneOf] <;>
+      simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+        List.length_nil, genZero.prob_trivial, prob_trivial_app, prob_trivial_abs,
+        prob_trivial_elements]
+    all_goals
+      generalize SPMF.prob (genTerm (τ1 :: Γ) τ2) trivialTerms = q at hq ⊢
+      norm_num
+      basify
+      linarith
+
 /-! ## `genTermSized` -/
 
 theorem genTermSized.prob_trivial_bool (h : varsWithType Γ .Bool = []) :
@@ -273,9 +295,8 @@ theorem genTermSized.prob_not_mentions_le :
     _ = 5 / 7 := by norm_num
 
 /-- At most `5/21` of `genTermSized`'s closed functions on `Bool` ignore their argument, against at
-least half of `genTerm`'s (`genTerm.half_le_prob_useless`).
-
-TODO: Why are we fixing a type? -/
+least half of `genTerm`'s (`genTerm.half_le_prob_useless`). At every context and function type the
+bound is only a third (`genTermSized.prob_useless_fun_le`). -/
 theorem genTermSized.prob_useless_le :
     SPMF.prob (genTermSized (n + 2) [] (.Fun .Bool .Bool)) uselessAbs ≤ 5 / 21 := by
   have hbody := genTermSized.prob_not_mentions_le (n := n)
@@ -287,6 +308,109 @@ theorem genTermSized.prob_useless_le :
     prob_useless_abs]
   calc _ ≤ ((4 : ℕ) * 0 + ((2 : ℕ) * (5 / 7) + 0)) / ((4 + (2 + 0) : ℕ) : ℝ≥0∞) := by gcongr
     _ = 5 / 21 := by clear hbody; norm_num; basify; norm_num
+
+/-! ### At every function type -/
+
+theorem prob_useless_elements (hne : varsWithType Γ τ ≠ []) :
+    SPMF.prob (elements (varsWithType Γ τ) hne) uselessAbs = 0 := by
+  refine (SPMF.prob_eq_zero_iff _ _).2 ((IsSoundFor.iff_obs (P := (· ∉ uselessAbs))).2 ?_)
+  walk
+  simp only [varsWithType, List.mem_filterMap] at *
+  obtain ⟨⟨τ', i⟩, _, h⟩ := ‹∃ _, _›
+  split at h <;> simp at h
+  subst h
+  simp [uselessAbs, Term.IsUselessAbs]
+
+theorem genZero.prob_useless_fun : SPMF.prob (genZero Γ (.Fun τ1 τ2)) uselessAbs = 1 := by
+  rw [genZero, prob_useless_abs]
+  exact le_antisymm (SPMF.prob_le_one _ _)
+    (genZero.prob_trivial.symm.le.trans (prob_le_prob_not_mentions _))
+
+theorem genTerm.prob_useless_fun (h : varsWithType Γ (.Fun τ1 τ2) = []) :
+    5 / 12 ≤ SPMF.prob (genTerm Γ (.Fun τ1 τ2)) uselessAbs := by
+  have hq := genTerm.quarter_le_prob_trivial.trans
+    (prob_le_prob_not_mentions (genTerm (τ1 :: Γ) τ2))
+  have hq1 := SPMF.prob_le_one (genTerm (τ1 :: Γ) τ2) {e | ¬ e.Mentions 0}
+  rw [genTerm]
+  simp only [h, ne_eq, not_true_eq_false, ↓reduceDIte, oneOfWith_eq]
+  rw [SPMF.prob_oneOf]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+    List.length_nil, genZero.prob_useless_fun, prob_useless_app, prob_useless_abs]
+  generalize SPMF.prob (genTerm (τ1 :: Γ) τ2) {e | ¬ e.Mentions 0} = q at hq hq1 ⊢
+  norm_num
+  basify
+  linarith
+
+theorem genTerm.prob_useless_fun_of_var (h : varsWithType Γ (.Fun τ1 τ2) ≠ []) :
+    5 / 16 ≤ SPMF.prob (genTerm Γ (.Fun τ1 τ2)) uselessAbs := by
+  have hq := genTerm.quarter_le_prob_trivial.trans
+    (prob_le_prob_not_mentions (genTerm (τ1 :: Γ) τ2))
+  have hq1 := SPMF.prob_le_one (genTerm (τ1 :: Γ) τ2) {e | ¬ e.Mentions 0}
+  rw [genTerm]
+  simp only [h, ne_eq, not_false_eq_true, ↓reduceDIte, oneOfWith_eq]
+  rw [SPMF.prob_oneOf]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+    List.length_nil, genZero.prob_useless_fun, prob_useless_app, prob_useless_abs,
+    prob_useless_elements]
+  generalize SPMF.prob (genTerm (τ1 :: Γ) τ2) {e | ¬ e.Mentions 0} = q at hq hq1 ⊢
+  norm_num
+  basify
+  linarith
+
+/-- At every context and function type, at least `5/16` of `genTerm`'s terms are abstractions that
+ignore their argument: its `genZero` branch always is one, and a quarter of its abstraction branch's
+bodies are trivial. -/
+theorem genTerm.prob_useless_fun_ge :
+    5 / 16 ≤ SPMF.prob (genTerm Γ (.Fun τ1 τ2)) uselessAbs := by
+  by_cases h : varsWithType Γ (.Fun τ1 τ2) = []
+  · exact le_trans (by basify; norm_num) (genTerm.prob_useless_fun h)
+  · exact genTerm.prob_useless_fun_of_var h
+
+theorem genTermSized.prob_useless_fun (h : varsWithType Γ (.Fun τ1 τ2) = []) :
+    SPMF.prob (genTermSized (n + 1) Γ (.Fun τ1 τ2)) uselessAbs ≤ 1 / 3 := by
+  have hq1 := SPMF.prob_le_one (genTermSized n (τ1 :: Γ) τ2) {e | ¬ e.Mentions 0}
+  rw [genTermSized]
+  simp only [h, ne_eq, not_true_eq_false, ↓reduceDIte, frequencyWith_eq]
+  rw [SPMF.prob_frequency]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, prob_useless_app,
+    prob_useless_abs]
+  generalize SPMF.prob (genTermSized n (τ1 :: Γ) τ2) {e | ¬ e.Mentions 0} = q at hq1 ⊢
+  norm_num
+  basify
+  linarith
+
+theorem genTermSized.prob_useless_fun_of_var (h : varsWithType Γ (.Fun τ1 τ2) ≠ []) :
+    SPMF.prob (genTermSized (n + 1) Γ (.Fun τ1 τ2)) uselessAbs ≤ 1 / 4 := by
+  have hq1 := SPMF.prob_le_one (genTermSized n (τ1 :: Γ) τ2) {e | ¬ e.Mentions 0}
+  rw [genTermSized]
+  simp only [h, ne_eq, not_false_eq_true, ↓reduceDIte, frequencyWith_eq]
+  rw [SPMF.prob_frequency]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, prob_useless_app,
+    prob_useless_abs, prob_useless_elements]
+  generalize SPMF.prob (genTermSized n (τ1 :: Γ) τ2) {e | ¬ e.Mentions 0} = q at hq1 ⊢
+  norm_num
+  basify
+  linarith
+
+/-- At every context and function type, at most a third of `genTermSized`'s terms are abstractions
+that ignore their argument. Only its abstraction branch can produce one, and nothing better holds of
+that branch at every context: a variable in scope may make the body ignore its argument. -/
+theorem genTermSized.prob_useless_fun_le :
+    SPMF.prob (genTermSized (n + 1) Γ (.Fun τ1 τ2)) uselessAbs ≤ 1 / 3 := by
+  by_cases h : varsWithType Γ (.Fun τ1 τ2) = []
+  · exact genTermSized.prob_useless_fun h
+  · exact (genTermSized.prob_useless_fun_of_var h).trans (by basify; norm_num)
+
+/-- At every size, context, and function type, `genTermSized` makes useless abstractions strictly
+less often than `genTerm`. -/
+theorem genTermSized.prob_useless_lt_genTerm :
+    SPMF.prob (genTermSized (n + 1) Γ (.Fun τ1 τ2)) uselessAbs
+      < SPMF.prob (genTerm Γ (.Fun τ1 τ2)) uselessAbs := by
+  by_cases h : varsWithType Γ (.Fun τ1 τ2) = []
+  · exact (genTermSized.prob_useless_fun h).trans_lt
+      (lt_of_lt_of_le (by basify; norm_num) (genTerm.prob_useless_fun h))
+  · exact (genTermSized.prob_useless_fun_of_var h).trans_lt
+      (lt_of_lt_of_le (by basify; norm_num) (genTerm.prob_useless_fun_of_var h))
 
 /-! ## Cost -/
 

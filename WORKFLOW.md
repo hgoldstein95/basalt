@@ -424,7 +424,11 @@ the loop, `C + r * B ≤ B`. The rejection bound is the one fact about `g` a fil
 the termination proof's, read at `SPMF.Cost` through `g`'s `IsCostFaithful` law
 (`IsCostFaithful.expect_eq`; `Tree.genBSTByFiltering.expected_cost_bounded`,
 `BST/ByFiltering.lean`). `NonEmptyList.genNonEmpty.expected_cost_bounded` (`NonEmptyList.lean`) is
-the same proof for a source that rarely rejects.
+the same proof for a source that rarely rejects. Stated as laws, with the rejection bound read at
+`SPMF`, the same bound is `IsExpectedCostBounded.suchThat`, and `IsExpectedCostBounded.not_suchThat`
+is its converse: a source with no finite bound gives a loop with none
+(`Basalt/Walk/ExpectedCost.lean`; `STLC/Rejection.lean` uses both). What the loop returns is `g`
+conditioned on `p`, `SPMF.suchThat_apply` (`Basalt/SPMF/Expect/Combinators.lean`).
 
 **`IsCostFaithful gen`** is `walk fixpoint` on each field, `⟨by walk fixpoint, by walk fixpoint⟩`,
 passing a callee's law by the field being proved (`h.erasedLe`, `h.leErased`).

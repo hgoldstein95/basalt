@@ -5,7 +5,9 @@ Authors: Harrison Goldstein
 -/
 module
 
+public import Basalt.Laws
 public import Basalt.SPMF.Cost
+public import Basalt.SPMF.Expect.Combinators
 public import Basalt.Walk.Average
 
 /-!
@@ -14,7 +16,8 @@ public import Basalt.Walk.Average
 What the walk needs of a bound on `SPMF.Cost.expectObs.spec g f`, on which
 `IsExpectedCostBounded g B` is the upper bound at `f = fun _ n => n`: how a fact about a
 sub-generator closes a leaf in either direction, the rules of the list combinators and of
-`suchThat`, and the admissibility `walk fixpoint` inducts with for an upper bound.
+`suchThat`, and the admissibility `walk fixpoint` inducts with for an upper bound. `suchThat`'s
+expected-cost laws, in both directions, live here too.
 -/
 
 @[expose] public section
@@ -173,7 +176,46 @@ theorem expect_suchThat_le {post : α → Nat → ℝ≥0∞} {k : ℝ≥0∞}
     expectObs.spec (suchThat g p) post ≤ k + C / (1 - r) :=
   expect_le_add_of_le (expect_suchThat_cost_le hg hr) hpost
 
+/-- The first draw alone costs `g`'s expected cost whenever the loop goes on to return, which it
+does with chance at least `a`, any bound on how often `g` accepts. -/
+theorem mul_expect_le_expect_suchThat {a : ℝ≥0∞}
+    (ha : a ≤ expectObs.spec g fun x _ => if p x then 1 else 0) :
+    a * expectObs.spec g (fun _ n => (n : ℝ≥0∞))
+      ≤ expectObs.spec (suchThat g p) fun _ n => (n : ℝ≥0∞) := by
+  set M := expectObs.spec (suchThat g p) fun _ _ => (1 : ℝ≥0∞) with hM
+  have hM1 : M ≤ 1 := (SPMF.expect_one _).trans_le (SPMF.mass_le_one _)
+  have haM : a ≤ M := by
+    refine ha.trans ?_
+    rw [hM]
+    conv_rhs => rw [suchThat]
+    refine le_of_le_of_eq (Obs.MonotoneC.spec_mono g fun x n => ?_)
+      (congrFun (expectObs.map_bind g _) _).symm
+    by_cases h : p x
+    · simp only [h, ite_true]
+      rw [congrFun (expectObs.map_pure x) _, WPC.pure_apply]
+    · simp only [h]
+      exact zero_le
+  have hk : ∀ x (n : Nat), M * n ≤ expectObs.spec (if p x then Pure.pure x else suchThat g p)
+      fun _ m => ((n + m : Nat) : ℝ≥0∞) := by
+    intro x n
+    by_cases h : p x
+    · simp only [h, ite_true]
+      rw [congrFun (expectObs.map_pure x) _, WPC.pure_apply]
+      simpa using mul_le_of_le_one_left' hM1
+    · simp only [h]
+      calc M * n = SPMF.expect (suchThat (G := SPMF.Cost) g p) fun _ => (n : ℝ≥0∞) := by
+            rw [hM, SPMF.expect_const]
+            exact congrArg (· * (n : ℝ≥0∞)) (SPMF.expect_one _)
+        _ ≤ _ := SPMF.expect_mono fun q => by push_cast; exact le_self_add
+  conv_rhs => rw [suchThat]
+  refine le_of_le_of_eq ?_ (congrFun (expectObs.map_bind g _) _).symm
+  calc a * expectObs.spec g (fun _ n => (n : ℝ≥0∞))
+      ≤ M * expectObs.spec g (fun _ n => (n : ℝ≥0∞)) := mul_le_mul_left haM _
+    _ = expectObs.spec g (fun _ n => M * n) := (SPMF.expect_mul_left _ _ _).symm
+    _ ≤ _ := Obs.MonotoneC.spec_mono g hk
+
 end suchThat
+
 
 @[gen_rule] theorem expect_permutationOf_le_const {xs : List α}
     {p : { ys // xs.Perm ys } → Nat → ℝ≥0∞} {d : ℝ≥0∞} (hp : ∀ a n, p a n = d) :
@@ -185,3 +227,38 @@ end suchThat
   expect_le_iSup
 
 end SPMF.Cost
+
+section suchThat
+
+variable {α : Type} {gen : {G : Type → Type} → [Gen G] → G α} {p : α → Bool}
+
+/-- Rejection sampling costs `g`'s expected cost over the chance of acceptance, from a bound `r` on
+how often `g` rejects: each rejected draw costs what an accepted one does, and starts over. -/
+theorem IsExpectedCostBounded.suchThat (hf : IsCostFaithful gen) {B r : ℝ≥0∞}
+    (hg : IsExpectedCostBounded (gen (G := SPMF.Cost)) B)
+    (hr : SPMF.prob (gen (G := SPMF)) {a | p a = false} ≤ r) :
+    IsExpectedCostBounded (_root_.suchThat (gen (G := SPMF.Cost)) p) (B / (1 - r)) :=
+  SPMF.Cost.expect_suchThat_cost_le hg
+    ((hf.expect_eq _).trans_le ((SPMF.prob_reject_eq_expect _ p).symm.trans_le hr))
+
+/-- The converse: a bound on rejection sampling bounds `g`'s expected cost, over any positive `a`
+below the chance that `g` accepts. -/
+theorem IsExpectedCostBounded.of_suchThat (hf : IsCostFaithful gen) {a B : ℝ≥0∞} (ha : a ≠ 0)
+    (hacc : a ≤ SPMF.prob (gen (G := SPMF)) {x | p x = true})
+    (h : IsExpectedCostBounded (_root_.suchThat (gen (G := SPMF.Cost)) p) B) :
+    IsExpectedCostBounded (gen (G := SPMF.Cost)) (B / a) := by
+  have ha1 : a ≠ ⊤ := ne_top_of_le_ne_top one_ne_top (hacc.trans (SPMF.prob_le_one _ _))
+  rw [iff_obs, ENNReal.le_div_iff_mul_le (Or.inl ha) (Or.inl ha1), mul_comm]
+  refine (SPMF.Cost.mul_expect_le_expect_suchThat ?_).trans h
+  exact hacc.trans ((SPMF.prob_accept_eq_expect _ p).trans (hf.expect_eq _).symm).le
+
+/-- Rejection sampling from a generator with no finite expected-cost bound has none either, as long
+as `g` accepts at all; a `g` that never accepts gives a loop that never returns, which costs
+nothing. -/
+theorem IsExpectedCostBounded.not_suchThat (hf : IsCostFaithful gen)
+    (hacc : 0 < SPMF.prob (gen (G := SPMF)) {x | p x = true})
+    (hg : ∀ B, B ≠ ⊤ → ¬ IsExpectedCostBounded (gen (G := SPMF.Cost)) B) {B : ℝ≥0∞}
+    (hB : B ≠ ⊤) : ¬ IsExpectedCostBounded (_root_.suchThat (gen (G := SPMF.Cost)) p) B :=
+  fun h => hg _ (ENNReal.div_ne_top hB hacc.ne') (h.of_suchThat hf hacc.ne' le_rfl)
+
+end suchThat
