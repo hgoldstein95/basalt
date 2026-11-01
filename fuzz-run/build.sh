@@ -212,8 +212,7 @@ done
 # `-Kfuzz=1` turns the instrumentation on (lakefile.lean, `fuzzLeancArgs`). Lake reads `-K` options
 # only when it elaborates the lakefile, and otherwise reuses the configuration it cached, so `-R` is
 # what makes the option take effect. The option then stays in that cache until the next `lake -R`,
-# which is harmless: only this executable asks for Basalt's C objects, and a package that requires
-# Basalt never sees the option.
+# which is harmless: in this workspace only this executable asks for Basalt's C objects.
 echo "== lake build basalt-fuzz =="
 rm -f "$EXE" fuzz-run/basalt-fuzz
 # shellcheck disable=SC2086   # a target list: the split into words is the point
@@ -251,9 +250,11 @@ fi
 # benchmark would reveal it.
 instrumented() { [ "$(nm -u "$1" 2>/dev/null | grep -c __sanitizer_cov_8bit_counters_init || true)" -gt 0 ]; }
 first_party=0
+# The packages directory may be a symlink, and the response file names its resolved path.
+PKGS=$(cd "$ROOT/.lake/packages" && pwd -P)
 while IFS= read -r o; do
   case $o in
-    "$ROOT/.lake/packages/"*)
+    "$ROOT/.lake/packages/"* | "$PKGS/"*)
       ! instrumented "$o" || die "${o##*/.lake/build/ir/} is instrumented: coverage over a dependency's PRNG is noise" ;;
     *)
       instrumented "$o" || die "${o#"$IR"/} is not instrumented: check for overlapping library globs"
@@ -267,7 +268,8 @@ done < <(grep -o '"[^"]*\.c\.o\.export"' "$LAKE_RSP" | tr -d '"')
 # `-Wl,-dead_strip` on macOS, and nothing in the program references this symbol, so the export flag
 # in link.rsp is the only thing keeping it. (`nm -g` lists dynamic externals; a hidden symbol shows
 # as `private external`, which `grep` then misses.)
-nm -g "$EXE" 2>/dev/null | grep -q 'T _\?LLVMFuzzerCustomMutator$' \
+# `grep -q` would stop at the first match and SIGPIPE `nm`, which `pipefail` reports as a failure.
+nm -g "$EXE" 2>/dev/null | grep 'T _\?LLVMFuzzerCustomMutator$' >/dev/null \
   || die "LLVMFuzzerCustomMutator is not exported: --grow would silently do nothing"
 
 # The committed entry point stays `fuzz-run/basalt-fuzz`, which every caller (CI, compare-*.sh) uses.
