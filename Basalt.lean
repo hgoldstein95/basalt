@@ -41,6 +41,7 @@ public import Basalt.SPMF.Cost
 public import Basalt.SPMF.CostErasure
 public import Basalt.SPMF.Expect.Basic
 public import Basalt.SPMF.Expect.Combinators
+public import Basalt.SPMF.Expect.Draws
 public import Basalt.SPMF.Expect.Obs
 public import Basalt.SPMF.Mass
 public import Basalt.SPMF.Ranking
