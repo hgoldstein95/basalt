@@ -37,6 +37,19 @@ theorem SPMF.expect_le_add_of_le {x : SPMF α} {h p : α → ℝ≥0∞} {k B : 
   rw [funext hp, SPMF.expect_add, SPMF.expect_const]
   exact add_le_add (mul_le_of_le_one_left' (SPMF.mass_le_one x)) hx
 
+/-- A bound `B` on `x`'s mass bounds the expectation of a constant `d` by `d * B`, since
+`expect x (fun _ => d) = d * mass x`: the upper-bound dual of `SPMF.le_expect_of_le`, for a draw whose
+continuation's bound is a constant that is not `1` plus one. It improves on the bound `d` alone only
+when the mass may be below `1`. -/
+@[obs_leaf]
+theorem SPMF.expect_le_mul_of_le {x : SPMF α} {p : α → ℝ≥0∞} {d B : ℝ≥0∞}
+    (hx : SPMF.expectObs.spec x (fun _ => 1) ≤ B) (hp : ∀ a, p a = d) :
+    SPMF.expectObs.spec x p ≤ d * B := by
+  show SPMF.expect x p ≤ d * B
+  rw [funext hp, SPMF.expect_const, mul_comm]
+  gcongr
+  exact (SPMF.expect_one x).symm.trans_le hx
+
 /-! ## The list combinators
 
 A list combinator has no shape of choice for the walk to enter, so its rules here use only its

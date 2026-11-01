@@ -37,6 +37,7 @@ public import Basalt.PlausibleGen.Backend
 public import Basalt.Random
 public import Basalt.RandomChoice
 public import Basalt.SPMF.Basic
+public import Basalt.SPMF.BranchingProcess
 public import Basalt.SPMF.Cost
 public import Basalt.SPMF.CostErasure
 public import Basalt.SPMF.Expect.Basic

@@ -62,6 +62,28 @@ theorem le_expect_iInf_of_le {x : SPMF α} {p : α → ℝ≥0∞} {c : ℝ≥0�
     (hx : c ≤ expectObs.spec x fun _ => 1) : c * ⨅ a, p a ≤ expectObs.spec x p :=
   (le_expect_of_le hx fun _ => rfl).trans (expect_mono fun a => iInf_le p a)
 
+/-! ## Lower bounds on an expectation
+
+A recursive occurrence is met under `k + h`, which a lower bound on its expectation of `h` bounds
+only when its mass is `1`: `le_expect_add` states it that way. Fixpoint induction proves no lower
+bound, so the fact comes from an induction on a seed that shrinks, as for `SPMF.Cost.le_expect_add`
+(`Basalt/Walk/ExpectedCost.lean`). -/
+
+/-- A lower bound `B` on `x`'s expectation of `h`, for use under any `k + h`, from `x`'s mass. -/
+theorem le_expect_add {x : SPMF α} {h : α → ℝ≥0∞} {B : ℝ≥0∞}
+    (hm : 1 ≤ expectObs.spec x fun _ => 1) (hx : B ≤ expectObs.spec x h) (k : ℝ≥0∞) :
+    k + B ≤ expectObs.spec x fun a => k + h a := by
+  show _ ≤ expect x fun a => k + h a
+  rw [expect_add, expect_const]
+  exact add_le_add (le_mul_of_one_le_left' (hm.trans_eq (expect_one x))) hx
+
+@[obs_leaf]
+theorem le_expect_of_add_le {x : SPMF α} {h p : α → ℝ≥0∞} {k B : ℝ≥0∞}
+    (hx : ∀ k, k + B ≤ expectObs.spec x fun a => k + h a) (hp : ∀ a, p a = k + h a) :
+    k + B ≤ expectObs.spec x p := by
+  rw [funext hp]
+  exact hx k
+
 end SPMF
 
 namespace SPMF
