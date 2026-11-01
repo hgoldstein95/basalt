@@ -1,11 +1,17 @@
 import Lake
 open Lake DSL
 
+/-- Whether this is a fuzz build. A fuzz build lives in its own build directory, so its instrumented
+objects and an ordinary build's never overwrite each other, and switching between them rebuilds
+neither. -/
+def fuzz : Bool := (get_config? fuzz).isSome
+
 package basalt where
   version := v!"0.1.0"
   -- TODO: Remove this if/when the Lean folks fix the way arguments get abstracted in
   -- `partial_fixpoint`s with modules.
   leanOptions := #[⟨`backward.proofsInPublic, true⟩]
+  buildDir := if fuzz then ".lake" / "build-fuzz" else defaultBuildDir
 
 require "leanprover-community" / mathlib @ git "v4.35.0"
 
@@ -21,7 +27,7 @@ link: nothing but `basalt-fuzz` supplies the libFuzzer runtime that defines `__s
 `-K` options are the root package's alone, so a package that requires Basalt gets `fuzz` only by
 asking for it: ``require basalt … with NameMap.empty.insert `fuzz "true"``. -/
 def fuzzLeancArgs : Array String :=
-  if (get_config? fuzz).isSome then #["-O1", "-fsanitize=fuzzer-no-link"] else #[]
+  if fuzz then #["-O1", "-fsanitize=fuzzer-no-link"] else #[]
 
 /-
 Under `-Kfuzz`, `-fsanitize=fuzzer-no-link` here is *not* about fuzzing Basalt: it is about what

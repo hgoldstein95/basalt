@@ -22,9 +22,9 @@ ROOT=$(pwd)
 # shellcheck source=/dev/null   # optional and git-ignored; nothing to follow
 if [ -f fuzz-run/env.sh ]; then . fuzz-run/env.sh; fi
 
-IR="$ROOT/.lake/build/ir"
+IR="$ROOT/.lake/build-fuzz/ir"
 OUT="$ROOT/fuzz-run/obj"; mkdir -p "$OUT"
-EXE="$ROOT/.lake/build/bin/basalt-fuzz"
+EXE="$ROOT/.lake/build-fuzz/bin/basalt-fuzz"
 
 die() { echo "== $* ==" >&2; exit 1; }
 
@@ -209,12 +209,14 @@ done
 # output is what forces the relink; a rebuild after switching `FUZZER_LIB_FLAGS` otherwise silently
 # keeps the old runtime.
 #
-# `-Kfuzz=1` turns the instrumentation on (lakefile.lean, `fuzzLeancArgs`). Lake reads `-K` options
-# only when it elaborates the lakefile, and otherwise reuses the configuration it cached, so `-R` is
-# what makes the option take effect. The option then stays in that cache until the next `lake -R`,
-# which is harmless: in this workspace only this executable asks for Basalt's C objects.
+# `-Kfuzz=1` turns the instrumentation on and moves the build to `.lake/build-fuzz` (lakefile.lean,
+# `fuzz`). Lake reads `-K` options only when it elaborates the lakefile, and otherwise reuses the
+# configuration it cached, so `-R` is what makes the option take effect, and the trap reconfigures
+# back out on exit: left in the cache, it would make every later `lake` command here, the editor's
+# included, a fuzz build.
 echo "== lake build basalt-fuzz =="
 rm -f "$EXE" fuzz-run/basalt-fuzz
+trap 'lake -R env true >/dev/null 2>&1 || true' EXIT
 # shellcheck disable=SC2086   # a target list: the split into words is the point
 lake -R -Kfuzz=1 build basalt-fuzz ${EXTRA_LAKE_TARGETS:-} > "$OUT/link.log" 2>&1 || {
   grep -viE 'unused|-Wl' "$OUT/link.log" >&2 || true
@@ -231,7 +233,7 @@ grep -viE 'unused|-Wl|^✔|^info:' "$OUT/link.log" || true
 # The response file Lake writes for its own link names every object it linked, dependency packages
 # included, so it is the ground truth for what got in — both checks below read it rather than the
 # `ir/` tree, which also holds objects left behind by renamed modules that are in no link at all.
-LAKE_RSP="$ROOT/.lake/build/bin/basalt-fuzz.rsp"
+LAKE_RSP="$ROOT/.lake/build-fuzz/bin/basalt-fuzz.rsp"
 [ -f "$LAKE_RSP" ] || die "lake wrote no link response file: cannot verify the closure"
 
 # Mathlib in the link closure. Previously an accidental umbrella import failed the link and so
