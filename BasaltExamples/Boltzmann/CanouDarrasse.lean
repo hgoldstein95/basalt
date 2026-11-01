@@ -473,7 +473,7 @@ def roundUnaryBinary [Gen G] (a b c : Nat) (h : 0 < a + b + c) (lo hi : Nat) :
 
 /-- The abort-and-retry sampler. -/
 def ceiledUnaryBinary [Gen G] (a b c : Nat) (h : 0 < a + b + c) (lo hi : Nat) : G UBTree :=
-  retry (roundUnaryBinary a b c h lo hi)
+  (fun o => o.getD .leaf) <$> suchThat (roundUnaryBinary a b c h lo hi) Option.isSome
 
 theorem genUnaryBinaryW_leaf (h : 0 < a + b + c) :
     (genUnaryBinaryW a b c h : SPMF UBTree) .leaf = a / (a + b + c : ℝ≥0∞) := by
@@ -603,7 +603,7 @@ theorem ceiledUnaryBinary_apply (h : 0 < a + b + c) (lo hi : Nat) (t : UBTree) :
       = prob (genUnaryBinaryW a b c h : SPMF UBTree) {t | between lo hi t = true} := by
     rw [← hsum, ENNReal.add_sub_cancel_left (apply_ne_top _ _), prob_eq_tsum_ite]
     exact tsum_congr fun t => by rw [roundUnaryBinary_some]; simp [between]
-  rw [ceiledUnaryBinary, retry_apply, hQ, roundUnaryBinary_some]
+  rw [ceiledUnaryBinary, getD_suchThat_isSome_apply, hQ, roundUnaryBinary_some]
   simp [between]
 
 /-- Within a size, abort-and-retry at `ρ` is uniform. -/

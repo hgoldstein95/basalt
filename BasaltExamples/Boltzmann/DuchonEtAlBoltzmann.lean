@@ -26,34 +26,34 @@ open scoped ENNReal
 namespace Boltzmann
 
 /-- Binary trees: `B = Z + Z × B × B`. -/
-inductive BTree where
+inductive BinaryTree where
   | leaf
-  | node (l r : BTree)
+  | node (l r : BinaryTree)
 deriving DecidableEq
 
 /-- The number of internal nodes. -/
-def BTree.internal : BTree → Nat
+def BinaryTree.internal : BinaryTree → Nat
   | .leaf => 0
   | .node l r => l.internal + r.internal + 1
 
 /-- The size of a tree: every node, internal or leaf, is one atom. -/
-def BTree.size : BTree → Nat
+def BinaryTree.size : BinaryTree → Nat
   | .leaf => 1
   | .node l r => l.size + r.size + 1
 
-theorem BTree.size_eq (t : BTree) : t.size = 2 * t.internal + 1 := by
+theorem BinaryTree.size_eq (t : BinaryTree) : t.size = 2 * t.internal + 1 := by
   induction t with
   | leaf => rfl
-  | node l r ihl ihr => simp only [BTree.size, BTree.internal, ihl, ihr]; omega
+  | node l r ihl ihr => simp only [BinaryTree.size, BinaryTree.internal, ihl, ihr]; omega
 
 /-- The probability `coin p` lands `true`. -/
 noncomputable def pr (p : Rat) : ℝ≥0∞ := (p.num.toNat : ℝ≥0∞) / (p.den : ℝ≥0∞)
 
 /-- `Γ B(x)`, with `p = x / B(x)`: a leaf with probability `p`, else a node and two recursive
 calls. -/
-def genB [Gen G] (p : Rat) : G BTree := do
+def genBinaryTree [Gen G] (p : Rat) : G BinaryTree := do
   if ← coin p then return .leaf
-  else return .node (← genB p) (← genB p)
+  else return .node (← genBinaryTree p) (← genBinaryTree p)
 partial_fixpoint
 
 section coin
@@ -109,14 +109,14 @@ end coin
 
 section mass
 
-private theorem node_apply_leaf (μ : SPMF BTree) :
-    (μ >>= fun a => μ >>= fun b => Pure.pure (BTree.node a b)) .leaf = 0 := by
+private theorem node_apply_leaf (μ : SPMF BinaryTree) :
+    (μ >>= fun a => μ >>= fun b => Pure.pure (BinaryTree.node a b)) .leaf = 0 := by
   rw [bind_apply]
   refine ENNReal.tsum_eq_zero.2 fun a => ?_
   rw [bind_apply, ENNReal.tsum_eq_zero.2 fun b => by simp, mul_zero]
 
-private theorem node_apply_node (μ : SPMF BTree) (l r : BTree) :
-    (μ >>= fun a => μ >>= fun b => Pure.pure (BTree.node a b)) (.node l r) = μ l * μ r := by
+private theorem node_apply_node (μ : SPMF BinaryTree) (l r : BinaryTree) :
+    (μ >>= fun a => μ >>= fun b => Pure.pure (BinaryTree.node a b)) (.node l r) = μ l * μ r := by
   rw [bind_apply, tsum_eq_single l fun a ha => ?_, bind_apply,
     tsum_eq_single r fun b hb => by simp [Ne.symm hb]]
   · simp
@@ -124,39 +124,40 @@ private theorem node_apply_node (μ : SPMF BTree) (l r : BTree) :
 
 /-- A tree with `k` internal nodes, and so `k + 1` leaves, has mass `p ^ (k + 1) (1 - p) ^ k`. The
 unfolding determines it by induction on the tree, with no appeal to the least fixed point. -/
-theorem genB_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (t : BTree) :
-    (genB p : SPMF BTree) t = pr p ^ (t.internal + 1) * (1 - pr p) ^ t.internal := by
+theorem genBinaryTree_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (t : BinaryTree) :
+    (genBinaryTree p : SPMF BinaryTree) t = pr p ^ (t.internal + 1) * (1 - pr p) ^ t.internal := by
   induction t with
   | leaf =>
-    rw [genB, bind_apply, tsum_bool]
+    rw [genBinaryTree, bind_apply, tsum_bool]
     simp only [Bool.false_eq_true, ↓reduceIte, coin_false hp0 hp1, coin_true hp0 hp1]
     rw [node_apply_leaf]
-    simp [BTree.internal]
+    simp [BinaryTree.internal]
   | node l r ihl ihr =>
-    rw [genB, bind_apply, tsum_bool]
+    rw [genBinaryTree, bind_apply, tsum_bool]
     simp only [Bool.false_eq_true, ↓reduceIte, coin_false hp0 hp1, coin_true hp0 hp1]
     rw [node_apply_node, ihl, ihr]
-    simp [BTree.internal]
+    simp [BinaryTree.internal]
     ring
 
-theorem genB_node (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (l r : BTree) :
-    (genB p : SPMF BTree) (.node l r)
-      = (1 - pr p) * ((genB p : SPMF BTree) l * (genB p : SPMF BTree) r) := by
-  rw [genB_apply hp0 hp1, genB_apply hp0 hp1, genB_apply hp0 hp1]
-  simp only [BTree.internal]
+theorem genBinaryTree_node (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (l r : BinaryTree) :
+    (genBinaryTree p : SPMF BinaryTree) (.node l r)
+      = (1 - pr p)
+        * ((genBinaryTree p : SPMF BinaryTree) l * (genBinaryTree p : SPMF BinaryTree) r) := by
+  rw [genBinaryTree_apply hp0 hp1, genBinaryTree_apply hp0 hp1, genBinaryTree_apply hp0 hp1]
+  simp only [BinaryTree.internal]
   ring
 
 /-- Uniform within each size. -/
-theorem genB_uniform (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {s t : BTree} (h : s.size = t.size) :
-    (genB p : SPMF BTree) s = (genB p : SPMF BTree) t := by
-  have : s.internal = t.internal := by rw [BTree.size_eq, BTree.size_eq] at h; omega
-  rw [genB_apply hp0 hp1, genB_apply hp0 hp1, this]
+theorem genBinaryTree_uniform (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {s t : BinaryTree} (h : s.size = t.size) :
+    (genBinaryTree p : SPMF BinaryTree) s = (genBinaryTree p : SPMF BinaryTree) t := by
+  have : s.internal = t.internal := by rw [BinaryTree.size_eq, BinaryTree.size_eq] at h; omega
+  rw [genBinaryTree_apply hp0 hp1, genBinaryTree_apply hp0 hp1, this]
 
 /-- **The Boltzmann form.** Any `B` solving the specification's equation `B = x + x B²`, with
 `p = x / B`, gives each tree mass `x ^ |t| / B`; no closed form for `B(x)` is needed. -/
-theorem genB_boltzmann (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {x B : ℝ≥0∞}
-    (hB : B = x + x * B ^ 2) (hB0 : B ≠ 0) (hBtop : B ≠ ⊤) (hpx : pr p = x / B) (t : BTree) :
-    (genB p : SPMF BTree) t = x ^ t.size / B := by
+theorem genBinaryTree_boltzmann (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {x B : ℝ≥0∞}
+    (hB : B = x + x * B ^ 2) (hB0 : B ≠ 0) (hBtop : B ≠ ⊤) (hpx : pr p = x / B) (t : BinaryTree) :
+    (genBinaryTree p : SPMF BinaryTree) t = x ^ t.size / B := by
   have hBB : B * B⁻¹ = 1 := ENNReal.mul_inv_cancel hB0 hBtop
   have h1 : x / B + x * B = 1 := by
     have h := congrArg (· * B⁻¹) hB
@@ -167,13 +168,13 @@ theorem genB_boltzmann (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {x B : ℝ≥0∞}
   have hq : 1 - pr p = x * B := by
     rw [hpx, ← h1, ENNReal.add_sub_cancel_left]
     exact ne_top_of_le_ne_top ENNReal.one_ne_top (h1 ▸ le_self_add)
-  rw [genB_apply hp0 hp1, hq, hpx, BTree.size_eq, div_eq_mul_inv, div_eq_mul_inv]
+  rw [genBinaryTree_apply hp0 hp1, hq, hpx, BinaryTree.size_eq, div_eq_mul_inv, div_eq_mul_inv]
   calc (x * B⁻¹) ^ (t.internal + 1) * (x * B) ^ t.internal
       = x ^ (2 * t.internal + 1) * B⁻¹ * (B * B⁻¹) ^ t.internal := by ring
     _ = x ^ (2 * t.internal + 1) * B⁻¹ := by rw [hBB, one_pow, mul_one]
 
-theorem genB_terminates (hp : 1/2 ≤ p) (hp1 : p ≤ 1) :
-    IsAlmostSurelyTerminating (genB p : SPMF BTree) := by
+theorem genBinaryTree_terminates (hp : 1/2 ≤ p) (hp1 : p ≤ 1) :
+    IsAlmostSurelyTerminating (genBinaryTree p : SPMF BinaryTree) := by
   have hp0 : 0 ≤ p := le_trans (by norm_num) hp
   have hx := half_le_pr hp
   have hx1 := pr_le_one hp0 hp1
@@ -188,13 +189,13 @@ end mass
 section rejection
 
 /-- Whether a tree's size lies between `lo` and `hi`: the approximate-size window `[lo, hi]`. -/
-def between (lo hi : Nat) (t : BTree) : Bool := decide (lo ≤ t.size ∧ t.size ≤ hi)
+def between (lo hi : Nat) (t : BinaryTree) : Bool := decide (lo ≤ t.size ∧ t.size ≤ hi)
 
 /-- §6.1's guarantee: rejection to a window keeps two trees of the same size equally likely. -/
-theorem rejection_uniform (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {s t : BTree} (h : s.size = t.size) :
-    (suchThat (genB p) (between lo hi) : SPMF BTree) s
-      = (suchThat (genB p) (between lo hi) : SPMF BTree) t := by
-  rw [suchThat_apply, suchThat_apply, genB_uniform hp0 hp1 h, between, between, h]
+theorem rejection_uniform (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {s t : BinaryTree} (h : s.size = t.size) :
+    (suchThat (genBinaryTree p) (between lo hi) : SPMF BinaryTree) s
+      = (suchThat (genBinaryTree p) (between lo hi) : SPMF BinaryTree) t := by
+  rw [suchThat_apply, suchThat_apply, genBinaryTree_uniform hp0 hp1 h, between, between, h]
 
 private theorem pr_four_fifths : pr (4 / 5) = 4 / 5 := by
   rw [pr]; norm_num
@@ -202,23 +203,25 @@ private theorem pr_four_fifths : pr (4 / 5) = 4 / 5 := by
 /-- Footnote 6: the output is not uniform across the window. At `p = 4/5` and the window `[1, 3]`,
 the leaf is more likely than the tree of size `3`. -/
 theorem rejection_not_uniform_across :
-    (suchThat (genB (4/5)) (between 1 3) : SPMF BTree) .leaf
-      ≠ (suchThat (genB (4/5)) (between 1 3) : SPMF BTree) (.node .leaf .leaf) := by
+    (suchThat (genBinaryTree (4/5)) (between 1 3) : SPMF BinaryTree) .leaf
+      ≠ (suchThat (genBinaryTree (4/5)) (between 1 3) : SPMF BinaryTree) (.node .leaf .leaf) := by
   have h0 : (0 : ℚ) ≤ 4 / 5 := by norm_num
   have h1 : (4 / 5 : ℚ) ≤ 1 := by norm_num
   have hne : (4 / 5 : ℝ≥0∞) ≠ ⊤ := ENNReal.div_ne_top (by norm_num) (by norm_num)
   have hlt1 : (4 / 5 : ℝ≥0∞) < 1 := ENNReal.div_lt_of_lt_mul (by norm_num)
   rw [suchThat_apply, suchThat_apply]
-  set R := prob (genB (4/5) : SPMF BTree) {b | between 1 3 b = false}
-  have hleaf : (genB (4/5) : SPMF BTree) .leaf = 4 / 5 := by
-    rw [genB_apply h0 h1, pr_four_fifths]; simp [BTree.internal]
+  set R := prob (genBinaryTree (4/5) : SPMF BinaryTree) {b | between 1 3 b = false}
+  have hleaf : (genBinaryTree (4/5) : SPMF BinaryTree) .leaf = 4 / 5 := by
+    rw [genBinaryTree_apply h0 h1, pr_four_fifths]; simp [BinaryTree.internal]
   have hR : R < 1 := by
-    have hacc : 4 / 5 ≤ prob (genB (4/5) : SPMF BTree) {b | between 1 3 b = true} := by
+    have hacc :
+        4 / 5 ≤ prob (genBinaryTree (4/5) : SPMF BinaryTree) {b | between 1 3 b = true} := by
       classical
       rw [prob_eq_tsum_ite, ← hleaf]
-      refine le_trans ?_ (ENNReal.le_tsum BTree.leaf)
-      simp [between, BTree.size]
-    have hsum := (prob_accept_add_reject (genB (4/5) : SPMF BTree) (between 1 3)).le.trans
+      refine le_trans ?_ (ENNReal.le_tsum BinaryTree.leaf)
+      simp [between, BinaryTree.size]
+    have hsum :=
+      (prob_accept_add_reject (genBinaryTree (4/5) : SPMF BinaryTree) (between 1 3)).le.trans
       (mass_le_one _)
     have : R + 4 / 5 ≤ 1 := by rw [add_comm]; exact le_trans (by gcongr) hsum
     exact lt_of_le_of_lt (ENNReal.le_sub_of_add_le_right hne this)
@@ -230,8 +233,8 @@ theorem rejection_not_uniform_across :
   intro h
   have h := congrArg (· * (1 - R)) h
   simp only [ENNReal.div_mul_cancel hD0 hDtop] at h
-  rw [hleaf, genB_apply h0 h1, pr_four_fifths] at h
-  simp only [BTree.internal] at h
+  rw [hleaf, genBinaryTree_apply h0 h1, pr_four_fifths] at h
+  simp only [BinaryTree.internal] at h
   have hlt : (4 / 5 : ℝ≥0∞) ^ (0 + 0 + 1 + 1) * (1 - 4 / 5) ^ (0 + 0 + 1) < 4 / 5 := by
     calc _ ≤ (4 / 5 : ℝ≥0∞) ^ 2 * 1 := by gcongr; exact pow_le_one₀ (by simp) tsub_le_self
       _ < 4 / 5 := by
@@ -247,24 +250,25 @@ theorem expect_bool (μ : SPMF Bool) (F : Bool → ℝ≥0∞) :
     expect μ F = μ false * F false + μ true * F true := by
   unfold expect; exact tsum_bool _
 
-/-- One unfolding of `genB`, with `z` for the recursive calls. -/
-theorem expect_genB_step (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (z : SPMF BTree) (f : BTree → ℝ≥0∞) :
-    expect (coin p >>= fun b => if b = true then Pure.pure BTree.leaf
-        else (z >>= fun l => z >>= fun r => Pure.pure (BTree.node l r))) f
+/-- One unfolding of `genBinaryTree`, with `z` for the recursive calls. -/
+theorem expect_genBinaryTree_step (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (z : SPMF BinaryTree)
+    (f : BinaryTree → ℝ≥0∞) :
+    expect (coin p >>= fun b => if b = true then Pure.pure BinaryTree.leaf
+        else (z >>= fun l => z >>= fun r => Pure.pure (BinaryTree.node l r))) f
       = pr p * f .leaf + (1 - pr p) * expect z (fun l => expect z fun r => f (.node l r)) := by
   rw [expect_bind, expect_bool, coin_false hp0 hp1, coin_true hp0 hp1, add_comm]
   simp only [↓reduceIte, Bool.false_eq_true, expect_pure, expect_bind]
 
 /-- The expected size of a node whose subtrees are drawn from `μ`. -/
-private theorem expect_node_size (μ : SPMF BTree) :
-    expect μ (fun l => expect μ fun r => ((BTree.node l r).size : ℝ≥0∞))
+private theorem expect_node_size (μ : SPMF BinaryTree) :
+    expect μ (fun l => expect μ fun r => ((BinaryTree.node l r).size : ℝ≥0∞))
       = expect μ (fun t => (t.size : ℝ≥0∞)) * μ.mass
         + μ.mass * (μ.mass + expect μ (fun t => (t.size : ℝ≥0∞))) := by
-  simp only [BTree.size, Nat.cast_add, Nat.cast_one]
-  have : ∀ l : BTree, expect μ (fun r => (l.size : ℝ≥0∞) + r.size + 1)
+  simp only [BinaryTree.size, Nat.cast_add, Nat.cast_one]
+  have : ∀ l : BinaryTree, expect μ (fun r => (l.size : ℝ≥0∞) + r.size + 1)
       = μ.mass * l.size + (μ.mass + expect μ (fun t => (t.size : ℝ≥0∞))) := by
     intro l
-    rw [show (fun r : BTree => (l.size : ℝ≥0∞) + r.size + 1)
+    rw [show (fun r : BinaryTree => (l.size : ℝ≥0∞) + r.size + 1)
         = fun r => (r.size : ℝ≥0∞) + (l.size + 1) by funext r; ring, expect_add_const]
     ring
   simp only [this]
@@ -296,38 +300,38 @@ private theorem size_fixpoint {x : ℝ≥0∞} (hx : 1/2 < x) (hx1 : x ≤ 1) :
 
 /-- The upper bound, by fixpoint induction: `E₀` bounds every approximant. This is the step that
 rules out the other solution of the unfolding, `E = ⊤`. -/
-theorem genB_expected_size_le (hp : 1/2 < p) (hp1 : p ≤ 1) :
-    expect (genB p : SPMF BTree) (fun t => (t.size : ℝ≥0∞)) ≤ 1 / (2 * pr p - 1) := by
+theorem genBinaryTree_expected_size_le (hp : 1/2 < p) (hp1 : p ≤ 1) :
+    expect (genBinaryTree p : SPMF BinaryTree) (fun t => (t.size : ℝ≥0∞)) ≤ 1 / (2 * pr p - 1) := by
   have hp0 : 0 ≤ p := le_trans (by norm_num) hp.le
-  refine genB.fixpoint_induct (G := SPMF) p _ (admissible_expect_le _ _) fun z hz => ?_
-  rw [expect_genB_step hp0 hp1, expect_node_size]
+  refine genBinaryTree.fixpoint_induct (G := SPMF) p _ (admissible_expect_le _ _) fun z hz => ?_
+  rw [expect_genBinaryTree_step hp0 hp1, expect_node_size]
   have hm := mass_le_one z
-  calc pr p * (BTree.leaf.size : ℝ≥0∞) + (1 - pr p) * (expect z (fun t => (t.size : ℝ≥0∞))
+  calc pr p * (BinaryTree.leaf.size : ℝ≥0∞) + (1 - pr p) * (expect z (fun t => (t.size : ℝ≥0∞))
         * z.mass + z.mass * (z.mass + expect z (fun t => (t.size : ℝ≥0∞))))
       ≤ pr p * 1 + (1 - pr p) * (1 / (2 * pr p - 1) * 1 + 1 * (1 + 1 / (2 * pr p - 1))) := by
-        simp only [BTree.size, Nat.cast_one]; gcongr
+        simp only [BinaryTree.size, Nat.cast_one]; gcongr
     _ = 1 / (2 * pr p - 1) := by
         simp only [mul_one, one_mul]; exact size_fixpoint (half_lt_pr hp) (pr_le_one hp0 hp1)
 
 /-- Unfolded once, with the subtrees terminating: `E = x + (1 - x)(2E + 1)`. -/
-theorem genB_expected_size_step (hp : 1/2 ≤ p) (hp1 : p ≤ 1) :
-    expect (genB p : SPMF BTree) (fun t => (t.size : ℝ≥0∞))
-      = pr p + (1 - pr p) * (expect (genB p : SPMF BTree) (fun t => (t.size : ℝ≥0∞))
-        + (1 + expect (genB p : SPMF BTree) (fun t => (t.size : ℝ≥0∞)))) := by
+theorem genBinaryTree_expected_size_step (hp : 1/2 ≤ p) (hp1 : p ≤ 1) :
+    expect (genBinaryTree p : SPMF BinaryTree) (fun t => (t.size : ℝ≥0∞))
+      = pr p + (1 - pr p) * (expect (genBinaryTree p : SPMF BinaryTree) (fun t => (t.size : ℝ≥0∞))
+        + (1 + expect (genBinaryTree p : SPMF BinaryTree) (fun t => (t.size : ℝ≥0∞)))) := by
   have hp0 : 0 ≤ p := le_trans (by norm_num) hp
-  have hm : (genB p : SPMF BTree).mass = 1 := genB_terminates hp hp1
-  conv_lhs => rw [genB]
-  rw [expect_genB_step hp0 hp1, expect_node_size, hm]
-  simp [BTree.size]
+  have hm : (genBinaryTree p : SPMF BinaryTree).mass = 1 := genBinaryTree_terminates hp hp1
+  conv_lhs => rw [genBinaryTree]
+  rw [expect_genBinaryTree_step hp0 hp1, expect_node_size, hm]
+  simp [BinaryTree.size]
 
 /-- **Proposition 2.1, for binary trees**: the expected size is `x B'(x) / B(x) = 1 / (2p - 1)`. -/
-theorem genB_expected_size (hp : 1/2 < p) (hp1 : p ≤ 1) :
-    expect (genB p : SPMF BTree) (fun t => (t.size : ℝ≥0∞)) = 1 / (2 * pr p - 1) := by
+theorem genBinaryTree_expected_size (hp : 1/2 < p) (hp1 : p ≤ 1) :
+    expect (genBinaryTree p : SPMF BinaryTree) (fun t => (t.size : ℝ≥0∞)) = 1 / (2 * pr p - 1) := by
   have hx := half_lt_pr hp
   have hx1 := pr_le_one (le_trans (by norm_num) hp.le) hp1
-  have hstep := genB_expected_size_step hp.le hp1
-  have hle := genB_expected_size_le hp hp1
-  set E := expect (genB p : SPMF BTree) (fun t => (t.size : ℝ≥0∞))
+  have hstep := genBinaryTree_expected_size_step hp.le hp1
+  have hle := genBinaryTree_expected_size_le hp hp1
+  set E := expect (genBinaryTree p : SPMF BinaryTree) (fun t => (t.size : ℝ≥0∞))
   set x := pr p
   have hD0 := two_mul_sub_one_ne_zero hx
   have hE : E ≠ ⊤ := ne_top_of_le_ne_top (ENNReal.div_ne_top ENNReal.one_ne_top hD0) hle
@@ -347,12 +351,12 @@ end size
 section supercritical
 
 /-- One unfolding of the mass: `m = x + (1 - x) m²`. -/
-theorem genB_mass_step (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
-    (genB p : SPMF BTree).mass
-      = pr p + (1 - pr p) * (genB p : SPMF BTree).mass ^ 2 := by
+theorem genBinaryTree_mass_step (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
+    (genBinaryTree p : SPMF BinaryTree).mass
+      = pr p + (1 - pr p) * (genBinaryTree p : SPMF BinaryTree).mass ^ 2 := by
   rw [← expect_one]
-  conv_lhs => rw [genB]
-  rw [expect_genB_step hp0 hp1]
+  conv_lhs => rw [genBinaryTree]
+  rw [expect_genBinaryTree_step hp0 hp1]
   simp [expect_const, sq]
 
 /-- `B = x / (1 - x)` solves `B = x + (1 - x) B²`, the root below `1` when `x < 1/2`. -/
@@ -367,13 +371,13 @@ private theorem small_root {x : ℝ≥0∞} (hx : x < 1/2) :
     _ = x / (1 - x) := by rw [← mul_add, tsub_add_cancel_of_le hx1.le, mul_one]
 
 /-- The upper bound, by fixpoint induction: every approximant has mass at most `x / (1 - x)`. -/
-theorem genB_mass_le (hp0 : 0 ≤ p) (hp : p < 1/2) :
-    (genB p : SPMF BTree).mass ≤ pr p / (1 - pr p) := by
+theorem genBinaryTree_mass_le (hp0 : 0 ≤ p) (hp : p < 1/2) :
+    (genBinaryTree p : SPMF BinaryTree).mass ≤ pr p / (1 - pr p) := by
   have hp1 : p ≤ 1 := hp.le.trans (by norm_num)
   have hx := pr_lt_half hp0 hp
   rw [← expect_one]
-  refine genB.fixpoint_induct (G := SPMF) p _ (admissible_expect_le _ _) fun z hz => ?_
-  rw [expect_genB_step hp0 hp1]
+  refine genBinaryTree.fixpoint_induct (G := SPMF) p _ (admissible_expect_le _ _) fun z hz => ?_
+  rw [expect_genBinaryTree_step hp0 hp1]
   simp only [expect_const, mul_one]
   calc pr p + (1 - pr p) * (z.mass * z.mass)
       ≤ pr p + (1 - pr p) * (pr p / (1 - pr p) * (pr p / (1 - pr p))) := by
@@ -382,24 +386,24 @@ theorem genB_mass_le (hp0 : 0 ≤ p) (hp : p < 1/2) :
 
 /-- **Supercritical binary trees**: for `p < 1/2` the sampler halts with probability `p / (1 - p)`,
 the smaller root of its mass equation. Every tree still gets `p ^ (k + 1) (1 - p) ^ k`
-(`genB_apply`), which is `x ^ |t| / B` for `x = √(p (1 - p))` and `B = x / p`, the *larger* root of
-`B = x + x B²` (`genB_boltzmann` holds of either root): the pointwise equations cannot tell the
-two apart, only the least fixed point can. -/
-theorem genB_mass_supercritical (hp0 : 0 ≤ p) (hp : p < 1/2) :
-    (genB p : SPMF BTree).mass = pr p / (1 - pr p) := by
+(`genBinaryTree_apply`), which is `x ^ |t| / B` for `x = √(p (1 - p))` and `B = x / p`, the *larger*
+root of `B = x + x B²` (`genBinaryTree_boltzmann` holds of either root): the pointwise equations
+cannot tell the two apart, only the least fixed point can. -/
+theorem genBinaryTree_mass_supercritical (hp0 : 0 ≤ p) (hp : p < 1/2) :
+    (genBinaryTree p : SPMF BinaryTree).mass = pr p / (1 - pr p) := by
   have hp1 : p ≤ 1 := hp.le.trans (by norm_num)
   have hx := pr_lt_half hp0 hp
-  have hle := genB_mass_le hp0 hp
-  have hstep := (genB_mass_step hp0 hp1).symm.le
+  have hle := genBinaryTree_mass_le hp0 hp
+  have hstep := (genBinaryTree_mass_step hp0 hp1).symm.le
   have hx1 : pr p < 1 := hx.trans (by norm_num)
   have hy0 : 1 - pr p ≠ 0 := (tsub_pos_of_lt hx1).ne'
   have hB := ENNReal.div_mul_cancel (b := pr p) hy0 (ENNReal.sub_ne_top ENNReal.one_ne_top)
   have hxx : pr p + pr p < 1 := (ENNReal.add_lt_add hx hx).trans_eq (ENNReal.add_halves 1)
   have hxy : pr p ≤ 1 - pr p := ENNReal.le_sub_of_add_le_left hx1.ne_top hxx.le
   have hB1 : pr p / (1 - pr p) ≤ 1 := ENNReal.div_le_of_le_mul (by rwa [one_mul])
-  have hm1 := mass_le_one (genB p : SPMF BTree)
+  have hm1 := mass_le_one (genBinaryTree p : SPMF BinaryTree)
   clear hy0 hx1 hp0 hp hp1 hx
-  generalize (genB p : SPMF BTree).mass = m at *
+  generalize (genBinaryTree p : SPMF BinaryTree).mass = m at *
   generalize pr p / (1 - pr p) = B at *
   generalize pr p = x at *
   basify
@@ -412,9 +416,10 @@ theorem genB_mass_supercritical (hp0 : 0 ≤ p) (hp : p < 1/2) :
 
 /-- **Example 2 at `x = 2/5`**: `B(2/5) = 1/2`, so `p = x / B(x) = 4/5`, and the expected size
 `x B'(x) / B(x) = 1 / (2p - 1)` is `5/3`. -/
-theorem genB_expected_size_two_fifths :
-    expect (genB (4/5) : SPMF BTree) (fun t => (t.size : ℝ≥0∞)) = 5 / 3 := by
-  rw [genB_expected_size (by norm_num) (by norm_num), show pr (4/5) = 4/5 by rw [pr]; norm_num]
+theorem genBinaryTree_expected_size_two_fifths :
+    expect (genBinaryTree (4/5) : SPMF BinaryTree) (fun t => (t.size : ℝ≥0∞)) = 5 / 3 := by
+  rw [genBinaryTree_expected_size (by norm_num) (by norm_num),
+    show pr (4/5) = 4/5 by rw [pr]; norm_num]
   have h : (2 : ℝ≥0∞) * (4 / 5) - 1 = 3 / 5 := by basify; norm_num
   rw [h, one_div, ENNReal.inv_div (by simp) (by simp)]
 

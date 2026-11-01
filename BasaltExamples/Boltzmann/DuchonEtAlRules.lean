@@ -13,8 +13,7 @@ public import BasaltExamples.Boltzmann.DuchonEtAlBoltzmann
 
 The rules of Duchon, Flajolet, Louchard and Schaeffer (2004, §3, Table 3) that assemble a Boltzmann
 sampler from its parts — union, product, sequence — each proved to give every object `γ` the mass
-`x ^ |γ| / C(x)`, and the retry loop of their rejection samplers (§6.1, §7) with its law and its
-geometric number of trials.
+`x ^ |γ| / C(x)`, and the law of the retry loop under their ceiled rejection sampler (§7).
 -/
 
 @[expose] public section
@@ -169,134 +168,24 @@ theorem seq_terminates (hq0 : 0 ≤ q) (hq1 : q < 1) {ga : SPMF α}
 
 end rules
 
-section retry
+section reject
 
 variable {α : Type}
 
-/-- The loop under every rejection sampler of §6.1 and §7: draw from `h` until it does not fail. -/
-def retry [Gen G] (h : G (Option α)) : G α := do
-  match ← h with
-  | some a => return a
-  | none => retry h
-partial_fixpoint
-
-/-- One round of `retry`, with `z` for the retry. -/
-theorem retry_round (h : SPMF (Option α)) (z : SPMF α) (a : α) :
-    (h >>= fun o => match o with | some a => Pure.pure a | none => z) a
-      = h (some a) + h none * z a := by
-  rw [bind_apply, tsum_option, add_comm, tsum_eq_single a fun b hb => by simp [Ne.symm hb]]
-  simp
-
-/-- **The law of a retry loop**, for every `h`: the value of a round that succeeds, renormalized
-by the rounds that fail. -/
-theorem retry_apply (h : SPMF (Option α)) (a : α) :
-    (retry h : SPMF α) a = h (some a) / (1 - h none) := by
-  refine rejection_loop_apply (A := fun b => h (some b)) (R := h none) (fun b => ?_) (fun b => ?_)
-    (fun c hc => ?_) a
-  · calc h (some b) + h none ≤ ∑' o, h o := by
-          rw [tsum_option, add_comm]; gcongr; exact ENNReal.le_tsum (f := fun a => h (some a)) b
-      _ ≤ 1 := mass_le_one h
-  · conv_lhs => rw [retry]
-    exact retry_round h _ b
-  · refine retry.fixpoint_induct (G := SPMF) h _ (admissible_apply_le c) fun z hz b => ?_
-    rw [retry_round]
-    exact le_trans (by gcongr; exact hz b) (hc b)
-
-/-- **Anticipated rejection is rejection.** A sampler `h` that gives up early, but gives each object
-it keeps the mass `g` gives it, and keeps exactly those satisfying `P`, retried, is `suchThat g P`
-whenever `h` and `g` both terminate. -/
-theorem retry_eq_suchThat {h : SPMF (Option α)} {g : SPMF α} {P : α → Bool}
-    (hh : ∀ a, h (some a) = if P a then g a else 0) (hm : h.mass = 1) (hg : g.mass = 1) :
-    (retry h : SPMF α) = suchThat g P := by
+/-- Retrying a round that may fail (`none`) until it succeeds, as rejection sampling: its law is the
+round's, renormalized by the rounds that fail. -/
+theorem getD_suchThat_isSome_apply (h : SPMF (Option α)) (d a : α) :
+    ((fun o => o.getD d) <$> suchThat h Option.isSome : SPMF α) a = h (some a) / (1 - h none) := by
   classical
-  have hsum : h none + prob g {a | P a = true} = 1 := by
-    rw [← hm, mass, tsum_option, prob_eq_tsum_ite]
-    congr 1
-    exact tsum_congr fun a => by rw [hh]; rfl
-  have hD : 1 - h none = prob g {a | P a = true} :=
-    by rw [← hsum, ENNReal.add_sub_cancel_left (apply_ne_top _ _)]
-  ext a
-  rw [retry_apply, suchThat_apply_of_mass _ _ hg, hD, hh]
-  split <;> simp
-
-/-- `retry`, counting its rounds. -/
-def retryCount [Gen G] (h : G (Option α)) : G (α × Nat) := do
-  match ← h with
-  | some a => return (a, 1)
-  | none => do
-    let r ← retryCount h
-    return (r.1, r.2 + 1)
-partial_fixpoint
-
-private theorem shift_injective : (fun r : α × Nat => (r.1, r.2 + 1)).Injective := fun r s h => by
-  simp only [Prod.mk.injEq, Nat.add_right_cancel_iff] at h; exact Prod.ext h.1 h.2
-
-/-- One round of `retryCount`, with `z` for the retry. -/
-theorem retryCount_round (h : SPMF (Option α)) (z : SPMF (α × Nat)) (a : α) (n : Nat) :
-    (h >>= fun o => match o with
-      | some a => Pure.pure (a, 1)
-      | none => z >>= fun r => Pure.pure (r.1, r.2 + 1)) (a, n + 1)
-      = (if n = 0 then h (some a) else 0) + h none * z (a, n) := by
-  rw [bind_apply, tsum_option, add_comm]
-  congr 1
-  · rw [tsum_eq_single a fun b hb => by simp [Ne.symm hb]]
-    by_cases hn : n = 0 <;> simp [hn]
-  · exact congrArg _ (bind_pure_apply_of_injective shift_injective z (a, n))
-
-theorem retryCount_zero (h : SPMF (Option α)) (a : α) :
-    (retryCount h : SPMF (α × Nat)) (a, 0) = 0 := by
-  rw [retryCount, bind_apply, tsum_option,
-    bind_pure_apply_of_ne (f := fun r : α × Nat => (r.1, r.2 + 1)) _ fun r h => by
-      simp only [Prod.mk.injEq, Nat.add_eq_zero_iff, one_ne_zero, and_false] at h]
+  have hrej : prob h {o | o.isSome = false} = h none := by
+    rw [show {o : Option α | o.isSome = false} = {none} by ext o; cases o <;> simp, prob_singleton]
+  rw [map_eq_pure_bind, bind_apply, tsum_option, suchThat_apply, hrej,
+    tsum_eq_single a fun b hb => by simp [Ne.symm hb]]
+  simp only [Option.isSome_none, Bool.false_eq_true, ↓reduceIte, zero_mul, zero_add,
+    Option.getD_some, pure_apply, mul_one]
+  rw [suchThat_apply, hrej]
   simp
 
-/-- **The number of trials is geometric** (§6.1): success on round `n + 1` means `n` failures. -/
-theorem retryCount_apply (h : SPMF (Option α)) (a : α) (n : Nat) :
-    (retryCount h : SPMF (α × Nat)) (a, n + 1) = h none ^ n * h (some a) := by
-  induction n with
-  | zero =>
-    conv_lhs => rw [retryCount]
-    rw [retryCount_round, retryCount_zero]
-    simp
-  | succ n ih =>
-    conv_lhs => rw [retryCount]
-    rw [retryCount_round, ih]
-    simp only [Nat.add_one_ne_zero, ↓reduceIte, zero_add]
-    ring
-
-theorem tsum_succ_mul_pow (r : ℝ≥0∞) :
-    ∑' n : ℕ, ((n + 1 : ℕ) : ℝ≥0∞) * r ^ n = ((1 - r)⁻¹) ^ 2 := by
-  rw [sq, ← ENNReal.tsum_geometric, ← ENNReal.tsum_mul_right]
-  simp_rw [← ENNReal.tsum_mul_left, ← pow_add]
-  rw [← ENNReal.tsum_prod, ← (Finset.HasAntidiagonal.sigmaAntidiagonalEquivProd).tsum_eq,
-    ENNReal.tsum_sigma']
-  refine tsum_congr fun n => ?_
-  rw [tsum_fintype]
-  simp only [Finset.HasAntidiagonal.sigmaAntidiagonalEquivProd, Equiv.coe_fn_mk]
-  rw [Finset.sum_coe_sort (Finset.HasAntidiagonal.antidiagonal n)
-    (fun x : ℕ × ℕ => r ^ (x.1 + x.2))]
-  rw [Finset.sum_congr rfl fun p hp => by rw [Finset.HasAntidiagonal.mem_antidiagonal.1 hp]]
-  simp
-
-/-- **The expected number of trials** is the inverse of the probability that a round succeeds. -/
-theorem expect_retryCount_trials (h : SPMF (Option α)) (hm : h.mass = 1) (hR : h none < 1) :
-    expect (retryCount h : SPMF (α × Nat)) (fun r => (r.2 : ℝ≥0∞)) = (1 - h none)⁻¹ := by
-  have hq : ∑' a, h (some a) = 1 - h none := by
-    rw [← hm, mass, tsum_option, ENNReal.add_sub_cancel_left (apply_ne_top _ _)]
-  have hD0 : 1 - h none ≠ 0 := (tsub_pos_of_lt hR).ne'
-  have hDtop : 1 - h none ≠ ⊤ := ENNReal.sub_ne_top ENNReal.one_ne_top
-  unfold expect
-  rw [ENNReal.tsum_prod' (f := fun r => (retryCount h : SPMF (α × Nat)) r * (r.2 : ℝ≥0∞))]
-  have hin : ∀ a, ∑' n : ℕ, (retryCount h : SPMF (α × Nat)) (a, n) * (n : ℝ≥0∞)
-      = h (some a) * ((1 - h none)⁻¹) ^ 2 := fun a => by
-    have hs := retryCount_apply h a
-    generalize (retryCount h : SPMF (α × Nat)) = μ at hs
-    rw [tsum_eq_zero_add' ENNReal.summable, ← tsum_succ_mul_pow, ← ENNReal.tsum_mul_left]
-    simp only [CharP.cast_eq_zero, mul_zero, zero_add, hs]
-    exact tsum_congr fun n => by ring
-  rw [tsum_congr hin, ENNReal.tsum_mul_right, hq, sq, ← mul_assoc,
-    ENNReal.mul_inv_cancel hD0 hDtop, one_mul]
-
-end retry
+end reject
 
 end Boltzmann
