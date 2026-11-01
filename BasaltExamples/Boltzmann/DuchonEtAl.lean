@@ -9,13 +9,14 @@ import Mathlib.Tactic.Basify
 public import Basalt
 
 /-!
-# Boltzmann Sampling of Binary Trees
+# Boltzmann Samplers
 
-The Boltzmann sampler for binary trees (Duchon, Flajolet, Louchard and Schaeffer 2004, Example 2),
-with its leaf probability `p = x / B(x)` as a parameter. Every tree of size `n` gets mass
-`x ^ n / B(x)`, so the sampler is uniform within each size, before and after rejection to a size
-window; its expected size `1 / (2p - 1)` above the critical `p = 1/2`, and its mass `p / (1 - p)`
-below it, are proved by fixpoint induction rather than from the generating function.
+Duchon, Flajolet, Louchard and Schaeffer, "Boltzmann Samplers for the Random Generation of
+Combinatorial Structures" (CPC 2004): the ordinary Boltzmann model (§2), and the sampler for binary
+trees (Example 2) with its leaf probability `p = x / B(x)` as a parameter. Every tree of size `n`
+gets mass `x ^ n / B(x)`, so the sampler is uniform within each size; its expected size
+`1 / (2p - 1)` above the critical `p = 1/2`, and its mass `p / (1 - p)` below it, are proved by
+fixpoint induction rather than from the generating function.
 -/
 
 @[expose] public section
@@ -24,6 +25,42 @@ open RandomChoice SPMF
 open scoped ENNReal
 
 namespace Boltzmann
+
+section model
+
+variable {α β : Type}
+
+/-- **The ordinary Boltzmann model** of parameter `x` (§2): each object `γ` of a class with size
+function `size` and generating function value `C = C(x)` has mass `x ^ |γ| / C`. -/
+def IsBoltzmann (μ : SPMF α) (size : α → ℕ) (x C : ℝ≥0∞) : Prop :=
+  ∀ a, μ a = x ^ size a / C
+
+/-- Uniform within each size, the model's point. -/
+theorem IsBoltzmann.uniform {μ : SPMF α} {size : α → ℕ} {x C : ℝ≥0∞} (h : IsBoltzmann μ size x C)
+    {a b : α} (hab : size a = size b) : μ a = μ b := by
+  rw [h, h, hab]
+
+end model
+
+section reject
+
+variable {α : Type}
+
+/-- Retrying a round that may fail (`none`) until it succeeds, as rejection sampling: its law is the
+round's, renormalized by the rounds that fail. -/
+theorem getD_suchThat_isSome_apply (h : SPMF (Option α)) (d a : α) :
+    ((fun o => o.getD d) <$> suchThat h Option.isSome : SPMF α) a = h (some a) / (1 - h none) := by
+  classical
+  have hrej : prob h {o | o.isSome = false} = h none := by
+    rw [show {o : Option α | o.isSome = false} = {none} by ext o; cases o <;> simp, prob_singleton]
+  rw [map_eq_pure_bind, bind_apply, tsum_option, suchThat_apply, hrej,
+    tsum_eq_single a fun b hb => by simp [Ne.symm hb]]
+  simp only [Option.isSome_none, Bool.false_eq_true, ↓reduceIte, zero_mul, zero_add,
+    Option.getD_some, pure_apply, mul_one]
+  rw [suchThat_apply, hrej]
+  simp
+
+end reject
 
 /-- Binary trees: `B = Z + Z × B × B`. -/
 inductive BinaryTree where
@@ -139,14 +176,6 @@ theorem genBinaryTree_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (t : BinaryTree) :
     simp [BinaryTree.internal]
     ring
 
-theorem genBinaryTree_node (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (l r : BinaryTree) :
-    (genBinaryTree p : SPMF BinaryTree) (.node l r)
-      = (1 - pr p)
-        * ((genBinaryTree p : SPMF BinaryTree) l * (genBinaryTree p : SPMF BinaryTree) r) := by
-  rw [genBinaryTree_apply hp0 hp1, genBinaryTree_apply hp0 hp1, genBinaryTree_apply hp0 hp1]
-  simp only [BinaryTree.internal]
-  ring
-
 /-- Uniform within each size. -/
 theorem genBinaryTree_uniform (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {s t : BinaryTree} (h : s.size = t.size) :
     (genBinaryTree p : SPMF BinaryTree) s = (genBinaryTree p : SPMF BinaryTree) t := by
@@ -185,64 +214,6 @@ theorem genBinaryTree_terminates (hp : 1/2 ≤ p) (hp1 : p ≤ 1) :
   simp [sq]
 
 end mass
-
-section rejection
-
-/-- Whether a tree's size lies between `lo` and `hi`: the approximate-size window `[lo, hi]`. -/
-def between (lo hi : Nat) (t : BinaryTree) : Bool := decide (lo ≤ t.size ∧ t.size ≤ hi)
-
-/-- §6.1's guarantee: rejection to a window keeps two trees of the same size equally likely. -/
-theorem rejection_uniform (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {s t : BinaryTree} (h : s.size = t.size) :
-    (suchThat (genBinaryTree p) (between lo hi) : SPMF BinaryTree) s
-      = (suchThat (genBinaryTree p) (between lo hi) : SPMF BinaryTree) t := by
-  rw [suchThat_apply, suchThat_apply, genBinaryTree_uniform hp0 hp1 h, between, between, h]
-
-private theorem pr_four_fifths : pr (4 / 5) = 4 / 5 := by
-  rw [pr]; norm_num
-
-/-- Footnote 6: the output is not uniform across the window. At `p = 4/5` and the window `[1, 3]`,
-the leaf is more likely than the tree of size `3`. -/
-theorem rejection_not_uniform_across :
-    (suchThat (genBinaryTree (4/5)) (between 1 3) : SPMF BinaryTree) .leaf
-      ≠ (suchThat (genBinaryTree (4/5)) (between 1 3) : SPMF BinaryTree) (.node .leaf .leaf) := by
-  have h0 : (0 : ℚ) ≤ 4 / 5 := by norm_num
-  have h1 : (4 / 5 : ℚ) ≤ 1 := by norm_num
-  have hne : (4 / 5 : ℝ≥0∞) ≠ ⊤ := ENNReal.div_ne_top (by norm_num) (by norm_num)
-  have hlt1 : (4 / 5 : ℝ≥0∞) < 1 := ENNReal.div_lt_of_lt_mul (by norm_num)
-  rw [suchThat_apply, suchThat_apply]
-  set R := prob (genBinaryTree (4/5) : SPMF BinaryTree) {b | between 1 3 b = false}
-  have hleaf : (genBinaryTree (4/5) : SPMF BinaryTree) .leaf = 4 / 5 := by
-    rw [genBinaryTree_apply h0 h1, pr_four_fifths]; simp [BinaryTree.internal]
-  have hR : R < 1 := by
-    have hacc :
-        4 / 5 ≤ prob (genBinaryTree (4/5) : SPMF BinaryTree) {b | between 1 3 b = true} := by
-      classical
-      rw [prob_eq_tsum_ite, ← hleaf]
-      refine le_trans ?_ (ENNReal.le_tsum BinaryTree.leaf)
-      simp [between, BinaryTree.size]
-    have hsum :=
-      (prob_accept_add_reject (genBinaryTree (4/5) : SPMF BinaryTree) (between 1 3)).le.trans
-      (mass_le_one _)
-    have : R + 4 / 5 ≤ 1 := by rw [add_comm]; exact le_trans (by gcongr) hsum
-    exact lt_of_le_of_lt (ENNReal.le_sub_of_add_le_right hne this)
-      (ENNReal.sub_lt_self ENNReal.one_ne_top one_ne_zero (by norm_num))
-  have hD0 : 1 - R ≠ 0 := (tsub_pos_of_lt hR).ne'
-  have hDtop : 1 - R ≠ ⊤ := ENNReal.sub_ne_top ENNReal.one_ne_top
-  simp only [show between 1 3 .leaf = true by decide,
-    show between 1 3 (.node .leaf .leaf) = true by decide, ↓reduceIte]
-  intro h
-  have h := congrArg (· * (1 - R)) h
-  simp only [ENNReal.div_mul_cancel hD0 hDtop] at h
-  rw [hleaf, genBinaryTree_apply h0 h1, pr_four_fifths] at h
-  simp only [BinaryTree.internal] at h
-  have hlt : (4 / 5 : ℝ≥0∞) ^ (0 + 0 + 1 + 1) * (1 - 4 / 5) ^ (0 + 0 + 1) < 4 / 5 := by
-    calc _ ≤ (4 / 5 : ℝ≥0∞) ^ 2 * 1 := by gcongr; exact pow_le_one₀ (by simp) tsub_le_self
-      _ < 4 / 5 := by
-        rw [mul_one, pow_two]
-        exact ENNReal.mul_lt_of_lt_div (by rw [ENNReal.div_self (by norm_num) hne]; exact hlt1)
-  exact hlt.ne h.symm
-
-end rejection
 
 section size
 

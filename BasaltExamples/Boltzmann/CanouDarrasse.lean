@@ -7,7 +7,7 @@ module
 
 import Mathlib.Tactic.Basify
 public import Basalt
-public import BasaltExamples.Boltzmann.DuchonEtAlRules
+public import BasaltExamples.Boltzmann.DuchonEtAl
 
 /-!
 # Singular Boltzmann Samplers for Trees
@@ -16,7 +16,7 @@ The three tree samplers of Canou and Darrasse, "Fast and Sound Random Generation
 Testing and Benchmarking in Objective Caml" (ML '09, Figs. 1–3), run at the singularity `x = ρ`,
 where every branching probability is rational and every sampler is critical: each is uniform within
 a size, terminates almost surely, and has infinite expected size. Their abort-and-retry sampler
-(§3.3) is uniform within a size.
+(§3.3) has the generator's law conditioned on the size window.
 -/
 
 @[expose] public section
@@ -304,55 +304,6 @@ theorem genUnaryBinary_boltzmann :
   rw [genUnaryBinaryW_apply, div_one, UBTree.size_eq, pow_add, pow_add]
   norm_num
 
-/-- Whether the weighted sampler gives two trees of the same size the same mass. -/
-def UniformWithinSize (μ : SPMF UBTree) : Prop :=
-  ∀ s t : UBTree, s.size = t.size → μ s = μ t
-
-/-- The weighted unary-binary sampler is uniform within each size exactly when `b² = a c` (or it
-never halts, `a = 0`); at `ρ`, `a = b = c`. -/
-theorem genUnaryBinaryW_uniform_iff (h : 0 < a + b + c) :
-    UniformWithinSize (genUnaryBinaryW a b c h : SPMF UBTree) ↔ a = 0 ∨ b ^ 2 = a * c := by
-  set S : ℝ≥0∞ := a + b + c
-  have hS0 : S ≠ 0 := by simp only [S]; exact_mod_cast h.ne'
-  have hStop : S ≠ ⊤ := by simp [S]
-  constructor
-  · intro hu
-    have := hu (.unary (.unary .leaf)) (.binary .leaf .leaf) rfl
-    simp only [genUnaryBinaryW_apply, UBTree.leaves, UBTree.unaries, UBTree.binaries] at this
-    rw [or_iff_not_imp_left]
-    intro ha
-    have h3 : (a : ℝ≥0∞) * b ^ 2 = a * (a * c) := by
-      have h' := congrArg (· * S ^ 3) this
-      simp only [div_eq_mul_inv] at h'
-      have hSS : S⁻¹ * S = 1 := ENNReal.inv_mul_cancel hS0 hStop
-      calc (a : ℝ≥0∞) * b ^ 2
-          = (↑a * S⁻¹) ^ 1 * (↑b * S⁻¹) ^ 2 * (↑c * S⁻¹) ^ 0 * S ^ 3 := by
-            simp only [pow_one, pow_zero, mul_one]
-            calc (a : ℝ≥0∞) * b ^ 2 = a * b ^ 2 * (S⁻¹ * S) ^ 3 := by rw [hSS, one_pow, mul_one]
-              _ = _ := by ring
-        _ = (↑a * S⁻¹) ^ 2 * (↑b * S⁻¹) ^ 0 * (↑c * S⁻¹) ^ 1 * S ^ 3 := h'
-        _ = a * (a * c) := by
-            simp only [pow_one, pow_zero, mul_one]
-            calc (↑a * S⁻¹) ^ 2 * (↑c * S⁻¹) * S ^ 3 = a * (a * c) * (S⁻¹ * S) ^ 3 := by ring
-              _ = _ := by rw [hSS, one_pow, mul_one]
-    have h3' : a * b ^ 2 = a * (a * c) := by exact_mod_cast h3
-    exact Nat.eq_of_mul_eq_mul_left (Nat.pos_of_ne_zero ha) h3'
-  · rintro (rfl | hb) s t hst
-    · simp only [genUnaryBinaryW_apply, Nat.cast_zero, ENNReal.zero_div, UBTree.leaves_eq,
-        zero_pow (Nat.succ_ne_zero _), zero_mul]
-    · have hxz : (a / S) * (c / S) = (b / S) ^ 2 := by
-        rw [div_eq_mul_inv, div_eq_mul_inv, div_eq_mul_inv, mul_pow,
-          show (b : ℝ≥0∞) ^ 2 = a * c by exact_mod_cast hb]
-        ring
-      have hform : ∀ t : UBTree, (genUnaryBinaryW a b c h : SPMF UBTree) t
-          = (a / S) * (b / S) ^ (t.size - 1) := fun t => by
-        rw [genUnaryBinaryW_apply, show (a + b + c : ℝ≥0∞) = S from rfl, UBTree.size_eq,
-          UBTree.leaves_eq,
-          show t.binaries + 1 + t.unaries + t.binaries - 1 = t.unaries + 2 * t.binaries by omega,
-          pow_add (b / S), pow_mul, ← hxz, mul_pow, pow_succ]
-        ring
-      rw [hform, hform, hst]
-
 /-- **Terminates almost surely at the singularity**: one, two, or no children, each with probability
 `1/3`, is mean offspring exactly `1`. -/
 theorem genUnaryBinary_terminates :
@@ -605,43 +556,6 @@ theorem ceiledUnaryBinary_apply (h : 0 < a + b + c) (lo hi : Nat) (t : UBTree) :
     exact tsum_congr fun t => by rw [roundUnaryBinary_some]; simp [between]
   rw [ceiledUnaryBinary, getD_suchThat_isSome_apply, hQ, roundUnaryBinary_some]
   simp [between]
-
-/-- Within a size, abort-and-retry at `ρ` is uniform. -/
-theorem ceiledUnaryBinary_uniform (lo hi : Nat) {s t : UBTree} (hst : s.size = t.size) :
-    (ceiledUnaryBinary 1 1 1 three_pos lo hi : SPMF UBTree) s
-      = (ceiledUnaryBinary 1 1 1 three_pos lo hi : SPMF UBTree) t := by
-  rw [ceiledUnaryBinary_apply, ceiledUnaryBinary_apply, between, between, hst,
-    genUnaryBinary_boltzmann.uniform hst]
-
-/-- A unary chain of size `n + 1`. -/
-def UBTree.chain : Nat → UBTree
-  | 0 => .leaf
-  | n + 1 => .unary (UBTree.chain n)
-
-theorem UBTree.chain_size (n : Nat) : (UBTree.chain n).size = n + 1 := by
-  induction n <;> simp [UBTree.chain, UBTree.size, *]
-
-/-- **Abort-and-retry terminates** although the sampler it ceils is critical with infinite expected
-size, for any nonempty window of positive sizes. -/
-theorem ceiledUnaryBinary_terminates {lo hi : Nat} (hlo : 1 ≤ lo) (hle : lo ≤ hi) :
-    IsAlmostSurelyTerminating (ceiledUnaryBinary 1 1 1 three_pos lo hi : SPMF UBTree) := by
-  classical
-  set Q := prob (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) {t | between lo hi t = true}
-  have hQsum : (∑' t, if between lo hi t = true
-      then (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) t
-      else 0) = Q := by simp only [Q, prob_eq_tsum_ite, Set.mem_ofPred_eq]
-  have hw : between lo hi (UBTree.chain (lo - 1)) = true := by
-    simp [between, UBTree.chain_size]; omega
-  have hQ0 : Q ≠ 0 := by
-    rw [← hQsum]
-    refine (lt_of_lt_of_le ?_ (ENNReal.le_tsum (UBTree.chain (lo - 1)))).ne'
-    simp only [hw, ↓reduceIte, genUnaryBinary_boltzmann _]
-    simp [ENNReal.pow_pos]
-  have hQtop : Q ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top
-    ((prob_le_mass _ _).trans (mass_le_one _))
-  unfold IsAlmostSurelyTerminating mass
-  simp_rw [ceiledUnaryBinary_apply, div_eq_mul_inv]
-  rw [ENNReal.tsum_mul_right, hQsum, ENNReal.mul_inv_cancel hQ0 hQtop]
 
 /-! ## Rose trees: `T = Z × Seq(T)`
 
