@@ -79,10 +79,14 @@ Guidelines that make the proofs go smoothly:
   in the recursive body needs a `@[partial_fixpoint_monotone]` lemma; the library's own combinators
   carry theirs (grep for the `@[partial_fixpoint_monotone]` tag for the current list), and
   combinators that don't mention the recursive call (like `chooseNat`) need nothing.
-- **Write a choice between literal branches as `oneOf! [g₀, …]` or `frequency! [(w₀, g₀), …]`.**
+- **Write a choice between literal branches as `oneOf! | g₀ | …` or `frequency! | w₀ => g₀ | …`.**
   They run as a chain of tests on the draw rather than building a list of closures, and every proof
   below sees `oneOf` / `frequency` — the walker directly, and `simp` through `oneOfWith_eq` /
   `frequencyWith_eq`. A branch list that is not a literal stays plain `oneOf` / `frequency`.
+- **A branch that exists only under a condition takes a guard**, `| if h : c => g h` (or
+  `| w if h : c => g h`), rather than a `dite` around two copies of the choice. Proofs see exactly
+  that `dite` (one case per combination of guards), which `walk` splits; the compiled code stays one
+  draw.
 - **Weighted choices go through `frequency!`**, one n-ary choice per site, with the weights inline.
   Tag the definition `@[tunable]` to make the weights runtime-addressable later (see
   `Basalt/Tuning/Attr.lean` and `BasaltTest/Tuning.lean`); it changes nothing about the proofs below.

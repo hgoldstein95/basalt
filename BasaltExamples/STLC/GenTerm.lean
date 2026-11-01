@@ -22,7 +22,7 @@ namespace STLC
 
 /-- Generates an arbitrary `Bool`. -/
 def Bool.arbitrary [Gen G] : G Bool :=
-  oneOf! [fun _ => pure true, fun _ => pure false]
+  oneOf! | pure true | pure false
 
 /-- Generates a Boolean literal. -/
 def genBool [Gen G] : G Term :=
@@ -66,37 +66,19 @@ variable when `Γ` has one of type `τ`, an application at an arbitrary argument
 introduction form of `τ`. -/
 def genTerm [Gen G] (Γ : Ctx) (τ : Ty) : G Term :=
   let vars := varsWithType Γ τ
-  if hne : vars ≠ [] then
-    oneOf! [
-      fun _ => genZero Γ τ,
-      fun _ => elements vars hne,
-      fun _ => do
-        let argTy ← genType
-        let e1 ← genTerm Γ (.Fun argTy τ)
-        let e2 ← genTerm Γ argTy
-        return .App e1 e2,
-      fun _ =>
-        match τ with
-        | .Bool => genBool
-        | .Fun τ1 τ2 => do
-          let e ← genTerm (τ1 :: Γ) τ2
-          return .Abs τ1 e
-    ]
-  else
-    oneOf! [
-      fun _ => genZero Γ τ,
-      fun _ => do
-        let argTy ← genType
-        let e1 ← genTerm Γ (.Fun argTy τ)
-        let e2 ← genTerm Γ argTy
-        return .App e1 e2,
-      fun _ =>
-        match τ with
-        | .Bool => genBool
-        | .Fun τ1 τ2 => do
-          let e ← genTerm (τ1 :: Γ) τ2
-          return .Abs τ1 e
-    ]
+  oneOf!
+  | genZero Γ τ
+  | if hne : vars ≠ [] => elements vars hne
+  | do
+    let argTy ← genType
+    let e1 ← genTerm Γ (.Fun argTy τ)
+    let e2 ← genTerm Γ argTy
+    return .App e1 e2
+  | match τ with
+    | .Bool => genBool
+    | .Fun τ1 τ2 => do
+      let e ← genTerm (τ1 :: Γ) τ2
+      return .Abs τ1 e
 partial_fixpoint
 
 theorem Bool.arbitrary.sound_complete : IsSoundAndComplete Bool.arbitrary ⊤ := by

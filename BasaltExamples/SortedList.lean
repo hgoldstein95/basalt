@@ -27,13 +27,13 @@ namespace SortedList
 /-- Generates a sorted list whose every element is at least `m`: stop with `[]`, or draw a gap with
 `Nat.arbitrary`, emit `m + gap`, and recurse with that as the new lower bound. -/
 def List.genSortedGt [Gen G] (m : Nat) : G (List Nat) := do
-  oneOf! [
-    fun _ => pure [],
-    fun _ => do
-      let delta ← Nat.arbitrary
-      let x := m + delta
-      let xs ← List.genSortedGt x
-      return x :: xs]
+  oneOf!
+  | pure []
+  | do
+    let delta ← Nat.arbitrary
+    let x := m + delta
+    let xs ← List.genSortedGt x
+    return x :: xs
 partial_fixpoint
 
 /-- Generates an arbitrary sorted list, i.e. one with lower bound `0`. -/

@@ -128,11 +128,16 @@ end combinators
 
 /-! ## Compiled Choice
 
-`oneOf! [g₀, g₁, …]` is `oneOfWith [g₀, g₁, …] hne impl h`: the model `oneOf [g₀, g₁, …]`, which
+`oneOf! | g₀ | g₁ …` is `oneOfWith [g₀, g₁, …] hne impl h`: the model `oneOf [g₀, g₁, …]`, which
 proofs see, and `impl`, which runs — the same draw followed by a chain of tests on it, with no list
 of branches to build. `h : impl = oneOf …` is an instance of `oneOf_eq_chain`, checked by unfolding
 `oneOfChain` over the literal list, so `impl` must be exactly what that unfolds to. `frequency!` is the
-same over `frequencyChain`. -/
+same over `frequencyChain`.
+
+With a guard, the choice is `guardedWith model impl h`. The model is a `dite` on each guard, in
+order, over the plain choice of the branches present; `impl` is `Branch.chain` (or
+`Branch.chainWeighted`) unrolled, and `h` is an instance of `oneOf_eq_branchChain` (or
+`frequency_eq_branchChain`) at each leaf. -/
 
 section compiled_choice
 
@@ -176,7 +181,7 @@ theorem oneOf_eq_chain {G : Type u → Type v} {α : Type u} [Gen G] (gs : List 
   have : 0 < gs.length := List.length_pos_iff.mpr hne
   rw [← oneOfChain_eq gs 0 _ (by omega), Nat.zero_add]
 
-/-- `oneOf gs hne`, run as `impl`. Write it as `oneOf! [g₀, g₁, …]`. -/
+/-- `oneOf gs hne`, run as `impl`. Write it as `oneOf! | g₀ | g₁ …`. -/
 @[inline] def oneOfWith {G : Type u → Type v} {α : Type u} [Gen G] (gs : List (Unit → G α))
     (hne : gs ≠ []) (impl : G α) (_h : impl = oneOf gs hne) : G α := impl
 
@@ -223,7 +228,7 @@ theorem frequency_eq_chain {G : Type → Type v} {α : Type} [Gen G]
   funext n
   simpa using (frequencyChain_eq gs 0 n).symm
 
-/-- `frequency gs h`, run as `impl`. Write it as `frequency! [(w₀, g₀), …]`. -/
+/-- `frequency gs h`, run as `impl`. Write it as `frequency! | w₀ => g₀ …`. -/
 @[inline] def frequencyWith {G : Type → Type v} {α : Type} [Gen G]
     (gs : List (Nat × (Unit → G α))) (h : 0 < (gs.map Prod.fst).sum) (impl : G α)
     (_h : impl = frequency gs h) : G α := impl
@@ -232,6 +237,190 @@ theorem frequency_eq_chain {G : Type → Type v} {α : Type} [Gen G]
     {gs : List (Nat × (Unit → G α))} {h : 0 < (gs.map Prod.fst).sum} {impl : G α}
     {he : impl = frequency gs h} : frequencyWith gs h impl he = frequency gs h :=
   he
+
+/-- A branch of a guarded choice: `always g`, or `when c g`, which is present only when `c` holds
+and may use its proof. -/
+inductive Branch (G : Type u → Type v) (α : Type u) where
+  | always (g : Unit → G α)
+  | when (c : Prop) [Decidable c] (g : c → Unit → G α)
+
+namespace Branch
+
+variable {G : Type u → Type v} {α : Type u}
+
+/-- The branches present. -/
+def present : List (Branch G α) → List (Unit → G α)
+  | [] => []
+  | always g :: bs => g :: present bs
+  | when c g :: bs => if h : c then g h :: present bs else present bs
+
+/-- `acc` plus the number of branches present. -/
+def count : List (Branch G α) → Nat → Nat
+  | [], acc => acc
+  | always _ :: bs, acc => count bs (acc + 1)
+  | when c _ :: bs, acc => count bs (acc + if c then 1 else 0)
+
+/-- The branches present, tested one index at a time: `chain bs k i` runs the present branch whose
+index, counted from `k`, is `i`. A guard is tested where its branch is, so the chain is linear in
+the branches and not exponential in the guards. -/
+def chain [Gen G] : List (Branch G α) → Nat → Nat → G α
+  | [], _, _ => default
+  | always g :: bs, k, i => if i = k then g () else chain bs (k + 1) i
+  | when c g :: bs, k, i =>
+    if h : c ∧ i = k then g h.1 () else chain bs (k + if c then 1 else 0) i
+
+theorem present_when_pos {c : Prop} [Decidable c] {g : c → Unit → G α} {bs : List (Branch G α)}
+    (h : c) : present (when c g :: bs) = g h :: present bs := dite_eq_left h
+
+theorem present_when_neg {c : Prop} [Decidable c] {g : c → Unit → G α} {bs : List (Branch G α)}
+    (h : ¬c) : present (when c g :: bs) = present bs := dite_eq_right h
+
+theorem count_eq (bs : List (Branch G α)) (acc : Nat) :
+    count bs acc = acc + (present bs).length := by
+  induction bs generalizing acc with
+  | nil => rfl
+  | cons b bs ih =>
+    cases b with
+    | always g => simp only [count, present, ih, List.length_cons]; omega
+    | when c g =>
+      simp only [count, present, ih]
+      split <;> simp; omega
+
+/-- Stated at a list `gs` rather than at `present bs`, whose index proof a rewrite of `present`
+could not carry. -/
+theorem chain_eq [Gen G] (bs : List (Branch G α)) (gs : List (Unit → G α))
+    (hgs : present bs = gs) (k j : Nat) (hj : j < gs.length) :
+    chain bs k (k + j) = (gs[j]'hj) () := by
+  induction bs generalizing gs k j with
+  | nil => subst hgs; simp [present] at hj
+  | cons b bs ih =>
+    cases b with
+    | always g =>
+      obtain rfl : g :: present bs = gs := hgs
+      cases j with
+      | zero => simp [chain]
+      | succ j =>
+        rw [chain, ite_eq_right (by omega), show k + (j + 1) = k + 1 + j by omega, ih _ rfl]
+        rfl
+    | when c g =>
+      by_cases hc : c
+      · obtain rfl := (present_when_pos hc).symm.trans hgs
+        cases j with
+        | zero => simp [chain, hc]
+        | succ j =>
+          rw [chain, dite_eq_right (by omega), ite_eq_left hc,
+            show k + (j + 1) = k + 1 + j by omega, ih _ rfl]
+          rfl
+      · rw [chain, dite_eq_right (by simp [hc]), ite_eq_right hc, Nat.add_zero,
+          ih _ ((present_when_neg hc).symm.trans hgs)]
+
+/-- The weighted branches present. -/
+def presentWeighted : List (Nat × Branch G α) → List (Nat × (Unit → G α))
+  | [] => []
+  | (w, always g) :: bs => (w, g) :: presentWeighted bs
+  | (w, when c g) :: bs => if h : c then (w, g h) :: presentWeighted bs else presentWeighted bs
+
+/-- `acc` plus the total weight of the branches present. -/
+def total : List (Nat × Branch G α) → Nat → Nat
+  | [], acc => acc
+  | (w, always _) :: bs, acc => total bs (acc + w)
+  | (w, when c _) :: bs, acc => total bs (acc + if c then w else 0)
+
+/-- The weighted branches present, tested against running totals, as `frequencyChain` tests
+them. -/
+def chainWeighted {G : Type → Type v} {α : Type} [Gen G] :
+    List (Nat × Branch G α) → Nat → Nat → G α
+  | [], _, _ => default
+  | (w, always g) :: bs, acc, n => if n < acc + w then g () else chainWeighted bs (acc + w) n
+  | (w, when c g) :: bs, acc, n =>
+    if h : c ∧ n < acc + w then g h.1 () else chainWeighted bs (acc + if c then w else 0) n
+
+theorem presentWeighted_when_pos {w : Nat} {c : Prop} [Decidable c] {g : c → Unit → G α}
+    {bs : List (Nat × Branch G α)} (h : c) :
+    presentWeighted ((w, when c g) :: bs) = (w, g h) :: presentWeighted bs := dite_eq_left h
+
+theorem presentWeighted_when_neg {w : Nat} {c : Prop} [Decidable c] {g : c → Unit → G α}
+    {bs : List (Nat × Branch G α)} (h : ¬c) :
+    presentWeighted ((w, when c g) :: bs) = presentWeighted bs := dite_eq_right h
+
+theorem total_eq (bs : List (Nat × Branch G α)) (acc : Nat) :
+    total bs acc = acc + ((presentWeighted bs).map Prod.fst).sum := by
+  induction bs generalizing acc with
+  | nil => rfl
+  | cons b bs ih =>
+    obtain ⟨w, b⟩ := b
+    cases b with
+    | always g => simp only [total, presentWeighted, ih, List.map_cons, List.sum_cons]; omega
+    | when c g =>
+      simp only [total, presentWeighted, ih]
+      split <;> simp; omega
+
+theorem chainWeighted_eq {G : Type → Type v} {α : Type} [Gen G] (bs : List (Nat × Branch G α))
+    (acc n : Nat) : chainWeighted bs acc n = frequencyChain (presentWeighted bs) acc n := by
+  induction bs generalizing acc with
+  | nil => rfl
+  | cons b bs ih =>
+    obtain ⟨w, b⟩ := b
+    cases b with
+    | always g => simp only [chainWeighted, presentWeighted, frequencyChain, ih]
+    | when c g =>
+      by_cases hc : c
+      · rw [presentWeighted_when_pos hc, chainWeighted, frequencyChain, ite_eq_left hc, ih]
+        by_cases hn : n < acc + w <;> simp [hc, hn]
+      · rw [presentWeighted_when_neg hc, chainWeighted, dite_eq_right (by simp [hc]),
+          ite_eq_right hc, Nat.add_zero, ih]
+
+end Branch
+
+/-- `oneOf gs` for `gs` the branches of `bs` present, as `oneOf_eq_chain` with `Branch.chain`. -/
+theorem oneOf_eq_branchChain {G : Type u → Type v} {α : Type u} [Gen G] (bs : List (Branch G α))
+    (gs : List (Unit → G α)) (hgs : Branch.present bs = gs) (hne : gs ≠ []) (n : Nat)
+    (hn : Branch.count bs 0 - 1 = n) :
+    oneOf gs hne = RandomChoice.choose 0 n (Nat.zero_le _) >>= fun i =>
+      Branch.chain bs 0 i.down.val := by
+  subst hn
+  rw [Branch.count_eq, Nat.zero_add, hgs]
+  unfold oneOf
+  congr 1
+  funext i
+  have := i.down.property.2
+  have : 0 < gs.length := List.length_pos_iff.mpr hne
+  have h := Branch.chain_eq bs gs hgs 0 i.down.val (by omega)
+  rw [Nat.zero_add] at h
+  exact h.symm
+
+/-- `frequency gs` for `gs` the weighted branches of `bs` present, as `frequency_eq_chain` with
+`Branch.chainWeighted`. -/
+theorem frequency_eq_branchChain {G : Type → Type v} {α : Type} [Gen G]
+    (bs : List (Nat × Branch G α)) (gs : List (Nat × (Unit → G α)))
+    (hgs : Branch.presentWeighted bs = gs) (h : 0 < (gs.map Prod.fst).sum) (m : Nat)
+    (hm : Branch.total bs 0 - 1 = m) :
+    frequency gs h = chooseNat 0 m (Nat.zero_le _) >>= fun n => Branch.chainWeighted bs 0 n := by
+  rw [frequency_eq_chain gs h m (by rw [← hm, Branch.total_eq, hgs, Nat.zero_add])]
+  congr 1
+  funext n
+  rw [Branch.chainWeighted_eq, hgs]
+
+theorem eq_dite {β : Sort u} {c : Prop} [Decidable c] {x : β} {t : c → β} {e : ¬c → β}
+    (ht : ∀ h, x = t h) (he : ∀ h, x = e h) : x = dite c t e := by
+  by_cases h : c
+  · rw [dite_eq_left h]; exact ht h
+  · rw [dite_eq_right h]; exact he h
+
+/-- `guardedWith model impl h` runs `impl`. -/
+@[inline] def guardedWithImpl {G : Type u → Type v} {α : Type u} (_model impl : G α)
+    (_h : impl = _model) : G α := impl
+
+/-- A guarded `oneOf!` or `frequency!`: `model`, a `dite` on each guard in turn over the plain
+choices among the branches present, run as `impl`, one draw and a chain of tests over all the
+branches. Unlike `oneOfWith`, its body is the model, so a proof that unfolds it sees the `dite`s and
+needs no rule for it. -/
+@[implemented_by guardedWithImpl]
+def guardedWith {G : Type u → Type v} {α : Type u} (model _impl : G α) (_h : _impl = model) :
+    G α := model
+
+@[simp] theorem guardedWith_eq {G : Type u → Type v} {α : Type u} {model impl : G α}
+    {h : impl = model} : guardedWith model impl h = model := rfl
 
 open Lean Meta in
 /-- `impl` and `impl = model` for `model` (a `oneOf` or `frequency`), from `eqChain`
@@ -310,41 +499,342 @@ meta def mkFrequencyWith? (e : Expr) : MetaM (Option Expr) := do
   let args := e.getAppArgs
   return mkAppN (mkConst ``frequencyWith e.getAppFn.constLevels!) (args.push impl |>.push h)
 
-/-- `oneOf [g₀, g₁, …]`, compiled to a chain of tests on the drawn index. -/
-syntax (name := oneOfBang) "oneOf! " "[" term,+ "]" : term
+open Lean in
+/-- A literal guarded choice: each branch's weight (`1` for `oneOf!`), its `Branch`, and the name
+its guard's proof is bound to. -/
+private meta structure Guarded where
+  weighted : Bool
+  /-- `G α` -/
+  ty : Expr
+  gen : Expr
+  α : Expr
+  inst : Expr
+  /-- The elaborated list literal: of `Branch G α`, or of `Nat × Branch G α` when weighted. -/
+  list : Expr
+  weights : Array Expr
+  branches : Array Expr
+  names : Array Name
 
-/-- `frequency [(w₀, g₀), (w₁, g₁), …]`, compiled to a chain of tests on the drawn weight. Like
-`frequency`, it takes the positivity of the total weight as an optional argument. -/
-syntax (name := frequencyBang) "frequency! " "[" term,+ "]" (ppSpace colGt term:max)? : term
+open Lean in
+/-- `a + b`, folded when both are literals, as the kernel reduces it. -/
+private meta def addFold (a b : Expr) : Expr :=
+  match a.nat?, b.nat? with
+  | some x, some y => mkNatLit (x + y)
+  | _, _ => mkNatAdd a b
+
+open Lean Meta in
+/-- The weight branch `j` adds to the running total: its weight, or `if c then w else 0`. -/
+private meta def Guarded.step (q : Guarded) (j : Nat) : MetaM Expr := do
+  let b := q.branches[j]!
+  if b.isAppOfArity ``Branch.always 3 then return q.weights[j]!
+  mkAppOptM ``ite #[mkConst ``Nat, b.getArg! 2, b.getArg! 3, q.weights[j]!, mkNatLit 0]
+
+open Lean Meta in
+/-- The running totals before each branch, and the total, unrolled as `Branch.count` and
+`Branch.total` unfold. -/
+private meta def Guarded.offsets (q : Guarded) : MetaM (Array Expr × Expr) := do
+  let mut ks := #[]
+  let mut k := mkNatLit 0
+  for j in [0:q.branches.size] do
+    ks := ks.push k
+    k := addFold k (← q.step j)
+  return (ks, k)
+
+open Lean Meta in
+/-- `Branch.chain` or `Branch.chainWeighted` of the branches from `0`, at the draw `i`, unrolled. -/
+private meta def Guarded.chain (q : Guarded) (i : Expr) : MetaM Expr := do
+  let (ks, _) ← q.offsets
+  let mut acc ← mkAppOptM ``Inhabited.default #[q.ty, none]
+  for j' in [0:q.branches.size] do
+    let j := q.branches.size - 1 - j'
+    let b := q.branches[j]!
+    let test ← if q.weighted then mkLt i (addFold ks[j]! q.weights[j]!) else mkEq i ks[j]!
+    let testInst ← synthInstance (mkApp (mkConst ``Decidable) test)
+    if b.isAppOfArity ``Branch.always 3 then
+      let g := (mkApp (b.getArg! 2) (mkConst ``Unit.unit)).headBeta
+      acc := mkApp5 (mkConst ``ite [← getLevel q.ty]) q.ty test testInst g acc
+    else
+      let c := b.getArg! 2
+      let p := mkAnd c test
+      let inst := mkApp4 (mkConst ``instDecidableAnd) c test (b.getArg! 3) testInst
+      let t ← withLocalDeclD `h p fun h => do
+        mkLambdaFVars #[h] (mkApp2 (b.getArg! 4) (mkProj ``And 0 h) (mkConst ``Unit.unit)).headBeta
+      let f ← withLocalDeclD `h (mkNot p) fun h => mkLambdaFVars #[h] acc
+      acc ← mkAppOptM ``dite #[q.ty, p, inst, t, f]
+  return acc
+
+open Lean Meta in
+/-- The branches present, as a list literal, for the leaf in which each guarded branch `j` has the
+proof `hyps[j]` (`(true, h)` for `h : c`, `(false, h)` for `h : ¬c`), with the proof that
+`Branch.present` (or `Branch.presentWeighted`) of the branches is it. -/
+private meta def Guarded.present (q : Guarded) (hyps : Array (Option (Bool × Expr))) :
+    MetaM (Expr × Expr) := do
+  let mut sufs := #[q.list]
+  let mut cur := q.list
+  while cur.isAppOfArity ``List.cons 3 do
+    cur := cur.appArg!
+    sufs := sufs.push cur
+  let presentFn := if q.weighted then ``Branch.presentWeighted else ``Branch.present
+  let (posLem, negLem) := if q.weighted
+    then (``Branch.presentWeighted_when_pos, ``Branch.presentWeighted_when_neg)
+    else (``Branch.present_when_pos, ``Branch.present_when_neg)
+  let entry (j : Nat) (g : Expr) : MetaM Expr :=
+    if q.weighted then mkAppM ``Prod.mk #[q.weights[j]!, g] else pure g
+  let gTy ← mkArrow (mkConst ``Unit) q.ty
+  let mut L ← mkAppOptM ``List.nil #[← if q.weighted then mkAppM ``Prod #[mkConst ``Nat, gTy]
+    else pure gTy]
+  let mut prf ← mkEqRefl L
+  for j' in [0:q.branches.size] do
+    let j := q.branches.size - 1 - j'
+    let b := q.branches[j]!
+    let here ← mkAppM presentFn #[sufs[j]!]
+    let lemArgs := (if q.weighted then #[q.gen, q.α, q.weights[j]!] else #[q.gen, q.α]) ++
+      #[b.getArg! 2, b.getArg! 3, b.getArg! 4, sufs[j + 1]!]
+    match hyps[j]! with
+    | none =>
+      let L' ← mkAppM ``List.cons #[← entry j (b.getArg! 2), L]
+      prf ← mkExpectedTypeHint (← mkCongrArg (← mkAppM ``List.cons #[← entry j (b.getArg! 2)]) prf)
+        (← mkEq here L')
+      L := L'
+    | some (true, h) =>
+      let e ← entry j (mkApp (b.getArg! 4) h).headBeta
+      let L' ← mkAppM ``List.cons #[e, L]
+      prf ← mkExpectedTypeHint (← mkEqTrans (← mkAppOptM posLem ((lemArgs.push h).map some))
+        (← mkCongrArg (← mkAppM ``List.cons #[e]) prf)) (← mkEq here L')
+      L := L'
+    | some (false, h) =>
+      prf ← mkExpectedTypeHint (← mkEqTrans (← mkAppOptM negLem ((lemArgs.push h).map some)) prf)
+        (← mkEq here L)
+  return (L, prf)
+
+open Lean Meta Elab Term in
+/-- `goal` by `gen_side_condition` in the current context, or the error `msg`. -/
+private meta def sideCondition (goal : Expr) (msg : MessageData) : TermElabM Expr := do
+  let mv ← mkFreshExprMVar goal
+  let saved ← saveState
+  let tac ← `(tactic| gen_side_condition)
+  -- `done` logs the goals it leaves and admits them, so a failure is a proof with a `sorry`, and
+  -- restores the message log.
+  let solved ← try
+      let gs ← withoutErrToSorry <| Tactic.run mv.mvarId! <|
+        Tactic.withoutRecover (Tactic.evalTactic tac *> Tactic.pruneSolvedGoals)
+      pure (gs.isEmpty && !(← instantiateMVars mv).hasSorry)
+    catch _ => pure false
+  unless solved do
+    saved.restore
+    throwError msg
+  instantiateMVars mv
+
+open Lean Meta Elab Term in
+/-- `guardedWith model impl h` for the guarded choice `q`. -/
+private meta def Guarded.compile (q : Guarded) : TermElabM Expr := do
+  let kw := if q.weighted then "frequency!" else "oneOf!"
+  let (_, tot) ← q.offsets
+  let hi := match tot.nat? with | some k => mkNatLit (k - 1) | none => mkNatSub tot (mkNatLit 1)
+  let (eqLem, totFn) := if q.weighted then (``frequency_eq_branchChain, ``Branch.total)
+    else (``oneOf_eq_branchChain, ``Branch.count)
+  let hhi ← mkExpectedTypeHint (← mkEqRefl hi)
+    (← mkEq (← mkAppM ``HSub.hSub #[← mkAppM totFn #[q.list, mkNatLit 0], mkNatLit 1]) hi)
+  -- `impl` is the right-hand side of `eqLem`, which does not depend on the leaf, with the chain
+  -- unrolled.
+  let gTy ← mkArrow (mkConst ``Unit) q.ty
+  let gsTy ← mkAppM ``List #[← if q.weighted then mkAppM ``Prod #[mkConst ``Nat, gTy] else pure gTy]
+  -- the side condition of the plain choice of `gs`
+  let posTy (gs : Expr) : MetaM Expr := do
+    if q.weighted then
+      mkLt (mkNatLit 0) (← mkAppM ``List.sum
+        #[← mkAppM ``List.map #[← mkAppOptM ``Prod.fst #[mkConst ``Nat, gTy], gs]])
+    else return mkNot (← mkEq gs (← mkAppOptM ``List.nil #[gTy]))
+  let gsV ← mkFreshExprMVar gsTy
+  let presentFn := if q.weighted then ``Branch.presentWeighted else ``Branch.present
+  let rhsArgs := #[q.gen, q.α, q.inst, q.list, gsV,
+    ← mkFreshExprMVar (← mkEq (← mkAppM presentFn #[q.list]) gsV),
+    ← mkFreshExprMVar (← posTy gsV), hi, hhi]
+  let some (_, _, rhs) := (← inferType (← mkAppOptM eqLem (rhsArgs.map some))).eq?
+    | throwError "{eqLem} is not an equation"
+  let bindArgs := rhs.getAppArgs
+  let k ← lambdaTelescope bindArgs[5]! fun xs body => do
+    mkLambdaFVars xs (← q.chain body.appArg!)
+  let impl := mkAppN rhs.getAppFn (bindArgs.set! 5 k)
+  let rec build (j : Nat) (hyps : Array (Option (Bool × Expr))) : TermElabM (Expr × Expr) := do
+    if h : j < q.branches.size then
+      let b := q.branches[j]
+      if b.isAppOfArity ``Branch.always 3 then
+        return ← build (j + 1) (hyps.push none)
+      let c := b.getArg! 2
+      let arm (pos : Bool) := withLocalDeclD q.names[j]! (if pos then c else mkNot c) fun hc => do
+        let (m, p) ← build (j + 1) (hyps.push (some (pos, hc)))
+        return (← mkLambdaFVars #[hc] m, ← mkLambdaFVars #[hc] p)
+      let (mt, pt) ← arm true
+      let (mf, pf) ← arm false
+      let model ← mkAppOptM ``dite #[q.ty, c, b.getArg! 3, mt, mf]
+      return (model, ← mkAppOptM ``eq_dite #[q.ty, c, b.getArg! 3, impl, mt, mf, pt, pf])
+    let (L, hL) ← q.present hyps
+    let absent := (← getLCtx).foldl (init := m!"") fun m d =>
+      if hyps.any (·.any (·.2 == .fvar d.fvarId)) then m!"{m}{indentExpr d.type}" else m
+    if L.isAppOfArity ``List.nil 1 then
+      let pf ← sideCondition (mkConst ``False) <| m!"{kw}: every branch is absent when{absent}\n" ++
+        m!"and `gen_side_condition` cannot rule that out. Add a branch without a guard."
+      let model ← mkFalseElim q.ty pf
+      return (model, ← mkFalseElim (← mkEq impl model) pf)
+    let hpos ← if q.weighted then
+        sideCondition (← posTy L) <| m!"{kw}: `gen_side_condition` cannot show that the " ++
+          m!"weights present are positive when{absent}"
+      else mkAppM ``List.cons_ne_nil #[L.appFn!.appArg!, L.appArg!]
+    let model ← mkAppOptM (if q.weighted then ``frequency else ``oneOf)
+      #[q.gen, q.α, q.inst, L, hpos]
+    let eqn ← mkAppOptM eqLem #[q.gen, q.α, q.inst, q.list, L, hL, hpos, hi, hhi]
+    return (model, ← mkExpectedTypeHint (← mkEqSymm eqn) (← mkEq impl model))
+  let (model, prf) ← build 0 #[]
+  mkAppOptM ``guardedWith #[q.gen, q.α, model, impl, prf]
+
+open Lean.Parser.Term in
+/-- A branch of `oneOf!`: `| g`, or `| if h : c => g`, which is present only when `c` holds. -/
+syntax oneOfBranch :=
+  ppDedent(ppLine) "| " (atomic("if " (atomic(binderIdent " : "))? term " => "))? term
+
+open Lean.Parser.Term in
+/-- A branch of `frequency!`: `| w => g`, or `| w if h : c => g`, which is present only when `c`
+holds. -/
+syntax frequencyBranch :=
+  ppDedent(ppLine) "| " term (" if " (atomic(binderIdent " : "))? term)? " => " term
+
+/-- A uniform choice among the branches present, compiled to one draw and a chain of tests on it:
+```
+oneOf!
+| g₀
+| if h : c => g₁ h
+```
+Proofs see `oneOf [g₀, …]`, or, with guards, a `dite` on each guard over the `oneOf`s of the
+branches present. Every combination of guards must leave a branch, by `gen_side_condition`. -/
+syntax (name := oneOfBang) "oneOf! " withPosition(many1Indent(oneOfBranch)) : term
+
+/-- A weighted choice among the branches present, compiled as `oneOf!` is:
+```
+frequency!
+| 3 => g₀
+| 1 if h : c => g₁ h
+```
+Every combination of guards must leave a positive total weight, by `gen_side_condition`. -/
+syntax (name := frequencyBang) "frequency! " withPosition(many1Indent(frequencyBranch)) : term
+
+open Lean Elab Term in
+/-- The guard `if h : c` or `if c` as `Branch.when c (fun h _ => g)`, with the proof's name. -/
+private meta def guardEntry (h? : Option (TSyntax [`ident, ``Lean.Parser.Term.hole])) (c g : Term) :
+    TermElabM (Term × Name) := do
+  if let some h := h? then
+    if h.raw.isIdent then
+      return (← `(Branch.when $c (fun $(⟨h.raw⟩) _ => $g)), h.raw.getId)
+  return (← `(Branch.when $c (fun _ _ => $g)), `h)
+
+open Lean Meta Elab Term in
+/-- The guarded choice of the `Branch` terms `es`, paired with `weights` when weighted, at `ty?`. -/
+private meta def elabGuarded (kw : String) (weighted : Bool) (es weights : Array Term)
+    (names : Array Name) (ty? : Option Expr) : TermElabM Expr := do
+  tryPostponeIfNoneOrMVar ty?
+  let some ty := ty? | throwError "{kw}: the generator type is not known"
+  let ty ← instantiateMVars ty
+  let .app gen α := ty | throwError "{kw}: expected a generator type, got{indentExpr ty}"
+  let branchTy ← mkAppOptM ``Branch #[gen, α]
+  let listTy ← mkAppM ``List #[← if weighted then mkAppM ``Prod #[mkConst ``Nat, branchTy]
+    else pure branchTy]
+  let entries ← if weighted then (es.zip weights).mapM fun (b, w) => `(($w, $b)) else pure es
+  let list ← elabTermEnsuringType (← `([$entries,*])) listTy
+  synthesizeSyntheticMVarsNoPostponing
+  let list := zetaSpine (← instantiateMVars list)
+  let some (_, elems) := list.listLit? | throwError "{kw}: expected a literal list"
+  let elems := elems.toArray
+  let (ws, bs) := if weighted then (elems.map (·.appFn!.appArg!), elems.map (·.appArg!))
+    else (elems.map fun _ => mkNatLit 1, elems)
+  let inst ← synthInstance (← mkAppM ``Gen #[gen])
+  Guarded.compile { weighted, ty, gen, α, inst, list, weights := ws, branches := bs, names }
 
 open Lean Elab Term in
 @[term_elab oneOfBang]
 meta def elabOneOfBang : TermElab := fun stx ty? => do
-  let `(oneOf! [$gs,*]) := stx | throwUnsupportedSyntax
-  let e ← elabTermEnsuringType (← `(oneOf [$gs,*] (List.cons_ne_nil _ _))) ty?
+  let `(oneOf! $alts*) := stx | throwUnsupportedSyntax
+  let mut plain : Array Term := #[]
+  let mut entries : Array Term := #[]
+  let mut names : Array Name := #[]
+  let mut guarded := false
+  for alt in alts do
+    match alt with
+    | `(oneOfBranch| | if $[$h :]? $c => $g) =>
+      let (e, n) ← guardEntry h c g
+      entries := entries.push e
+      names := names.push n
+      guarded := true
+    | `(oneOfBranch| | $g) =>
+      plain := plain.push (← `(fun _ => $g))
+      entries := entries.push (← `(Branch.always (fun _ => $g)))
+      names := names.push .anonymous
+    | _ => throwUnsupportedSyntax
+  if guarded then return ← elabGuarded "oneOf!" false entries #[] names ty?
+  let e ← elabTermEnsuringType (← `(oneOf [$plain,*] (List.cons_ne_nil _ _))) ty?
   let some e' ← mkOneOfWith? e | throwError "oneOf!: expected a `oneOf` of a literal list"
   return e'
 
 open Lean Elab Term in
 @[term_elab frequencyBang]
 meta def elabFrequencyBang : TermElab := fun stx ty? => do
-  let `(frequency! [$ps,*] $[$h]?) := stx | throwUnsupportedSyntax
-  let model ← match h with
-    | some h => `(frequency [$ps,*] $h)
-    | none => `(frequency [$ps,*])
-  let e ← elabTermEnsuringType model ty?
+  let `(frequency! $alts*) := stx | throwUnsupportedSyntax
+  let mut plain : Array Term := #[]
+  let mut entries : Array Term := #[]
+  let mut weights : Array Term := #[]
+  let mut names : Array Name := #[]
+  let mut guarded := false
+  for alt in alts do
+    match alt with
+    | `(frequencyBranch| | $w if $[$h :]? $c => $g) =>
+      let (e, n) ← guardEntry h c g
+      entries := entries.push e
+      weights := weights.push w
+      names := names.push n
+      guarded := true
+    | `(frequencyBranch| | $w => $g) =>
+      plain := plain.push (← `(($w, fun _ => $g)))
+      entries := entries.push (← `(Branch.always (fun _ => $g)))
+      weights := weights.push w
+      names := names.push .anonymous
+    | _ => throwUnsupportedSyntax
+  if guarded then return ← elabGuarded "frequency!" true entries weights names ty?
+  let e ← elabTermEnsuringType (← `(frequency [$plain,*])) ty?
   let some e' ← mkFrequencyWith? e
     | throwError "frequency!: expected a `frequency` of a literal list of pairs"
   return e'
 
+open Lean in
+/-- `g` from `fun x => g`, when `g` does not mention `x`. -/
+private meta def branchBody? (f : Term) : Option Term :=
+  match f with
+  | `(fun $x:ident => $g) =>
+    if (g.raw.find? fun s => s.isIdent && s.getId == x.getId).isSome then none else some g
+  | _ => none
+
 @[app_unexpander oneOfWith]
 meta def unexpandOneOfWith : Lean.PrettyPrinter.Unexpander
-  | `($_ [$gs,*] $_ $_ $_) => `(oneOf! [$gs,*])
+  | `($_ [$gs,*] $_ $_ $_) => do
+    let bs ← gs.getElems.mapM fun g => do
+      let some g := branchBody? g | throw ()
+      `(oneOfBranch| | $g)
+    `(oneOf! $bs*)
   | _ => throw ()
 
 @[app_unexpander frequencyWith]
 meta def unexpandFrequencyWith : Lean.PrettyPrinter.Unexpander
-  | `($_ [$ps,*] $_ $_ $_) => `(frequency! [$ps,*])
+  | `($_ [$ps,*] $_ $_ $_) => do
+    let bs ← ps.getElems.mapM fun
+      | `(($w, $g)) => do
+        let some g := branchBody? g | throw ()
+        `(frequencyBranch| | $w => $g)
+      | _ => throw ()
+    `(frequency! $bs*)
+  | _ => throw ()
+
+/-- A guarded choice shows as its model, which is what a proof sees. -/
+@[app_unexpander guardedWith]
+meta def unexpandGuardedWith : Lean.PrettyPrinter.Unexpander
+  | `($_ $model $_ $_) => pure model
   | _ => throw ()
 
 end compiled_choice
@@ -539,6 +1029,12 @@ theorem monotone_frequencyWith {G : Type → Type v} {α : Type} [Gen G] {γ : S
   himpl
 
 @[partial_fixpoint_monotone]
+theorem monotone_guardedWith {G : Type u → Type v} {α : Type u} [Gen G] {γ : Sort w}
+    [PartialOrder γ] (model impl : γ → G α) (h : ∀ x, impl x = model x) (hmodel : monotone model) :
+    monotone (fun x => guardedWith (model x) (impl x) (h x)) :=
+  hmodel
+
+@[partial_fixpoint_monotone]
 theorem monotone_vectorOf [Gen G] {γ : Sort w} [PartialOrder γ]
     (n : Nat) (g : γ → G α) (hg : monotone g) :
     monotone (fun x => vectorOf n (g x)) := by
@@ -588,22 +1084,22 @@ section recursive_combinators
 `g`.  Note: this produces the empty list 50% of the time, so for production generators, you should
 consider using other combinators, e.g. `listOfMaxLength`. -/
 def listOf [Gen G] (g : G α) : G (List α) := do
-  oneOf! [
-    fun _ => pure [],
-    fun _ => do
-      let x ← g
-      let xs ← listOf g
-      return x :: xs]
+  oneOf!
+  | pure []
+  | do
+    let x ← g
+    let xs ← listOf g
+    return x :: xs
 partial_fixpoint
 
 /-- Generates a *non-empty* list with unbounded length, where each element is produced using `g`. -/
 def nonEmptyListOf {G α} [Gen G] (g : G α) : G (List α) := do
-  oneOf! [
-    fun _ => do let x ← g; pure [x],
-    fun _ => do
-      let x ← g
-      let xs ← nonEmptyListOf g
-      return x :: xs]
+  oneOf!
+  | do let x ← g; pure [x]
+  | do
+    let x ← g
+    let xs ← nonEmptyListOf g
+    return x :: xs
 partial_fixpoint
 
 private theorem admissible_le {α : Sort u} [CCPO α] (w : α) : admissible (· ⊑ w) :=

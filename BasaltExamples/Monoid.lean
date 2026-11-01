@@ -31,6 +31,6 @@ namespace Monoid
 
 /-- Generates a type paired with a `Monoid` instance, choosing uniformly between `ℕ` and `ℝ`. -/
 def genMonoid [Gen G] : G (Σ (α : Type), Monoid α) :=
-  oneOf! [fun _ => pure ⟨ℕ, Nat.instMonoid⟩, fun _ => pure ⟨ℝ, Real.instMonoid⟩]
+  oneOf! | pure ⟨ℕ, Nat.instMonoid⟩ | pure ⟨ℝ, Real.instMonoid⟩
 
 end Monoid

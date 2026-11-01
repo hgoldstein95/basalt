@@ -64,7 +64,7 @@ private def propPick : PropM FuzzGen Unit :=
 
 /- `oneOf!` makes `oneOf`'s draw, so a byte picks the same branch. -/
 private def propPickCompiled : PropM FuzzGen Unit :=
-  forAll (oneOf! [fun _ => pure 100, fun _ => pure 200]) (fun n => n == 100)
+  forAll (oneOf! | pure 100 | pure 200) (fun n => n == 100)
 
 /-- info: pass -/
 #guard_msgs in #eval IO.println (render (runOne propPickCompiled (bytes [8])))
