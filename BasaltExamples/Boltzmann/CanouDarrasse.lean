@@ -28,7 +28,8 @@ namespace Boltzmann.CanouDarrasse
 
 /-! ## Ternary trees: `T = Z + T × T × T`
 
-Fig. 1's grammar puts the atom `Z` only at leaves, so `|t|` counts leaves. At `ρ = 2√3/9`, `T(ρ) = 1/√3` and the leaf probability is
+Fig. 1's grammar puts the atom `Z` only at leaves, so `|t|` counts leaves. At `ρ = 2√3/9`,
+`T(ρ) = 1/√3` and the leaf probability is
 `ρ / T(ρ) = 2/3`. -/
 
 /-- Ternary trees. -/
@@ -102,14 +103,6 @@ theorem genTernary_boltzmann (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {x T : ℝ≥0∞} 
   calc (x * T⁻¹) ^ (2 * t.internal + 1) * (T ^ 2) ^ t.internal
       = x ^ (2 * t.internal + 1) * T⁻¹ * (T * T⁻¹) ^ (2 * t.internal) := by ring
     _ = x ^ (2 * t.internal + 1) * T⁻¹ := by rw [hTT, one_pow, mul_one]
-
-/-- At `ρ`: a tree with `k` internal nodes has mass `(2/3) (4/27) ^ k = (2/3) ρ ^ 2k`. -/
-theorem genTernary_singular_apply (t : TTree) :
-    (genTernary (2/3) : SPMF TTree) t = 2 / 3 * (4 / 27) ^ t.internal := by
-  rw [genTernary_apply (by norm_num) (by norm_num), show pr (2/3) = 2/3 by rw [pr]; norm_num,
-    TTree.size_eq, pow_succ, pow_mul, mul_right_comm, ← mul_pow, mul_comm]
-  congr 2
-  basify; norm_num
 
 theorem pr_two_thirds : pr (2/3) = 2/3 := by rw [pr]; norm_num
 
@@ -220,112 +213,112 @@ theorem genTernary_expected_size_singular :
       _ = E + 2 / 3 := by rw [ENNReal.mul_div_cancel (by norm_num) (by norm_num), mul_one]
   exact absurd ((ENNReal.add_right_inj hE).1 h).symm (by simp)
 
-/-! ## One-two trees: `T = Z + Z × T + Z × T × T`
+/-! ## Unary-binary trees: `T = Z + Z × T + Z × T × T`
 
 At `ρ = 1/3`, `T(ρ) = 1`, and the leaf, unary, and binary branches each have probability `1/3`. -/
 
-/-- One-two (unary-binary, Motzkin) trees. -/
-inductive OTTree where
+/-- Unary-binary (Motzkin) trees, the paper's one-two trees. -/
+inductive UBTree where
   | leaf
-  | unary (t : OTTree)
-  | binary (l r : OTTree)
+  | unary (t : UBTree)
+  | binary (l r : UBTree)
 deriving DecidableEq
 
 /-- The size: every node is an atom. -/
-def OTTree.size : OTTree → Nat
+def UBTree.size : UBTree → Nat
   | .leaf => 1
   | .unary t => t.size + 1
   | .binary l r => l.size + r.size + 1
 
-def OTTree.leaves : OTTree → Nat
+def UBTree.leaves : UBTree → Nat
   | .leaf => 1
   | .unary t => t.leaves
   | .binary l r => l.leaves + r.leaves
 
-def OTTree.unaries : OTTree → Nat
+def UBTree.unaries : UBTree → Nat
   | .leaf => 0
   | .unary t => t.unaries + 1
   | .binary l r => l.unaries + r.unaries
 
-def OTTree.binaries : OTTree → Nat
+def UBTree.binaries : UBTree → Nat
   | .leaf => 0
   | .unary t => t.binaries
   | .binary l r => l.binaries + r.binaries + 1
 
-theorem OTTree.leaves_eq (t : OTTree) : t.leaves = t.binaries + 1 := by
-  induction t <;> simp only [OTTree.leaves, OTTree.binaries, *]; omega
+theorem UBTree.leaves_eq (t : UBTree) : t.leaves = t.binaries + 1 := by
+  induction t <;> simp only [UBTree.leaves, UBTree.binaries, *]; omega
 
-theorem OTTree.size_eq (t : OTTree) : t.size = t.leaves + t.unaries + t.binaries := by
-  induction t <;> simp only [OTTree.size, OTTree.leaves, OTTree.unaries, OTTree.binaries, *] <;>
+theorem UBTree.size_eq (t : UBTree) : t.size = t.leaves + t.unaries + t.binaries := by
+  induction t <;> simp only [UBTree.size, UBTree.leaves, UBTree.unaries, UBTree.binaries, *] <;>
     omega
 
-/-- Fig. 3's `OTTree ()`, with the three branches weighted `a`, `b`, `c` (at `ρ`, all equal). -/
-def genOneTwoW [Gen G] (a b c : Nat) (h : 0 < a + b + c) : G OTTree :=
+/-- Fig. 3's `UBTree ()`, with the three branches weighted `a`, `b`, `c` (at `ρ`, all equal). -/
+def genUnaryBinaryW [Gen G] (a b c : Nat) (h : 0 < a + b + c) : G UBTree :=
   frequency! [
     (a, fun _ => pure .leaf),
-    (b, fun _ => do return .unary (← genOneTwoW a b c h)),
-    (c, fun _ => do return .binary (← genOneTwoW a b c h) (← genOneTwoW a b c h))]
+    (b, fun _ => do return .unary (← genUnaryBinaryW a b c h)),
+    (c, fun _ => do return .binary (← genUnaryBinaryW a b c h) (← genUnaryBinaryW a b c h))]
     (by simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]; omega)
 partial_fixpoint
 
 theorem three_pos : 0 < 1 + 1 + 1 := by norm_num
 
-theorem genOneTwoW_apply (h : 0 < a + b + c) (t : OTTree) :
-    (genOneTwoW a b c h : SPMF OTTree) t
+theorem genUnaryBinaryW_apply (h : 0 < a + b + c) (t : UBTree) :
+    (genUnaryBinaryW a b c h : SPMF UBTree) t
       = (a / (a + b + c : ℝ≥0∞)) ^ t.leaves * (b / (a + b + c : ℝ≥0∞)) ^ t.unaries
         * (c / (a + b + c : ℝ≥0∞)) ^ t.binaries := by
   induction t with
   | leaf =>
-    rw [genOneTwoW, frequencyWith_eq, frequency_apply]
+    rw [genUnaryBinaryW, frequencyWith_eq, frequency_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, pure_apply, ↓reduceIte]
-    rw [bind_pure_apply_of_ne _ fun _ => OTTree.noConfusion,
-      bind_bind_pure_apply_of_ne (f := OTTree.binary) _ _ fun _ _ => OTTree.noConfusion]
-    simp [OTTree.leaves, OTTree.unaries, OTTree.binaries, ENNReal.div_eq_inv_mul, add_assoc]
+    rw [bind_pure_apply_of_ne _ fun _ => UBTree.noConfusion,
+      bind_bind_pure_apply_of_ne (f := UBTree.binary) _ _ fun _ _ => UBTree.noConfusion]
+    simp [UBTree.leaves, UBTree.unaries, UBTree.binaries, ENNReal.div_eq_inv_mul, add_assoc]
   | unary t ih =>
-    rw [genOneTwoW, frequencyWith_eq, frequency_apply]
+    rw [genUnaryBinaryW, frequencyWith_eq, frequency_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, pure_apply, reduceCtorEq,
       ↓reduceIte]
-    rw [bind_pure_apply_of_injective (fun _ _ h => OTTree.unary.inj h), ih,
-      bind_bind_pure_apply_of_ne (f := OTTree.binary) _ _ fun _ _ => OTTree.noConfusion]
-    simp only [OTTree.leaves, OTTree.unaries, OTTree.binaries, ENNReal.div_eq_inv_mul, add_zero,
+    rw [bind_pure_apply_of_injective (fun _ _ h => UBTree.unary.inj h), ih,
+      bind_bind_pure_apply_of_ne (f := UBTree.binary) _ _ fun _ _ => UBTree.noConfusion]
+    simp only [UBTree.leaves, UBTree.unaries, UBTree.binaries, ENNReal.div_eq_inv_mul, add_zero,
       Nat.cast_add,
       ← add_assoc]
     ring
   | binary l r ihl ihr =>
-    rw [genOneTwoW, frequencyWith_eq, frequency_apply]
+    rw [genUnaryBinaryW, frequencyWith_eq, frequency_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, pure_apply, reduceCtorEq,
       ↓reduceIte]
-    rw [bind_pure_apply_of_ne _ fun _ => OTTree.noConfusion,
-      bind_bind_pure_apply_of_injective (f := OTTree.binary) fun _ _ _ _ h => OTTree.binary.inj h,
+    rw [bind_pure_apply_of_ne _ fun _ => UBTree.noConfusion,
+      bind_bind_pure_apply_of_injective (f := UBTree.binary) fun _ _ _ _ h => UBTree.binary.inj h,
       ihl, ihr]
-    simp only [OTTree.leaves, OTTree.unaries, OTTree.binaries, ENNReal.div_eq_inv_mul, add_zero,
+    simp only [UBTree.leaves, UBTree.unaries, UBTree.binaries, ENNReal.div_eq_inv_mul, add_zero,
       Nat.cast_add,
       ← add_assoc]
     ring
 
 /-- At `ρ = 1/3` all three weights are equal; a tree of size `n` has mass `(1/3) ^ n`: the
 Boltzmann form with `T(ρ) = 1`. -/
-theorem genOneTwo_boltzmann :
-    IsBoltzmann (genOneTwoW 1 1 1 three_pos : SPMF OTTree) OTTree.size (1/3) 1 := by
+theorem genUnaryBinary_boltzmann :
+    IsBoltzmann (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) UBTree.size (1/3) 1 := by
   intro t
-  rw [genOneTwoW_apply, div_one, OTTree.size_eq, pow_add, pow_add]
+  rw [genUnaryBinaryW_apply, div_one, UBTree.size_eq, pow_add, pow_add]
   norm_num
 
 /-- Whether the weighted sampler gives two trees of the same size the same mass. -/
-def UniformWithinSize (μ : SPMF OTTree) : Prop :=
-  ∀ s t : OTTree, s.size = t.size → μ s = μ t
+def UniformWithinSize (μ : SPMF UBTree) : Prop :=
+  ∀ s t : UBTree, s.size = t.size → μ s = μ t
 
-/-- The weighted one-two sampler is uniform within each size exactly when `b² = a c` (or it never
-halts, `a = 0`); at `ρ`, `a = b = c`. -/
-theorem genOneTwoW_uniform_iff (h : 0 < a + b + c) :
-    UniformWithinSize (genOneTwoW a b c h : SPMF OTTree) ↔ a = 0 ∨ b ^ 2 = a * c := by
+/-- The weighted unary-binary sampler is uniform within each size exactly when `b² = a c` (or it
+never halts, `a = 0`); at `ρ`, `a = b = c`. -/
+theorem genUnaryBinaryW_uniform_iff (h : 0 < a + b + c) :
+    UniformWithinSize (genUnaryBinaryW a b c h : SPMF UBTree) ↔ a = 0 ∨ b ^ 2 = a * c := by
   set S : ℝ≥0∞ := a + b + c
   have hS0 : S ≠ 0 := by simp only [S]; exact_mod_cast h.ne'
   have hStop : S ≠ ⊤ := by simp [S]
   constructor
   · intro hu
     have := hu (.unary (.unary .leaf)) (.binary .leaf .leaf) rfl
-    simp only [genOneTwoW_apply, OTTree.leaves, OTTree.unaries, OTTree.binaries] at this
+    simp only [genUnaryBinaryW_apply, UBTree.leaves, UBTree.unaries, UBTree.binaries] at this
     rw [or_iff_not_imp_left]
     intro ha
     have h3 : (a : ℝ≥0∞) * b ^ 2 = a * (a * c) := by
@@ -345,16 +338,16 @@ theorem genOneTwoW_uniform_iff (h : 0 < a + b + c) :
     have h3' : a * b ^ 2 = a * (a * c) := by exact_mod_cast h3
     exact Nat.eq_of_mul_eq_mul_left (Nat.pos_of_ne_zero ha) h3'
   · rintro (rfl | hb) s t hst
-    · simp only [genOneTwoW_apply, Nat.cast_zero, ENNReal.zero_div, OTTree.leaves_eq,
+    · simp only [genUnaryBinaryW_apply, Nat.cast_zero, ENNReal.zero_div, UBTree.leaves_eq,
         zero_pow (Nat.succ_ne_zero _), zero_mul]
     · have hxz : (a / S) * (c / S) = (b / S) ^ 2 := by
         rw [div_eq_mul_inv, div_eq_mul_inv, div_eq_mul_inv, mul_pow,
           show (b : ℝ≥0∞) ^ 2 = a * c by exact_mod_cast hb]
         ring
-      have hform : ∀ t : OTTree, (genOneTwoW a b c h : SPMF OTTree) t
+      have hform : ∀ t : UBTree, (genUnaryBinaryW a b c h : SPMF UBTree) t
           = (a / S) * (b / S) ^ (t.size - 1) := fun t => by
-        rw [genOneTwoW_apply, show (a + b + c : ℝ≥0∞) = S from rfl, OTTree.size_eq,
-          OTTree.leaves_eq,
+        rw [genUnaryBinaryW_apply, show (a + b + c : ℝ≥0∞) = S from rfl, UBTree.size_eq,
+          UBTree.leaves_eq,
           show t.binaries + 1 + t.unaries + t.binaries - 1 = t.unaries + 2 * t.binaries by omega,
           pow_add (b / S), pow_mul, ← hxz, mul_pow, pow_succ]
         ring
@@ -362,24 +355,24 @@ theorem genOneTwoW_uniform_iff (h : 0 < a + b + c) :
 
 /-- **Terminates almost surely at the singularity**: one, two, or no children, each with probability
 `1/3`, is mean offspring exactly `1`. -/
-theorem genOneTwo_terminates :
-    IsAlmostSurelyTerminating (genOneTwoW 1 1 1 three_pos : SPMF OTTree) := by
+theorem genUnaryBinary_terminates :
+    IsAlmostSurelyTerminating (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) := by
   mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 3) (b := 1 / 3) (d := 1 / 3)
   norm_num [sq, ENNReal.div_eq_inv_mul, mul_add]
   exact le_of_eq (by ring)
 
 /-- **Infinite expected size at the singularity**: unfolded once, `E = 1 + E`. -/
-theorem genOneTwo_expected_size :
-    expect (genOneTwoW 1 1 1 three_pos : SPMF OTTree) (fun t => (t.size : ℝ≥0∞)) = ⊤ := by
-  have hm : (genOneTwoW 1 1 1 three_pos : SPMF OTTree).mass = 1 := genOneTwo_terminates
-  have hstep : expect (genOneTwoW 1 1 1 three_pos : SPMF OTTree) (fun t => (t.size : ℝ≥0∞))
-      = expect (genOneTwoW 1 1 1 three_pos : SPMF OTTree) (fun t => (t.size : ℝ≥0∞)) := rfl
-  conv_rhs at hstep => rw [genOneTwoW]
+theorem genUnaryBinary_expected_size :
+    expect (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) (fun t => (t.size : ℝ≥0∞)) = ⊤ := by
+  have hm : (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree).mass = 1 := genUnaryBinary_terminates
+  have hstep : expect (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) (fun t => (t.size : ℝ≥0∞))
+      = expect (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) (fun t => (t.size : ℝ≥0∞)) := rfl
+  conv_rhs at hstep => rw [genUnaryBinaryW]
   rw [frequencyWith_eq, expect_frequency] at hstep
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, expect_bind, expect_pure,
-    OTTree.size, Nat.cast_add, Nat.cast_one, add_assoc, expect_const_add, expect_add_const, hm,
+    UBTree.size, Nat.cast_add, Nat.cast_one, add_assoc, expect_const_add, expect_add_const, hm,
     one_mul, mul_one] at hstep
-  generalize expect (genOneTwoW 1 1 1 three_pos : SPMF OTTree) (fun t => (t.size : ℝ≥0∞)) = E
+  generalize expect (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) (fun t => (t.size : ℝ≥0∞)) = E
     at hstep ⊢
   rw [show (1 + (E + (1 + (E + (E + (1 + 0))))) : ℝ≥0∞) = 3 * (E + 1) by ring,
     show (1 + (1 + (1 + ((0 : ℕ) : ℝ≥0∞))) : ℝ≥0∞) = 3 by norm_num,
@@ -450,116 +443,118 @@ theorem ceil_bind_apply_of_ne {x : SPMF (Option (α × Nat))} {y : Nat → SPMF 
 
 end ceil
 
-/-- `genOneTwoW` with a budget of `k` atoms: it gives up (`none`) as soon as the tree would exceed
-the budget, and returns the budget left. -/
-def genOTCeil [Gen G] (a b c : Nat) (h : 0 < a + b + c) (k : Nat) :
-    G (Option (OTTree × Nat)) := do
+/-- `genUnaryBinaryW` with a budget of `k` atoms: it gives up (`none`) as soon as the tree would
+exceed the budget, and returns the budget left. -/
+def genUnaryBinaryCeil [Gen G] (a b c : Nat) (h : 0 < a + b + c) (k : Nat) :
+    G (Option (UBTree × Nat)) := do
   if k = 0 then return none
   frequency! [
     (a, fun _ => pure (some (.leaf, k - 1))),
     (b, fun _ => do
-      match ← genOTCeil a b c h (k - 1) with
+      match ← genUnaryBinaryCeil a b c h (k - 1) with
       | none => return none
       | some (t, k') => return some (.unary t, k')),
     (c, fun _ => do
-      match ← genOTCeil a b c h (k - 1) with
+      match ← genUnaryBinaryCeil a b c h (k - 1) with
       | none => return none
       | some (l, k') =>
-        match ← genOTCeil a b c h k' with
+        match ← genUnaryBinaryCeil a b c h k' with
         | none => return none
         | some (r, k'') => return some (.binary l r, k''))]
     (by simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]; omega)
 partial_fixpoint
 
 /-- One round: a ceiled draw, kept if it reaches the lower bound. -/
-def roundOT [Gen G] (a b c : Nat) (h : 0 < a + b + c) (lo hi : Nat) : G (Option OTTree) := do
-  match ← genOTCeil a b c h hi with
+def roundUnaryBinary [Gen G] (a b c : Nat) (h : 0 < a + b + c) (lo hi : Nat) :
+    G (Option UBTree) := do
+  match ← genUnaryBinaryCeil a b c h hi with
   | some (t, _) => return if lo ≤ t.size then some t else none
   | none => return none
 
 /-- The abort-and-retry sampler. -/
-def ceiledOT [Gen G] (a b c : Nat) (h : 0 < a + b + c) (lo hi : Nat) : G OTTree :=
-  retry (roundOT a b c h lo hi)
+def ceiledUnaryBinary [Gen G] (a b c : Nat) (h : 0 < a + b + c) (lo hi : Nat) : G UBTree :=
+  retry (roundUnaryBinary a b c h lo hi)
 
-theorem genOneTwoW_leaf (h : 0 < a + b + c) :
-    (genOneTwoW a b c h : SPMF OTTree) .leaf = a / (a + b + c : ℝ≥0∞) := by
-  simp [genOneTwoW_apply, OTTree.leaves, OTTree.unaries, OTTree.binaries]
+theorem genUnaryBinaryW_leaf (h : 0 < a + b + c) :
+    (genUnaryBinaryW a b c h : SPMF UBTree) .leaf = a / (a + b + c : ℝ≥0∞) := by
+  simp [genUnaryBinaryW_apply, UBTree.leaves, UBTree.unaries, UBTree.binaries]
 
-theorem genOneTwoW_unary (h : 0 < a + b + c) (t : OTTree) :
-    (genOneTwoW a b c h : SPMF OTTree) (.unary t)
-      = b / (a + b + c : ℝ≥0∞) * (genOneTwoW a b c h : SPMF OTTree) t := by
-  simp only [genOneTwoW_apply, OTTree.leaves, OTTree.unaries, OTTree.binaries]; ring
+theorem genUnaryBinaryW_unary (h : 0 < a + b + c) (t : UBTree) :
+    (genUnaryBinaryW a b c h : SPMF UBTree) (.unary t)
+      = b / (a + b + c : ℝ≥0∞) * (genUnaryBinaryW a b c h : SPMF UBTree) t := by
+  simp only [genUnaryBinaryW_apply, UBTree.leaves, UBTree.unaries, UBTree.binaries]; ring
 
-theorem genOneTwoW_binary (h : 0 < a + b + c) (l r : OTTree) :
-    (genOneTwoW a b c h : SPMF OTTree) (.binary l r)
+theorem genUnaryBinaryW_binary (h : 0 < a + b + c) (l r : UBTree) :
+    (genUnaryBinaryW a b c h : SPMF UBTree) (.binary l r)
       = c / (a + b + c : ℝ≥0∞)
-        * ((genOneTwoW a b c h : SPMF OTTree) l * (genOneTwoW a b c h : SPMF OTTree) r) := by
-  simp only [genOneTwoW_apply, OTTree.leaves, OTTree.unaries, OTTree.binaries]; ring
+        * ((genUnaryBinaryW a b c h : SPMF UBTree) l
+          * (genUnaryBinaryW a b c h : SPMF UBTree) r) := by
+  simp only [genUnaryBinaryW_apply, UBTree.leaves, UBTree.unaries, UBTree.binaries]; ring
 
-theorem genOTCeil_apply (h : 0 < a + b + c) (t : OTTree) :
-    ∀ k k', (genOTCeil a b c h k : SPMF _) (some (t, k'))
-      = if t.size ≤ k ∧ k' = k - t.size then (genOneTwoW a b c h : SPMF OTTree) t else 0 := by
+theorem genUnaryBinaryCeil_apply (h : 0 < a + b + c) (t : UBTree) :
+    ∀ k k', (genUnaryBinaryCeil a b c h k : SPMF _) (some (t, k'))
+      = if t.size ≤ k ∧ k' = k - t.size then (genUnaryBinaryW a b c h : SPMF UBTree) t else 0 := by
   induction t with
   | leaf =>
     intro k k'
     rcases k with _ | j
-    · rw [genOTCeil]; simp [OTTree.size]
-    rw [genOTCeil]
+    · rw [genUnaryBinaryCeil]; simp [UBTree.size]
+    rw [genUnaryBinaryCeil]
     simp only [Nat.add_one_ne_zero, ↓reduceIte, Nat.add_sub_cancel]
     rw [frequencyWith_eq, frequency_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, add_zero]
-    rw [ceil_map_apply_of_ne (g := OTTree.unary) (by rfl) (by intros; rfl)
-        (by intros; exact OTTree.noConfusion),
-      ceil_bind_apply_of_ne (g := OTTree.binary) (by rfl) (by intros; rfl) (by intros; rfl)
-        (by intros; rfl) (by intros; exact OTTree.noConfusion), genOneTwoW_leaf]
+    rw [ceil_map_apply_of_ne (g := UBTree.unary) (by rfl) (by intros; rfl)
+        (by intros; exact UBTree.noConfusion),
+      ceil_bind_apply_of_ne (g := UBTree.binary) (by rfl) (by intros; rfl) (by intros; rfl)
+        (by intros; rfl) (by intros; exact UBTree.noConfusion), genUnaryBinaryW_leaf]
     simp only [pure_apply, Option.some.injEq, Prod.mk.injEq, true_and, mul_zero, add_zero,
       Nat.cast_add, ← add_assoc]
-    split_ifs with h1 h2 h2 <;> simp only [OTTree.size] at * <;> first | omega | simp
+    split_ifs with h1 h2 h2 <;> simp only [UBTree.size] at * <;> first | omega | simp
   | unary t ih =>
     intro k k'
     rcases k with _ | j
-    · rw [genOTCeil]; simp [OTTree.size]
-    rw [genOTCeil]
+    · rw [genUnaryBinaryCeil]; simp [UBTree.size]
+    rw [genUnaryBinaryCeil]
     simp only [Nat.add_one_ne_zero, ↓reduceIte, Nat.add_sub_cancel]
     rw [frequencyWith_eq, frequency_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, add_zero]
-    rw [ceil_map_apply (g := OTTree.unary) (fun _ _ h => OTTree.unary.inj h) (by rfl)
+    rw [ceil_map_apply (g := UBTree.unary) (fun _ _ h => UBTree.unary.inj h) (by rfl)
         (by intros; rfl),
-      ceil_bind_apply_of_ne (g := OTTree.binary) (by rfl) (by intros; rfl) (by intros; rfl)
-        (by intros; rfl) (by intros; exact OTTree.noConfusion), ih, genOneTwoW_unary]
+      ceil_bind_apply_of_ne (g := UBTree.binary) (by rfl) (by intros; rfl) (by intros; rfl)
+        (by intros; rfl) (by intros; exact UBTree.noConfusion), ih, genUnaryBinaryW_unary]
     simp only [pure_apply, Option.some.injEq, Prod.mk.injEq, reduceCtorEq, false_and, ↓reduceIte,
       mul_zero, zero_add, add_zero, Nat.cast_add, ← add_assoc]
-    split_ifs with h1 h2 h2 <;> simp only [OTTree.size] at * <;>
+    split_ifs with h1 h2 h2 <;> simp only [UBTree.size] at * <;>
       first | omega | simp | (simp only [div_eq_mul_inv]; ring)
   | binary l r ihl ihr =>
     intro k k'
     rcases k with _ | j
-    · rw [genOTCeil]; simp [OTTree.size]
-    rw [genOTCeil]
+    · rw [genUnaryBinaryCeil]; simp [UBTree.size]
+    rw [genUnaryBinaryCeil]
     simp only [Nat.add_one_ne_zero, ↓reduceIte, Nat.add_sub_cancel]
     rw [frequencyWith_eq, frequency_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, add_zero]
-    rw [ceil_map_apply_of_ne (g := OTTree.unary) (by rfl) (by intros; rfl)
-        (by intros; exact OTTree.noConfusion),
-      ceil_bind_apply (g := OTTree.binary) (fun _ _ _ _ h => OTTree.binary.inj h) (by rfl)
+    rw [ceil_map_apply_of_ne (g := UBTree.unary) (by rfl) (by intros; rfl)
+        (by intros; exact UBTree.noConfusion),
+      ceil_bind_apply (g := UBTree.binary) (fun _ _ _ _ h => UBTree.binary.inj h) (by rfl)
         (by intros; rfl) (by intros; rfl) (by intros; rfl),
       tsum_eq_single (j - l.size) fun k1 hk1 => by
         rw [ihl, ite_eq_right_iff.2 fun h => absurd h (by omega), zero_mul],
       ihl,
-      ihr, genOneTwoW_binary]
+      ihr, genUnaryBinaryW_binary]
     simp only [pure_apply, Option.some.injEq, Prod.mk.injEq, reduceCtorEq, false_and, ↓reduceIte,
       mul_zero, zero_add, Nat.cast_add, ← add_assoc, and_true]
-    split_ifs with h1 h2 h3 h3 <;> simp only [OTTree.size] at * <;>
+    split_ifs with h1 h2 h3 h3 <;> simp only [UBTree.size] at * <;>
       first | omega | simp | (simp only [div_eq_mul_inv]; ring)
 
 /-- The ceiled sampler always halts: the budget shrinks on every call. -/
-theorem genOTCeil_mass (h : 0 < a + b + c) (k : Nat) :
-    (genOTCeil a b c h k : SPMF _).mass = 1 := by
+theorem genUnaryBinaryCeil_mass (h : 0 < a + b + c) (k : Nat) :
+    (genUnaryBinaryCeil a b c h k : SPMF _).mass = 1 := by
   induction k using Nat.strong_induction_on with
   | _ k ih =>
   rcases k with _ | j
-  · rw [genOTCeil]; simp
-  rw [genOTCeil]
+  · rw [genUnaryBinaryCeil]; simp
+  rw [genUnaryBinaryCeil]
   simp only [Nat.add_one_ne_zero, ↓reduceIte, Nat.add_sub_cancel]
   rw [frequencyWith_eq, mass_frequency]
   simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, add_zero, mass_pure,
@@ -571,104 +566,107 @@ theorem genOTCeil_mass (h : 0 < a + b + c) (k : Nat) :
   · rintro (_ | ⟨l, k'⟩) hne
     · simp
     · have hk : k' ≤ j := by
-        rw [genOTCeil_apply] at hne
+        rw [genUnaryBinaryCeil_apply] at hne
         by_contra hk
         exact hne (ite_eq_right_iff.2 fun h => absurd h (by omega))
       rw [mass_bind_of_mass_one (by rintro (_ | ⟨r, k''⟩) _ <;> simp), ih k' (by omega)]
 
-/-- One round keeps each tree in the window with `genOneTwoW`'s mass. -/
-theorem roundOT_some (h : 0 < a + b + c) (lo hi : Nat) (t : OTTree) :
-    (roundOT a b c h lo hi : SPMF _) (some t)
-      = if lo ≤ t.size ∧ t.size ≤ hi then (genOneTwoW a b c h : SPMF OTTree) t else 0 := by
-  rw [roundOT, bind_apply, tsum_option, ENNReal.tsum_prod', tsum_eq_single t fun t' ht' =>
+/-- One round keeps each tree in the window with `genUnaryBinaryW`'s mass. -/
+theorem roundUnaryBinary_some (h : 0 < a + b + c) (lo hi : Nat) (t : UBTree) :
+    (roundUnaryBinary a b c h lo hi : SPMF _) (some t)
+      = if lo ≤ t.size ∧ t.size ≤ hi then (genUnaryBinaryW a b c h : SPMF UBTree) t else 0 := by
+  rw [roundUnaryBinary, bind_apply, tsum_option, ENNReal.tsum_prod', tsum_eq_single t fun t' ht' =>
     ENNReal.tsum_eq_zero.2 fun k => by dsimp only; split_ifs <;> simp [Ne.symm ht'],
     tsum_eq_single (hi - t.size) fun k hk => by
-      rw [genOTCeil_apply, ite_eq_right_iff.2 fun h => absurd h (by omega), zero_mul]]
-  simp only [pure_apply, reduceCtorEq, ↓reduceIte, mul_zero, zero_add, genOTCeil_apply]
+      rw [genUnaryBinaryCeil_apply, ite_eq_right_iff.2 fun h => absurd h (by omega), zero_mul]]
+  simp only [pure_apply, reduceCtorEq, ↓reduceIte, mul_zero, zero_add, genUnaryBinaryCeil_apply]
   by_cases h1 : lo ≤ t.size <;> by_cases h2 : t.size ≤ hi <;> simp [h1, h2]
 
-/-- The window `[lo, hi]` on sizes. -/
-def window (lo hi : Nat) (t : OTTree) : Bool := decide (lo ≤ t.size ∧ t.size ≤ hi)
+/-- Whether a tree's size lies between `lo` and `hi`. -/
+def between (lo hi : Nat) (t : UBTree) : Bool := decide (lo ≤ t.size ∧ t.size ≤ hi)
 
-theorem roundOT_mass (h : 0 < a + b + c) (lo hi : Nat) :
-    (roundOT a b c h lo hi : SPMF _).mass = 1 := by
-  rw [roundOT, mass_bind_of_mass_one (by rintro (_ | ⟨t, k⟩) _ <;> simp), genOTCeil_mass]
+theorem roundUnaryBinary_mass (h : 0 < a + b + c) (lo hi : Nat) :
+    (roundUnaryBinary a b c h lo hi : SPMF _).mass = 1 := by
+  rw [roundUnaryBinary, mass_bind_of_mass_one (by rintro (_ | ⟨t, k⟩) _ <;> simp),
+    genUnaryBinaryCeil_mass]
 
-/-- **The law of abort-and-retry**, for every weighting: `genOneTwoW` conditioned on the window. -/
-theorem ceiledOT_apply (h : 0 < a + b + c) (lo hi : Nat) (t : OTTree) :
-    (ceiledOT a b c h lo hi : SPMF OTTree) t
-      = (if window lo hi t then (genOneTwoW a b c h : SPMF OTTree) t else 0)
-        / prob (genOneTwoW a b c h : SPMF OTTree) {t | window lo hi t = true} := by
+/-- **The law of abort-and-retry**, for every weighting: `genUnaryBinaryW` conditioned on the
+window. -/
+theorem ceiledUnaryBinary_apply (h : 0 < a + b + c) (lo hi : Nat) (t : UBTree) :
+    (ceiledUnaryBinary a b c h lo hi : SPMF UBTree) t
+      = (if between lo hi t then (genUnaryBinaryW a b c h : SPMF UBTree) t else 0)
+        / prob (genUnaryBinaryW a b c h : SPMF UBTree) {t | between lo hi t = true} := by
   classical
-  have hsum := roundOT_mass h lo hi
+  have hsum := roundUnaryBinary_mass h lo hi
   rw [mass, tsum_option] at hsum
-  have hQ : 1 - (roundOT a b c h lo hi : SPMF _) none
-      = prob (genOneTwoW a b c h : SPMF OTTree) {t | window lo hi t = true} := by
+  have hQ : 1 - (roundUnaryBinary a b c h lo hi : SPMF _) none
+      = prob (genUnaryBinaryW a b c h : SPMF UBTree) {t | between lo hi t = true} := by
     rw [← hsum, ENNReal.add_sub_cancel_left (apply_ne_top _ _), prob_eq_tsum_ite]
-    exact tsum_congr fun t => by rw [roundOT_some]; simp [window]
-  rw [ceiledOT, retry_apply, hQ, roundOT_some]
-  simp [window]
+    exact tsum_congr fun t => by rw [roundUnaryBinary_some]; simp [between]
+  rw [ceiledUnaryBinary, retry_apply, hQ, roundUnaryBinary_some]
+  simp [between]
 
 /-- Within a size, abort-and-retry at `ρ` is uniform. -/
-theorem ceiledOT_uniform (lo hi : Nat) {s t : OTTree} (hst : s.size = t.size) :
-    (ceiledOT 1 1 1 three_pos lo hi : SPMF OTTree) s
-      = (ceiledOT 1 1 1 three_pos lo hi : SPMF OTTree) t := by
-  rw [ceiledOT_apply, ceiledOT_apply, window, window, hst,
-    genOneTwo_boltzmann.uniform hst]
+theorem ceiledUnaryBinary_uniform (lo hi : Nat) {s t : UBTree} (hst : s.size = t.size) :
+    (ceiledUnaryBinary 1 1 1 three_pos lo hi : SPMF UBTree) s
+      = (ceiledUnaryBinary 1 1 1 three_pos lo hi : SPMF UBTree) t := by
+  rw [ceiledUnaryBinary_apply, ceiledUnaryBinary_apply, between, between, hst,
+    genUnaryBinary_boltzmann.uniform hst]
 
 /-- A unary chain of size `n + 1`. -/
-def OTTree.chain : Nat → OTTree
+def UBTree.chain : Nat → UBTree
   | 0 => .leaf
-  | n + 1 => .unary (OTTree.chain n)
+  | n + 1 => .unary (UBTree.chain n)
 
-theorem OTTree.chain_size (n : Nat) : (OTTree.chain n).size = n + 1 := by
-  induction n <;> simp [OTTree.chain, OTTree.size, *]
+theorem UBTree.chain_size (n : Nat) : (UBTree.chain n).size = n + 1 := by
+  induction n <;> simp [UBTree.chain, UBTree.size, *]
 
 /-- **Abort-and-retry terminates** although the sampler it ceils is critical with infinite expected
 size, for any nonempty window of positive sizes. -/
-theorem ceiledOT_terminates {lo hi : Nat} (hlo : 1 ≤ lo) (hle : lo ≤ hi) :
-    IsAlmostSurelyTerminating (ceiledOT 1 1 1 three_pos lo hi : SPMF OTTree) := by
+theorem ceiledUnaryBinary_terminates {lo hi : Nat} (hlo : 1 ≤ lo) (hle : lo ≤ hi) :
+    IsAlmostSurelyTerminating (ceiledUnaryBinary 1 1 1 three_pos lo hi : SPMF UBTree) := by
   classical
-  set Q := prob (genOneTwoW 1 1 1 three_pos : SPMF OTTree) {t | window lo hi t = true}
-  have hQsum : (∑' t, if window lo hi t = true then (genOneTwoW 1 1 1 three_pos : SPMF OTTree) t
+  set Q := prob (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) {t | between lo hi t = true}
+  have hQsum : (∑' t, if between lo hi t = true
+      then (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) t
       else 0) = Q := by simp only [Q, prob_eq_tsum_ite, Set.mem_ofPred_eq]
-  have hw : window lo hi (OTTree.chain (lo - 1)) = true := by
-    simp [window, OTTree.chain_size]; omega
+  have hw : between lo hi (UBTree.chain (lo - 1)) = true := by
+    simp [between, UBTree.chain_size]; omega
   have hQ0 : Q ≠ 0 := by
     rw [← hQsum]
-    refine (lt_of_lt_of_le ?_ (ENNReal.le_tsum (OTTree.chain (lo - 1)))).ne'
-    simp only [hw, ↓reduceIte, genOneTwo_boltzmann _]
+    refine (lt_of_lt_of_le ?_ (ENNReal.le_tsum (UBTree.chain (lo - 1)))).ne'
+    simp only [hw, ↓reduceIte, genUnaryBinary_boltzmann _]
     simp [ENNReal.pow_pos]
   have hQtop : Q ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top
     ((prob_le_mass _ _).trans (mass_le_one _))
   unfold IsAlmostSurelyTerminating mass
-  simp_rw [ceiledOT_apply, div_eq_mul_inv]
+  simp_rw [ceiledUnaryBinary_apply, div_eq_mul_inv]
   rw [ENNReal.tsum_mul_right, hQsum, ENNReal.mul_inv_cancel hQ0 hQtop]
 
-/-! ## General trees: `T = Z × Seq(T)`
+/-! ## Rose trees: `T = Z × Seq(T)`
 
 At `ρ = 1/4`, `T(ρ) = 1/2`, so the number of children is geometric with parameter `1/2`: exactly the
 length law of Basalt's `listOf`. The sampler is the naive recursive generator `node <$> listOf gen`.
 -/
 
-/-- General plane trees. -/
-inductive GTree where
-  | node (cs : List GTree)
+/-- Unlabelled rose trees (general plane trees), the paper's general trees. -/
+inductive RoseTree where
+  | node (cs : List RoseTree)
 
 /-- The size: the number of nodes. -/
-def GTree.size : GTree → Nat
+def RoseTree.size : RoseTree → Nat
   | .node cs => (cs.attach.map fun ⟨c, _⟩ => c.size).sum + 1
 
-theorem GTree.size_node (cs : List GTree) :
-    (GTree.node cs).size = (cs.map GTree.size).sum + 1 := by
-  rw [GTree.size]
+theorem RoseTree.size_node (cs : List RoseTree) :
+    (RoseTree.node cs).size = (cs.map RoseTree.size).sum + 1 := by
+  rw [RoseTree.size]
   congr 2
   conv_rhs => rw [← List.attach_map_subtype_val cs, List.map_map]
   rfl
 
-private theorem prod_map_eq {f : GTree → ℝ≥0∞} :
-    ∀ cs : List GTree, (∀ c ∈ cs, f c = 2 * (1 / 4) ^ c.size) →
-      (cs.map f).prod = 2 ^ cs.length * (1 / 4) ^ (cs.map GTree.size).sum
+private theorem prod_map_eq {f : RoseTree → ℝ≥0∞} :
+    ∀ cs : List RoseTree, (∀ c ∈ cs, f c = 2 * (1 / 4) ^ c.size) →
+      (cs.map f).prod = 2 ^ cs.length * (1 / 4) ^ (cs.map RoseTree.size).sum
   | [], _ => by simp
   | c :: cs, h => by
     rw [List.map_cons, List.prod_cons, h c (by simp),
@@ -676,24 +674,26 @@ private theorem prod_map_eq {f : GTree → ℝ≥0∞} :
     simp only [List.length_cons, List.map_cons, List.sum_cons, pow_succ, pow_add]
     ring
 
-/-- Fig. 3's `GTree ()`: a node, then a geometric number of independent subtrees. -/
-def genGeneral [Gen G] : G GTree := do
-  return .node (← listOf genGeneral)
+/-- Fig. 3's `RoseTree ()`: a node, then a geometric number of independent subtrees. -/
+def genRoseTree [Gen G] : G RoseTree := do
+  return .node (← listOf genRoseTree)
 partial_fixpoint
 
 /-- **The Boltzmann form**: a tree of `n` nodes has mass `ρ ^ n / T(ρ) = 2 (1/4) ^ n`. -/
-theorem genGeneral_apply : ∀ t : GTree, (genGeneral : SPMF GTree) t = 2 * (1 / 4) ^ t.size
+theorem genRoseTree_apply : ∀ t : RoseTree, (genRoseTree : SPMF RoseTree) t = 2 * (1 / 4) ^ t.size
   | .node cs => by
-    have ih : ∀ c ∈ cs, (genGeneral : SPMF GTree) c = 2 * (1 / 4) ^ c.size :=
-      fun c _ => genGeneral_apply c
-    rw [genGeneral, bind_pure_apply_of_injective (fun _ _ h => GTree.node.inj h), listOf_apply,
-      GTree.size_node, prod_map_eq cs ih, pow_succ, pow_add, pow_one]
+    have ih : ∀ c ∈ cs, (genRoseTree : SPMF RoseTree) c = 2 * (1 / 4) ^ c.size :=
+      fun c _ => genRoseTree_apply c
+    rw [genRoseTree, bind_pure_apply_of_injective (fun _ _ h => RoseTree.node.inj h), listOf_apply,
+      RoseTree.size_node, prod_map_eq cs ih, pow_succ, pow_add, pow_one]
     have h2 : (1 / 2 : ℝ≥0∞) ^ cs.length * 2 ^ cs.length = 1 := by
       rw [← mul_pow, one_div, ENNReal.inv_mul_cancel (by norm_num) (by norm_num), one_pow]
-    calc (1 / 2 : ℝ≥0∞) ^ cs.length * (1 / 2) * (2 ^ cs.length * (1 / 4) ^ (cs.map GTree.size).sum)
-        = ((1 / 2) ^ cs.length * 2 ^ cs.length) * (1 / 2) * (1 / 4) ^ (cs.map GTree.size).sum := by
+    calc (1 / 2 : ℝ≥0∞) ^ cs.length * (1 / 2)
+          * (2 ^ cs.length * (1 / 4) ^ (cs.map RoseTree.size).sum)
+        = ((1 / 2) ^ cs.length * 2 ^ cs.length) * (1 / 2)
+          * (1 / 4) ^ (cs.map RoseTree.size).sum := by
           ring
-      _ = 2 * ((1 / 4) ^ (cs.map GTree.size).sum * (1 / 4)) := by
+      _ = 2 * ((1 / 4) ^ (cs.map RoseTree.size).sum * (1 / 4)) := by
           rw [h2, one_mul]
           rw [show (1 / 2 : ℝ≥0∞) = 2 * (1 / 4) by
             rw [← ENNReal.toReal_eq_toReal_iff' (by simp) (by simp [ENNReal.mul_eq_top])]
@@ -702,36 +702,37 @@ theorem genGeneral_apply : ∀ t : GTree, (genGeneral : SPMF GTree) t = 2 * (1 /
 
 /-- **Terminates almost surely**: the mass satisfies `m = 1/2 + m²/2`, whose only root in `[0, 1]`
 is the double root `1` of the critical case — here the unfolding alone decides. -/
-theorem genGeneral_terminates : IsAlmostSurelyTerminating (genGeneral : SPMF GTree) := by
-  have hstep := mass_listOf_step (genGeneral : SPMF GTree)
-  have hm : (genGeneral : SPMF GTree).mass = (listOf genGeneral : SPMF (List GTree)).mass := by
-    conv_lhs => rw [genGeneral]
+theorem genRoseTree_terminates : IsAlmostSurelyTerminating (genRoseTree : SPMF RoseTree) := by
+  have hstep := mass_listOf_step (genRoseTree : SPMF RoseTree)
+  have hm : (genRoseTree : SPMF RoseTree).mass
+      = (listOf genRoseTree : SPMF (List RoseTree)).mass := by
+    conv_lhs => rw [genRoseTree]
     exact mass_bind_pure
   rw [← hm] at hstep
   replace hstep := hstep.symm.le
-  have hm1 := mass_le_one (genGeneral : SPMF GTree)
+  have hm1 := mass_le_one (genRoseTree : SPMF RoseTree)
   unfold IsAlmostSurelyTerminating
-  generalize (genGeneral : SPMF GTree).mass = m at *
+  generalize (genRoseTree : SPMF RoseTree).mass = m at *
   clear hm
   basify
   nlinarith [sq_nonneg (m - 1)]
 
 /-- **Infinite expected size**: with `S` the expected size of the children, `E = S + 1` and
 `S = (E + S) / 2`. -/
-theorem genGeneral_expected_size :
-    expect (genGeneral : SPMF GTree) (fun t => (t.size : ℝ≥0∞)) = ⊤ := by
-  have hm : (genGeneral : SPMF GTree).mass = 1 := genGeneral_terminates
-  have hL : (listOf genGeneral : SPMF (List GTree)).mass = 1 := by
-    rw [← hm]; conv_rhs => rw [genGeneral]
+theorem genRoseTree_expected_size :
+    expect (genRoseTree : SPMF RoseTree) (fun t => (t.size : ℝ≥0∞)) = ⊤ := by
+  have hm : (genRoseTree : SPMF RoseTree).mass = 1 := genRoseTree_terminates
+  have hL : (listOf genRoseTree : SPMF (List RoseTree)).mass = 1 := by
+    rw [← hm]; conv_rhs => rw [genRoseTree]
     exact mass_bind_pure.symm
-  set S := expect (listOf genGeneral : SPMF (List GTree))
-    (fun cs => ((cs.map GTree.size).sum : ℝ≥0∞))
-  have hE : expect (genGeneral : SPMF GTree) (fun t => (t.size : ℝ≥0∞)) = S + 1 := by
-    conv_lhs => rw [genGeneral]
+  set S := expect (listOf genRoseTree : SPMF (List RoseTree))
+    (fun cs => ((cs.map RoseTree.size).sum : ℝ≥0∞))
+  have hE : expect (genRoseTree : SPMF RoseTree) (fun t => (t.size : ℝ≥0∞)) = S + 1 := by
+    conv_lhs => rw [genRoseTree]
     rw [expect_bind]
-    simp only [expect_pure, GTree.size_node, Nat.cast_add, Nat.cast_one]
+    simp only [expect_pure, RoseTree.size_node, Nat.cast_add, Nat.cast_one]
     rw [expect_add_const, hL, one_mul]
-  have hS : S = 1 / 2 * (expect (genGeneral : SPMF GTree) (fun t => (t.size : ℝ≥0∞)) + S) := by
+  have hS : S = 1 / 2 * (expect (genRoseTree : SPMF RoseTree) (fun t => (t.size : ℝ≥0∞)) + S) := by
     conv_lhs => simp only [S]; rw [expect_listOf_step]
     simp only [List.map_nil, List.sum_nil, Nat.cast_zero, mul_zero, zero_add, List.map_cons,
       List.sum_cons, Nat.cast_add, expect_const_add, expect_add_const, hL, hm, one_mul]

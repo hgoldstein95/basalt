@@ -123,13 +123,13 @@ theorem genBCeil_mass (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (k : Nat) : (genBCeil p k 
 /-- One round keeps each tree in the window with `genB`'s mass. -/
 theorem roundB_some (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) (t : BTree) :
     (roundB p lo hi : SPMF _) (some t)
-      = if window lo hi t then (genB p : SPMF BTree) t else 0 := by
+      = if between lo hi t then (genB p : SPMF BTree) t else 0 := by
   rw [roundB, bind_apply, tsum_option, ENNReal.tsum_prod', tsum_eq_single t fun t' ht' =>
     ENNReal.tsum_eq_zero.2 fun k => by dsimp only; split_ifs <;> simp [Ne.symm ht'],
     tsum_eq_single (hi - t.size) fun k hk => by
       rw [genBCeil_apply hp0 hp1, ite_eq_right_iff.2 fun h => absurd h (by omega), zero_mul]]
   simp only [pure_apply, reduceCtorEq, ↓reduceIte, mul_zero, zero_add, genBCeil_apply hp0 hp1]
-  by_cases h1 : lo ≤ t.size <;> by_cases h2 : t.size ≤ hi <;> simp [window, h1, h2]
+  by_cases h1 : lo ≤ t.size <;> by_cases h2 : t.size ≤ hi <;> simp [between, h1, h2]
 
 theorem roundB_mass (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) :
     (roundB p lo hi : SPMF _).mass = 1 := by
@@ -138,20 +138,20 @@ theorem roundB_mass (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) :
 /-- **The law of the ceiled rejection sampler**, for every `p`: `genB` conditioned on the window. -/
 theorem ceiled_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) (t : BTree) :
     (ceiled p lo hi : SPMF BTree) t
-      = (if window lo hi t then (genB p : SPMF BTree) t else 0)
-        / prob (genB p : SPMF BTree) {t | window lo hi t = true} := by
+      = (if between lo hi t then (genB p : SPMF BTree) t else 0)
+        / prob (genB p : SPMF BTree) {t | between lo hi t = true} := by
   classical
   have hsum := roundB_mass hp0 hp1 lo hi
   rw [mass, tsum_option] at hsum
   have hQ : 1 - (roundB p lo hi : SPMF _) none
-      = prob (genB p : SPMF BTree) {t | window lo hi t = true} := by
+      = prob (genB p : SPMF BTree) {t | between lo hi t = true} := by
     rw [← hsum, ENNReal.add_sub_cancel_left (apply_ne_top _ _), prob_eq_tsum_ite]
     exact tsum_congr fun t => by rw [roundB_some hp0 hp1]; simp
   rw [ceiled, retry_apply, hQ, roundB_some hp0 hp1]
 
 /-- **Ceiled rejection = straight rejection**, when `genB` terminates. -/
 theorem ceiled_eq_suchThat (hp : 1/2 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) :
-    (ceiled p lo hi : SPMF BTree) = suchThat (genB p) (window lo hi) := by
+    (ceiled p lo hi : SPMF BTree) = suchThat (genB p) (between lo hi) := by
   ext t
   rw [ceiled_apply (le_trans (by norm_num) hp) hp1,
     suchThat_apply_of_mass _ _ (genB_terminates hp hp1)]
@@ -159,15 +159,15 @@ theorem ceiled_eq_suchThat (hp : 1/2 ≤ p) (hp1 : p ≤ 1) (lo hi : Nat) :
 
 /-- The ceiled sampler terminates for every `0 < p < 1`, with no termination of `genB` assumed,
 once some tree lies in the window. -/
-theorem ceiled_terminates (hp0 : 0 < p) (hp1 : p < 1) (hw : ∃ t, window lo hi t = true) :
+theorem ceiled_terminates (hp0 : 0 < p) (hp1 : p < 1) (hw : ∃ t, between lo hi t = true) :
     IsAlmostSurelyTerminating (ceiled p lo hi : SPMF BTree) := by
   obtain ⟨t₀, ht₀⟩ := hw
   have hx0 : pr p ≠ 0 := by
     rw [pr_eq_ofReal hp0.le]; exact (ENNReal.ofReal_pos.2 (by exact_mod_cast hp0)).ne'
   have hx1 : pr p < 1 := by
     rw [pr_eq_ofReal hp0.le]; exact ENNReal.ofReal_lt_one.2 (by exact_mod_cast hp1)
-  set Q := prob (genB p : SPMF BTree) {t | window lo hi t = true}
-  have hQsum : (∑' t, if window lo hi t = true then (genB p : SPMF BTree) t else 0) = Q := by
+  set Q := prob (genB p : SPMF BTree) {t | between lo hi t = true}
+  have hQsum : (∑' t, if between lo hi t = true then (genB p : SPMF BTree) t else 0) = Q := by
     simp only [Q, prob_eq_tsum_ite, Set.mem_ofPred_eq]
   have hQ0 : Q ≠ 0 := by
     rw [← hQsum]

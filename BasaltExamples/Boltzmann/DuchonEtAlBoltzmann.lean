@@ -187,14 +187,14 @@ end mass
 
 section rejection
 
-/-- The approximate-size window `[lo, hi]`. -/
-def window (lo hi : Nat) (t : BTree) : Bool := decide (lo ≤ t.size ∧ t.size ≤ hi)
+/-- Whether a tree's size lies between `lo` and `hi`: the approximate-size window `[lo, hi]`. -/
+def between (lo hi : Nat) (t : BTree) : Bool := decide (lo ≤ t.size ∧ t.size ≤ hi)
 
 /-- §6.1's guarantee: rejection to a window keeps two trees of the same size equally likely. -/
 theorem rejection_uniform (hp0 : 0 ≤ p) (hp1 : p ≤ 1) {s t : BTree} (h : s.size = t.size) :
-    (suchThat (genB p) (window lo hi) : SPMF BTree) s
-      = (suchThat (genB p) (window lo hi) : SPMF BTree) t := by
-  rw [suchThat_apply, suchThat_apply, genB_uniform hp0 hp1 h, window, window, h]
+    (suchThat (genB p) (between lo hi) : SPMF BTree) s
+      = (suchThat (genB p) (between lo hi) : SPMF BTree) t := by
+  rw [suchThat_apply, suchThat_apply, genB_uniform hp0 hp1 h, between, between, h]
 
 private theorem pr_four_fifths : pr (4 / 5) = 4 / 5 := by
   rw [pr]; norm_num
@@ -202,31 +202,31 @@ private theorem pr_four_fifths : pr (4 / 5) = 4 / 5 := by
 /-- Footnote 6: the output is not uniform across the window. At `p = 4/5` and the window `[1, 3]`,
 the leaf is more likely than the tree of size `3`. -/
 theorem rejection_not_uniform_across :
-    (suchThat (genB (4/5)) (window 1 3) : SPMF BTree) .leaf
-      ≠ (suchThat (genB (4/5)) (window 1 3) : SPMF BTree) (.node .leaf .leaf) := by
+    (suchThat (genB (4/5)) (between 1 3) : SPMF BTree) .leaf
+      ≠ (suchThat (genB (4/5)) (between 1 3) : SPMF BTree) (.node .leaf .leaf) := by
   have h0 : (0 : ℚ) ≤ 4 / 5 := by norm_num
   have h1 : (4 / 5 : ℚ) ≤ 1 := by norm_num
   have hne : (4 / 5 : ℝ≥0∞) ≠ ⊤ := ENNReal.div_ne_top (by norm_num) (by norm_num)
   have hlt1 : (4 / 5 : ℝ≥0∞) < 1 := ENNReal.div_lt_of_lt_mul (by norm_num)
   rw [suchThat_apply, suchThat_apply]
-  set R := prob (genB (4/5) : SPMF BTree) {b | window 1 3 b = false}
+  set R := prob (genB (4/5) : SPMF BTree) {b | between 1 3 b = false}
   have hleaf : (genB (4/5) : SPMF BTree) .leaf = 4 / 5 := by
     rw [genB_apply h0 h1, pr_four_fifths]; simp [BTree.internal]
   have hR : R < 1 := by
-    have hacc : 4 / 5 ≤ prob (genB (4/5) : SPMF BTree) {b | window 1 3 b = true} := by
+    have hacc : 4 / 5 ≤ prob (genB (4/5) : SPMF BTree) {b | between 1 3 b = true} := by
       classical
       rw [prob_eq_tsum_ite, ← hleaf]
       refine le_trans ?_ (ENNReal.le_tsum BTree.leaf)
-      simp [window, BTree.size]
-    have hsum := (prob_accept_add_reject (genB (4/5) : SPMF BTree) (window 1 3)).le.trans
+      simp [between, BTree.size]
+    have hsum := (prob_accept_add_reject (genB (4/5) : SPMF BTree) (between 1 3)).le.trans
       (mass_le_one _)
     have : R + 4 / 5 ≤ 1 := by rw [add_comm]; exact le_trans (by gcongr) hsum
     exact lt_of_le_of_lt (ENNReal.le_sub_of_add_le_right hne this)
       (ENNReal.sub_lt_self ENNReal.one_ne_top one_ne_zero (by norm_num))
   have hD0 : 1 - R ≠ 0 := (tsub_pos_of_lt hR).ne'
   have hDtop : 1 - R ≠ ⊤ := ENNReal.sub_ne_top ENNReal.one_ne_top
-  simp only [show window 1 3 .leaf = true by decide,
-    show window 1 3 (.node .leaf .leaf) = true by decide, ↓reduceIte]
+  simp only [show between 1 3 .leaf = true by decide,
+    show between 1 3 (.node .leaf .leaf) = true by decide, ↓reduceIte]
   intro h
   have h := congrArg (· * (1 - R)) h
   simp only [ENNReal.div_mul_cancel hD0 hDtop] at h
