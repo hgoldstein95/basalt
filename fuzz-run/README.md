@@ -92,13 +92,13 @@ a compile-time flag on that C. **Lake owns the closure and the scope.** `basalt-
 `lean_exe`, so Lake derives the link closure from imports; the instrumentation scope is
 `-fsanitize=fuzzer-no-link` in the `moreLeancArgs` of the `Basalt` and `BasaltFuzz` libraries and of
 the executable root (`fuzzLeancArgs` in `lakefile.lean`). It is on only under `lake -R -Kfuzz=1`,
-which `build.sh` passes: Lake compiles a library's C with that library's flags for any executable
-that links it, so an always-instrumented `Basalt` would break the link of every downstream
-executable (none of them supplies the libFuzzer runtime). That is every first-party object in the
-closure and nothing else: the Lean runtime and stdlib are linked uninstrumented, and so are
-Plausible's `Gen`/`Random` and SplitMix, which are the `--backend=plausible`/`io` PRNGs rather than
-code under test (coverage over a PRNG's mixing steps is noise in the feedback). Partial coverage
-still guides libFuzzer.
+which `build.sh` passes, or in a dependent that requires Basalt with the `fuzz` option: Lake
+compiles a library's C with that library's flags for any executable that links it, so an
+always-instrumented `Basalt` would break the link of every downstream executable (none of them
+supplies the libFuzzer runtime). That is every first-party object in the closure and nothing else:
+the Lean runtime and stdlib are linked uninstrumented, and so are Plausible's `Gen`/`Random` and
+SplitMix, which are the `--backend=plausible`/`io` PRNGs rather than code under test (coverage over a
+PRNG's mixing steps is noise in the feedback). Partial coverage still guides libFuzzer.
 
 The live generator code is not in the module a reader would look in, which is why the scope is a
 *library* setting rather than a per-module one. A generator is polymorphic in its monad, so the copy

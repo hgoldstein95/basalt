@@ -18,7 +18,8 @@ It cannot be on unconditionally. Lake compiles a library's C with that library's
 whenever an executable links its modules, and every executable that imports `Basalt` links some of
 them. An instrumented `Basalt` therefore reaches every downstream executable, which then fails to
 link: nothing but `basalt-fuzz` supplies the libFuzzer runtime that defines `__sanitizer_cov_*`.
-`-K` options are the root package's alone, so a package that requires Basalt never sees `fuzz`. -/
+`-K` options are the root package's alone, so a package that requires Basalt gets `fuzz` only by
+asking for it: ``require basalt … with NameMap.empty.insert `fuzz "true"``. -/
 def fuzzLeancArgs : Array String :=
   if (get_config? fuzz).isSome then #["-O1", "-fsanitize=fuzzer-no-link"] else #[]
 
