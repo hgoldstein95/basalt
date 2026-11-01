@@ -209,30 +209,6 @@ theorem prob_pure_of_mem {a : α} {E : Set α} (h : a ∈ E) :
   classical
   simp [prob_pure, h]
 
-/-- An event and its complement split the mass. -/
-theorem prob_compl_add_prob (p : SPMF α) (E : Set α) : prob p Eᶜ + prob p E = p.mass := by
-  unfold prob
-  rw [← expect_add, ← expect_one]
-  congr 1
-  funext a
-  by_cases h : a ∈ E <;> simp [Set.indicator, h]
-
-/-- A lower bound `q` on the probability of `E` is an upper bound `1 − q` on the probability of
-its complement. -/
-theorem prob_compl_le {p : SPMF α} {E : Set α} {q : ℝ≥0∞} (hq : q ≤ prob p E) :
-    prob p Eᶜ ≤ 1 - q := by
-  have hE : prob p E ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top
-    ((prob_le_mass p E).trans (mass_le_one p))
-  rw [ENNReal.eq_sub_of_add_eq hE (prob_compl_add_prob p E)]
-  exact tsub_le_tsub (mass_le_one p) hq
-
-/-- The union bound, for two events. -/
-theorem prob_union_le (p : SPMF α) (A B : Set α) : prob p (A ∪ B) ≤ prob p A + prob p B := by
-  unfold prob
-  rw [← expect_add]
-  refine expect_mono fun a => ?_
-  by_cases ha : a ∈ A <;> by_cases hb : a ∈ B <;> simp [Set.indicator, ha, hb]
-
 /-- A lower bound through a bind: a draw lands in `F`, and from every point of `F` the continuation
 meets `E` with probability at least `d`. -/
 theorem prob_bind_ge {x : SPMF α} {f : α → SPMF β} {E : Set β} (F : Set α) {d : ℝ≥0∞}

@@ -26,11 +26,10 @@ Each constant is derived from the generator's branches in its docstring. `genTer
 almost surely (`genTerm.terminates`), so no branch loses mass and the bounds are close to the
 measured rates. The first two bounds count one family of witnesses each.
 
-* `genTerm_linear_le_exp` and `genTerm_linear_within`: `N` tests all miss a linear term with
-  probability at most `e^{−linearBound·N}`, so at most `δ` once `N ≥ ln(1/δ) / linearBound`.
-* `genTerm_all_shapes_le_exp` and `genTerm_all_shapes_within`: after `N` tests some shape is still
-  missing with probability at most `∑ᵢ e^{−qᵢN}`, so at most `δ` once
-  `N ≥ ln(3/δ) / linearBound`.
+* `genTerm_linear_within`: `N ≥ ln(1/δ) / linearBound` tests all miss a linear term with
+  probability at most `δ`.
+* `genTerm_all_shapes_within`: after `N ≥ ln(3/δ) / linearBound` tests some shape is still missing
+  with probability at most `δ`.
 * `genTerm_linear_expected_le` and `genTerm_all_shapes_expected_le` bound the sums that read as the
   expected number of tests, `1 / linearBound` and `∑ᵢ 1 / qᵢ`.
 
@@ -84,15 +83,6 @@ noncomputable def discardsArgBound : ℝ≥0 := 1 / 2
 /-- The per-draw probability of an application: the application branch (`1/3`). -/
 noncomputable def isAppBound : ℝ≥0 := 1 / 3
 
-theorem coe_linearBound : (linearBound : ℝ≥0∞) = 1 / 12 := by
-  rw [linearBound, ENNReal.coe_div (by norm_num)]; simp
-
-theorem coe_discardsArgBound : (discardsArgBound : ℝ≥0∞) = 1 / 2 := by
-  rw [discardsArgBound, ENNReal.coe_div (by norm_num)]; simp
-
-theorem coe_isAppBound : (isAppBound : ℝ≥0∞) = 1 / 3 := by
-  rw [isAppBound, ENNReal.coe_div (by norm_num)]; simp
-
 /-! ## One draw of `genTerm` -/
 
 /-- A Boolean literal. -/
@@ -107,42 +97,6 @@ theorem genBool_prob_boolLit : SPMF.prob (genBool : SPMF Term) IsBoolLit = 1 := 
     exact ⟨b, rfl⟩
   rw [SPMF.prob_eq_mass_of_subset h]
   exact (genZero.terminates (Γ := [Ty.Bool]) (τ := .Bool))
-
-/-- In the context `[Bool]` at `Bool`, the variable `#0` is drawn with probability at least `1/4`:
-`elements` over the one variable of type `Bool` is one branch of four. -/
-theorem genTerm_bool_prob_var0 :
-    (1 : ℝ≥0∞) / 4 ≤ SPMF.prob (genTerm [Ty.Bool] .Bool) {Term.Var 0} := by
-  rw [genTerm]
-  have hv : varsWithType [Ty.Bool] Ty.Bool = [Term.Var 0] := rfl
-  simp only [hv, ne_eq, List.cons_ne_nil, not_false_eq_true, dite_true, oneOfWith_eq,
-    SPMF.prob_oneOf]
-  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
-    List.length_nil]
-  have h1 : SPMF.prob (elements [Term.Var 0] (List.cons_ne_nil _ _) : SPMF Term)
-      {Term.Var 0} = 1 := by
-    unfold SPMF.prob; rw [SPMF.expect_elements]; simp
-  rw [h1, show ((0 + 1 + 1 + 1 + 1 : ℕ) : ℝ≥0∞) = 4 by norm_num]
-  refine ENNReal.div_le_div_right ?_ _
-  exact le_trans (le_add_right le_rfl) le_add_self
-
-/-- In the context `[Bool]` at `Bool`, a Boolean literal is drawn with probability at least `1/2`:
-the `genZero` branch and the introduction branch are both `genBool`. -/
-theorem genTerm_bool_prob_boolLit :
-    (1 : ℝ≥0∞) / 2 ≤ SPMF.prob (genTerm [Ty.Bool] .Bool) IsBoolLit := by
-  rw [genTerm]
-  have hv : varsWithType [Ty.Bool] Ty.Bool = [Term.Var 0] := rfl
-  simp only [hv, ne_eq, List.cons_ne_nil, not_false_eq_true, dite_true, oneOfWith_eq,
-    SPMF.prob_oneOf]
-  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
-    List.length_nil]
-  rw [show genZero [Ty.Bool] Ty.Bool = (genBool : SPMF Term) from rfl, genBool_prob_boolLit,
-    show ((0 + 1 + 1 + 1 + 1 : ℕ) : ℝ≥0∞) = 4 by norm_num]
-  calc (1 : ℝ≥0∞) / 2 = (1 + 1) / 4 := by
-        rw [ENNReal.div_eq_div_iff (by norm_num) (by norm_num) (by norm_num) (by norm_num)]
-        norm_num
-    _ ≤ _ := by
-        refine ENNReal.div_le_div_right (add_le_add le_rfl ?_) _
-        exact le_add_left (le_add_left (by rw [add_zero]))
 
 /-- The three branches of `genTerm [] (Bool → Bool)`, each with probability `1/3`. -/
 theorem genTerm_fun_prob_eq (E : Set Term) :
@@ -167,12 +121,26 @@ theorem genTerm_fun_prob_eq (E : Set Term) :
 `1/12`: the introduction branch (`1/3`) with the body `#0` (`1/4`), which is `λx. x`. -/
 theorem genTerm_prob_linear_ge :
     (linearBound : ℝ≥0∞) ≤ SPMF.prob (genTerm [] (.Fun .Bool .Bool)) IsLinear := by
-  rw [coe_linearBound, genTerm_fun_prob_eq]
+  rw [show (linearBound : ℝ≥0∞) = 1 / 12 by
+    rw [linearBound, ENNReal.coe_div (by norm_num)]; simp, genTerm_fun_prob_eq]
   have habs : (1 : ℝ≥0∞) / 4 ≤ SPMF.prob (do
       let e ← genTerm [Ty.Bool] Ty.Bool
       pure (Term.Abs Ty.Bool e) : SPMF Term) IsLinear := by
     refine le_trans ?_ (SPMF.prob_bind_ge {Term.Var 0} (d := 1) fun e he => ?_)
-    · rw [mul_one]; exact genTerm_bool_prob_var0
+    · rw [mul_one]
+      -- In the context `[Bool]` at `Bool`, `#0` is one branch of four.
+      rw [genTerm]
+      have hv : varsWithType [Ty.Bool] Ty.Bool = [Term.Var 0] := rfl
+      simp only [hv, ne_eq, List.cons_ne_nil, not_false_eq_true, dite_true, oneOfWith_eq,
+        SPMF.prob_oneOf]
+      simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+        List.length_nil]
+      have h1 : SPMF.prob (elements [Term.Var 0] (List.cons_ne_nil _ _) : SPMF Term)
+          {Term.Var 0} = 1 := by
+        unfold SPMF.prob; rw [SPMF.expect_elements]; simp
+      rw [h1, show ((0 + 1 + 1 + 1 + 1 : ℕ) : ℝ≥0∞) = 4 by norm_num]
+      refine ENNReal.div_le_div_right ?_ _
+      exact le_trans (le_add_right le_rfl) le_add_self
     · rw [Set.mem_singleton_iff.mp he, SPMF.prob_pure_of_mem]
       rfl
   calc (1 : ℝ≥0∞) / 12 = 1 / 4 / 3 := by
@@ -187,7 +155,8 @@ a literal `b` with probability at least `1/2`: always under `genZero` (`1/3`), a
 the time under the introduction branch (`1/3 · 1/2`). -/
 theorem genTerm_prob_discardsArg_ge :
     (discardsArgBound : ℝ≥0∞) ≤ SPMF.prob (genTerm [] (.Fun .Bool .Bool)) DiscardsArg := by
-  rw [coe_discardsArgBound, genTerm_fun_prob_eq]
+  rw [show (discardsArgBound : ℝ≥0∞) = 1 / 2 by
+    rw [discardsArgBound, ENNReal.coe_div (by norm_num)]; simp, genTerm_fun_prob_eq]
   have hlit : ∀ e ∈ IsBoolLit, (1 : ℝ≥0∞) ≤
       SPMF.prob (Pure.pure (Term.Abs Ty.Bool e) : SPMF Term) DiscardsArg := by
     rintro e ⟨b, rfl⟩
@@ -203,7 +172,22 @@ theorem genTerm_prob_discardsArg_ge :
       let e ← genTerm [Ty.Bool] Ty.Bool
       pure (Term.Abs Ty.Bool e) : SPMF Term) DiscardsArg := by
     refine le_trans ?_ (SPMF.prob_bind_ge IsBoolLit hlit)
-    rw [mul_one]; exact genTerm_bool_prob_boolLit
+    rw [mul_one]
+    -- In the context `[Bool]` at `Bool`, two of the four branches are `genBool`.
+    rw [genTerm]
+    have hv : varsWithType [Ty.Bool] Ty.Bool = [Term.Var 0] := rfl
+    simp only [hv, ne_eq, List.cons_ne_nil, not_false_eq_true, dite_true, oneOfWith_eq,
+      SPMF.prob_oneOf]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil]
+    rw [show genZero [Ty.Bool] Ty.Bool = (genBool : SPMF Term) from rfl, genBool_prob_boolLit,
+      show ((0 + 1 + 1 + 1 + 1 : ℕ) : ℝ≥0∞) = 4 by norm_num]
+    calc (1 : ℝ≥0∞) / 2 = (1 + 1) / 4 := by
+          rw [ENNReal.div_eq_div_iff (by norm_num) (by norm_num) (by norm_num) (by norm_num)]
+          norm_num
+      _ ≤ _ := by
+          refine ENNReal.div_le_div_right (add_le_add le_rfl ?_) _
+          exact le_add_left (le_add_left (by rw [add_zero]))
   calc (1 : ℝ≥0∞) / 2 = (1 + 1 / 2) / 3 := by
         rw [ENNReal.div_eq_div_iff (by norm_num) (by norm_num) (by norm_num) (by norm_num)]
         rw [mul_add, mul_one, ENNReal.mul_div_cancel (by norm_num) (by norm_num)]
@@ -211,28 +195,28 @@ theorem genTerm_prob_discardsArg_ge :
     _ ≤ _ := ENNReal.div_le_div_right
         (add_le_add hzero (le_add_left (by rw [add_zero]; exact habs))) _
 
-/-- Every draw of the application branch is an application, and the branch terminates. -/
-theorem genTerm_fun_app_branch_prob_isApp :
-    SPMF.prob (do
-      let argTy ← genType
-      let e1 ← genTerm [] (argTy.Fun (Ty.Bool.Fun Ty.Bool))
-      let e2 ← genTerm [] argTy
-      pure (e1.App e2) : SPMF Term) IsApp = 1 := by
-  refine le_antisymm ((SPMF.prob_le_mass _ _).trans (SPMF.mass_le_one _)) ?_
-  refine le_trans ?_ (SPMF.prob_bind_ge Set.univ (d := 1) fun argTy _ => ?_)
-  · rw [SPMF.prob_univ, genType.terminates, mul_one]
-  refine le_trans ?_ (SPMF.prob_bind_ge Set.univ (d := 1) fun e1 _ => ?_)
-  · rw [SPMF.prob_univ, genTerm.terminates, mul_one]
-  refine le_trans ?_ (SPMF.prob_bind_ge Set.univ (d := 1) fun e2 _ => ?_)
-  · rw [SPMF.prob_univ, genTerm.terminates, mul_one]
-  rw [SPMF.prob_pure_of_mem (show Term.App e1 e2 ∈ IsApp from ⟨e1, e2, rfl⟩)]
-
 /-- **An application, exactly.** One draw of `genTerm [] (Bool → Bool)` is an application with
 probability exactly `isAppBound`: the application branch produces nothing else and terminates, and
 the other two branches produce lambdas. -/
 theorem genTerm_prob_isApp_eq :
     SPMF.prob (genTerm [] (.Fun .Bool .Bool)) IsApp = isAppBound := by
-  rw [coe_isAppBound, genTerm_fun_prob_eq, genTerm_fun_app_branch_prob_isApp]
+  -- Every draw of the application branch is an application, and the branch terminates.
+  have happ :
+    SPMF.prob (do
+      let argTy ← genType
+      let e1 ← genTerm [] (argTy.Fun (Ty.Bool.Fun Ty.Bool))
+      let e2 ← genTerm [] argTy
+      pure (e1.App e2) : SPMF Term) IsApp = 1 := by
+    refine le_antisymm ((SPMF.prob_le_mass _ _).trans (SPMF.mass_le_one _)) ?_
+    refine le_trans ?_ (SPMF.prob_bind_ge Set.univ (d := 1) fun argTy _ => ?_)
+    · rw [SPMF.prob_univ, genType.terminates, mul_one]
+    refine le_trans ?_ (SPMF.prob_bind_ge Set.univ (d := 1) fun e1 _ => ?_)
+    · rw [SPMF.prob_univ, genTerm.terminates, mul_one]
+    refine le_trans ?_ (SPMF.prob_bind_ge Set.univ (d := 1) fun e2 _ => ?_)
+    · rw [SPMF.prob_univ, genTerm.terminates, mul_one]
+    rw [SPMF.prob_pure_of_mem (show Term.App e1 e2 ∈ IsApp from ⟨e1, e2, rfl⟩)]
+  rw [show (isAppBound : ℝ≥0∞) = 1 / 3 by
+    rw [isAppBound, ENNReal.coe_div (by norm_num)]; simp, genTerm_fun_prob_eq, happ]
   have hzero : SPMF.prob (genZero [] (.Fun .Bool .Bool) : SPMF Term) IsApp = 0 := by
     rw [SPMF.prob_eq_zero_iff]
     intro t ht
@@ -254,18 +238,7 @@ theorem genTerm_prob_isApp_eq :
   rw [hzero, habs]
   simp
 
-theorem genTerm_prob_isApp_ge :
-    (isAppBound : ℝ≥0∞) ≤ SPMF.prob (genTerm [] (.Fun .Bool .Bool)) IsApp :=
-  genTerm_prob_isApp_eq.ge
-
 /-! ## How many tests -/
-
-/-- **Tests until a linear term**: `N` draws of `genTerm [] (Bool → Bool)` are all non-linear with
-probability at most `e^{−linearBound·N}`. -/
-theorem genTerm_linear_le_exp (N : Nat) :
-    SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term))
-      {ts | ∀ t ∈ ts, t ∉ IsLinear} ≤ ENNReal.ofReal (Real.exp (-(linearBound * N))) :=
-  SPMF.prob_vectorOf_miss_le_exp _ genTerm_prob_linear_ge N
 
 /-- **Tests until a linear term, with confidence `1 − δ`**: `N ≥ ln(1/δ) / linearBound` draws of
 `genTerm [] (Bool → Bool)` are all non-linear with probability at most `δ`. -/
@@ -293,16 +266,7 @@ theorem shapeBounds_le (i : Fin 3) :
   fin_cases i
   · exact genTerm_prob_linear_ge
   · exact genTerm_prob_discardsArg_ge
-  · exact genTerm_prob_isApp_ge
-
-/-- `linearBound` is the smallest of the three bounds, so it bounds every shape's probability. -/
-theorem linearBound_le_shapes (i : Fin 3) :
-    (linearBound : ℝ≥0∞) ≤ SPMF.prob (genTerm [] (.Fun .Bool .Bool)) (shapes i) := by
-  refine le_trans (ENNReal.coe_le_coe.mpr ?_) (shapeBounds_le i)
-  fin_cases i <;> simp only [shapeBounds, linearBound, discardsArgBound, isAppBound] <;>
-    first
-    | exact le_rfl
-    | (rw [← NNReal.coe_le_coe]; push_cast; norm_num)
+  · exact genTerm_prob_isApp_eq.ge
 
 /-- The event that some shape is missing from every term of a list. -/
 def SomeShapeMissing : Set (List Term) := {ts | ∃ i, ∀ t ∈ ts, t ∉ shapes i}
@@ -311,16 +275,6 @@ theorem someShapeMissing_eq :
     SomeShapeMissing = {ts | ∃ i ∈ (Finset.univ : Finset (Fin 3)), ∀ t ∈ ts, t ∉ shapes i} := by
   ext ts; simp [SomeShapeMissing]
 
-/-- **Tests until all three shapes**: after `N` draws of `genTerm [] (Bool → Bool)`, some shape
-(linear, ignores its argument, application) is still missing with probability at most
-`∑ᵢ e^{−shapeBounds i · N}`. -/
-theorem genTerm_all_shapes_le_exp (N : Nat) :
-    SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term)) SomeShapeMissing
-      ≤ ∑ i, ENNReal.ofReal (Real.exp (-(shapeBounds i * N))) := by
-  rw [someShapeMissing_eq]
-  exact SPMF.prob_vectorOf_someMiss_le_exp _ Finset.univ shapes shapeBounds
-    (fun i _ => shapeBounds_le i) N
-
 /-- **Tests until all three shapes, with confidence `1 − δ`**: after
 `N ≥ ln(3/δ) / linearBound` draws of `genTerm [] (Bool → Bool)`, some shape is still missing with
 probability at most `δ`. The `3` is the number of shapes. -/
@@ -328,8 +282,14 @@ theorem genTerm_all_shapes_within {δ : ℝ≥0} (hδ : 0 < δ) {N : Nat}
     (hN : Real.log (Fintype.card (Fin 3) / δ) ≤ linearBound * N) :
     SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term)) SomeShapeMissing ≤ δ := by
   rw [someShapeMissing_eq]
-  exact SPMF.prob_vectorOf_someMiss_le_of_log_le _ Finset.univ shapes
-    (fun i _ => linearBound_le_shapes i) hδ (by rwa [Finset.card_univ])
+  refine SPMF.prob_vectorOf_someMiss_le_of_log_le _ Finset.univ shapes
+    (fun i _ => ?_) hδ (by rwa [Finset.card_univ])
+  -- `linearBound` is the smallest of the three bounds, so it bounds every shape's probability.
+  refine le_trans (ENNReal.coe_le_coe.mpr ?_) (shapeBounds_le i)
+  fin_cases i <;> simp only [shapeBounds, linearBound, discardsArgBound, isAppBound] <;>
+    first
+    | exact le_rfl
+    | (rw [← NNReal.coe_le_coe]; push_cast; norm_num)
 
 /-- **Expected tests until all three shapes**: the sum that reads as the expected number of tests
 (`Basalt.SPMF.Expect.Draws`) is at most `∑ᵢ 1 / shapeBounds i`. -/
