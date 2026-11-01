@@ -98,7 +98,9 @@ always-instrumented `Basalt` would break the link of every downstream executable
 supplies the libFuzzer runtime). That is every first-party object in the closure and nothing else:
 the Lean runtime and stdlib are linked uninstrumented, and so are Plausible's `Gen`/`Random` and
 SplitMix, which are the `--backend=plausible`/`io` PRNGs rather than code under test (coverage over a
-PRNG's mixing steps is noise in the feedback). Partial coverage still guides libFuzzer.
+PRNG's mixing steps is noise in the feedback). Partial coverage still guides libFuzzer. A fuzz build
+of Basalt lives in `.lake/build-fuzz`, so it and an ordinary build never overwrite each other's
+objects.
 
 The live generator code is not in the module a reader would look in, which is why the scope is a
 *library* setting rather than a per-module one. A generator is polymorphic in its monad, so the copy
@@ -115,8 +117,8 @@ whose violation leaves a *working* fuzzer that searches badly rather than a buil
 Lake's link response file, the instrumentation scope in both directions (every first-party object in
 that response file references `__sanitizer_cov_8bit_counters_init`; no dependency object does), and
 `LLVMFuzzerCustomMutator` still exported past `-Wl,-dead_strip`. The response file read is Lake's own,
-so the scope check covers exactly what was linked: `.lake/build/ir/` additionally holds objects left
-behind by renamed modules, which enter no link and whose flags say nothing.
+so the scope check covers exactly what was linked: `.lake/build-fuzz/ir/` additionally holds objects
+left behind by renamed modules, which enter no link and whose flags say nothing.
 
 ### What the instrumentation scope buys
 
