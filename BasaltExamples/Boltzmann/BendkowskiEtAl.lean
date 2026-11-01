@@ -163,12 +163,6 @@ theorem genIdx_terminates (hp0 : 0 < pz) (hp1 : pz ≤ 1) :
   coin_goals pz hp0.le hp1
   rw [ENNReal.sub_sub_cancel ENNReal.one_ne_top (pr_le_one hp0.le hp1), mul_one, add_comm]
 
-/-- The printed sampler of §4.1: `boltzmann_index` `R < 0.35700035696434995`, `boltzmann_lambda`
-`R < 0.6525813160382378`, `boltzmann_leaf` `R < 0.7044190409261122`, the decimals read exactly. -/
-def paperSampler [Gen G] : G Term :=
-  genLam 35700035696434995 29558095907388785 34741868396176220 (by norm_num)
-    (7044190409261122 / 10 ^ 16)
-
 /-! ## Anticipated rejection of open terms
 
 `pickIndex` walks the list of binders above it and fails when it runs out; `ranTypable` then
@@ -365,13 +359,5 @@ theorem retry_genClosed_uniform (h : 0 < wi + wl + wa) (hp0 : 0 ≤ pz) (hp1 : p
       = (retry (genClosed wi wl wa h pz 0) : SPMF Term) t := by
   rw [retry_apply, retry_apply, genClosed_apply h hp0 hp1, genClosed_apply h hp0 hp1]
   simp only [hs, ht, ↓reduceIte, hB.uniform hst]
-
-/-- The printed sampler is subcritical (mean offspring `≈ 0.9904`), so it and its anticipated
-rejection both terminate, and they agree. -/
-theorem paperSampler_retry :
-    (retry (genClosed 35700035696434995 29558095907388785 34741868396176220 (by norm_num)
-        (7044190409261122 / 10 ^ 16) 0) : SPMF Term)
-      = suchThat (paperSampler : SPMF Term) (Term.closedUnder 0) :=
-  retry_genClosed _ (by norm_num) (by norm_num) (by norm_num) (by norm_num)
 
 end Boltzmann.BendkowskiEtAl

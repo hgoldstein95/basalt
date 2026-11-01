@@ -14,7 +14,7 @@ public import BasaltExamples.Boltzmann.DuchonEtAlBoltzmann
 The rules of Duchon, Flajolet, Louchard and Schaeffer (2004, §3, Table 3) that assemble a Boltzmann
 sampler from its parts — union, product, sequence — each proved to give every object `γ` the mass
 `x ^ |γ| / C(x)`, and the retry loop of their rejection samplers (§6.1, §7) with its law and its
-geometric number of trials; and Example 2's critical sampler for unbalanced 2–3 trees.
+geometric number of trials.
 -/
 
 @[expose] public section
@@ -298,104 +298,5 @@ theorem expect_retryCount_trials (h : SPMF (Option α)) (hm : h.mass = 1) (hR : 
     ENNReal.mul_inv_cancel hD0 hDtop, one_mul]
 
 end retry
-
-section twoThree
-
-/-! ## Unbalanced 2–3 trees (Example 2)
-
-`U = Z + U² + U³`, only leaves counting, sampled at the critical `ρ_U = 5/27`, where `U(ρ) = 1/3`
-and the branching probabilities are `5/9`, `1/3`, `1/9`. -/
-
-/-- Unbalanced 2–3 trees. -/
-inductive Tree23 where
-  | leaf
-  | two (a b : Tree23)
-  | three (a b c : Tree23)
-
-/-- The size: leaves only. -/
-def Tree23.size : Tree23 → Nat
-  | .leaf => 1
-  | .two a b => a.size + b.size
-  | .three a b c => a.size + b.size + c.size
-
-def Tree23.twos : Tree23 → Nat
-  | .leaf => 0
-  | .two a b => a.twos + b.twos + 1
-  | .three a b c => a.twos + b.twos + c.twos
-
-def Tree23.threes : Tree23 → Nat
-  | .leaf => 0
-  | .two a b => a.threes + b.threes
-  | .three a b c => a.threes + b.threes + c.threes + 1
-
-theorem Tree23.size_eq (t : Tree23) : t.size = 1 + t.twos + 2 * t.threes := by
-  induction t <;> simp only [Tree23.size, Tree23.twos, Tree23.threes, *] <;> omega
-
-/-- The critical sampler: branching probabilities `5/9`, `3/9`, `1/9`. -/
-def gen23 [Gen G] : G Tree23 :=
-  frequency! [
-    (5, fun _ => pure .leaf),
-    (3, fun _ => do return .two (← gen23) (← gen23)),
-    (1, fun _ => do return .three (← gen23) (← gen23) (← gen23))] (by simp)
-partial_fixpoint
-
-theorem gen23_apply (t : Tree23) :
-    (gen23 : SPMF Tree23) t = (5 / 9) ^ t.size * (3 / 9) ^ t.twos * (1 / 9) ^ t.threes := by
-  induction t with
-  | leaf =>
-    rw [gen23, frequencyWith_eq, frequency_apply]
-    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, pure_apply, ↓reduceIte]
-    rw [bind_bind_pure_apply_of_ne (f := Tree23.two) _ _ fun _ _ => Tree23.noConfusion,
-      bind3_pure_apply_of_ne (f := Tree23.three) _ _ _ fun _ _ _ => Tree23.noConfusion]
-    simp only [Tree23.size, Tree23.twos, Tree23.threes]
-    norm_num [ENNReal.div_eq_inv_mul]
-  | two a b iha ihb =>
-    rw [gen23, frequencyWith_eq, frequency_apply]
-    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, pure_apply, reduceCtorEq,
-      ↓reduceIte]
-    rw [bind_bind_pure_apply_of_injective (f := Tree23.two) fun _ _ _ _ h => Tree23.two.inj h,
-      bind3_pure_apply_of_ne (f := Tree23.three) _ _ _ fun _ _ _ => Tree23.noConfusion, iha, ihb]
-    simp only [Tree23.size, Tree23.twos, Tree23.threes, pow_add, pow_one]
-    norm_num [ENNReal.div_eq_inv_mul]
-    ring
-  | three a b c iha ihb ihc =>
-    rw [gen23, frequencyWith_eq, frequency_apply]
-    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, pure_apply, reduceCtorEq,
-      ↓reduceIte]
-    rw [bind_bind_pure_apply_of_ne (f := Tree23.two) _ _ fun _ _ => Tree23.noConfusion,
-      bind3_pure_apply_of_injective (f := Tree23.three) fun _ _ _ _ _ _ h => Tree23.three.inj h,
-      iha, ihb, ihc]
-    simp only [Tree23.size, Tree23.twos, Tree23.threes, pow_add, pow_one]
-    norm_num [ENNReal.div_eq_inv_mul]
-    ring
-
-/-- **The Boltzmann form at `ρ_U = 5/27`**: a tree with `n` leaves has mass `ρ ^ n / U(ρ)`. -/
-theorem gen23_boltzmann : IsBoltzmann (gen23 : SPMF Tree23) Tree23.size (5 / 27) (1 / 3) := by
-  intro t
-  have c1 : (3 / 9 : ℝ≥0∞) = 3⁻¹ := by
-    rw [← ENNReal.toReal_eq_toReal_iff' (by simp [ENNReal.div_eq_top]) (by simp)]; simp; norm_num
-  have c2 : (1 / 9 : ℝ≥0∞) = 3⁻¹ ^ 2 := by
-    rw [← ENNReal.toReal_eq_toReal_iff' (by simp) (by simp)]; simp; norm_num
-  have c3 : (5 / 27 : ℝ≥0∞) = 5 / 9 * 3⁻¹ := by
-    rw [← ENNReal.toReal_eq_toReal_iff' (by simp [ENNReal.div_eq_top])
-      (by simp [ENNReal.div_eq_top, ENNReal.mul_eq_top])]; simp; norm_num
-  have h3 : (3⁻¹ : ℝ≥0∞) * 3⁻¹⁻¹ = 1 := ENNReal.mul_inv_cancel (by simp) (by simp)
-  rw [gen23_apply, Tree23.size_eq, c1, c2, c3, one_div, div_eq_mul_inv (b := (3 : ℝ≥0∞)⁻¹)]
-  generalize (5 / 9 : ℝ≥0∞) = x
-  generalize (3⁻¹ : ℝ≥0∞) = y at h3 ⊢
-  calc x ^ (1 + t.twos + 2 * t.threes) * y ^ t.twos * (y ^ 2) ^ t.threes
-      = x ^ (1 + t.twos + 2 * t.threes) * y ^ t.twos * (y ^ 2) ^ t.threes * (y * y⁻¹) := by
-        rw [h3, mul_one]
-    _ = _ := by rw [mul_pow, pow_add, pow_add, pow_mul]; ring
-
-/-- "Branching probabilities for a nullary, binary, and ternary node are found to be,
-respectively, `5/9`, `1/3`, `1/9`": mean offspring `2/3 + 1/3 = 1`, so the sampler is critical and
-terminates almost surely. -/
-theorem gen23_terminates : IsAlmostSurelyTerminating (gen23 : SPMF Tree23) := by
-  mass_fixpoint using SPMF.LfpIsOne.cubic (a := 5 / 9) (b := 0) (d := 3 / 9) (e := 1 / 9)
-  norm_num [sq, ENNReal.div_eq_inv_mul, mul_add, pow_succ]
-  exact le_of_eq (by ring)
-
-end twoThree
 
 end Boltzmann

@@ -14,8 +14,8 @@ public import Basalt
 The Boltzmann sampler for binary trees (Duchon, Flajolet, Louchard and Schaeffer 2004, Example 2),
 with its leaf probability `p = x / B(x)` as a parameter. Every tree of size `n` gets mass
 `x ^ n / B(x)`, so the sampler is uniform within each size, before and after rejection to a size
-window; its expected size `1 / (2p - 1)`, infinite at the critical `p = 1/2`, and its mass
-`p / (1 - p)` below it, are proved by fixpoint induction rather than from the generating function.
+window; its expected size `1 / (2p - 1)` above the critical `p = 1/2`, and its mass `p / (1 - p)`
+below it, are proved by fixpoint induction rather than from the generating function.
 -/
 
 @[expose] public section
@@ -341,20 +341,6 @@ theorem genB_expected_size (hp : 1/2 < p) (hp1 : p ≤ 1) :
         conv_lhs => rw [hstep]
         ring
     _ = 1 + 2 * (1 - x) * E := by rw [add_tsub_cancel_of_le hx1]
-
-/-- The critical case: the sampler terminates almost surely, but its expected size is infinite. -/
-theorem genB_expected_size_critical :
-    expect (genB (1/2) : SPMF BTree) (fun t => (t.size : ℝ≥0∞)) = ⊤ := by
-  have hstep := genB_expected_size_step (p := 1/2) le_rfl (by norm_num)
-  have hhalf : pr (1/2) = 1/2 := by rw [pr]; norm_num
-  rw [hhalf, show (1 : ℝ≥0∞) - 1 / 2 = 1 / 2 by rw [one_div, ENNReal.one_sub_inv_two]] at hstep
-  set E := expect (genB (1/2) : SPMF BTree) (fun t => (t.size : ℝ≥0∞))
-  by_contra hE
-  have h : E + 0 = E + 1 :=
-    calc E + 0 = 1 / 2 + 1 / 2 * (E + (1 + E)) := by rw [add_zero]; exact hstep
-      _ = E * (1 / 2 + 1 / 2) + (1 / 2 + 1 / 2) := by ring
-      _ = E + 1 := by rw [ENNReal.add_halves, mul_one]
-  exact zero_ne_one ((ENNReal.add_right_inj hE).1 h)
 
 end size
 
