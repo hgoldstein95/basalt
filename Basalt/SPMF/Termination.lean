@@ -95,6 +95,23 @@ theorem LfpIsOne.quadratic {a b d : ℝ≥0∞} (habd : a + b + d = 1 := by basi
   nlinarith [mul_pos (mul_pos ha (sub_pos.mpr hlt)) (sub_pos.mpr hlt),
     mul_nonneg (mul_nonneg ‹0 ≤ c› (sub_nonneg.mpr hle)) (show 0 ≤ a - d by linarith)]
 
+/-- **At most three recursive calls**, with probabilities `a`, `b`, `d`, `e` of zero, one, two, and
+three: mean offspring `b + 2d + 3e ≤ 1`, critical case included, provided a step can stop
+(`0 < a`). -/
+theorem LfpIsOne.cubic {a b d e : ℝ≥0∞} (habde : a + b + d + e = 1 := by basify; norm_num)
+    (hbde : b + 2 * d + 3 * e ≤ 1 := by basify; norm_num) (ha : 0 < a := by norm_num) :
+    LfpIsOne fun c => a + b * c + d * c ^ 2 + e * c ^ 3 := by
+  intro c hle hge
+  simp only at hge
+  basify
+  refine le_antisymm hle (not_lt.mp fun hlt => ?_)
+  obtain rfl : b = 1 - a - d - e := by linarith
+  -- `a + bc + dc² + ec³ - c = (1-c)(a - dc - ec(1+c)) ≥ a(1-c)²`, as `d + 2e ≤ a`
+  have h1 : 0 < 1 - c := sub_pos.mpr hlt
+  nlinarith [mul_pos (mul_pos ha h1) h1, mul_nonneg (mul_nonneg ‹0 ≤ c› h1.le)
+    (show 0 ≤ a - d - 2 * e by linarith), mul_nonneg (mul_nonneg (mul_nonneg ‹0 ≤ e› ‹0 ≤ c›) h1.le)
+    h1.le]
+
 end certificates
 
 end SPMF

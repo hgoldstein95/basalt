@@ -131,18 +131,6 @@ private theorem expect_retry_le (hg : expectObs.spec g (fun _ n => (n : ℝ≥0�
   rw [hsplit, SPMF.expect_add, SPMF.expect_mul_left, mul_comm B]
   exact add_le_add hg (mul_le_mul_left hr B)
 
-private theorem add_mul_div_one_sub_le (C r : ℝ≥0∞) : C + r * (C / (1 - r)) ≤ C / (1 - r) := by
-  rcases lt_or_ge r 1 with hr | hr
-  · refine le_of_eq ?_
-    calc C + r * (C / (1 - r)) = (1 - r) * (C / (1 - r)) + r * (C / (1 - r)) := by
-          rw [ENNReal.mul_div_cancel (tsub_pos_of_lt hr).ne'
-            (ENNReal.sub_ne_top ENNReal.one_ne_top)]
-      _ = C / (1 - r) := by rw [← add_mul, tsub_add_cancel_of_le hr.le, one_mul]
-  · rw [tsub_eq_zero_of_le hr]
-    rcases eq_or_ne C 0 with rfl | hC
-    · simp
-    · rw [ENNReal.div_zero hC]; exact le_top
-
 theorem expect_suchThat_cost_le (hg : expectObs.spec g (fun _ n => (n : ℝ≥0∞)) ≤ C)
     (hr : expectObs.spec g (fun a _ => if p a then 0 else 1) ≤ r) :
     expectObs.spec (suchThat g p) (fun _ n => (n : ℝ≥0∞)) ≤ C / (1 - r) := by

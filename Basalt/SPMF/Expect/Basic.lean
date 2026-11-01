@@ -92,6 +92,27 @@ theorem expect_mul_left (p : SPMF α) (c : ℝ≥0∞) (f : α → ℝ≥0∞) :
   rw [← ENNReal.tsum_mul_left]
   congr 1; ext a; ring
 
+theorem expect_add_const (p : SPMF α) (f : α → ℝ≥0∞) (c : ℝ≥0∞) :
+    expect p (fun a => f a + c) = expect p f + p.mass * c := by
+  rw [expect_add, expect_const]
+
+theorem expect_const_add (p : SPMF α) (c : ℝ≥0∞) (f : α → ℝ≥0∞) :
+    expect p (fun a => c + f a) = p.mass * c + expect p f := by
+  rw [expect_add, expect_const]
+
+/-- `C / (1 - r)` is closed under one round of a loop that keeps `C` and retries with chance `r`. -/
+theorem add_mul_div_one_sub_le (C r : ℝ≥0∞) : C + r * (C / (1 - r)) ≤ C / (1 - r) := by
+  rcases lt_or_ge r 1 with hr | hr
+  · refine le_of_eq ?_
+    calc C + r * (C / (1 - r)) = (1 - r) * (C / (1 - r)) + r * (C / (1 - r)) := by
+          rw [ENNReal.mul_div_cancel (tsub_pos_of_lt hr).ne'
+            (ENNReal.sub_ne_top ENNReal.one_ne_top)]
+      _ = C / (1 - r) := by rw [← add_mul, tsub_add_cancel_of_le hr.le, one_mul]
+  · rw [tsub_eq_zero_of_le hr]
+    rcases eq_or_ne C 0 with rfl | hC
+    · simp
+    · rw [ENNReal.div_zero hC]; exact le_top
+
 /-- Off-support values of `f` don't matter, so a `sound_complete` law lets `f` be understood on
 valid values only. -/
 theorem expect_congr_support {p : SPMF α} {f g : α → ℝ≥0∞}

@@ -103,11 +103,11 @@ definition, and the definition is right here to run.
     the registry, so a *new* combinator with no lemma is not caught.
 - **Expected values and event probabilities** (`expect`, `prob`, Markov, `admissible_expect_le`) —
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
-  [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
-  [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean); what the walk needs
-  of an expectation bound — [Basalt/Walk/Expect.lean](Basalt/Walk/Expect.lean), pinned by
-  [BasaltTest/Walk/Expect.lean](BasaltTest/Walk/Expect.lean). The practical entry for a bound is
-  WORKFLOW.md's Recipe 4.
+  [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' and
+  `suchThat`'s — [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean); what
+  the walk needs of an expectation bound — [Basalt/Walk/Expect.lean](Basalt/Walk/Expect.lean),
+  pinned by [BasaltTest/Walk/Expect.lean](BasaltTest/Walk/Expect.lean). The practical entry for a
+  bound is WORKFLOW.md's Recipe 4.
 - **Cost** — the interpretation (`SPMF.Cost` and its support inversion):
   [Basalt/SPMF/Cost.lean](Basalt/SPMF/Cost.lean); what the walk needs of it:
   [Basalt/Walk/Cost.lean](Basalt/Walk/Cost.lean), pinned by

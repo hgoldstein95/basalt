@@ -95,6 +95,15 @@ theorem mass_frequency
       = (gs.map fun p => (p.1 : ℝ≥0∞) * (p.2 ()).mass).sum / ((gs.map Prod.fst).sum : ℝ≥0∞) := by
   simpa only [expect_one] using expect_frequency h fun _ => 1
 
+/-- A bind whose continuations all halt, wherever `x` can land, keeps `x`'s mass. -/
+theorem mass_bind_of_mass_one {x : SPMF α} {f : α → SPMF β}
+    (hf : ∀ a, x a ≠ 0 → (f a).mass = 1) : (x >>= f).mass = x.mass := by
+  rw [mass_bind_tsum, mass]
+  refine tsum_congr fun a => ?_
+  by_cases ha : x a = 0
+  · rw [ha, zero_mul]
+  · rw [hf a ha, mul_one]
+
 end mass
 
 end SPMF

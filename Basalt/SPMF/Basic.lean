@@ -229,6 +229,56 @@ theorem bot_bind (f : α → SPMF β) : (Bot.bot (α := SPMF α) >>= f) = Bot.bo
 
 end equations
 
+section apply
+
+universe u
+
+variable {α β γ δ : Type u}
+
+theorem tsum_option (f : Option α → ℝ≥0∞) : ∑' o, f o = f none + ∑' a, f (some a) := by
+  rw [← (Equiv.optionEquivSumPUnit.{0, u} α).symm.tsum_eq,
+    Summable.tsum_sum ENNReal.summable ENNReal.summable]
+  simp [add_comm]
+
+theorem bind_pure_apply_of_injective {f : α → β} (hf : f.Injective) (x : SPMF α) (a : α) :
+    (x >>= fun a => Pure.pure (f a)) (f a) = x a := by
+  rw [bind_apply, tsum_eq_single a fun b hb => by simp [hf.ne (Ne.symm hb)]]
+  simp
+
+theorem bind_pure_apply_of_ne {f : α → β} (x : SPMF α) {b : β} (hb : ∀ a, f a ≠ b) :
+    (x >>= fun a => Pure.pure (f a)) b = 0 :=
+  ENNReal.tsum_eq_zero.2 fun a => by simp [Ne.symm (hb a)]
+
+theorem bind_bind_pure_apply_of_injective {f : α → β → γ}
+    (hf : ∀ a b a' b', f a b = f a' b' → a = a' ∧ b = b') (x : SPMF α) (y : SPMF β) (a : α)
+    (b : β) : (x >>= fun a => y >>= fun b => Pure.pure (f a b)) (f a b) = x a * y b := by
+  rw [bind_apply, tsum_eq_single a fun a' ha' => ?_]
+  · exact congrArg _ (bind_pure_apply_of_injective (fun b b' h => (hf a b a b' h).2) y b)
+  · rw [bind_pure_apply_of_ne (f := f a') y (b := f a b) fun b' h => ha' (hf _ _ _ _ h).1,
+      mul_zero]
+
+theorem bind_bind_pure_apply_of_ne {f : α → β → γ} (x : SPMF α) (y : SPMF β) {c : γ}
+    (hc : ∀ a b, f a b ≠ c) : (x >>= fun a => y >>= fun b => Pure.pure (f a b)) c = 0 :=
+  ENNReal.tsum_eq_zero.2 fun a => by rw [bind_pure_apply_of_ne y (hc a), mul_zero]
+
+theorem bind3_pure_apply_of_injective {f : α → β → γ → δ}
+    (hf : ∀ a b c a' b' c', f a b c = f a' b' c' → a = a' ∧ b = b' ∧ c = c') (x : SPMF α)
+    (y : SPMF β) (z : SPMF γ) (a : α) (b : β) (c : γ) :
+    (x >>= fun a => y >>= fun b => z >>= fun c => Pure.pure (f a b c)) (f a b c)
+      = x a * (y b * z c) := by
+  rw [bind_apply, tsum_eq_single a fun a' ha' => ?_]
+  · exact congrArg _ (bind_bind_pure_apply_of_injective (f := f a)
+      (fun b c b' c' h => (hf _ _ _ _ _ _ h).2) y z b c)
+  · rw [bind_bind_pure_apply_of_ne (f := f a') y z (c := f a b c)
+      fun b' c' h => ha' (hf _ _ _ _ _ _ h).1, mul_zero]
+
+theorem bind3_pure_apply_of_ne {f : α → β → γ → δ} (x : SPMF α) (y : SPMF β) (z : SPMF γ)
+    {d : δ} (hd : ∀ a b c, f a b c ≠ d) :
+    (x >>= fun a => y >>= fun b => z >>= fun c => Pure.pure (f a b c)) d = 0 :=
+  ENNReal.tsum_eq_zero.2 fun a => by rw [bind_bind_pure_apply_of_ne y z (hd a), mul_zero]
+
+end apply
+
 section support
 
 /-- The support of an `SPMF` is the set of values that have nonzero mass. -/
