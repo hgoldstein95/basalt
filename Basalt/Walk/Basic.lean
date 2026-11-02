@@ -314,11 +314,27 @@ def solveSideGoal (goal : MVarId) (ty : Expr) : MetaM Bool := goal.withContext d
 
 /-! ## Leaves -/
 
+/-- Whether a fact `e` can be about `g` by the generators' types: a necessary condition for any of
+`tryFact`'s unifications, and cheap where those are not. Unifying generators at different types (a
+draw of a list against a draw of an expression) fails only after unfolding both, through their
+instances. -/
+private def factTypeFits (e g : Expr) : MetaM Bool := do
+  let saved ← saveState
+  let r ← observing? do
+    let (_, _, concl) ← forallMetaTelescopeReducing (← inferType e)
+    let some s := (← instantiateMVars concl).find? (·.isAppOfArity ``Obs.spec 10) | return true
+    isDefEq (← inferType (s.getArg! 8)) (← inferType g)
+  saved.restore
+  return r.getD true
+
 /-- Close `goal`, a leaf, with the fact `e`, as it is or through one of the observation's `leaves`,
 `e`'s binders instantiated by `instBinders` first: possibly all of them for the fact as it is, and
-all but the bridge's own for a bridge. `none` if nothing applies. -/
-private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
+all but the bridge's own for a bridge. `none` if nothing applies. `g`, the generator at the leaf,
+rules out a fact about a generator of another type before anything is unified. -/
+private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) (g? : Option Expr := none) :
     MetaM (Option (List MVarId)) := do
+  if let some g := g? then
+    unless ← factTypeFits e g do return none
   -- A fact that is the goal, binders and all: a generator argument's family of observations.
   let whole ← observing? do
     unless ← isDefEq (← goal.getType) (← inferType e) do failure
@@ -537,6 +553,39 @@ private def applyRule (goal : MVarId) (lem : Name) (genRel? : Option Name := non
     else post
   applyExact goal (← mkExpectedTypeHint rule (nameBound (← inferType rule) names))
 
+/-- For each rule, the head constants of its subject's explicit arguments, reduced at reducible
+transparency: `none` where the argument is a variable or has no constant head. -/
+initialize ruleArgHeadsCache : IO.Ref (Std.HashMap Name (Array (Option Name))) ← IO.mkRef {}
+
+private def argHead? (a : Expr) : MetaM (Option Name) := do
+  return (← whnfR (← instantiateMVars a)).getAppFn.constName?
+
+private def ruleArgHeads (j : Judgment) (lem : Name) : MetaM (Array (Option Name)) := do
+  if let some hs := (← ruleArgHeadsCache.get)[lem]? then return hs
+  let hs ← forallTelescope (← getConstInfo lem).type fun _ concl => do
+    let concl ← whnfR concl
+    let some (s, _) := j.subject? (← getEnv) concl | return #[]
+    let info ← getFunInfo s.getAppFn
+    s.getAppArgs.mapIdxM fun i a => do
+      let explicit := (info.paramInfo[i]?.map (·.binderInfo.isExplicit)).getD true
+      if explicit then argHead? a else return none
+  ruleArgHeadsCache.modify (·.insert lem hs)
+  return hs
+
+/-- Whether `lem` cannot apply to `g` by its subject's argument heads alone: an explicit argument
+whose head constant, at reducible transparency, differs from the goal's. Rules are selected the way
+`simp`'s discrimination trees select lemmas, before unification; a rule over a guarded list (`filterMap`)
+is not unified with a literal one, which on a long list of guarded branches costs more than the walk. -/
+private def quickReject (j : Judgment) (lem : Name) (g : Expr) : MetaM Bool := do
+  let hs ← ruleArgHeads j lem
+  let args := g.getAppArgs
+  unless hs.size == args.size do return false
+  for (h?, a) in hs.zip args do
+    let some h := h? | continue
+    let some n ← argHead? a | continue
+    if n != h then return true
+  return false
+
 /-- `g`'s combinator's rules for `j`, on the observation `obs?` for a bound, then, on a relation,
 its `@[gen_rel_rule]`s through the relation's proof that it is a `GenRel`, then its `@[gen_map]`
 lemma read into the algebra's shapes. -/
@@ -549,6 +598,7 @@ private def tryRules (j : Judgment) (obs? : Option Name) (goal : MVarId) (g : Ex
   let viaGenRel := match j, g.getAppFn.constName? with
     | .rel _ w, some head => (genRelRulesFor env head).map (·, some w)
     | _, _ => #[]
+  let own ← own.filterM fun lem => do return !(← quickReject j lem g)
   let lems := own.map (·, none) ++ viaGenRel
   if let some gs ← firstApplying lems (fun (lem, w) => applyRule goal lem w) finish then
     return some gs
@@ -563,6 +613,9 @@ def elabFact (t : Term) : TermElabM Expr :=
     Term.synthesizeSyntheticMVarsNoPostponing
     instantiateMVars e
 
+/-- The constants each passed fact's statement mentions, by the fact's syntax, for the current walk. -/
+initialize factConstsCache : IO.Ref (Std.HashMap String (Array Name)) ← IO.mkRef {}
+
 /-- A fact about `g`: one the caller passed, or a hypothesis (a recursive occurrence). A passed fact
 is committed to before its bridge's premises are walked, so that a failure inside them is reported
 where it happens. -/
@@ -575,17 +628,32 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
     | .fvar x => e.containsFVar x
     | _ => true
   for t in extras do
+    -- Elaborating every fact at every draw only to find it is about another generator dominates a
+    -- walk over a large generator: the constants each fact's statement mentions are learned once per
+    -- walk, and a fact that cannot mention `g`'s head is not elaborated at all.
+    if let .const n _ := g.getAppFn then
+      let key := toString t
+      match (← factConstsCache.get)[key]? with
+      | some cs => unless cs.contains n do continue
+      | none =>
+        let saved ← saveState
+        let cs? ← observing? do
+          return (← instantiateMVars (← inferType (← elabFact t))).getUsedConstants
+        saved.restore
+        if let some cs := cs? then
+          factConstsCache.modify (·.insert key cs)
+          unless cs.contains n do continue
     let r ← observing? do
       let e ← elabFact t
       unless mentionsHead (← instantiateMVars (← inferType e)) do failure
-      let some gs ← tryFact leaves goal e | failure
+      let some gs ← tryFact leaves goal e g | failure
       namePremises none (← goal.getType) gs
     if let some gs := r then return some (← rest gs)
   for decl in ← getLCtx do
     unless decl.isImplementationDetail do
       unless ← isProp decl.type do continue
       unless mentionsHead (← instantiateMVars decl.type) do continue
-      if let some gs ← tryFact leaves goal decl.toExpr then
+      if let some gs ← tryFact leaves goal decl.toExpr g then
         return some (← rest (← namePremises none (← goal.getType) gs))
   return none
 
