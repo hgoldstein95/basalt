@@ -55,8 +55,10 @@ computed, the proof of the inequality, and the goals the walk left. `O` is the o
 def computeBound (extras : Array Term) (obs : Name) (lower : Bool) (g post : Expr) :
     TermElabM (Expr × Expr × List MVarId) := do
   let gTy ← instantiateMVars (← inferType g)
+  -- An observation over a monad of fixed universe has no universe parameter of its own.
+  let lvls ← if (← getConstInfo obs).levelParams.isEmpty then pure [] else pure [← getDecLevel gTy]
   let spec := mkApp (← mkAppOptM ``Obs.spec #[none, none, none, none, none, none,
-    some (mkConst obs [← getDecLevel gTy]), none, some g]) post
+    some (mkConst obs lvls), none, some g]) post
   let b ← mkFreshExprMVar (← inferType spec)
   let pf ← mkFreshExprMVar (← if lower then mkAppM ``LE.le #[b, spec] else mkAppM ``LE.le #[spec, b])
   let rest ← walk extras pf.mvarId!
