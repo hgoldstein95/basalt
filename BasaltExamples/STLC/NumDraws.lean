@@ -1,7 +1,7 @@
 /-
-Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
-Authors: Harrison Goldstein & Ernest Ng
+Authors: Harrison Goldstein, Ernest Ng
 -/
 module
 
@@ -11,31 +11,8 @@ public import BasaltExamples.STLC.Termination
 /-!
 # How Many Tests Until `genTerm` Produces a Shape
 
-`genTerm` is sound and complete (`genTerm.sound_complete`): it produces exactly the well-typed
-terms. That says which terms can appear, and not how often. This file bounds how often three shapes
-appear in one draw of `genTerm [] (Bool → Bool)`, and then how many draws a test needs to see them,
-through the geometric and coupon-collector bounds of `Basalt.SPMF.Expect.Draws`.
-
-| Shape | Witness | Probability of one draw |
-|---|---|---|
-| `IsLinear`: every bound variable used exactly once | `λx. x` | at least `linearBound` |
-| `DiscardsArg`: a lambda that ignores its argument | `λx. b` | at least `discardsArgBound` |
-| `IsApp`: an application at the root | any | exactly `isAppBound` |
-
-Each constant is derived from the generator's branches in its docstring. `genTerm` terminates
-almost surely (`genTerm.terminates`), so no branch loses mass and the bounds are close to the
-measured rates. The first two bounds count one family of witnesses each.
-
-* `genTerm_linear_within`: `N ≥ ln(1/δ) / linearBound` tests all miss a linear term with
-  probability at most `δ`.
-* `genTerm_all_shapes_within`: after `N ≥ ln(3/δ) / linearBound` tests some shape is still missing
-  with probability at most `δ`.
-* `genTerm_linear_expected_le` and `genTerm_all_shapes_expected_le` bound the sums that read as the
-  expected number of tests, `1 / linearBound` and `∑ᵢ 1 / qᵢ`.
-
-The tests are modelled as `vectorOf N`, independent draws at the fixed arguments `[]` and
-`Bool → Bool`. `genTerm` has no size parameter, so this is a test run.
--/
+This file bounds how often three shapes appear in one draw of `genTerm [] (Bool → Bool)`, and then
+how many draws a test needs to see them. -/
 
 @[expose] public section
 
