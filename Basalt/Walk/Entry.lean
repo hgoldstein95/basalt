@@ -163,11 +163,12 @@ def tidy (lctx : LocalContext) (goal : MVarId) : MetaM MVarId := goal.withContex
   goal.setTag .anonymous
   let mut goal := goal
   for d in ← getLCtx do
-    unless d.isImplementationDetail do
+    -- A hypothesis the walk began with is the caller's, and no draw of the walk is in it: only
+    -- those the walk introduced are tidied (and renamed).
+    unless d.isImplementationDetail || lctx.contains d.fvarId do
       let t ← tidyExpr d.type
       if t != d.type then goal ← goal.replaceLocalDeclDefEq d.fvarId t
-      unless lctx.contains d.fvarId do
-        goal ← goal.rename d.fvarId (← mkFreshUserName d.userName.eraseMacroScopes)
+      goal ← goal.rename d.fvarId (← mkFreshUserName d.userName.eraseMacroScopes)
   goal ← goal.withContext do goal.replaceTargetDefEq (← tidyExpr (← goal.getType))
   goal.withContext do
     let ty ← goal.getType
