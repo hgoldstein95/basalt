@@ -1,7 +1,7 @@
 /-
-Copyright (c) 2026 Harrison Goldstein & Ernest Ng. All rights reserved.
+Copyright (c) 2026 Harrison Goldstein. All rights reserved.
 Released under MIT license as described in the file LICENSE.
-Authors: Harrison Goldstein & Ernest Ng
+Authors: Harrison Goldstein, Ernest Ng
 -/
 module
 
@@ -12,29 +12,7 @@ public import Mathlib.Analysis.SpecialFunctions.Log.Basic
 /-!
 # How Many Draws Until a Shape Appears
 
-`vectorOf N g` is `N` independent draws from `g`. If one draw has a shape `E` with probability at
-least `q`, these bounds say how many draws a test needs to see `E`:
-
-* `prob_vectorOf_miss_le` (the geometric bound): all `N` draws miss `E` with probability at most
-  `(1 − q)ᴺ`, and `prob_vectorOf_miss_le_of_log_le` makes it at most `δ` once
-  `N ≥ ln(1/δ) / q`.
-* `tsum_prob_vectorOf_miss_le`: `∑ₙ P(n draws all miss E) ≤ 1 / q`.
-* `prob_vectorOf_someMiss_le` (the coupon-collector bound): for events `E i`, `i ∈ s`, some event
-  is missed by all `N` draws with probability at most `∑ᵢ (1 − qᵢ)ᴺ`, and at most `δ` once
-  `N ≥ ln(|s|/δ) / q` for a common bound `q` (`prob_vectorOf_someMiss_le_of_log_le`).
-* `tsum_prob_vectorOf_someMiss_le`: `∑ₙ P(after n draws some E i is missing) ≤ ∑ᵢ 1 / qᵢ`.
-
-**Reading the sums as expected waiting times.** For a generator that terminates almost surely,
-`∑ₙ P(the first n draws all miss E)` is the expected number of draws until the first draw in `E`,
-by the tail-sum formula `E[T] = ∑ₙ P(T > n)`; the coupon-collector sum is likewise the expected
-number of draws until every `E i` has appeared. This module proves the bounds on the sums and does
-not define the waiting time `T` itself, so that reading is an interpretation, not a theorem here.
-
-**What a draw is.** `vectorOf N g` draws `N` times from one generator at fixed arguments. That
-models a test run of a generator with no size parameter. A runner that changes a size parameter
-from one test to the next draws from a different generator each time, and these bounds do not
-cover it directly.
--/
+Provides infrastructure for reasoning about how many draws a test needs to see `E`. -/
 
 @[expose] public section
 
