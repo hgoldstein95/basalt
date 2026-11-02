@@ -268,14 +268,19 @@ partial def splitBoundMatches (i : Nat) (g : MVarId) : MetaM (List MVarId) := do
 /-- One goal per path through a computed demonic precondition: its `∀` and `→` introduced, its `∧`,
 `if` and `match` split. Only a connective that is there syntactically is split, so that a
 postcondition defined as a conjunction stays folded. -/
-partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
-  let ty := (← reduceCtorProjs (← g.getType)).consumeMData
+partial def splitPaths (g : MVarId) (reduced : Bool := false) : MetaM (List MVarId) := g.withContext do
+  -- The projections out of constructors are reduced once, in the goal itself: an `intro` or a split
+  -- of `∧`, `if` or `dite` leaves subterms of an already reduced statement, and only unfolding a
+  -- `foldr` or splitting a `match` can make new ones. Reducing the whole remaining precondition at
+  -- every step is quadratic in its size.
+  let g ← if reduced then pure g else g.replaceTargetDefEq (← reduceCtorProjs (← g.getType))
+  let ty := (← instantiateMVars (← g.getType)).consumeMData
   if ty.isConstOf ``True then
     g.assign (mkConst ``True.intro)
     return []
   if ty.isForall then
     let (_, g) ← g.intro1P
-    return ← splitPaths g
+    return ← splitPaths g true
   if ty.isAppOf ``List.foldr then
     return ← splitPaths (← g.replaceTargetDefEq (← whnf ty))
   if (← matchMatcherApp? ty).isSome then
@@ -292,7 +297,7 @@ partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
       (``ite, 5, ``ite_intro)] do
     if ty.isAppOfArity head arity then
       if let some gs ← observing? (applyExact g (← mkConstWithFreshMVarLevels lem)) then
-        return ← gs.flatMapM splitPaths
+        return ← gs.flatMapM (splitPaths · true)
   return [g]
 
 /-- The computed angelic precondition `g`, pruned: its `List.foldr Or False` and `List.map` over a
@@ -488,6 +493,7 @@ syntax (name := walkTac) "walk" (&" fixpoint")? (walkFacts)? : tactic
 elab_rules : tactic
   | `(tactic| walk $[fixpoint%$fix]? $[$fs]?) => withMainContext do
     let facts := walkFacts.terms fs
+    factConstsCache.set {}
     for t in facts do checkFact t
     let goal ← getMainGoal
     replaceMainGoal (← if fix.isSome then walkFixpoint facts goal else walkGoal facts goal)
