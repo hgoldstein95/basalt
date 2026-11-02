@@ -20,6 +20,8 @@ It then runs that executable as a child process and reads back its report.
 
 The executable imports the current module as it is on disk, so save the file first. Like `#eval`, a
 `#fuzz` in a file also runs when the file is built, except in the fuzz workspace's own build of it.
+That build fails wherever `fuzz-run/build.sh` has not been run, so put `#fuzz` in test files, not in
+modules that dependents or CI compile.
 -/
 
 public meta section
