@@ -170,7 +170,9 @@ the failure model, the supported platforms, and how fast each backend finds a bu
   the library and out, imports the narrowest thing it needs.
 - `BasaltExamples/` — worked generators with correctness proofs. Because each file proves its
   generator's laws, this directory is also most of the effective regression suite for the library's
-  lemma sets and tactics.
+  lemma sets and tactics. `UniformConstrained/` formalizes Claessen, Duregård and Pałka,
+  *Generating constrained random data with uniform distribution* (JFP 2015); its module docstrings
+  record where the formalization disagrees with the paper.
 - `BasaltTest/` — regression tests, named for the library module they guard when one exists.
 - `BasaltFuzz/` — the generators, properties, and buggy operations the `basalt-fuzz` executable
   fuzzes. It is linked into a native executable; `fuzz-run/README.md` owns what that requires.
