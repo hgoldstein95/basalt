@@ -11,8 +11,8 @@ public import BasaltExamples.BST
 /-!
 # Uniform Binary Search Trees
 
-`Tree.genUniformBST lo m n` draws a search tree with exactly `n` nodes and keys in
-`[lo, lo + m - 1]`, and every such tree is equally likely (`Tree.genUniformBST.uniform`).
+`Tree.genUniformBST lo m n` generates a BST with exactly `n` nodes where node values lie in the interval
+`[lo, lo + m - 1]`. We prove that every such tree is generated equally likely (`Tree.genUniformBST.uniform`).
 -/
 
 @[expose] public section
@@ -22,21 +22,20 @@ open scoped ENNReal
 
 namespace BST
 
-/-- The ways to split a node over `m` keys and `n + 1` nodes: the offset of its key, and the size
-of its left subtree. -/
+/-- All ways to split a node over `m` keys and `n + 1` nodes -/
 def splits (m n : Nat) : List (Nat × Fin (n + 1)) := List.range m ×ˢ List.finRange (n + 1)
 
 theorem mem_splits {m n : Nat} {p : Nat × Fin (n + 1)} : p ∈ splits m n ↔ p.1 < m := by
   rw [splits, List.mem_product]; simp
 
-/-- The number of search trees with `n` nodes over `m` consecutive keys. -/
+/-- The no. of BSTs with `n` nodes over `m` consecutive keys. -/
 def numBST (m : Nat) : Nat → Nat
   | 0 => 1
   | n + 1 => ((splits m n).map fun p => numBST p.1 p.2 * numBST (m - 1 - p.1) (n - p.2)).sum
 termination_by n => n
 
-/-- Draws a search tree with `n` nodes over the keys `[lo, lo + m - 1]`: a split `p` with weight
-the number of trees it leaves, then a uniform tree for each side. -/
+/-- Generates a BST with `n` nodes, with node values from the interval `[lo, lo + m - 1]`:
+   a split `p` with weight the number of trees it leaves, then a uniform tree for each side. -/
 def Tree.genUniformBST [Gen G] (lo : Int) (m : Nat) (n : Nat) : G (Tree Int) :=
   match n with
   | 0 => pure .leaf
@@ -107,7 +106,8 @@ theorem node_bind_apply_node (l r : Tree Int) (x : Int) :
   · simp [h]
 
 open Classical in
-/-- The probability of each tree, for any `m` and `n` with a tree to draw. -/
+
+/-- Closed form expression for the probability of generating a particular BST -/
 theorem Tree.genUniformBST_apply (t : Tree Int) :
     ∀ (lo : Int) (m n : Nat), 0 < numBST m n →
       (Tree.genUniformBST lo m n : SPMF (Tree Int)) t
@@ -197,8 +197,8 @@ theorem Tree.genUniformBST_apply (t : Tree Int) :
 end uniform
 
 open Classical in
-/-- **`Tree.genUniformBST lo m n` is uniform over the search trees with `n` nodes and keys in
-`[lo, lo + m - 1]`**: each has probability `1 / numBST m n`, and every other tree `0`. -/
+/-- `Tree.genUniformBST lo m n` generates a BST with `n` nodes and keys in
+`[lo, lo + m - 1]` uniformly: each possible BST is generated with probability `1 / numBST m n`. -/
 theorem Tree.genUniformBST.uniform {lo : Int} {m n : Nat} (h : n ≤ m) (t : Tree Int) :
     (Tree.genUniformBST lo m n : SPMF (Tree Int)) t
       = if t.IsBSTOfSize lo m n then ((numBST m n : ℝ≥0∞))⁻¹ else 0 :=
