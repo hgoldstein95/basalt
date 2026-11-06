@@ -627,28 +627,45 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
     | .const n _ => (e.find? (·.isConstOf n)).isSome
     | .fvar x => e.containsFVar x
     | _ => true
-  for t in extras do
-    -- Elaborating every fact at every draw only to find it is about another generator dominates a
-    -- walk over a large generator: the constants each fact's statement mentions are learned once per
-    -- walk, and a fact that cannot mention `g`'s head is not elaborated at all.
-    if let .const n _ := g.getAppFn then
-      let key := toString t
-      match (← factConstsCache.get)[key]? with
-      | some cs => unless cs.contains n do continue
-      | none =>
-        let saved ← saveState
-        let cs? ← observing? do
-          return (← instantiateMVars (← inferType (← elabFact t))).getUsedConstants
-        saved.restore
+  -- Besides the head, the relation a class-indexed generator is for: under `BacktrackGenFor.gen
+  -- (P := fun s => ValidDecimal s)` every generator law mentions the head, and unifying a law about
+  -- another predicate unfolds both predicates' definitions before it fails.
+  let rec lamBody : Expr → Expr
+    | .lam _ _ b _ => lamBody b
+    | e => e
+  let predHeads : Array Name := (← instantiateMVars g).getAppArgs.filterMap fun a =>
+    if a.isLambda then (lamBody a).getAppFn.constName? else none
+  -- Two passes: first the facts that also mention the predicate's relation, then the rest. A law
+  -- about the drawn predicate is usually the one that applies, and found first it spares the failed
+  -- unifications against the others; the second pass keeps every fact the head admits.
+  for pass in [0, 1] do
+    for t in extras do
+      -- Elaborating every fact at every draw only to find it is about another generator dominates a
+      -- walk over a large generator: the constants each fact's statement mentions are learned once
+      -- per walk, and a fact that cannot mention `g`'s head is not elaborated at all.
+      if let .const n _ := g.getAppFn then
+        let key := toString t
+        let cs? ← match (← factConstsCache.get)[key]? with
+          | some cs => pure (some cs)
+          | none => do
+            let saved ← saveState
+            let cs? ← observing? do
+              return (← instantiateMVars (← inferType (← elabFact t))).getUsedConstants
+            saved.restore
+            if let some cs := cs? then factConstsCache.modify (·.insert key cs)
+            pure cs?
+        -- A fact that does not elaborate here is tried once, in the second pass.
         if let some cs := cs? then
-          factConstsCache.modify (·.insert key cs)
           unless cs.contains n do continue
-    let r ← observing? do
-      let e ← elabFact t
-      unless mentionsHead (← instantiateMVars (← inferType e)) do failure
-      let some gs ← tryFact leaves goal e g | failure
-      namePremises none (← goal.getType) gs
-    if let some gs := r then return some (← rest gs)
+          if (pass == 0) != predHeads.all cs.contains then continue
+        else if pass == 0 then continue
+      else if pass == 1 then continue
+      let r ← observing? do
+        let e ← elabFact t
+        unless mentionsHead (← instantiateMVars (← inferType e)) do failure
+        let some gs ← tryFact leaves goal e g | failure
+        namePremises none (← goal.getType) gs
+      if let some gs := r then return some (← rest gs)
   for decl in ← getLCtx do
     unless decl.isImplementationDetail do
       unless ← isProp decl.type do continue
