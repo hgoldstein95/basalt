@@ -169,7 +169,10 @@ def matchCongr? (j : Judgment) (goal : MVarId) (restate : Expr → Expr) (g : Ex
       | .spec upper => some (if upper then 3 else 2)
       | .rel .. => some (ty.getAppNumArgs - 1)
       | .mix _ => none) | return none
-  let other ← instantiateMVars (ty.getArg! i)
+  -- The counterpart reduced as the walked side was (`bound`'s `whnfR`): a continuation applied to its
+  -- value, and a `match` on a pair, which structure eta takes apart, would otherwise leave the two
+  -- sides at different `match`es.
+  let other ← whnfR (← instantiateMVars (ty.getArg! i))
   let some (β, uβ, cs) ← (match j with
     | .rel .. => do
       let some mb ← matchMatcherApp? other | return none
