@@ -55,8 +55,10 @@ computed, the proof of the inequality, and the goals the walk left. `O` is the o
 def computeBound (extras : Array Term) (obs : Name) (lower : Bool) (g post : Expr) :
     TermElabM (Expr × Expr × List MVarId) := do
   let gTy ← instantiateMVars (← inferType g)
+  -- An observation over a monad of fixed universe has no universe parameter of its own.
+  let lvls ← if (← getConstInfo obs).levelParams.isEmpty then pure [] else pure [← getDecLevel gTy]
   let spec := mkApp (← mkAppOptM ``Obs.spec #[none, none, none, none, none, none,
-    some (mkConst obs [← getDecLevel gTy]), none, some g]) post
+    some (mkConst obs lvls), none, some g]) post
   let b ← mkFreshExprMVar (← inferType spec)
   let pf ← mkFreshExprMVar (← if lower then mkAppM ``LE.le #[b, spec] else mkAppM ``LE.le #[spec, b])
   let rest ← walk extras pf.mvarId!
@@ -161,11 +163,12 @@ def tidy (lctx : LocalContext) (goal : MVarId) : MetaM MVarId := goal.withContex
   goal.setTag .anonymous
   let mut goal := goal
   for d in ← getLCtx do
-    unless d.isImplementationDetail do
+    -- A hypothesis the walk began with is the caller's, and no draw of the walk is in it: only
+    -- those the walk introduced are tidied (and renamed).
+    unless d.isImplementationDetail || lctx.contains d.fvarId do
       let t ← tidyExpr d.type
       if t != d.type then goal ← goal.replaceLocalDeclDefEq d.fvarId t
-      unless lctx.contains d.fvarId do
-        goal ← goal.rename d.fvarId (← mkFreshUserName d.userName.eraseMacroScopes)
+      goal ← goal.rename d.fvarId (← mkFreshUserName d.userName.eraseMacroScopes)
   goal ← goal.withContext do goal.replaceTargetDefEq (← tidyExpr (← goal.getType))
   goal.withContext do
     let ty ← goal.getType
@@ -265,14 +268,19 @@ partial def splitBoundMatches (i : Nat) (g : MVarId) : MetaM (List MVarId) := do
 /-- One goal per path through a computed demonic precondition: its `∀` and `→` introduced, its `∧`,
 `if` and `match` split. Only a connective that is there syntactically is split, so that a
 postcondition defined as a conjunction stays folded. -/
-partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
-  let ty := (← reduceCtorProjs (← g.getType)).consumeMData
+partial def splitPaths (g : MVarId) (reduced : Bool := false) : MetaM (List MVarId) := g.withContext do
+  -- The projections out of constructors are reduced once, in the goal itself: an `intro` or a split
+  -- of `∧`, `if` or `dite` leaves subterms of an already reduced statement, and only unfolding a
+  -- `foldr` or splitting a `match` can make new ones. Reducing the whole remaining precondition at
+  -- every step is quadratic in its size.
+  let g ← if reduced then pure g else g.replaceTargetDefEq (← reduceCtorProjs (← g.getType))
+  let ty := (← instantiateMVars (← g.getType)).consumeMData
   if ty.isConstOf ``True then
     g.assign (mkConst ``True.intro)
     return []
   if ty.isForall then
     let (_, g) ← g.intro1P
-    return ← splitPaths g
+    return ← splitPaths g true
   if ty.isAppOf ``List.foldr then
     return ← splitPaths (← g.replaceTargetDefEq (← whnf ty))
   if (← matchMatcherApp? ty).isSome then
@@ -289,7 +297,7 @@ partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
       (``ite, 5, ``ite_intro)] do
     if ty.isAppOfArity head arity then
       if let some gs ← observing? (applyExact g (← mkConstWithFreshMVarLevels lem)) then
-        return ← gs.flatMapM splitPaths
+        return ← gs.flatMapM (splitPaths · true)
   return [g]
 
 /-- The computed angelic precondition `g`, pruned: its `List.foldr Or False` and `List.map` over a
@@ -485,6 +493,9 @@ syntax (name := walkTac) "walk" (&" fixpoint")? (walkFacts)? : tactic
 elab_rules : tactic
   | `(tactic| walk $[fixpoint%$fix]? $[$fs]?) => withMainContext do
     let facts := walkFacts.terms fs
+    -- This thread's entries only: other threads' walks may be running.
+    let tid ← (IO.getTID : BaseIO UInt64)
+    (← factConstsCache).modify fun m => m.filter fun k _ => k.1 != tid
     for t in facts do checkFact t
     let goal ← getMainGoal
     replaceMainGoal (← if fix.isSome then walkFixpoint facts goal else walkGoal facts goal)
