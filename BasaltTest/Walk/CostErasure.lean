@@ -38,6 +38,15 @@ partial_fixpoint
 
 example : IsCostFaithful coins := ⟨by walk fixpoint, by walk fixpoint⟩
 
+-- A helper the walk unfolds is unfolded alike on the other side, so the `match` its body opens with
+-- is the counterpart's too.
+def pick [Gen G] : Nat → G Nat
+  | 0 => pure 0
+  | n + 1 => do return (← Nat.arbitrary) + n
+
+example (n : Nat) : IsCostFaithful (pick n) :=
+  ⟨by walk [natFaithful.erasedLe], by walk [natFaithful.leErased]⟩
+
 -- A callee's law is passed by the field the walk is proving.
 example : IsCostFaithful List.arbitrary :=
   ⟨by walk fixpoint [natFaithful.erasedLe], by walk fixpoint [natFaithful.leErased]⟩

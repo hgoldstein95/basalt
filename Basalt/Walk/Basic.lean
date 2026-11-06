@@ -723,6 +723,21 @@ private def attempt (step : TermElabM (Option α)) : TermElabM (Except Exception
     saved.restore
     return .error ex
 
+/-- On a relation, the counterpart of a definition the walk unfolded is the same definition at the
+other reading: unfold it alike, so that the two sides stay the same program (and a `match` its body
+opens with is the same `match`). -/
+def unfoldCounterpart (j : Judgment) (c : Name) (goal : MVarId) : MetaM MVarId := do
+  let .rel .. := j | return goal
+  goal.withContext do
+    let ty ← instantiateMVars (← goal.getType)
+    let i := ty.getAppNumArgs - 1
+    let other ← whnfR (ty.getArg! i)
+    let .const c' us := other.getAppFn | return goal
+    unless c' == c do return goal
+    let some (.defnInfo info) := (← getEnv).find? c | return goal
+    let v ← instantiateValueLevelParams (.defnInfo info) us
+    goal.change (mkAppN ty.getAppFn (ty.getAppArgs.set! i ((renameLambdas v).beta other.getAppArgs)))
+
 mutual
 
 /-- Prove `goal` by walking the generator, returning the goals no judgment recognizes. `extras` are
@@ -781,7 +796,7 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
     if let .error ex := rules then throw ex
   -- Unfolding comes after the facts, so that a caller's fact stays an abstraction boundary.
   if let some (c, body) ← unfold? j obs? g then
-    let goal ← goal.change (restate body)
+    let goal ← unfoldCounterpart j c (← goal.change (restate body))
     try return ← walk extras goal
     catch ex => throwError "{ex.toMessageData}\n(in the unfolding of `{c}`)"
   if let some gs ← matchCongr? j goal restate g then return ← rest gs
