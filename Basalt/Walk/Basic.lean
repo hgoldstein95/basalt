@@ -613,8 +613,17 @@ def elabFact (t : Term) : TermElabM Expr :=
     Term.synthesizeSyntheticMVarsNoPostponing
     instantiateMVars e
 
-/-- The constants each passed fact's statement mentions, by the fact's syntax, for the current walk. -/
-initialize factConstsCache : IO.Ref (Std.HashMap String (Array Name)) ← IO.mkRef {}
+/-- The constants each passed fact's statement mentions, by the thread and the fact's syntax, for
+the current walk. Walks run in parallel (Lean elaborates proofs as tasks), and the same syntax
+(`ih.1`) names a different fact in each: keyed by syntax alone, a walk skipped the fact it needed. -/
+initialize factConstsShards : Array (IO.Ref (Std.HashMap (UInt64 × String) (Array Name))) ←
+  (Array.range 64).mapM fun _ => IO.mkRef {}
+
+/-- This thread's shard of the cache: one reference shared by every thread has them wait on it. -/
+def factConstsCache : BaseIO (IO.Ref (Std.HashMap (UInt64 × String) (Array Name))) := do
+  match factConstsShards[((← IO.getTID) % 64).toNat]? with
+  | some r => return r
+  | none => IO.mkRef {}
 
 /-- A fact about `g`: one the caller passed, or a hypothesis (a recursive occurrence). A passed fact
 is committed to before its bridge's premises are walked, so that a failure inside them is reported
@@ -644,15 +653,16 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
       -- walk over a large generator: the constants each fact's statement mentions are learned once
       -- per walk, and a fact that cannot mention `g`'s head is not elaborated at all.
       if let .const n _ := g.getAppFn then
-        let key := toString t
-        let cs? ← match (← factConstsCache.get)[key]? with
+        let key := (← (IO.getTID : BaseIO UInt64), toString t)
+        let cache ← factConstsCache
+        let cs? ← match (← cache.get)[key]? with
           | some cs => pure (some cs)
           | none => do
             let saved ← saveState
             let cs? ← observing? do
               return (← instantiateMVars (← inferType (← elabFact t))).getUsedConstants
             saved.restore
-            if let some cs := cs? then factConstsCache.modify (·.insert key cs)
+            if let some cs := cs? then cache.modify (·.insert key cs)
             pure cs?
         -- A fact that does not elaborate here is tried once, in the second pass.
         if let some cs := cs? then
