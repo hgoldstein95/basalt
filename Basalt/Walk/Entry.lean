@@ -493,7 +493,9 @@ syntax (name := walkTac) "walk" (&" fixpoint")? (walkFacts)? : tactic
 elab_rules : tactic
   | `(tactic| walk $[fixpoint%$fix]? $[$fs]?) => withMainContext do
     let facts := walkFacts.terms fs
-    factConstsCache.set {}
+    -- This thread's entries only: other threads' walks may be running.
+    let tid ← (IO.getTID : BaseIO UInt64)
+    (← factConstsCache).modify fun m => m.filter fun k _ => k.1 != tid
     for t in facts do checkFact t
     let goal ← getMainGoal
     replaceMainGoal (← if fix.isSome then walkFixpoint facts goal else walkGoal facts goal)
