@@ -47,6 +47,16 @@ def pick [Gen G] : Nat → G Nat
 example (n : Nat) : IsCostFaithful (pick n) :=
   ⟨by walk [natFaithful.erasedLe], by walk [natFaithful.leErased]⟩
 
+-- A continuation that takes a pair apart reaches the same `match` on both sides.
+def pairMatch [Gen G] : G Nat :=
+  (do return ((← Nat.arbitrary), (← Nat.arbitrary)) : G (Nat × Nat)) >>= fun (a, b) =>
+    match b with
+    | 0 => pure a
+    | _ => Nat.arbitrary
+
+example : IsCostFaithful pairMatch :=
+  ⟨by walk [natFaithful.erasedLe], by walk [natFaithful.leErased]⟩
+
 -- A callee's law is passed by the field the walk is proving.
 example : IsCostFaithful List.arbitrary :=
   ⟨by walk fixpoint [natFaithful.erasedLe], by walk fixpoint [natFaithful.leErased]⟩
