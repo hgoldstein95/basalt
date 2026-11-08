@@ -169,15 +169,15 @@ theorem listOf_apply (g : SPMF α) (l : List α) :
     rw [listOf, oneOfWith_eq, oneOf_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, pure_apply, ↓reduceIte]
-    rw [bind_bind_pure_apply_of_ne (f := List.cons) _ _ fun _ _ => List.cons_ne_nil _ _]
+    rw [(apply_eq_zero_iff _ []).2 (by simp)]
     simp
   | cons a l ih =>
     rw [listOf, oneOfWith_eq, oneOf_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
       List.length_nil, pure_apply, reduceCtorEq, ↓reduceIte]
-    rw [bind_bind_pure_apply_of_injective (f := List.cons) fun _ _ _ _ h => List.cons.inj h, ih]
-    simp only [List.prod_cons, zero_add, add_zero, div_eq_mul_inv, one_mul,
-      show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
+    rw [bind_apply_of_unique a (by simp), bind_apply_of_unique l (by simp), ih]
+    simp only [pure_apply, ↓reduceIte, mul_one, List.prod_cons, zero_add, add_zero, div_eq_mul_inv,
+      one_mul, show ((1 + 1 : ℕ) : ℝ≥0∞) = 2 by norm_num]
     ring
 
 /-- One unfolding of `listOf`'s mass. -/

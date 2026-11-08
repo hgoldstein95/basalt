@@ -146,19 +146,6 @@ end coin
 
 section mass
 
-private theorem node_apply_leaf (μ : SPMF BinaryTree) :
-    (μ >>= fun a => μ >>= fun b => Pure.pure (BinaryTree.node a b)) .leaf = 0 := by
-  rw [bind_apply]
-  refine ENNReal.tsum_eq_zero.2 fun a => ?_
-  rw [bind_apply, ENNReal.tsum_eq_zero.2 fun b => by simp, mul_zero]
-
-private theorem node_apply_node (μ : SPMF BinaryTree) (l r : BinaryTree) :
-    (μ >>= fun a => μ >>= fun b => Pure.pure (BinaryTree.node a b)) (.node l r) = μ l * μ r := by
-  rw [bind_apply, tsum_eq_single l fun a ha => ?_, bind_apply,
-    tsum_eq_single r fun b hb => by simp [Ne.symm hb]]
-  · simp
-  · rw [bind_apply, ENNReal.tsum_eq_zero.2 fun b => by simp [Ne.symm ha], mul_zero]
-
 /-- A tree with `k` internal nodes, and so `k + 1` leaves, has mass `p ^ (k + 1) (1 - p) ^ k`. The
 unfolding determines it by induction on the tree, with no appeal to the least fixed point. -/
 theorem genBinaryTree_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (t : BinaryTree) :
@@ -167,12 +154,12 @@ theorem genBinaryTree_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (t : BinaryTree) :
   | leaf =>
     rw [genBinaryTree, bind_apply, tsum_bool]
     simp only [Bool.false_eq_true, ↓reduceIte, coin_false hp0 hp1, coin_true hp0 hp1]
-    rw [node_apply_leaf]
+    rw [(apply_eq_zero_iff _ BinaryTree.leaf).2 (by simp)]
     simp [BinaryTree.internal]
   | node l r ihl ihr =>
     rw [genBinaryTree, bind_apply, tsum_bool]
     simp only [Bool.false_eq_true, ↓reduceIte, coin_false hp0 hp1, coin_true hp0 hp1]
-    rw [node_apply_node, ihl, ihr]
+    rw [bind_apply_of_unique l (by simp), bind_apply_of_unique r (by simp), ihl, ihr]
     simp [BinaryTree.internal]
     ring
 

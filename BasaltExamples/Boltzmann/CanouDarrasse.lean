@@ -66,13 +66,13 @@ theorem genTernary_apply (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (t : TTree) :
   | leaf =>
     rw [genTernary, bind_apply, tsum_bool]
     simp only [Bool.false_eq_true, ↓reduceIte, coin_false hp0 hp1, coin_true hp0 hp1]
-    rw [bind3_pure_apply_of_ne (f := TTree.node) _ _ _ fun _ _ _ => TTree.noConfusion]
+    rw [(apply_eq_zero_iff _ TTree.leaf).2 (by simp)]
     simp [TTree.size, TTree.internal]
   | node a b c iha ihb ihc =>
     rw [genTernary, bind_apply, tsum_bool]
     simp only [Bool.false_eq_true, ↓reduceIte, coin_false hp0 hp1, coin_true hp0 hp1]
-    rw [bind3_pure_apply_of_injective (f := TTree.node) (fun _ _ _ _ _ _ h => TTree.node.inj h),
-      iha, ihb, ihc]
+    rw [bind_apply_of_unique a (by simp), bind_apply_of_unique b (by simp),
+      bind_apply_of_unique c (by simp), iha, ihb, ihc]
     simp only [pure_apply, reduceCtorEq, ↓reduceIte, mul_zero, add_zero, TTree.size,
       TTree.internal]
     ring
@@ -271,15 +271,15 @@ theorem genUnaryBinaryW_apply (h : 0 < a + b + c) (t : UBTree) :
   | leaf =>
     rw [genUnaryBinaryW, frequencyWith_eq, frequency_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, pure_apply, ↓reduceIte]
-    rw [bind_pure_apply_of_ne _ fun _ => UBTree.noConfusion,
-      bind_bind_pure_apply_of_ne (f := UBTree.binary) _ _ fun _ _ => UBTree.noConfusion]
+    rw [(apply_eq_zero_iff _ UBTree.leaf).2 (by simp),
+      (apply_eq_zero_iff _ UBTree.leaf).2 (by simp)]
     simp [UBTree.leaves, UBTree.unaries, UBTree.binaries, ENNReal.div_eq_inv_mul, add_assoc]
   | unary t ih =>
     rw [genUnaryBinaryW, frequencyWith_eq, frequency_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, pure_apply, reduceCtorEq,
       ↓reduceIte]
     rw [bind_pure_apply_of_injective (fun _ _ h => UBTree.unary.inj h), ih,
-      bind_bind_pure_apply_of_ne (f := UBTree.binary) _ _ fun _ _ => UBTree.noConfusion]
+      (apply_eq_zero_iff _ (UBTree.unary t)).2 (by simp)]
     simp only [UBTree.leaves, UBTree.unaries, UBTree.binaries, ENNReal.div_eq_inv_mul, add_zero,
       Nat.cast_add,
       ← add_assoc]
@@ -288,12 +288,10 @@ theorem genUnaryBinaryW_apply (h : 0 < a + b + c) (t : UBTree) :
     rw [genUnaryBinaryW, frequencyWith_eq, frequency_apply]
     simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, pure_apply, reduceCtorEq,
       ↓reduceIte]
-    rw [bind_pure_apply_of_ne _ fun _ => UBTree.noConfusion,
-      bind_bind_pure_apply_of_injective (f := UBTree.binary) fun _ _ _ _ h => UBTree.binary.inj h,
-      ihl, ihr]
-    simp only [UBTree.leaves, UBTree.unaries, UBTree.binaries, ENNReal.div_eq_inv_mul, add_zero,
-      Nat.cast_add,
-      ← add_assoc]
+    rw [(apply_eq_zero_iff _ (UBTree.binary l r)).2 (by simp), bind_apply_of_unique l (by simp),
+      bind_apply_of_unique r (by simp), ihl, ihr]
+    simp only [pure_apply, ↓reduceIte, mul_one, UBTree.leaves, UBTree.unaries, UBTree.binaries,
+      ENNReal.div_eq_inv_mul, add_zero, Nat.cast_add, ← add_assoc]
     ring
 
 /-- At `ρ = 1/3` all three weights are equal; a tree of size `n` has mass `(1/3) ^ n`: the
