@@ -12,7 +12,8 @@ public import BasaltExamples.STLC.NumDraws
 # How Many Tests Until `genTerm` Uses Its Arguments
 
 This file bounds how often one draw of `genTerm` at `Bool → Bool` and at `Bool → Bool → Bool` is a
-function whose body mentions every argument, and then how many draws a test needs to see one. -/
+function whose body mentions every argument, and then how many draws a test needs to see one, at
+most and at least. -/
 
 @[expose] public section
 
@@ -103,6 +104,39 @@ theorem genType_prob_bool_ge : (1 : ℝ≥0∞) / 2 ≤ SPMF.prob (genType : SPM
     List.sum_nil, List.length_cons, List.length_nil,
     SPMF.prob_pure_of_mem (Set.mem_singleton Ty.Bool)]
   exact ENNReal.div_le_div (le_add_right le_rfl) (by norm_num)
+
+/-- A draw mapped by `f` lands in `E` only when the draw lands in `B`. -/
+theorem prob_bind_pure_le {α : Type} {x : SPMF α} {f : α → Term} {E : Set Term} {B : Set α}
+    (h : ∀ a, f a ∈ E → a ∈ B) :
+    SPMF.prob (do let a ← x; pure (f a) : SPMF Term) E ≤ SPMF.prob x B := by
+  classical
+  rw [SPMF.prob_bind]
+  refine SPMF.expect_mono fun a => ?_
+  rw [SPMF.prob_pure]
+  by_cases ha : f a ∈ E <;> simp [ha, Set.indicator, h a]
+
+/-- `genBool` misses an event with no literal in it. -/
+theorem genBool_prob_eq_zero {E : Set Term} (h : ∀ b, Term.Bool b ∉ E) :
+    SPMF.prob (genBool : SPMF Term) E = 0 := by
+  rw [SPMF.prob_eq_zero_iff]
+  intro t ht
+  unfold genBool at ht
+  simp only [SPMF.mem_support_map_iff] at ht
+  obtain ⟨b, -, rfl⟩ := ht
+  exact h b
+
+/-- The application branch misses an event with no application in it. -/
+theorem prob_app_eq_zero {Γ : Ctx} {τ : Ty} {E : Set Term} (h : ∀ a b, Term.App a b ∉ E) :
+    SPMF.prob (do
+        let argTy ← genType
+        let e1 ← genTerm Γ (argTy.Fun τ)
+        let e2 ← genTerm Γ argTy
+        pure (e1.App e2) : SPMF Term) E = 0 := by
+  rw [SPMF.prob_eq_zero_iff]
+  intro t ht
+  support_simp at ht
+  obtain ⟨_, _, e1, _, e2, _, rfl⟩ := ht
+  exact h e1 e2
 
 /-! ## One draw of `genTerm` -/
 
@@ -232,5 +266,152 @@ theorem genTerm_usesArgs2_expected_le :
     ∑' N, SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool (.Fun .Bool .Bool)) : SPMF Term))
       {ts | ∀ t ∈ ts, t ∉ UsesArgs 2} ≤ (usesArgs2Bound : ℝ≥0∞)⁻¹ :=
   SPMF.tsum_prob_vectorOf_miss_le _ genTerm_prob_usesArgs2_ge
+
+/-! ## How many tests, at least -/
+
+/-- The per-draw upper bound at `Bool → Bool`: a function that uses its argument is neither a
+lambda that ignores it nor an application. -/
+noncomputable def usesArgs1UpperBound : ℝ≥0 := 1 - (discardsArgBound + isAppBound)
+
+/-- The per-draw upper bound at `Bool → Bool → Bool`: two introduction branches (`1/3 · 1/3`),
+then the application branch of the body (`1/4`), the only branch whose body can mention both
+arguments. -/
+noncomputable def usesArgs2UpperBound : ℝ≥0 := 1 / 36
+
+theorem disjoint_usesArgs1 : Disjoint (UsesArgs 1) (DiscardsArg ∪ IsApp) := by
+  rw [Set.disjoint_left]
+  rintro t ⟨τs, b, hlen, rfl, hu⟩ ht
+  match τs, hlen with
+  | [τ], _ =>
+    rcases ht with ⟨τ', b', h, h0⟩ | ⟨a, a', h⟩ <;> simp [Term.absN] at h
+    obtain ⟨-, rfl⟩ := h
+    exact absurd (hu 0 (by omega)) (by omega)
+
+theorem genTerm_prob_usesArgs1_le :
+    SPMF.prob (genTerm [] (.Fun .Bool .Bool)) (UsesArgs 1) ≤ usesArgs1UpperBound := by
+  have hdisj : Disjoint DiscardsArg IsApp := by
+    rw [Set.disjoint_left]
+    rintro t ⟨τ, b, rfl, -⟩ ⟨a, a', h⟩
+    cases h
+  refine (SPMF.prob_le_one_sub_of_disjoint _ disjoint_usesArgs1).trans ?_
+  rw [SPMF.prob_union_of_disjoint _ hdisj, usesArgs1UpperBound, ENNReal.coe_sub, ENNReal.coe_one,
+    ENNReal.coe_add]
+  exact tsub_le_tsub_left (add_le_add genTerm_prob_discardsArg_ge genTerm_prob_isApp_eq.ge) 1
+
+theorem usesArgs1UpperBound_lt_one : usesArgs1UpperBound < 1 :=
+  tsub_lt_self one_pos (by norm_num [discardsArgBound, isAppBound])
+
+/-- A lambda whose body over two Boolean arguments mentions both. -/
+def LamUsesBoth : Set Term := {e | ∃ τ b, e = Term.Abs τ b ∧ b ∈ UsesBoth}
+
+theorem lamUsesBoth_of_abs_mem {τ : Ty} {e : Term} (h : Term.Abs τ e ∈ UsesArgs 2) :
+    e ∈ LamUsesBoth := by
+  obtain ⟨τs, b, hlen, heq, hu⟩ := h
+  match τs, hlen with
+  | [τ1, τ2], _ =>
+    simp only [Term.absN, Term.Abs.injEq] at heq
+    exact ⟨τ2, b, heq.2, hu 0 (by omega), hu 1 (by omega)⟩
+
+theorem genTerm_prob_usesArgs2_le :
+    SPMF.prob (genTerm [] (.Fun .Bool (.Fun .Bool .Bool))) (UsesArgs 2) ≤ usesArgs2UpperBound := by
+  have hlit : ∀ b, Term.Bool b ∉ UsesBoth := fun b h => by simp [UsesBoth, Term.uses] at h
+  -- In the context `[Bool, Bool]` at `Bool`, only the application branch can mention both.
+  have hbody : SPMF.prob (genTerm [Ty.Bool, Ty.Bool] Ty.Bool) UsesBoth ≤ 1 / 4 := by
+    conv_lhs => rw [genTerm.eq_def]
+    simp only [ne_eq, show varsWithType [Ty.Bool, Ty.Bool] Ty.Bool
+        = [Term.Var 0, Term.Var 1] from rfl,
+      List.cons_ne_nil, not_false_eq_true, dite_true, oneOfWith_eq, SPMF.prob_oneOf]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil, show ((0 + 1 + 1 + 1 + 1 : ℕ) : ℝ≥0∞) = 4 by norm_num]
+    have hvars : SPMF.prob (elements [Term.Var 0, Term.Var 1] (List.cons_ne_nil _ _) : SPMF Term)
+        UsesBoth = 0 := by
+      unfold SPMF.prob; rw [SPMF.expect_elements]; simp [UsesBoth, Term.uses, Set.indicator]
+    rw [show genZero [Ty.Bool, Ty.Bool] Ty.Bool = (genBool : SPMF Term) from rfl,
+      genBool_prob_eq_zero hlit, hvars]
+    simp only [zero_add, add_zero]
+    exact ENNReal.div_le_div_right ((SPMF.prob_le_mass _ _).trans (SPMF.mass_le_one _)) _
+  -- In the context `[Bool]` at `Bool → Bool`, only the introduction branch is a lambda over such
+  -- a body.
+  have hzero : SPMF.prob (genZero [Ty.Bool] (.Fun .Bool .Bool) : SPMF Term) LamUsesBoth = 0 := by
+    rw [show (genZero [Ty.Bool] (.Fun .Bool .Bool) : SPMF Term)
+        = (do let e ← (genBool : SPMF Term); pure (Term.Abs Ty.Bool e)) from rfl]
+    refine le_antisymm ((prob_bind_pure_le (B := UsesBoth) fun e he => ?_).trans
+      (genBool_prob_eq_zero hlit).le) bot_le
+    obtain ⟨τ, b, h, hb⟩ := he; cases h; exact hb
+  have hlam : SPMF.prob (genTerm [Ty.Bool] (.Fun .Bool .Bool)) LamUsesBoth ≤ 1 / 4 / 3 := by
+    conv_lhs => rw [genTerm]
+    simp only [ne_eq, show varsWithType [Ty.Bool] (Ty.Fun .Bool .Bool) = [] from rfl,
+      not_true_eq_false, dite_false, oneOfWith_eq, SPMF.prob_oneOf]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+      List.length_nil, show ((0 + 1 + 1 + 1 : ℕ) : ℝ≥0∞) = 3 by norm_num, add_zero]
+    rw [hzero, prob_app_eq_zero (fun a b h => by obtain ⟨_, _, h, _⟩ := h; cases h), zero_add,
+      zero_add]
+    refine ENNReal.div_le_div_right ((prob_bind_pure_le fun e he => ?_).trans hbody) _
+    obtain ⟨τ, b, h, hb⟩ := he; cases h; exact hb
+  -- At the root, only the introduction branch is a lambda over such a lambda.
+  conv_lhs => rw [genTerm]
+  simp only [ne_eq, show varsWithType [] (Ty.Fun .Bool (.Fun .Bool .Bool)) = [] from rfl,
+    not_true_eq_false, dite_false, oneOfWith_eq, SPMF.prob_oneOf]
+  simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, List.length_cons,
+    List.length_nil, show ((0 + 1 + 1 + 1 : ℕ) : ℝ≥0∞) = 3 by norm_num, add_zero]
+  have hzero2 : SPMF.prob (genZero [] (.Fun .Bool (.Fun .Bool .Bool)) : SPMF Term) (UsesArgs 2)
+      = 0 := by
+    rw [show (genZero [] (.Fun .Bool (.Fun .Bool .Bool)) : SPMF Term)
+        = (do let e ← (genZero [Ty.Bool] (.Fun .Bool .Bool) : SPMF Term); pure (Term.Abs Ty.Bool e))
+        from rfl]
+    exact le_antisymm ((prob_bind_pure_le fun e he => lamUsesBoth_of_abs_mem he).trans
+      hzero.le) bot_le
+  have happ : ∀ a b, Term.App a b ∉ UsesArgs 2 := by
+    rintro a b ⟨τs, b', hlen, heq, -⟩
+    match τs, hlen with
+    | [_, _], _ => simp [Term.absN] at heq
+  rw [hzero2, prob_app_eq_zero happ, zero_add, zero_add]
+  refine ((ENNReal.div_le_div_right ((prob_bind_pure_le fun e he =>
+    lamUsesBoth_of_abs_mem he).trans hlam) _)).trans (le_of_eq ?_)
+  rw [usesArgs2UpperBound, ENNReal.coe_div (by norm_num)]
+  rw [← ENNReal.toReal_eq_toReal_iff' (by simp [ENNReal.div_eq_top]) (by simp)]
+  simp [ENNReal.toReal_div]
+  norm_num
+
+theorem usesArgs2UpperBound_lt_one : usesArgs2UpperBound < 1 := by
+  rw [usesArgs2UpperBound, ← NNReal.coe_lt_coe]; push_cast; norm_num
+
+/-- **Tests `Bool → Bool` needs to use its argument, with confidence `p`**: `N` draws of
+`genTerm [] (Bool → Bool)` include one that uses its argument with probability at least `p` only
+when `N ≥ ln(1/(1 − p)) / ln(1/(1 − usesArgs1UpperBound))`. -/
+theorem genTerm_usesArgs1_needs {p : ℝ≥0} {N : Nat}
+    (hp : (p : ℝ≥0∞) ≤ SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term))
+      {ts | ∃ t ∈ ts, t ∈ UsesArgs 1}) :
+    Real.log (1 / (1 - p)) ≤ N * Real.log (1 / (1 - usesArgs1UpperBound)) :=
+  SPMF.log_le_of_le_prob_vectorOf_hit _ genTerm.terminates genTerm_prob_usesArgs1_le
+    usesArgs1UpperBound_lt_one hp
+
+/-- **Expected tests until `Bool → Bool` uses its argument, from below**: the sum that reads as
+the expected number of tests (`Basalt.SPMF.Expect.Draws`) is at least `1 / usesArgs1UpperBound`. -/
+theorem genTerm_usesArgs1_expected_ge :
+    (usesArgs1UpperBound : ℝ≥0∞)⁻¹
+      ≤ ∑' N, SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term))
+        {ts | ∀ t ∈ ts, t ∉ UsesArgs 1} :=
+  SPMF.inv_le_tsum_prob_vectorOf_miss _ genTerm.terminates genTerm_prob_usesArgs1_le
+
+/-- **Tests `Bool → Bool → Bool` needs to use both arguments, with confidence `p`**: `N` draws of
+`genTerm [] (Bool → Bool → Bool)` include one that uses both arguments with probability at least
+`p` only when `N ≥ ln(1/(1 − p)) / ln(1/(1 − usesArgs2UpperBound))`. -/
+theorem genTerm_usesArgs2_needs {p : ℝ≥0} {N : Nat}
+    (hp : (p : ℝ≥0∞)
+      ≤ SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool (.Fun .Bool .Bool)) : SPMF Term))
+        {ts | ∃ t ∈ ts, t ∈ UsesArgs 2}) :
+    Real.log (1 / (1 - p)) ≤ N * Real.log (1 / (1 - usesArgs2UpperBound)) :=
+  SPMF.log_le_of_le_prob_vectorOf_hit _ genTerm.terminates genTerm_prob_usesArgs2_le
+    usesArgs2UpperBound_lt_one hp
+
+/-- **Expected tests until `Bool → Bool → Bool` uses both arguments, from below**: the sum that
+reads as the expected number of tests (`Basalt.SPMF.Expect.Draws`) is at least
+`1 / usesArgs2UpperBound`. -/
+theorem genTerm_usesArgs2_expected_ge :
+    (usesArgs2UpperBound : ℝ≥0∞)⁻¹
+      ≤ ∑' N, SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool (.Fun .Bool .Bool)) : SPMF Term))
+        {ts | ∀ t ∈ ts, t ∉ UsesArgs 2} :=
+  SPMF.inv_le_tsum_prob_vectorOf_miss _ genTerm.terminates genTerm_prob_usesArgs2_le
 
 end STLC

@@ -12,7 +12,8 @@ public import Mathlib.Analysis.SpecialFunctions.Log.Basic
 /-!
 # How Many Draws Until a Shape Appears
 
-Provides infrastructure for reasoning about how many draws a test needs to see `E`. -/
+Provides infrastructure for reasoning about how many draws a test needs to see `E`: at most, from a
+lower bound on one draw, and at least, from an upper bound. -/
 
 @[expose] public section
 
@@ -34,17 +35,8 @@ theorem prob_vectorOf_miss_le {E : Set α} {q : ℝ≥0∞} (hq : q ≤ prob g E
   have h := prob_vectorOf_all (g := g) Eᶜ N
   simp only [Set.mem_compl_iff] at h
   rw [h]
-  -- `E` and its complement split the mass, which is at most `1`.
-  have hsplit : prob g Eᶜ + prob g E = g.mass := by
-    unfold prob
-    rw [← expect_add, ← expect_one]
-    congr 1
-    funext a
-    by_cases h : a ∈ E <;> simp [Set.indicator, h]
-  have hE : prob g E ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top
-    ((prob_le_mass g E).trans (mass_le_one g))
   have hc : prob g Eᶜ ≤ 1 - q := by
-    rw [ENNReal.eq_sub_of_add_eq hE hsplit]
+    rw [ENNReal.eq_sub_of_add_eq (prob_ne_top g E) (prob_compl_add g E)]
     exact tsub_le_tsub (mass_le_one g) hq
   exact pow_le_pow_left₀ (by positivity) hc N
 
@@ -159,6 +151,76 @@ theorem prob_vectorOf_someMiss_le_of_log_le {ι : Type} (s : Finset ι) (E : ι 
   calc (s.card : ℝ) * Real.exp (-(q * N)) ≤ s.card * (δ / s.card) :=
         mul_le_mul_of_nonneg_left h hc.le
     _ = δ := by field_simp
+
+/-! ### Lower bounds, from an upper bound on one draw -/
+
+/-- **The geometric bound, from below.** If `g` terminates and one draw lands in `E` with
+probability at most `q`, then `N` independent draws all miss `E` with probability at least
+`(1 − q)ᴺ`. -/
+theorem one_sub_pow_le_prob_vectorOf_miss (hg : g.mass = 1) {E : Set α} {q : ℝ≥0∞}
+    (hq : prob g E ≤ q) (N : Nat) :
+    (1 - q) ^ N ≤ prob (vectorOf N g) {xs | ∀ x ∈ xs, x ∉ E} := by
+  have h := prob_vectorOf_all (g := g) Eᶜ N
+  simp only [Set.mem_compl_iff] at h
+  rw [h, ENNReal.eq_sub_of_add_eq (prob_ne_top g E) (prob_compl_add g E), hg]
+  exact pow_le_pow_left₀ (by positivity) (tsub_le_tsub_left hq 1) N
+
+/-- If `g` terminates and one draw lands in `E` with probability at most `q`, then
+`1/q ≤ ∑ₙ P(n draws all miss E)`, the expected number of draws until the first hit. -/
+theorem inv_le_tsum_prob_vectorOf_miss (hg : g.mass = 1) {E : Set α} {q : ℝ≥0∞}
+    (hq : prob g E ≤ q) :
+    q⁻¹ ≤ ∑' N, prob (vectorOf N g) {xs | ∀ x ∈ xs, x ∉ E} := by
+  calc q⁻¹ ≤ (1 - (1 - q))⁻¹ := ENNReal.inv_le_inv.mpr tsub_tsub_le
+    _ = ∑' N, (1 - q) ^ N := (ENNReal.tsum_geometric _).symm
+    _ ≤ _ := ENNReal.tsum_le_tsum fun N => one_sub_pow_le_prob_vectorOf_miss g hg hq N
+
+/-- **The number of draws a confidence needs.** If `g` terminates and one draw lands in `E` with
+probability at most `q < 1`, then `N` draws see `E` with probability at least `p` only when
+`N ≥ ln(1/(1 − p)) / ln(1/(1 − q))`. -/
+theorem log_le_of_le_prob_vectorOf_hit (hg : g.mass = 1) {E : Set α} {q p : ℝ≥0}
+    (hq : prob g E ≤ q) (hq1 : q < 1) {N : Nat}
+    (hp : (p : ℝ≥0∞) ≤ prob (vectorOf N g) {xs | ∃ x ∈ xs, x ∈ E}) :
+    Real.log (1 / (1 - p)) ≤ N * Real.log (1 / (1 - q)) := by
+  -- A run of `N` draws either sees `E` or misses it every time.
+  have hsplit : prob (vectorOf N g) {xs | ∃ x ∈ xs, x ∈ E}
+      + prob (vectorOf N g) {xs | ∀ x ∈ xs, x ∉ E} = 1 := by
+    have hmass : (vectorOf N g).mass = 1 := by
+      have h := prob_vectorOf_all (g := g) Set.univ N
+      rwa [prob_univ, hg, one_pow, show {xs : List α | ∀ x ∈ xs, x ∈ Set.univ} = Set.univ by
+        ext xs; simp, prob_univ] at h
+    rw [← hmass, ← prob_compl_add (vectorOf N g) {xs | ∀ x ∈ xs, x ∉ E}]
+    congr 2
+    ext xs
+    simp
+  -- So `p + (1 − q)ᴺ ≤ 1`, over the reals, and `1 − p` is positive.
+  have hle : (p : ℝ≥0∞) + (1 - q) ^ N ≤ 1 := by
+    exact (add_le_add hp (one_sub_pow_le_prob_vectorOf_miss g hg hq N)).trans hsplit.le
+  rw [← ENNReal.coe_one, ← ENNReal.coe_sub, ← ENNReal.coe_pow, ← ENNReal.coe_add,
+    ENNReal.coe_le_coe, ← NNReal.coe_le_coe] at hle
+  push_cast [NNReal.coe_sub hq1.le] at hle
+  have hq1' : (q : ℝ) < 1 := hq1
+  have hpos : 0 < (1 - (q : ℝ)) ^ N := pow_pos (by linarith) N
+  have hlog := Real.log_le_log hpos (show (1 - (q : ℝ)) ^ N ≤ 1 - p by linarith)
+  rw [Real.log_pow] at hlog
+  rw [one_div, Real.log_inv, one_div, Real.log_inv]
+  linarith
+
+/-- **Every coupon needs at least the draws of one.** If `g` terminates and one draw lands in
+`E i`, for some `i ∈ s`, with probability at most `q < 1`, then `N` draws see every `E j`, `j ∈ s`,
+with probability at least `p` only when `N ≥ ln(1/(1 − p)) / ln(1/(1 − q))`. -/
+theorem log_le_of_le_prob_vectorOf_allHit (hg : g.mass = 1) {ι : Type} {s : Finset ι}
+    {E : ι → Set α} {i : ι} (hi : i ∈ s) {q p : ℝ≥0} (hq : prob g (E i) ≤ q) (hq1 : q < 1)
+    {N : Nat} (hp : (p : ℝ≥0∞) ≤ prob (vectorOf N g) {xs | ∀ j ∈ s, ∃ x ∈ xs, x ∈ E j}) :
+    Real.log (1 / (1 - p)) ≤ N * Real.log (1 / (1 - q)) :=
+  log_le_of_le_prob_vectorOf_hit g hg hq hq1 (hp.trans (prob_mono fun _ h => h i hi))
+
+/-- If `g` terminates and one draw lands in `E i`, for some `i ∈ s`, with probability at most `q`,
+then `1/q ≤ ∑ₙ P(after n draws some E j is still missing)`. -/
+theorem inv_le_tsum_prob_vectorOf_someMiss (hg : g.mass = 1) {ι : Type} {s : Finset ι}
+    {E : ι → Set α} {i : ι} (hi : i ∈ s) {q : ℝ≥0∞} (hq : prob g (E i) ≤ q) :
+    q⁻¹ ≤ ∑' N, prob (vectorOf N g) {xs | ∃ j ∈ s, ∀ x ∈ xs, x ∉ E j} :=
+  (inv_le_tsum_prob_vectorOf_miss g hg hq).trans
+    (ENNReal.tsum_le_tsum fun _ => prob_mono fun _ h => ⟨i, hi, h⟩)
 
 end draws
 

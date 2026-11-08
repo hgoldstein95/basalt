@@ -12,7 +12,7 @@ public import BasaltExamples.STLC.Termination
 # How Many Tests Until `genTerm` Produces a Shape
 
 This file bounds how often three shapes appear in one draw of `genTerm [] (Bool → Bool)`, and then
-how many draws a test needs to see them. -/
+how many draws a test needs to see them, at most and at least. -/
 
 @[expose] public section
 
@@ -275,5 +275,89 @@ theorem genTerm_all_shapes_expected_le :
       ≤ ∑ i, (shapeBounds i : ℝ≥0∞)⁻¹ := by
   rw [someShapeMissing_eq]
   exact SPMF.tsum_prob_vectorOf_someMiss_le _ Finset.univ shapes _ (fun i _ => shapeBounds_le i)
+
+/-! ## How many tests, at least -/
+
+/-- The per-draw upper bound for a linear term: a lambda that ignores its argument is not linear. -/
+noncomputable def linearUpperBound : ℝ≥0 := 1 - discardsArgBound
+
+theorem disjoint_linear_discardsArg : Disjoint IsLinear DiscardsArg := by
+  rw [Set.disjoint_left]
+  rintro t ht ⟨τ, b, rfl, hb⟩
+  simp [IsLinear, Term.isLinear, hb] at ht
+
+theorem genTerm_prob_linear_le :
+    SPMF.prob (genTerm [] (.Fun .Bool .Bool)) IsLinear ≤ linearUpperBound := by
+  refine (SPMF.prob_le_one_sub_of_disjoint _ disjoint_linear_discardsArg).trans ?_
+  rw [linearUpperBound, ENNReal.coe_sub, ENNReal.coe_one]
+  exact tsub_le_tsub_left genTerm_prob_discardsArg_ge 1
+
+theorem linearUpperBound_lt_one : linearUpperBound < 1 :=
+  tsub_lt_self one_pos (by norm_num [discardsArgBound])
+
+/-- **Tests a linear term needs, with confidence `p`**: `N` draws of `genTerm [] (Bool → Bool)`
+include a linear term with probability at least `p` only when
+`N ≥ ln(1/(1 − p)) / ln(1/(1 − linearUpperBound))`. -/
+theorem genTerm_linear_needs {p : ℝ≥0} {N : Nat}
+    (hp : (p : ℝ≥0∞) ≤ SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term))
+      {ts | ∃ t ∈ ts, t ∈ IsLinear}) :
+    Real.log (1 / (1 - p)) ≤ N * Real.log (1 / (1 - linearUpperBound)) :=
+  SPMF.log_le_of_le_prob_vectorOf_hit _ genTerm.terminates genTerm_prob_linear_le
+    linearUpperBound_lt_one hp
+
+/-- **Expected tests until a linear term, from below**: the sum that reads as the expected number
+of tests (`Basalt.SPMF.Expect.Draws`) is at least `1 / linearUpperBound`. -/
+theorem genTerm_linear_expected_ge :
+    (linearUpperBound : ℝ≥0∞)⁻¹
+      ≤ ∑' N, SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term))
+        {ts | ∀ t ∈ ts, t ∉ IsLinear} :=
+  SPMF.inv_le_tsum_prob_vectorOf_miss _ genTerm.terminates genTerm_prob_linear_le
+
+theorem isAppBound_lt_one : isAppBound < 1 := by
+  rw [isAppBound, ← NNReal.coe_lt_coe]; push_cast; norm_num
+
+/-- **Tests an application needs, with confidence `p`**: `N` draws of `genTerm [] (Bool → Bool)`
+include an application with probability at least `p` only when
+`N ≥ ln(1/(1 − p)) / ln(1/(1 − isAppBound))`. Since `isAppBound` is exact, so is this. -/
+theorem genTerm_app_needs {p : ℝ≥0} {N : Nat}
+    (hp : (p : ℝ≥0∞) ≤ SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term))
+      {ts | ∃ t ∈ ts, t ∈ IsApp}) :
+    Real.log (1 / (1 - p)) ≤ N * Real.log (1 / (1 - isAppBound)) :=
+  SPMF.log_le_of_le_prob_vectorOf_hit _ genTerm.terminates genTerm_prob_isApp_eq.le
+    isAppBound_lt_one hp
+
+/-- **Expected tests until an application, from below**: at least `1 / isAppBound`, which with
+`genTerm_prob_isApp_eq` and `tsum_prob_vectorOf_miss_le` makes it exact. -/
+theorem genTerm_app_expected_ge :
+    (isAppBound : ℝ≥0∞)⁻¹
+      ≤ ∑' N, SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term))
+        {ts | ∀ t ∈ ts, t ∉ IsApp} :=
+  SPMF.inv_le_tsum_prob_vectorOf_miss _ genTerm.terminates genTerm_prob_isApp_eq.le
+
+/-- The event that every shape appears in a list. -/
+def AllShapesSeen : Set (List Term) := {ts | ∀ i, ∃ t ∈ ts, t ∈ shapes i}
+
+/-- **Tests all three shapes need, with confidence `p`**: `N` draws of `genTerm [] (Bool → Bool)`
+include every shape with probability at least `p` only when
+`N ≥ ln(1/(1 − p)) / ln(1/(1 − isAppBound))`: they must at least include an application, the
+shape with the smallest per-draw upper bound. -/
+theorem genTerm_all_shapes_needs {p : ℝ≥0} {N : Nat}
+    (hp : (p : ℝ≥0∞)
+      ≤ SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term)) AllShapesSeen) :
+    Real.log (1 / (1 - p)) ≤ N * Real.log (1 / (1 - isAppBound)) := by
+  refine SPMF.log_le_of_le_prob_vectorOf_allHit _ genTerm.terminates (s := Finset.univ)
+    (E := shapes) (Finset.mem_univ 2) genTerm_prob_isApp_eq.le isAppBound_lt_one ?_
+  convert hp using 2
+  ext ts; simp [AllShapesSeen]
+
+/-- **Expected tests until all three shapes, from below**: the sum that reads as the expected
+number of tests (`Basalt.SPMF.Expect.Draws`) is at least `1 / isAppBound`. -/
+theorem genTerm_all_shapes_expected_ge :
+    (isAppBound : ℝ≥0∞)⁻¹
+      ≤ ∑' N, SPMF.prob (vectorOf N (genTerm [] (.Fun .Bool .Bool) : SPMF Term))
+        SomeShapeMissing := by
+  rw [someShapeMissing_eq]
+  exact SPMF.inv_le_tsum_prob_vectorOf_someMiss _ genTerm.terminates (Finset.mem_univ 2)
+    genTerm_prob_isApp_eq.le
 
 end STLC

@@ -105,7 +105,7 @@ definition, and the definition is right here to run.
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
   [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean); how many independent
-  draws see a shape (geometric and coupon-collector bounds) —
+  draws see a shape (geometric and coupon-collector bounds, and lower bounds on the draws) —
   [Basalt/SPMF/Expect/Draws.lean](Basalt/SPMF/Expect/Draws.lean), instantiated for STLC by
   [BasaltExamples/STLC/NumDraws.lean](BasaltExamples/STLC/NumDraws.lean) (term shapes) and
   [BasaltExamples/STLC/UsesArgs.lean](BasaltExamples/STLC/UsesArgs.lean) (functions that use

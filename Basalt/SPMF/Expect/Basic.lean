@@ -236,6 +236,34 @@ theorem prob_le_expect_div (p : SPMF α) (f : α → ℝ≥0∞) {c : ℝ≥0∞
   rw [ENNReal.le_div_iff_mul_le (Or.inl hc0) (Or.inl hct), mul_comm]
   exact mul_prob_le_expect p f c
 
+/-- A draw lands in `E` or in its complement. -/
+theorem prob_compl_add (p : SPMF α) (E : Set α) : prob p Eᶜ + prob p E = p.mass := by
+  unfold prob
+  rw [← expect_add, ← expect_one]
+  congr 1
+  funext a
+  by_cases h : a ∈ E <;> simp [Set.indicator, h]
+
+theorem prob_ne_top (p : SPMF α) (E : Set α) : prob p E ≠ ⊤ :=
+  ne_top_of_le_ne_top ENNReal.one_ne_top ((prob_le_mass p E).trans (mass_le_one p))
+
+theorem prob_union_of_disjoint (p : SPMF α) {E F : Set α} (h : Disjoint E F) :
+    prob p (E ∪ F) = prob p E + prob p F := by
+  unfold prob
+  rw [← expect_add]
+  congr 1
+  funext a
+  by_cases hE : a ∈ E <;> by_cases hF : a ∈ F
+  · exact absurd hF (Set.disjoint_left.mp h hE)
+  all_goals simp [Set.indicator, hE, hF]
+
+/-- An upper bound from a disjoint lower bound: a draw that lands in `F` misses `E`. -/
+theorem prob_le_one_sub_of_disjoint (p : SPMF α) {E F : Set α} (h : Disjoint E F) :
+    prob p E ≤ 1 - prob p F := by
+  calc prob p E ≤ prob p Fᶜ := prob_mono (Set.subset_compl_iff_disjoint_right.mpr h)
+    _ = p.mass - prob p F := ENNReal.eq_sub_of_add_eq (prob_ne_top p F) (prob_compl_add p F)
+    _ ≤ 1 - prob p F := tsub_le_tsub_right (mass_le_one p) _
+
 theorem mem_support_iff_prob_pos {p : SPMF α} {a : α} : a ∈ p.support ↔ 0 < prob p {a} := by
   rw [prob_singleton]
   exact (apply_pos_iff p a).symm
