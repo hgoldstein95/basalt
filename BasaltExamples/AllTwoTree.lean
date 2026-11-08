@@ -73,8 +73,8 @@ theorem genTree.sound_complete : IsSoundAndComplete genTree Tree.isAllTwos := by
       exact ⟨l, ihl hl, r, ihr hr, rfl⟩
 
 theorem genTree.terminates : IsAlmostSurelyTerminating genTree := by
-  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
+  mass_fixpoint using SPMF.LfpIsOne.poly ![1 / 2, 0, 1 / 2]
+  simp [Fin.sum_univ_succ, sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genTree.cost_bounded : IsCostBounded genTree Tree.cost := by
   rw [IsCostBounded.iff_obs]
@@ -116,8 +116,8 @@ def genWeightedTree [Gen G] : G Tree :=
 partial_fixpoint
 
 theorem genWeightedTree.terminates : IsAlmostSurelyTerminating genWeightedTree := by
-  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 2 / 3) (b := 0) (d := 1 / 3)
-  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
+  mass_fixpoint using SPMF.LfpIsOne.poly ![2 / 3, 0, 1 / 3]
+  simp [Fin.sum_univ_succ, sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genWeightedTree.faithful : IsFaithful genWeightedTree := by
   faithful_fixpoint [genWeightedTree.terminates]

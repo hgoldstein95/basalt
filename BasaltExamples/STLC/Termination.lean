@@ -29,7 +29,10 @@ theorem genZero.terminates : IsAlmostSurelyTerminating (genZero Γ τ) := by
 
 theorem genTerm.terminates : IsAlmostSurelyTerminating (genTerm Γ τ) := by
   mass_fixpoint [genZero.terminates.obs, genType.terminates.obs]
-    using SPMF.LfpIsOne.quadratic (a := 1 / 3) (b := 1 / 3) (d := 1 / 3)
+    using SPMF.LfpIsOne.poly ![1 / 3, 1 / 3, 1 / 3]
+  all_goals simp only [Fin.sum_univ_three, Matrix.cons_val_zero, Matrix.cons_val_one,
+    Matrix.cons_val_two, Matrix.tail_cons, Matrix.head_cons, Fin.val_zero, Fin.val_one, Fin.val_two,
+    pow_zero, pow_one, mul_one]
   all_goals
     split
     all_goals

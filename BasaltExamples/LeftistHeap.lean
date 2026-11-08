@@ -114,8 +114,8 @@ theorem Tree.genLeftistOfRank.sound_complete :
 
 theorem Tree.genLeftist.terminates : IsAlmostSurelyTerminating (Tree.genLeftist lo) := by
   mass_fixpoint [Nat.arbitrary.terminates.obs]
-    using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
+    using SPMF.LfpIsOne.poly ![1 / 2, 0, 1 / 2]
+  simp [Fin.sum_univ_succ, sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem Tree.genLeftist.faithful : IsFaithful (Tree.genLeftist lo) := by
   faithful_fixpoint [Tree.genLeftist.terminates, Nat.arbitrary.faithful]

@@ -83,8 +83,8 @@ theorem Tree.genHeap.sound_complete :
 
 theorem Tree.genHeap.terminates : IsAlmostSurelyTerminating (Tree.genHeap lo) := by
   mass_fixpoint [Nat.arbitrary.terminates.obs]
-    using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
+    using SPMF.LfpIsOne.poly ![1 / 2, 0, 1 / 2]
+  simp [Fin.sum_univ_succ, sq, ENNReal.div_eq_inv_mul, mul_add]
 
 /-- The number of random choices is bounded by the tree's size and value-sum (no backtracking). -/
 theorem Tree.genHeap.cost_bounded :

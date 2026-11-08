@@ -194,11 +194,12 @@ theorem genBinaryTree_terminates (hp : 1/2 ≤ p) (hp1 : p ≤ 1) :
   have hp0 : 0 ≤ p := le_trans (by norm_num) hp
   have hx := half_le_pr hp
   have hx1 := pr_le_one hp0 hp1
-  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := pr p) (b := 0) (d := 1 - pr p)
-    (by rw [add_zero, add_tsub_cancel_of_le hx1])
-    (by basify; rw [max_eq_left (by linarith)]; linarith) (lt_of_lt_of_le (by norm_num) hx)
+  mass_fixpoint using SPMF.LfpIsOne.poly ![pr p, 0, 1 - pr p]
+    (by simp [Fin.sum_univ_succ, add_tsub_cancel_of_le hx1])
+    (by simp [Fin.sum_univ_succ]; basify; rw [max_eq_left (by linarith)]; linarith)
+    (lt_of_lt_of_le (by norm_num) hx)
   coin_goals p hp0 hp1
-  simp [sq]
+  simp [Fin.sum_univ_succ, sq]
 
 end mass
 

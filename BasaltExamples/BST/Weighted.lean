@@ -14,7 +14,7 @@ public import BasaltExamples.BST
 
 A `frequency`-weighted, `@[tunable]` variant of `genBST` (`BasaltExamples/BST`): the same trees with
 the same cost bound, but a distribution under which the crude branching bound is supercritical, so
-no `LfpIsOne.quadratic` certificate applies. Termination goes through a ranking function on the
+no `LfpIsOne.poly` certificate applies. Termination goes through a ranking function on the
 shrinking seed `(lo, hi)` instead (`bstLevel`, `bstRank`).
 -/
 

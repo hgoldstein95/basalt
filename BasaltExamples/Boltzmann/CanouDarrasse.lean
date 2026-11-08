@@ -136,11 +136,13 @@ theorem genTernary_terminates (hp : 2/3 ≤ p) (hp1 : p ≤ 1) :
   have hp0 : 0 ≤ p := le_trans (by norm_num) hp
   have hx : 2/3 ≤ pr p := pr_two_thirds ▸ pr_mono (by norm_num) hp
   have hx1 := pr_le_one hp0 hp1
-  mass_fixpoint using SPMF.LfpIsOne.cubic (a := pr p) (b := 0) (d := 0) (e := 1 - pr p)
-    (by rw [add_zero, add_zero, add_tsub_cancel_of_le hx1])
-    (by basify; rw [max_eq_left (by linarith)]; linarith) (lt_of_lt_of_le (by norm_num) hx)
+  mass_fixpoint using SPMF.LfpIsOne.poly ![pr p, 0, 0, 1 - pr p]
+    (by simp [Fin.sum_univ_succ, add_tsub_cancel_of_le hx1])
+    (by simp [Fin.sum_univ_succ]; basify; rw [max_eq_left (by linarith)]; linarith)
+    (lt_of_lt_of_le (by norm_num) hx)
   coin_goals p hp0 hp1
-  exact le_of_eq (by ring)
+  simp only [Fin.sum_univ_succ, Fin.sum_univ_zero]
+  exact le_of_eq (by simp; ring)
 
 /-- Below `2/3` the mass is at most `1 / (3 (1 - p))`: by fixpoint induction, as
 `x + (1 - x) t³ ≤ t` at `t = 1 / (3 (1 - x))` with slack `(3 (1 - x) - 1)³ / (27 (1 - x)²)`. -/
@@ -306,9 +308,8 @@ theorem genUnaryBinary_boltzmann :
 `1/3`, is mean offspring exactly `1`. -/
 theorem genUnaryBinary_terminates :
     IsAlmostSurelyTerminating (genUnaryBinaryW 1 1 1 three_pos : SPMF UBTree) := by
-  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 3) (b := 1 / 3) (d := 1 / 3)
-  norm_num [sq, ENNReal.div_eq_inv_mul, mul_add]
-  exact le_of_eq (by ring)
+  mass_fixpoint using SPMF.LfpIsOne.poly ![1 / 3, 1 / 3, 1 / 3]
+  norm_num [Fin.sum_univ_succ, sq, ENNReal.div_eq_inv_mul, mul_add]
 
 /-- **Infinite expected size at the singularity**: unfolded once, `E = 1 + E`. -/
 theorem genUnaryBinary_expected_size :

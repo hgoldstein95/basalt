@@ -34,7 +34,10 @@ lo hi : ℤ
 -/
 #guard_msgs in
 example (lo hi : Int) : IsAlmostSurelyTerminating (BST.Tree.genBST lo hi) := by
-  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
+  mass_fixpoint using SPMF.LfpIsOne.poly ![1 / 2, 0, 1 / 2]
+  simp only [Fin.sum_univ_three, Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.cons_val_two,
+    Matrix.tail_cons, Matrix.head_cons, Fin.val_zero, Fin.val_one, Fin.val_two, pow_zero, pow_one,
+    mul_one]
   trace_state
   split
   · rw [zero_mul, add_zero]

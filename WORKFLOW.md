@@ -258,18 +258,19 @@ no recursion — including one that only post-processes a callee — is the firs
 |---|---|---|
 | No recursive call | `SPMF.LfpIsOne.one` | `1` |
 | Mean offspring `m < 1` | `SPMF.LfpIsOne.affine (m := m)` | `(1 - m) + m * c` |
-| At most two calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.quadratic (a := _) (b := _) (d := _)` | `a + b * c + d * c ^ 2` |
-| At most three calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.cubic (a := _) (b := _) (d := _) (e := _)` | `a + b * c + d * c ^ 2 + e * c ^ 3` |
+| `a i` the chance of `i` calls, mean offspring `≤ 1` (critical included) | `SPMF.LfpIsOne.poly ![a₀, a₁, …]` | `∑ i, a i * c ^ i` |
 | Shrinking seed, mean offspring `> 1` | `SPMF.LfpIsOne.ranking …` with `mass_fixpoint per_seed` (below) | a function of `c` and the seed |
 
 `m` is weights-on-recursive-branches over total weights, counting each branch once per recursive
 call: a two-branch `oneOf` with one recursive branch has `m = 1/2`; `frequency [(2, leaf…), (1,
-node…)]` with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a quadratic, `a = 2/3`, `d = 1/3`;
-a two-branch `oneOf` between a leaf and two calls is the quadratic `a = d = 1/2`. **A critical
+node…)]` with two calls in `node` has `m = 2·(1/3) = 2/3`, or, as a polynomial, `![2/3, 0, 1/3]`;
+a two-branch `oneOf` between a leaf and two calls is `![1/2, 0, 1/2]`. **A critical
 generator (`m = 1`) terminates but has no finite `IsExpectedCostBounded`**
 (`AllTwoTree.genTree.not_expected_cost_bounded`) — reweight it if you can. A certificate closes its
 own side conditions when its weights are numerals; otherwise pass them as arguments
-(`SPMF.LfpIsOne.affine (m := m) h`).
+(`SPMF.LfpIsOne.affine (m := m) h`). `poly`'s bound is a sum over `Fin n`:
+`simp [Fin.sum_univ_succ]` expands it, and `Fin.sum_univ_three` with the `Matrix.cons_val_*` lemmas
+restores the term-by-term shape (`BasaltExamples/BST.lean`).
 
 **`mass_fixpoint`** applies the criterion to the family over the generator's seed, unfolds one
 step, and walks it; its docstring says what it leaves in context, `hrec` among it: the bound on

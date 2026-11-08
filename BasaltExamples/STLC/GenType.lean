@@ -45,8 +45,8 @@ theorem genType.sound_complete : IsSoundAndComplete genType (fun _ => True) := b
       exact ⟨τ1, ih1 trivial, τ2, ih2 trivial, rfl⟩
 
 theorem genType.terminates : IsAlmostSurelyTerminating genType := by
-  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
-  simp [sq, ENNReal.div_eq_inv_mul, mul_add]
+  mass_fixpoint using SPMF.LfpIsOne.poly ![1 / 2, 0, 1 / 2]
+  simp [Fin.sum_univ_succ, sq, ENNReal.div_eq_inv_mul, mul_add]
 
 theorem genType.cost_bounded : IsCostBounded genType Ty.size := by
   rw [IsCostBounded.iff_obs]

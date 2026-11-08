@@ -6,6 +6,8 @@ Authors: Harrison Goldstein
 module
 
 public meta import Mathlib.Tactic.Basify
+public import Mathlib.Algebra.BigOperators.Fin
+import Mathlib.Algebra.Order.Ring.Pow
 import Mathlib.Tactic.Linarith
 public import Basalt.SPMF.Mass
 
@@ -81,36 +83,72 @@ theorem LfpIsOne.affine {m : ℝ≥0∞} (hm : m < 1 := by norm_num) :
   rw [max_eq_left (by linarith)] at hge
   nlinarith
 
-/-- **At most two recursive calls**, with probabilities `a`, `b`, `d` of zero, one, and two: mean
-offspring `b + 2d ≤ 1`, so this covers the critical case, provided a step can stop (`0 < a`). -/
-theorem LfpIsOne.quadratic {a b d : ℝ≥0∞} (habd : a + b + d = 1 := by basify; norm_num)
-    (hbd : b + 2 * d ≤ 1 := by basify; norm_num) (ha : 0 < a := by norm_num) :
-    LfpIsOne fun c => a + b * c + d * c ^ 2 := by
-  intro c hle hge
-  simp only at hge
-  basify
-  refine le_antisymm hle (not_lt.mp fun hlt => ?_)
-  obtain rfl : b = 1 - a - d := by linarith
-  -- `a + bc + dc² - c = a(1-c)² + c(1-c)(a-d)`, and `a ≥ d`
-  nlinarith [mul_pos (mul_pos ha (sub_pos.mpr hlt)) (sub_pos.mpr hlt),
-    mul_nonneg (mul_nonneg ‹0 ≤ c› (sub_nonneg.mpr hle)) (show 0 ≤ a - d by linarith)]
+/-- Bernoulli's inequality, as one branch's slack in `LfpIsOne.poly`. -/
+private theorem pow_sub_self_ge {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) (i : ℕ) :
+    (1 - i) * (x * (1 - x)) ≤ x ^ i - x := by
+  rcases i with _ | k
+  · simp only [Nat.cast_zero, sub_zero, one_mul, pow_zero]; nlinarith
+  · have h := one_add_mul_le_pow (show (-2 : ℝ) ≤ x - 1 by linarith) k
+    rw [add_sub_cancel] at h
+    push_cast
+    rw [pow_succ]
+    nlinarith [mul_le_mul_of_nonneg_left h hx0]
 
-/-- **At most three recursive calls**, with probabilities `a`, `b`, `d`, `e` of zero, one, two, and
-three: mean offspring `b + 2d + 3e ≤ 1`, critical case included, provided a step can stop
-(`0 < a`). -/
-theorem LfpIsOne.cubic {a b d e : ℝ≥0∞} (habde : a + b + d + e = 1 := by basify; norm_num)
-    (hbde : b + 2 * d + 3 * e ≤ 1 := by basify; norm_num) (ha : 0 < a := by norm_num) :
-    LfpIsOne fun c => a + b * c + d * c ^ 2 + e * c ^ 3 := by
-  intro c hle hge
-  simp only at hge
-  basify
-  refine le_antisymm hle (not_lt.mp fun hlt => ?_)
-  obtain rfl : b = 1 - a - d - e := by linarith
-  -- `a + bc + dc² + ec³ - c = (1-c)(a - dc - ec(1+c)) ≥ a(1-c)²`, as `d + 2e ≤ a`
-  have h1 : 0 < 1 - c := sub_pos.mpr hlt
-  nlinarith [mul_pos (mul_pos ha h1) h1, mul_nonneg (mul_nonneg ‹0 ≤ c› h1.le)
-    (show 0 ≤ a - d - 2 * e by linarith), mul_nonneg (mul_nonneg (mul_nonneg ‹0 ≤ e› ‹0 ≤ c›) h1.le)
-    h1.le]
+private theorem lfpIsOne_poly_succ {n : ℕ} (a : Fin (n + 1) → ℝ≥0∞) (hsum : ∑ i, a i = 1)
+    (hmean : ∑ i, (i.val : ℝ≥0∞) * a i ≤ 1) (ha : 0 < a 0) :
+    LfpIsOne fun c => ∑ i, a i * c ^ (i : ℕ) := by
+  intro c hc hle
+  refine le_antisymm hc (not_lt.mp fun hlt => ?_)
+  simp only at hle
+  have hfin : ∀ i, a i ≠ ⊤ := fun i => ne_top_of_le_ne_top one_ne_top
+    (hsum ▸ Finset.single_le_sum (fun j _ => zero_le) (Finset.mem_univ i))
+  have hct : c ≠ ⊤ := ne_top_of_le_ne_top one_ne_top hc
+  have hsumR : ∑ i, (a i).toReal = 1 := by
+    rw [← ENNReal.toReal_sum fun i _ => hfin i, hsum, toReal_one]
+  have hmeanR : ∑ i, (i.val : ℝ) * (a i).toReal ≤ 1 := by
+    have h := (ENNReal.toReal_le_toReal (ne_top_of_le_ne_top one_ne_top hmean) one_ne_top).2 hmean
+    simpa [ENNReal.toReal_sum fun i _ => mul_ne_top (natCast_ne_top _) (hfin i), toReal_mul]
+      using h
+  have hleR : ∑ i, (a i).toReal * c.toReal ^ (i : ℕ) ≤ c.toReal := by
+    have h := (ENNReal.toReal_le_toReal (ne_top_of_le_ne_top hct hle) hct).2 hle
+    simpa [ENNReal.toReal_sum fun i _ => mul_ne_top (hfin i) (pow_ne_top hct), toReal_mul,
+      toReal_pow] using h
+  have ha0 : 0 < (a 0).toReal := ENNReal.toReal_pos ha.ne' (hfin 0)
+  have hx1 : c.toReal < 1 := by
+    simpa using (ENNReal.toReal_lt_toReal hct one_ne_top).2 hlt
+  have hx0 : 0 ≤ c.toReal := toReal_nonneg
+  generalize c.toReal = x at *
+  -- Branchwise Bernoulli, with the stopping branch's slack `a₀ (1 - x)²` kept.
+  have hbranch :
+      ∑ i, (a i).toReal * ((1 - (i.val : ℝ)) * (x * (1 - x))) + (a 0).toReal * (1 - x) ^ 2
+        ≤ ∑ i, (a i).toReal * (x ^ (i : ℕ) - x) := by
+    rw [Fin.sum_univ_succ, Fin.sum_univ_succ (fun i => (a i).toReal * (x ^ (i : ℕ) - x))]
+    have htail := Finset.sum_le_sum fun (j : Fin n) (_ : j ∈ Finset.univ) =>
+      mul_le_mul_of_nonneg_left (pow_sub_self_ge hx0 hx1.le (j.succ : ℕ)) toReal_nonneg
+        (a := (a j.succ).toReal)
+    simp only [Fin.val_zero, Fin.val_succ, Nat.cast_zero, pow_zero] at htail ⊢
+    nlinarith
+  have hlhs : ∑ i, (a i).toReal * ((1 - (i.val : ℝ)) * (x * (1 - x)))
+      = (∑ i, (a i).toReal - ∑ i, (i.val : ℝ) * (a i).toReal) * (x * (1 - x)) := by
+    rw [← Finset.sum_sub_distrib, Finset.sum_mul]
+    exact Finset.sum_congr rfl fun i _ => by ring
+  have hrhs : ∑ i, (a i).toReal * (x ^ (i : ℕ) - x)
+      = ∑ i, (a i).toReal * x ^ (i : ℕ) - (∑ i, (a i).toReal) * x := by
+    rw [Finset.sum_mul, ← Finset.sum_sub_distrib]
+    exact Finset.sum_congr rfl fun i _ => by ring
+  rw [hlhs, hrhs, hsumR] at hbranch
+  nlinarith [mul_nonneg (mul_nonneg hx0 (sub_nonneg.2 hx1.le)) (sub_nonneg.2 hmeanR),
+    mul_pos ha0 (pow_pos (sub_pos.2 hx1) 2)]
+
+/-- **At most `n - 1` recursive calls**, with `a i` the probability of `i` of them: mean offspring
+`∑ i * a i ≤ 1`, critical case included, provided a step can stop (`0 < a 0`). -/
+theorem LfpIsOne.poly {n : ℕ} [NeZero n] (a : Fin n → ℝ≥0∞)
+    (hsum : ∑ i, a i = 1 := by simp [Fin.sum_univ_succ] <;> basify <;> norm_num)
+    (hmean : ∑ i, (i.val : ℝ≥0∞) * a i ≤ 1 := by simp [Fin.sum_univ_succ] <;> basify <;> norm_num)
+    (ha : 0 < a 0 := by norm_num) :
+    LfpIsOne fun c => ∑ i, a i * c ^ (i : ℕ) := by
+  obtain ⟨m, rfl⟩ := Nat.exists_eq_succ_of_ne_zero (NeZero.ne n)
+  exact lfpIsOne_poly_succ a hsum hmean ha
 
 end certificates
 

@@ -76,7 +76,10 @@ section termination
 open scoped ENNReal
 
 theorem Tree.genBST.terminates : IsAlmostSurelyTerminating (Tree.genBST lo hi) := by
-  mass_fixpoint using SPMF.LfpIsOne.quadratic (a := 1 / 2) (b := 0) (d := 1 / 2)
+  mass_fixpoint using SPMF.LfpIsOne.poly ![1 / 2, 0, 1 / 2]
+  simp only [Fin.sum_univ_three, Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.cons_val_two,
+    Matrix.tail_cons, Matrix.head_cons, Fin.val_zero, Fin.val_one, Fin.val_two, pow_zero, pow_one,
+    mul_one]
   split
   · rw [zero_mul, add_zero]
     calc (1 : ℝ≥0∞) / 2 + 1 / 2 * c ^ 2 ≤ 1 / 2 + 1 / 2 * 1 ^ 2 := by gcongr
