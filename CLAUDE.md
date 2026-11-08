@@ -105,10 +105,8 @@ definition, and the definition is right here to run.
   [Basalt/SPMF/Expect/Basic.lean](Basalt/SPMF/Expect/Basic.lean); each combinator's equation —
   [Basalt/SPMF/Expect/Obs.lean](Basalt/SPMF/Expect/Obs.lean); the list combinators' —
   [Basalt/SPMF/Expect/Combinators.lean](Basalt/SPMF/Expect/Combinators.lean); what the walk needs
-  of an upper bound — [Basalt/Walk/Expect.lean](Basalt/Walk/Expect.lean), pinned by
-  [BasaltTest/Walk/Expect.lean](BasaltTest/Walk/Expect.lean), and of a lower bound, beside the mass
-  bounds that are its case at `1` — [Basalt/Walk/Mass.lean](Basalt/Walk/Mass.lean), pinned by
-  [BasaltTest/Walk/Mass.lean](BasaltTest/Walk/Mass.lean). A size-bounded generator's predicted
+  of an expectation bound — [Basalt/Walk/Expect.lean](Basalt/Walk/Expect.lean), pinned by
+  [BasaltTest/Walk/Expect.lean](BasaltTest/Walk/Expect.lean). A size-bounded generator's predicted
   constructor counts, as a branching process —
   [Basalt/SPMF/BranchingProcess.lean](Basalt/SPMF/BranchingProcess.lean). The practical entry for a
   bound is WORKFLOW.md's Recipe 4.

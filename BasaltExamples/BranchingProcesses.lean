@@ -164,43 +164,36 @@ noncomputable def expectedNodesAtSize : Nat → ℝ≥0∞
   | 0 => 0
   | n + 1 => (1 + 2 * expectedNodesAtSize ((n + 1) / 2)) / 4
 
-theorem genTree.expect_nodes_le (n : Nat) :
-    SPMF.expect (genTree n) (fun t => (t.nodes : ℝ≥0∞)) ≤ expectedNodesAtSize n := by
-  rw [SPMF.expect_eq_obs]
-  walk fixpoint
-  all_goals simp [Tree.nodes, expectedNodesAtSize, two_mul, add_assoc]
-
-theorem genTree.le_expect_nodes (n : Nat) (k : ℝ≥0∞) :
-    k + expectedNodesAtSize n ≤
-      SPMF.expectObs.spec (genTree n : SPMF Tree) (fun t => k + (t.nodes : ℝ≥0∞)) := by
-  induction n using Nat.strong_induction_on generalizing k with
+theorem genTree.mass (n : Nat) : (genTree n : SPMF Tree).mass = 1 := by
+  induction n using Nat.strong_induction_on with
   | _ n ih =>
     cases n with
     | zero =>
-      conv_rhs => rw [genTree]
-      walk
-      simp only [Tree.nodes, expectedNodesAtSize, List.sum_cons, List.sum_nil, List.length_cons,
-        List.length_nil, Nat.cast_zero, add_zero]
-      rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num)]
-      apply le_of_eq
-      push_cast
-      ring
+      rw [← SPMF.expect_one, genTree, oneOfWith_eq, SPMF.expect_oneOf]
+      norm_num [ENNReal.div_self]
     | succ n =>
-      conv_rhs => rw [genTree]
-      walk [ih ((n + 1) / 2) (by omega)]
-      simp only [Tree.nodes, expectedNodesAtSize, List.sum_cons, List.sum_nil, List.length_cons,
-        List.length_nil, Nat.cast_zero, add_zero]
-      push_cast
-      rw [ENNReal.le_div_iff_mul_le (by norm_num) (by norm_num), add_mul,
-        ENNReal.div_mul_cancel (by norm_num) (by norm_num)]
-      apply le_of_eq
-      ring
+      rw [← SPMF.expect_one, genTree, oneOfWith_eq, SPMF.expect_oneOf]
+      simp only [List.map, SPMF.expect_bind, SPMF.expect_pure]
+      simp only [SPMF.expect_one, ih ((n + 1) / 2) (by omega)]
+      norm_num [ENNReal.div_self]
 
-/-- The expected number of `node`s is exactly `megaNodes n`. -/
+/-- The expected number of `node`s is exactly `expectedNodesAtSize n`. -/
 theorem genTree.expect_nodes (n : Nat) :
     SPMF.expect (genTree n) (fun t => (t.nodes : ℝ≥0∞)) = expectedNodesAtSize n := by
-  refine le_antisymm (genTree.expect_nodes_le n) ?_
-  simpa [SPMF.expect_eq_obs] using genTree.le_expect_nodes n 0
+  induction n using Nat.strong_induction_on with
+  | _ n ih =>
+    cases n with
+    | zero =>
+      rw [genTree, oneOfWith_eq, SPMF.expect_oneOf]
+      simp [Tree.nodes, expectedNodesAtSize]
+    | succ n =>
+      rw [genTree, oneOfWith_eq, SPMF.expect_oneOf, expectedNodesAtSize]
+      simp only [List.map, SPMF.expect_bind, SPMF.expect_pure, Tree.nodes, Nat.cast_add,
+        Nat.cast_one, Nat.cast_zero, SPMF.expect_add, SPMF.expect_const, ih ((n + 1) / 2) (by omega),
+        genTree.mass, one_mul]
+      congr 1
+      norm_num
+      ring
 
 
 /-! ## Dragen's generator (§4, §5)
@@ -269,41 +262,29 @@ theorem genTree2Spec_meanTypes (u v : Unit) : genTree2Spec.meanTypes u v = 13 / 
     ← mul_div_assoc, ENNReal.div_add_div_same]
   norm_num
 
-theorem genTree2.expect_count_le (c : Ctor) (n : Nat) :
-    SPMF.expect (genTree2 n) (fun t => (t.count c : ℝ≥0∞)) ≤ genTree2Spec.predicted () c n := by
-  rw [SPMF.expect_eq_obs]
-  walk fixpoint
-  · rw [genTree2Spec.predicted_zero]
-    cases c <;> simp [Tree'.count, BranchingProcess.Spec.terminal, Ctor.args]
-  · rw [Nat.succ_eq_add_one, genTree2Spec.predicted_succ]
-    simp only [Fintype.sum_unique, genTree2Spec_meanTypes]
-    cases c <;> simp [Tree'.count, Ctor.prob]
-    all_goals (apply le_of_eq; simp only [div_eq_mul_inv]; ring)
-
-theorem genTree2.le_expect_count (c : Ctor) (n : Nat) (k : ℝ≥0∞) :
-    k + genTree2Spec.predicted () c n ≤
-      SPMF.expectObs.spec (genTree2 n : SPMF Tree') (fun t => k + (t.count c : ℝ≥0∞)) := by
-  induction n generalizing k with
-  | zero =>
-    conv_rhs => rw [genTree2]
-    walk
-    rw [genTree2Spec.predicted_zero]
-    cases c <;> simp [Tree'.count, BranchingProcess.Spec.terminal, Ctor.args]
+theorem genTree2.mass (n : Nat) : (genTree2 n : SPMF Tree').mass = 1 := by
+  induction n with
+  | zero => rw [genTree2]; simp
   | succ n ih =>
-    conv_rhs => rw [genTree2]
-    walk [ih]
-    rw [genTree2Spec.predicted_succ]
-    simp only [Fintype.sum_unique, genTree2Spec_meanTypes]
-    conv_lhs => rw [show k = k * 10 * 10⁻¹ from
-      (ENNReal.mul_inv_cancel_right (by norm_num) (by norm_num)).symm]
-    cases c <;> simp [Tree'.count, Ctor.prob]
-    all_goals (apply le_of_eq; simp only [div_eq_mul_inv]; ring)
+    rw [← SPMF.expect_one, genTree2, frequencyWith_eq, SPMF.expect_frequency]
+    simp only [List.map, SPMF.expect_bind, SPMF.expect_pure]
+    simp only [SPMF.expect_one, ih]
+    norm_num [ENNReal.div_self]
 
 /-- **§4–5**: every constructor's expected count is the branching process's prediction. -/
 theorem genTree2.expect_count (c : Ctor) (n : Nat) :
     SPMF.expect (genTree2 n) (fun t => (t.count c : ℝ≥0∞)) = genTree2Spec.predicted () c n := by
-  refine le_antisymm (genTree2.expect_count_le c n) ?_
-  simpa [SPMF.expect_eq_obs] using genTree2.le_expect_count c n 0
+  induction n with
+  | zero =>
+    rw [genTree2, genTree2Spec.predicted_zero]
+    cases c <;> simp [Tree'.count, BranchingProcess.Spec.terminal, Ctor.args]
+  | succ n ih =>
+    rw [genTree2, genTree2Spec.predicted_succ, frequencyWith_eq, SPMF.expect_frequency]
+    simp only [List.map, SPMF.expect_bind, SPMF.expect_pure, Tree'.count, Nat.cast_add,
+      SPMF.expect_add, SPMF.expect_const, one_mul, ih, genTree2.mass, Fintype.sum_unique,
+      genTree2Spec_meanTypes]
+    cases c <;> simp [Ctor.prob]
+    all_goals (simp only [div_eq_mul_inv]; ring)
 
 theorem genTree2Spec_level (k : Nat) : genTree2Spec.level () k () = (13 / 10) ^ k := by
   induction k with
@@ -417,73 +398,45 @@ theorem mutualSpec_meanTypes : mutualSpec.meanTypes = !![1 / 2, 1 / 2; 2 / 3, 0]
     simp [BranchingProcess.Spec.meanTypes, Finset.univ, Fintype.elems, MutualCtor.ty,
       MutualCtor.prob, MutualCtor.args]
 
-/-- Each constructor's expected count is at most its prediction. -/
-theorem genT12.expect_count_le (n : Nat) :
-    (∀ c, SPMF.expect (genT1 n) (fun t => (t.count c : ℝ≥0∞)) ≤ mutualSpec.predicted 0 c n) ∧
-    (∀ c, SPMF.expect (genT2 n) (fun t => (t.count c : ℝ≥0∞)) ≤ mutualSpec.predicted 1 c n) := by
+theorem genT12.mass (n : Nat) :
+    (genT1 n : SPMF T1).mass = 1 ∧ (genT2 n : SPMF T2).mass = 1 := by
   induction n with
-  | zero =>
-    refine ⟨fun c => ?_, fun c => ?_⟩ <;> rw [SPMF.expect_eq_obs, mutualSpec.predicted_zero]
-    · conv_lhs => rw [genT1]
-      walk
-      cases c <;> simp [T1.count, BranchingProcess.Spec.terminal, MutualCtor.ty, MutualCtor.args]
-    · conv_lhs => rw [genT2]
-      walk
-      cases c <;> simp [T2.count, BranchingProcess.Spec.terminal, MutualCtor.ty, MutualCtor.args]
+  | zero => constructor <;> simp [genT1, genT2]
   | succ n ih =>
-    refine ⟨fun c => ?_, fun c => ?_⟩ <;>
-      rw [SPMF.expect_eq_obs, mutualSpec.predicted_succ, mutualSpec_meanTypes]
-    · have h1 := ih.1 c
-      have h2 := ih.2 c
-      rw [SPMF.expect_eq_obs] at h1 h2
-      conv_lhs => rw [genT1]
-      walk [h1, h2]
-      cases c <;> simp [T1.count, MutualCtor.ty, MutualCtor.prob, Fin.sum_univ_two]
-      all_goals (apply le_of_eq; simp only [div_eq_mul_inv]; ring)
-    · have h1 := ih.1 c
-      rw [SPMF.expect_eq_obs] at h1
-      conv_lhs => rw [genT2]
-      walk [h1]
-      cases c <;> simp [T2.count, MutualCtor.ty, MutualCtor.prob, Fin.sum_univ_two]
-      all_goals (apply le_of_eq; simp only [div_eq_mul_inv]; ring)
-
-theorem genT12.le_expect_count (n : Nat) :
-    (∀ c k, k + mutualSpec.predicted 0 c n ≤
-      SPMF.expectObs.spec (genT1 n : SPMF T1) (fun t => k + (t.count c : ℝ≥0∞))) ∧
-    (∀ c k, k + mutualSpec.predicted 1 c n ≤
-      SPMF.expectObs.spec (genT2 n : SPMF T2) (fun t => k + (t.count c : ℝ≥0∞))) := by
-  induction n with
-  | zero =>
-    refine ⟨fun c k => ?_, fun c k => ?_⟩ <;> rw [mutualSpec.predicted_zero]
-    · conv_rhs => rw [genT1]
-      walk
-      cases c <;> simp [T1.count, BranchingProcess.Spec.terminal, MutualCtor.ty, MutualCtor.args]
-    · conv_rhs => rw [genT2]
-      walk
-      cases c <;> simp [T2.count, BranchingProcess.Spec.terminal, MutualCtor.ty, MutualCtor.args]
-  | succ n ih =>
-    refine ⟨fun c k => ?_, fun c k => ?_⟩ <;> rw [mutualSpec.predicted_succ, mutualSpec_meanTypes]
-    · conv_rhs => rw [genT1]
-      walk [ih.1 c, ih.2 c]
-      conv_lhs => rw [show k = k * 2 * 2⁻¹ from
-        (ENNReal.mul_inv_cancel_right (by norm_num) (by norm_num)).symm]
-      cases c <;> simp [T1.count, MutualCtor.ty, MutualCtor.prob, Fin.sum_univ_two]
-      all_goals (apply le_of_eq; simp only [div_eq_mul_inv]; ring)
-    · conv_rhs => rw [genT2]
-      walk [ih.1 c]
-      conv_lhs => rw [show k = k * 3 * 3⁻¹ from
-        (ENNReal.mul_inv_cancel_right (by norm_num) (by norm_num)).symm]
-      cases c <;> simp [T2.count, MutualCtor.ty, MutualCtor.prob, Fin.sum_univ_two]
-      all_goals (apply le_of_eq; simp only [div_eq_mul_inv]; ring)
+    constructor
+    · rw [← SPMF.expect_one, genT1, oneOfWith_eq, SPMF.expect_oneOf]
+      simp only [List.map, SPMF.expect_bind, SPMF.expect_pure]
+      simp only [SPMF.expect_one, ih.1, ih.2]
+      norm_num [ENNReal.div_self]
+    · rw [← SPMF.expect_one, genT2, frequencyWith_eq, SPMF.expect_frequency]
+      simp only [List.map, SPMF.expect_bind, SPMF.expect_pure]
+      simp only [SPMF.expect_one, ih.1]
+      norm_num [ENNReal.div_self]
 
 /-- **Theorem 1 for Figure 8**: each constructor's expected count is the prediction from the mean
 matrix of types. -/
 theorem genT12.expect_count (n : Nat) :
     (∀ c, SPMF.expect (genT1 n) (fun t => (t.count c : ℝ≥0∞)) = mutualSpec.predicted 0 c n) ∧
     (∀ c, SPMF.expect (genT2 n) (fun t => (t.count c : ℝ≥0∞)) = mutualSpec.predicted 1 c n) := by
-  refine ⟨fun c => le_antisymm ((genT12.expect_count_le n).1 c) ?_,
-    fun c => le_antisymm ((genT12.expect_count_le n).2 c) ?_⟩
-  · simpa [SPMF.expect_eq_obs] using (genT12.le_expect_count n).1 c 0
-  · simpa [SPMF.expect_eq_obs] using (genT12.le_expect_count n).2 c 0
+  induction n with
+  | zero =>
+    refine ⟨fun c => ?_, fun c => ?_⟩ <;> rw [mutualSpec.predicted_zero]
+    · rw [genT1]
+      cases c <;> simp [T1.count, BranchingProcess.Spec.terminal, MutualCtor.ty, MutualCtor.args]
+    · rw [genT2]
+      cases c <;> simp [T2.count, BranchingProcess.Spec.terminal, MutualCtor.ty, MutualCtor.args]
+  | succ n ih =>
+    refine ⟨fun c => ?_, fun c => ?_⟩ <;> rw [mutualSpec.predicted_succ, mutualSpec_meanTypes]
+    · rw [genT1, oneOfWith_eq, SPMF.expect_oneOf]
+      simp only [List.map, SPMF.expect_bind, SPMF.expect_pure, T1.count, Nat.cast_add,
+        SPMF.expect_add, SPMF.expect_const, ih.1 c, ih.2 c, (genT12.mass n).1, (genT12.mass n).2,
+        one_mul]
+      cases c <;> simp [MutualCtor.ty, MutualCtor.prob, Fin.sum_univ_two]
+      all_goals (simp only [div_eq_mul_inv]; ring)
+    · rw [genT2, frequencyWith_eq, SPMF.expect_frequency]
+      simp only [List.map, SPMF.expect_bind, SPMF.expect_pure, T2.count, Nat.cast_add,
+        SPMF.expect_add, SPMF.expect_const, ih.1 c, (genT12.mass n).1, one_mul]
+      cases c <;> simp [MutualCtor.ty, MutualCtor.prob, Fin.sum_univ_two]
+      all_goals (simp only [div_eq_mul_inv]; ring)
 
 end BranchingProcesses
