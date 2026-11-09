@@ -282,6 +282,50 @@ def solveCast (goal : MVarId) : MetaM Unit := goal.withContext do
 
 /-! ## Side goals -/
 
+register_option basalt.walk.keepMatchesOn : String := {
+  defValue := ""
+  descr := "comma-separated constants: a `match` of a computed angelic precondition whose discriminant \
+    mentions one is left to the caller instead of being split on (a check's verdict, which the \
+    caller decides from a law)"
+}
+
+register_option basalt.walk.profile : Bool := {
+  defValue := false
+  descr := "report where `walk`'s time goes: its phases and its operations"
+}
+
+/-- Cumulative time and count per walk operation (profiling). -/
+initialize walkTimes : IO.Ref (Std.HashMap String (Nat × Nat)) ← IO.mkRef {}
+
+/-- Child time accumulated by each open frame, innermost first. -/
+initialize walkStack : IO.Ref (List Nat) ← IO.mkRef []
+
+/-- Whether the walk records its timings (`BASALT_WALK_TIMES` set). Off by default: the records are
+shared by every thread, and a walk updates them at every step, so walks run in parallel (in proofs
+Lean elaborates as tasks) would mostly wait on each other for them. -/
+initialize walkTimesOn : Bool ← return (← IO.getEnv "BASALT_WALK_TIMES").isSome
+
+/-- Run `x` as a frame `k`, recording its time less its frames' children as `k.self`. -/
+def selfTime {α : Type} (k : String) (x : TermElabM α) : TermElabM α := do
+  unless walkTimesOn do return ← x
+  (walkStack.modify (0 :: ·) : BaseIO Unit)
+  let t0 ← (IO.monoNanosNow : BaseIO Nat)
+  tryFinally x do
+    let t1 ← (IO.monoNanosNow : BaseIO Nat)
+    let st ← (walkStack.get : BaseIO (List Nat))
+    let (child, rest) := match st with | c :: r => (c, r) | [] => (0, [])
+    let incl := t1 - t0
+    let rest := match rest with | p :: r => (p + incl) :: r | [] => []
+    (walkStack.set rest : BaseIO Unit)
+    (walkTimes.modify fun h => let (a, n) := h.getD (k ++ ".self") (0, 0); h.insert (k ++ ".self") (a + (incl - child), n + 1) : BaseIO Unit)
+
+def timeIt {m : Type → Type} [Monad m] [MonadLiftT BaseIO m] [MonadFinally m] {α : Type} (k : String) (x : m α) : m α := do
+  unless walkTimesOn do return ← x
+  let t0 ← (IO.monoNanosNow : BaseIO Nat)
+  tryFinally x do
+    let t1 ← (IO.monoNanosNow : BaseIO Nat)
+    (walkTimes.modify fun h => let (a, b) := h.getD k (0, 0); h.insert k (a + (t1 - t0), b + 1) : BaseIO Unit)
+
 /-- Close `goal`, whose type is `ty`, when it is a side goal a rule or a bridge leaves, and report
 whether it did. -/
 def solveSideGoal (goal : MVarId) (ty : Expr) : MetaM Bool := goal.withContext do
@@ -314,11 +358,26 @@ def solveSideGoal (goal : MVarId) (ty : Expr) : MetaM Bool := goal.withContext d
 
 /-! ## Leaves -/
 
+/-- Whether a fact `e` can be about `g` by the generators' types: a necessary condition for any of
+`tryFact`'s unifications, and cheap where those are not. Unifying generators at different types (a
+draw of a list against a draw of an expression) fails only after unfolding both, through their
+instances. -/
+private def factTypeFits (e g : Expr) : MetaM Bool := do
+  let saved ← saveState
+  let r ← observing? do
+    let (_, _, concl) ← forallMetaTelescopeReducing (← inferType e)
+    let some s := (← instantiateMVars concl).find? (·.isAppOfArity ``Obs.spec 10) | return true
+    isDefEq (← inferType (s.getArg! 8)) (← inferType g)
+  saved.restore
+  return r.getD true
+
 /-- Close `goal`, a leaf, with the fact `e`, as it is or through one of the observation's `leaves`,
 `e`'s binders instantiated by `instBinders` first: possibly all of them for the fact as it is, and
 all but the bridge's own for a bridge. `none` if nothing applies. -/
-private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) :
+private def tryFact (leaves : Leaves) (goal : MVarId) (e : Expr) (g? : Option Expr := none) :
     MetaM (Option (List MVarId)) := do
+  if let some g := g? then
+    unless ← timeIt "factTypeFits" (factTypeFits e g) do return none
   -- A fact that is the goal, binders and all: a generator argument's family of observations.
   let whole ← observing? do
     unless ← isDefEq (← goal.getType) (← inferType e) do failure
@@ -498,8 +557,11 @@ private def firstApplying (cands : Array α) (apply : α → TermElabM β)
       firstErr := firstErr <|> some ex
       saved.restore
     | .ok b =>
+      let t0 ← (IO.monoNanosNow : BaseIO Nat)
       try return some (← finish b)
       catch ex =>
+        let t1 ← (IO.monoNanosNow : BaseIO Nat)
+        if walkTimesOn then (walkTimes.modify fun h => let (a, n) := h.getD "rules.failedFinish" (0, 0); h.insert "rules.failedFinish" (a + (t1 - t0), n + 1) : BaseIO Unit)
         appliedErr := appliedErr <|> some ex
         saved.restore
   if let some ex := appliedErr <|> firstErr then throw ex
@@ -523,7 +585,7 @@ abbrev WalkRest := List MVarId → TermElabM (List MVarId)
 postcondition binds or, on the shape of a draw, after the value drawn. A `@[gen_rel_rule]` is first
 applied to `genRel?`, the relation's proof that it is a `GenRel`. -/
 private def applyRule (goal : MVarId) (lem : Name) (genRel? : Option Name := none) :
-    TermElabM (List MVarId) := do
+    TermElabM (List MVarId) := timeIt "applyRule" do
   let mut rule ← mkConstWithFreshMVarLevels lem
   if let some w := genRel? then
     let w ← mkConstWithFreshMVarLevels w
@@ -537,23 +599,67 @@ private def applyRule (goal : MVarId) (lem : Name) (genRel? : Option Name := non
     else post
   applyExact goal (← mkExpectedTypeHint rule (nameBound (← inferType rule) names))
 
+/-- For each rule, the head constants of its subject's explicit arguments, reduced at reducible
+transparency: `none` where the argument is a variable or has no constant head. -/
+initialize ruleArgHeadsCache : IO.Ref (Std.HashMap Name (Array (Option Name))) ← IO.mkRef {}
+
+private def argHead? (a : Expr) : MetaM (Option Name) := do
+  return (← whnfR (← instantiateMVars a)).getAppFn.constName?
+
+private def ruleArgHeads (j : Judgment) (lem : Name) : MetaM (Array (Option Name)) := do
+  if let some hs := (← ruleArgHeadsCache.get)[lem]? then return hs
+  let hs ← forallTelescope (← getConstInfo lem).type fun _ concl => do
+    let concl ← whnfR concl
+    let some (s, _) := j.subject? (← getEnv) concl | return #[]
+    let info ← getFunInfo s.getAppFn
+    s.getAppArgs.mapIdxM fun i a => do
+      let explicit := (info.paramInfo[i]?.map (·.binderInfo.isExplicit)).getD true
+      if explicit then argHead? a else return none
+  ruleArgHeadsCache.modify (·.insert lem hs)
+  return hs
+
+/-- Whether `lem` cannot apply to `g` by its subject's argument heads alone: an explicit argument
+whose head constant, at reducible transparency, differs from the goal's. Rules are selected the way
+`simp`'s discrimination trees select lemmas, before unification; a rule over a guarded list (`filterMap`)
+is not unified with a literal one, which on a long list of guarded branches costs more than the walk. -/
+private def quickReject (j : Judgment) (lem : Name) (g : Expr) : MetaM Bool := do
+  let hs ← ruleArgHeads j lem
+  let args := g.getAppArgs
+  unless hs.size == args.size do return false
+  for (h?, a) in hs.zip args do
+    let some h := h? | continue
+    let some n ← argHead? a | continue
+    if n != h then return true
+  return false
+
 /-- `g`'s combinator's rules for `j`, on the observation `obs?` for a bound, then, on a relation,
 its `@[gen_rel_rule]`s through the relation's proof that it is a `GenRel`, then its `@[gen_map]`
 lemma read into the algebra's shapes. -/
 private def tryRules (j : Judgment) (obs? : Option Name) (goal : MVarId) (g : Expr)
-    (rest : WalkRest) : TermElabM (Option (List MVarId)) := do
+    (rest : WalkRest) : TermElabM (Option (List MVarId)) := selfTime "tryRules" do
   let finish (premises : List MVarId) := do
-    rest (← namePremises (some g) (← goal.getType) premises)
+    rest (← timeIt "namePremises" (namePremises (some g) (← goal.getType) premises))
   let env ← getEnv
-  let own ← ownRules j obs? g
+  let own ← timeIt "ownRules" (ownRules j obs? g)
   let viaGenRel := match j, g.getAppFn.constName? with
     | .rel _ w, some head => (genRelRulesFor env head).map (·, some w)
     | _, _ => #[]
+  let own ← own.filterM fun lem => do return !(← quickReject j lem g)
   let lems := own.map (·, none) ++ viaGenRel
-  if let some gs ← firstApplying lems (fun (lem, w) => applyRule goal lem w) finish then
+  if let some gs ← firstApplying lems (fun (lem, w) => do
+      let t0 ← (IO.monoNanosNow : BaseIO Nat)
+      try
+        let r ← applyRule goal lem w
+        let t1 ← (IO.monoNanosNow : BaseIO Nat)
+        if walkTimesOn then (walkTimes.modify fun h => let k := "ok:" ++ toString lem; let (a, n) := h.getD k (0, 0); h.insert k (a + (t1 - t0), n + 1) : BaseIO Unit)
+        return r
+      catch ex =>
+        let t1 ← (IO.monoNanosNow : BaseIO Nat)
+        if walkTimesOn then (walkTimes.modify fun h => let k := "FAIL:" ++ toString lem; let (a, n) := h.getD k (0, 0); h.insert k (a + (t1 - t0), n + 1) : BaseIO Unit)
+        throw ex) finish then
     return some gs
   let some mapLem := g.getAppFn.constName?.bind (mapFor env) | return none
-  firstApplying (adapters j) (applyMap · mapLem goal) finish
+  firstApplying (adapters j) (fun a => timeIt "applyMap" (applyMap a mapLem goal)) finish
 
 /-- `t`, a fact a caller passed, elaborated with its metavariables instantiated: an error is thrown,
 not elaborated to `sorry`. -/
@@ -563,29 +669,99 @@ def elabFact (t : Term) : TermElabM Expr :=
     Term.synthesizeSyntheticMVarsNoPostponing
     instantiateMVars e
 
+/-- The constants each passed fact's statement mentions, by the fact's syntax, for the current walk. -/
+-- Keyed by the thread as well as the fact's syntax: walks run in parallel (in proofs Lean
+-- elaborates as tasks), and the same syntax (`ih.1`) names different facts in each.
+initialize factConstsShards : Array (IO.Ref (Std.HashMap (UInt64 × String) (Array Name))) ←
+  (Array.range 64).mapM fun _ => IO.mkRef {}
+
+/-- The shard of the cache for this thread: one shared reference would have every thread wait on it. -/
+def factConstsCache : BaseIO (IO.Ref (Std.HashMap (UInt64 × String) (Array Name))) := do
+  let tid ← IO.getTID
+  match factConstsShards[(tid % 64).toNat]? with
+  | some r => return r
+  | none => IO.mkRef {}
+
 /-- A fact about `g`: one the caller passed, or a hypothesis (a recursive occurrence). A passed fact
 is committed to before its bridge's premises are walked, so that a failure inside them is reported
 where it happens. -/
 private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g : Expr)
-    (rest : WalkRest) : TermElabM (Option (List MVarId)) := do
+    (rest : WalkRest) : TermElabM (Option (List MVarId)) := selfTime "tryFacts" do
   -- A fact is tried only if it mentions `g`'s head: unifying one about another generator unfolds
   -- both, and on a generator over a long literal list that exceeds the recursion depth.
   let mentionsHead (e : Expr) : Bool := match g.getAppFn with
     | .const n _ => (e.find? (·.isConstOf n)).isSome
     | .fvar x => e.containsFVar x
     | _ => true
-  for t in extras do
-    let r ← observing? do
-      let e ← elabFact t
-      unless mentionsHead (← instantiateMVars (← inferType e)) do failure
-      let some gs ← tryFact leaves goal e | failure
-      namePremises none (← goal.getType) gs
-    if let some gs := r then return some (← rest gs)
+  -- Besides the head, the relation a class-indexed generator is for: under `BacktrackGenFor.gen
+  -- (P := fun s => ValidDecimal s)` every generator law mentions the head, and unifying a law about
+  -- another predicate unfolds both predicates' definitions before it fails.
+  let g' ← instantiateMVars g
+  let rec lamBody : Expr → Expr
+    | .lam _ _ b _ => lamBody b
+    | e => e
+  -- A predicate on a pair is a `match` on it (`fun (k, m) => …`), its relation in the match's
+  -- alternative; each file that writes one has its own matcher, so the matcher is no evidence.
+  let env ← getEnv
+  let headOf (b : Expr) : Option Name := match b.getAppFn with
+    | .const m _ =>
+      if Lean.Meta.isMatcherCore env m then
+        b.getAppArgs.findSome? fun alt =>
+          if alt.isLambda then
+            match (lamBody alt).getAppFn with
+            | .const m' _ => if Lean.Meta.isMatcherCore env m' then none else some m'
+            | _ => none
+          else none
+      else some m
+    | _ => none
+  let predHeads : Array Name := g'.getAppArgs.filterMap fun a =>
+    if a.isLambda then headOf (lamBody a) else none
+  let tScan0 ← (IO.monoNanosNow : BaseIO Nat)
+  -- Two passes: first the facts that also mention the predicate's relation, then the rest. A law
+  -- about the drawn predicate is usually the one that applies, and found first it spares the failed
+  -- unifications against the others; the second pass keeps every fact the head admits.
+  for pass in [0, 1] do
+    for t in extras do
+      -- Elaborating every fact at every draw only to find it is about another generator dominates a
+      -- walk over a large generator: the constants each fact's statement mentions are learned once per
+      -- walk, and a fact that cannot mention `g`'s head is not elaborated at all.
+      if let .const n _ := g.getAppFn then
+        let key ← timeIt "tryFacts.key" (pure (toString t))
+        let tid ← (IO.getTID : BaseIO UInt64)
+        let cache ← factConstsCache
+        let cs? ← match (← cache.get)[(tid, key)]? with
+          | some cs => pure (some cs)
+          | none => do
+            let saved ← saveState
+            let cs? ← observing? do
+              return (← instantiateMVars (← inferType (← elabFact t))).getUsedConstants
+            saved.restore
+            if let some cs := cs? then cache.modify (·.insert (tid, key) cs)
+            pure cs?
+        if let some cs := cs? then
+          unless cs.contains n do continue
+          let predOk := predHeads.all cs.contains
+          if (pass == 0) != predOk then continue
+        else if pass == 0 then continue
+      else if pass == 1 then continue
+      let tf0 ← (IO.monoNanosNow : BaseIO Nat)
+      let r ← observing? do
+        let e ← timeIt "elabFact" (elabFact t)
+        unless ← timeIt "mentionsHead" (do return mentionsHead (← instantiateMVars (← inferType e))) do failure
+        let some gs ← timeIt "tryFact" (tryFact leaves goal e g) | failure
+        timeIt "namePremises" (namePremises none (← goal.getType) gs)
+      if r.isNone then
+        let tf1 ← (IO.monoNanosNow : BaseIO Nat)
+        let k := "factFail:" ++ ((toString t).drop 18).take 90
+        if walkTimesOn then (walkTimes.modify fun h => let (a, n) := h.getD k (0, 0); h.insert k (a + (tf1 - tf0), n + 1) : BaseIO Unit)
+      if let some gs := r then return some (← rest gs)
+  let tScan1 ← (IO.monoNanosNow : BaseIO Nat)
+  if walkTimesOn then (walkTimes.modify fun h => let (a, n) := h.getD "tryFacts.scanMiss" (0, 0); h.insert "tryFacts.scanMiss" (a + (tScan1 - tScan0), n + 1) : BaseIO Unit)
   for decl in ← getLCtx do
     unless decl.isImplementationDetail do
       unless ← isProp decl.type do continue
       unless mentionsHead (← instantiateMVars decl.type) do continue
-      if let some gs ← tryFact leaves goal decl.toExpr then
+      if let some gs ← timeIt "tryFactLctx" (tryFact leaves goal decl.toExpr g) then
         return some (← rest (← namePremises none (← goal.getType) gs))
   return none
 
@@ -628,34 +804,179 @@ private def attempt (step : TermElabM (Option α)) : TermElabM (Except Exception
     saved.restore
     return .error ex
 
+/-- On a relation, the counterpart of a definition the walk unfolded is the same definition at the
+other reading: unfold it alike, so that the two sides stay the same program (and a `match` its body
+opens with is the same `match`). -/
+def unfoldCounterpart (j : Judgment) (c : Name) (goal : MVarId) : MetaM MVarId := do
+  let .rel .. := j | return goal
+  goal.withContext do
+    let ty ← instantiateMVars (← goal.getType)
+    let i := ty.getAppNumArgs - 1
+    let other ← whnfR (ty.getArg! i)
+    let .const c' us := other.getAppFn | return goal
+    unless c' == c do return goal
+    let some (.defnInfo info) := (← getEnv).find? c | return goal
+    let v ← instantiateValueLevelParams (.defnInfo info) us
+    goal.change (mkAppN ty.getAppFn (ty.getAppArgs.set! i ((renameLambdas v).beta other.getAppArgs)))
+
+register_option basalt.walk.pruneReduceMatch : Bool := {
+  defValue := false
+  descr := "the walk reduces the `match`es on constructors in a precondition, definitionally, before \
+    its pruning `simp`"
+}
+
+register_option basalt.walk.pruneDischarge : Bool := {
+  defValue := true
+  descr := "the walk's pruning `simp` discharges side conditions (a `match` equation's overlap \
+    hypotheses, mostly: most of its time, and they never decide a branch the plain reduction of the \
+    `match` does not)"
+}
+
+register_option basalt.walk.pruneDropClashing : Bool := {
+  defValue := false
+  descr := "pruning drops a precondition's branches whose constructor clashes with the value before \
+    `simp` goes through them"
+}
+
+register_option basalt.walk.dropUnreachable : Bool := {
+  defValue := false
+  descr := "a reachability goal `?c ≤ reach g (· = t)` whose generator returns, at every tail, a value \
+    of another constructor than `t`'s gets `False` for its precondition, without walking `g`"
+}
+
+/-- Two terms that differ in a constructor or a literal where both have one: never equal. A term
+with a variable, bound or free, at a position is no evidence there. -/
+partial def valuesClash (a b : Expr) : MetaM Bool := do
+  match a, b with
+  | .lit l₁, .lit l₂ => return l₁ != l₂
+  | _, _ =>
+    let env ← getEnv
+    let some f := a.getAppFn.constName? | return false
+    let some g := b.getAppFn.constName? | return false
+    let some (.ctorInfo c) := env.find? f | return false
+    let some (.ctorInfo _) := env.find? g | return false
+    if f != g then return true
+    let as := a.getAppArgs; let bs := b.getAppArgs
+    unless as.size == bs.size do return false
+    for i in [c.numParams:as.size] do
+      if ← valuesClash as[i]! bs[i]! then return true
+    return false
+
+/-- The values a generator returns, read off its tails (`pure v`; the continuation of a `bind`;
+each branch of a `backtrack`, an `ite`, a `match`; nothing from a failure): `none` where a tail is
+anything else (a call, which may return anything). -/
+initialize tailValuesCache : IO.Ref (Std.HashMap Expr (Option (Array Expr))) ← IO.mkRef {}
+
+partial def tailValues (e : Expr) (fuel : Nat := 200) : MetaM (Option (Array Expr)) := do
+  if fuel == 0 then return none
+  let e := e.consumeMData
+  -- each sub-generator is scanned again by the walk's every step into it: the answers kept
+  if let some r := (← tailValuesCache.get)[e]? then return r
+  let r ← tailValuesCore e fuel
+  tailValuesCache.modify fun m => (if m.size > 100000 then {} else m).insert e r
+  return r
+where tailValuesCore (e : Expr) (fuel : Nat) : MetaM (Option (Array Expr)) := do
+  let rec lamBody : Expr → Expr
+    | .lam _ _ b _ => lamBody b
+    | e => e
+  match e with
+  | .letE _ _ _ b _ => return ← tailValues b (fuel - 1)
+  | .lam _ _ b _ => return ← tailValues b (fuel - 1)
+  | _ => pure ()
+  let some c := e.getAppFn.constName? | return none
+  let args := e.getAppArgs
+  if c == ``Pure.pure && args.size == 4 then return some #[args[3]!]
+  if c == ``Bind.bind && args.size == 6 then return ← tailValues (lamBody args[5]!) (fuel - 1)
+  if c == `Specimen.Fail.fail || c == `Specimen.outOfFuel || c == `Specimen.truncated ||
+      c == `Specimen.FailWith.failWith then return some #[]
+  if c == `Specimen.Backtrack.backtrack then
+    let some (_, xs) := (args.back?.bind (·.listLit?)) | return none
+    let mut out := #[]
+    for x in xs do
+      unless x.isAppOfArity ``Prod.mk 4 do return none
+      let some vs ← tailValues (lamBody (x.getArg! 3)) (fuel - 1) | return none
+      out := out ++ vs
+    return some out
+  if (c == ``ite && args.size == 5) || (c == ``dite && args.size == 5) then
+    let some a ← tailValues (lamBody args[3]!) (fuel - 1) | return none
+    let some b ← tailValues (lamBody args[4]!) (fuel - 1) | return none
+    return some (a ++ b)
+  if let some info ← Lean.Meta.getMatcherInfo? c then
+    let alts := args.extract (info.getFirstAltPos) (info.getFirstAltPos + info.numAlts)
+    unless alts.size == info.numAlts do return none
+    let mut out := #[]
+    for alt in alts do
+      let some vs ← tailValues (lamBody alt) (fuel - 1) | return none
+      out := out ++ vs
+    return some out
+  return none
+
+/-- `goal`, `?c ≤ reach g (· = t)` (`basalt.walk.dropUnreachable`), closed with `False` for `?c` when
+every value `g` returns clashes with `t`: sound whatever the check says (`False` implies anything),
+complete since no run of `g` returns `t`. -/
+def dropUnreachable? (goal : MVarId) (g : Expr) : MetaM Bool := do
+  unless basalt.walk.dropUnreachable.get (← getOptions) do return false
+  timeIt "du.ctx" <| goal.withContext (dropUnreachableCore goal g)
+where dropUnreachableCore (goal : MVarId) (g : Expr) : MetaM Bool := do
+  let ty ← timeIt "du.inst" (do instantiateMVars (← goal.getType))
+  unless ty.isAppOfArity ``LE.le 4 && (ty.getArg! 0).isProp do return false
+  let c := ty.getArg! 2
+  -- (two steps: a `(← …)` in `&&` is run whatever the left side, and `mvarId!` panics on a non-mvar,
+  -- each panic printing a backtrace under a lock every thread waits on)
+  unless c.isMVar do return false
+  if ← c.mvarId!.isAssigned then return false
+  let spec := ty.getArg! 3
+  let some t ← timeIt "du.post" (do
+    unless (toString (spec.getAppFn.constName?.getD .anonymous)).endsWith "spec" do return none
+    let post := spec.appArg!
+    let .lam _ _ body _ := post | return none
+    let some (_, l, r) := body.eq? | return none
+    let t := if l.isBVar && l.bvarIdx! == 0 then r else if r.isBVar && r.bvarIdx! == 0 then l else body
+    if t.hasLooseBVars || (t.isApp && t.getAppFn.isConstOf ``Eq) then return none
+    return some t) | return false
+  let t ← timeIt "du.whnf" (do whnfR (← instantiateMVars t))
+  -- only a value with a constructor at its head can clash
+  let some th := t.getAppFn.constName? | return false
+  unless (← getEnv).find? th |>.any (·.isCtor) do return false
+  let some vs ← timeIt "du.tails" (tailValues g) | return false
+  for v in vs do
+    unless ← timeIt "du.clash" (valuesClash v t) do return false
+  unless ← timeIt "du.assign" (isDefEq c (mkConst ``False)) do return false
+  -- `fun h => False.elim h`, built directly: `mkAppOptM` would infer the type of `spec`, the whole
+  -- generator's, and `mkLambdaFVars` would instantiate its metavariables
+  let pf := Expr.lam `h (mkConst ``False) (mkApp2 (mkConst ``False.elim [Level.zero]) spec (.bvar 0)) .default
+  goal.assign pf
+  return true
+
 mutual
 
 /-- Prove `goal` by walking the generator, returning the goals no judgment recognizes. `extras` are
 the facts the caller passed, kept as syntax because one may be used at several sub-generators, and
 elaborating once would freeze its metavariables at the first. -/
 partial def walk (extras : Array Term) (goal : MVarId) : TermElabM (List MVarId) :=
-  goal.withContext do
-  if let some g ← argumentSubject? (← instantiateMVars (← goal.getType)) then
+  selfTime "walk" <| goal.withContext do
+  if let some g ← timeIt "walk.argSubject" (do argumentSubject? (← instantiateMVars (← goal.getType))) then
     if let some gs ← tryFacts {} extras goal g (walkAll extras) then return gs
     throwError "no hypothesis or fact gives{indentExpr (← instantiateMVars (← goal.getType))}\nof \
       a combinator's generator argument. Prove one and pass it to `walk [h.obs]`.\
       {← unelaboratedFacts extras goal}"
-  let ty ← whnfR (← instantiateMVars (← goal.getType))
+  let ty ← timeIt "walk.whnfInst" (do whnfR (← instantiateMVars (← goal.getType)))
   -- A rule's premise may be a `∀` (a bind's continuation, an `ite`'s branch condition).
   if let .forallE n _ _ _ := ty then
-    let (_, goal) ← goal.intro ((← getLCtx).getUnusedName n.eraseMacroScopes)
+    let (_, goal) ← timeIt "walk.intro" (goal.intro ((← getLCtx).getUnusedName n.eraseMacroScopes))
     return ← walk extras goal
   for j in judgments (← getEnv) do
     if let some (g, restate) := j.subject? (← getEnv) ty then
-      return ← bound j (← j.leaves ty) extras goal restate g
+      let lv ← timeIt "walk.leaves" (j.leaves ty)
+      return ← bound j lv extras goal restate g
   -- The branch premises of a list combinator, built one branch at a time.
   if let some head := ty.getAppFn.constName? then
     if isBranchList (← getEnv) head then
       let ctor := if (← whnfR ty.appArg!).isAppOfArity ``List.nil 1 then `nil else `cons
       return ← walkAll extras
-        (← applyExact goal (← mkConstWithFreshMVarLevels (head ++ ctor)))
-  if ← solveSideGoal goal ty then return []
-  return [← goal.replaceTargetDefEq (← instantiateMVars (← goal.getType)).headBeta]
+        (← timeIt "walk.branchCtor" (do applyExact goal (← mkConstWithFreshMVarLevels (head ++ ctor))))
+  if ← timeIt "walk.side" (solveSideGoal goal ty) then return []
+  return [← timeIt "walk.leafReturn" (do goal.replaceTargetDefEq (← instantiateMVars (← goal.getType)).headBeta)]
 
 /-- `walk` each goal in turn. -/
 partial def walkAll (extras : Array Term) (goals : List MVarId) : TermElabM (List MVarId) :=
@@ -665,19 +986,24 @@ partial def walkAll (extras : Array Term) (goals : List MVarId) : TermElabM (Lis
 combinator, a fact about `g`, `g` unfolded when it is a definition with no rule, and a bound on `g`
 by itself. -/
 partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal : MVarId)
-    (restate : Expr → Expr) (g : Expr) : TermElabM (List MVarId) := goal.withContext do
+    (restate : Expr → Expr) (g : Expr) : TermElabM (List MVarId) := selfTime "bound" <| goal.withContext do
   -- The reduction covers a branch that is still a redex or a projection (`(fun () => …) ()`,
   -- `p.2 ()`); no combinator is reducible, so no reduction can turn one combinator into another.
   -- The goal is restated in the reduced form before a rule is applied: matching a rule against
   -- an unreduced branch closes a side condition like `xs ≠ []` by proof irrelevance rather than by
   -- unification, and the side condition then survives as a goal.
-  let g' ← whnfR g
-  let goal ← if g' == g then pure goal else goal.change (restate g')
+  let g' ← timeIt "bound.whnfR" (whnfR g)
+  let goal ← timeIt "bound.change" (if g' == g then pure goal else goal.change (restate g'))
   let g := g'
+  if ← timeIt "bound.dropUnreachable" (dropUnreachable? goal g) then return []
   let rest := walkAll extras
-  let obs? := (specObs? (← whnfR (← instantiateMVars (← goal.getType)))).map (·.1)
+  let obs? ← timeIt "bound.obs" (do return (specObs? (← whnfR (← instantiateMVars (← goal.getType)))).map (·.1))
   -- Rules that all fail leave a fact to try, and their error is reported only if none applies.
+  let t0 ← (IO.monoNanosNow : BaseIO Nat)
   let rules ← attempt (tryRules j obs? goal g rest)
+  if let .error _ := rules then
+    let t1 ← (IO.monoNanosNow : BaseIO Nat)
+    if walkTimesOn then (walkTimes.modify fun h => let (a, n) := h.getD "bound.rulesErr" (0, 0); h.insert "bound.rulesErr" (a + (t1 - t0), n + 1) : BaseIO Unit)
   if let .ok (some gs) := rules then return gs
   if let some gs ← tryFacts leaves extras goal g rest then return gs
   -- Where the generator may be left in the bound as itself, a combinator none of whose rules is
@@ -685,11 +1011,12 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
   if leaves.self.isEmpty then
     if let .error ex := rules then throw ex
   -- Unfolding comes after the facts, so that a caller's fact stays an abstraction boundary.
-  if let some (c, body) ← unfold? j obs? g then
-    let goal ← goal.change (restate body)
+  if let some (c, body) ← timeIt "bound.unfold?" (unfold? j obs? g) then
+    let goal ← timeIt "bound.unfoldChange" (goal.change (restate body))
+    let goal ← unfoldCounterpart j c goal
     try return ← walk extras goal
     catch ex => throwError "{ex.toMessageData}\n(in the unfolding of `{c}`)"
-  if let some gs ← matchCongr? j goal restate g then return ← rest gs
+  if let some gs ← timeIt "bound.matchCongr" (matchCongr? j goal restate g) then return ← rest gs
   if (← matchMatcherApp? g).isSome then
     throwError "the walk does not enter this `match`:{indentExpr g}\nIt enters one whose type does \
       not depend on its discriminants, that is applied to nothing further, and, on a relation, \

@@ -55,12 +55,26 @@ computed, the proof of the inequality, and the goals the walk left. `O` is the o
 def computeBound (extras : Array Term) (obs : Name) (lower : Bool) (g post : Expr) :
     TermElabM (Expr × Expr × List MVarId) := do
   let gTy ← instantiateMVars (← inferType g)
+  -- An observation over a monad of fixed universe has no universe parameter of its own.
+  let lvls ← if (← getConstInfo obs).levelParams.isEmpty then pure [] else pure [← getDecLevel gTy]
   let spec := mkApp (← mkAppOptM ``Obs.spec #[none, none, none, none, none, none,
-    some (mkConst obs [← getDecLevel gTy]), none, some g]) post
+    some (mkConst obs lvls), none, some g]) post
   let b ← mkFreshExprMVar (← inferType spec)
   let pf ← mkFreshExprMVar (← if lower then mkAppM ``LE.le #[b, spec] else mkAppM ``LE.le #[spec, b])
+  walkTimes.set {}
+  let tw0 ← IO.monoMsNow
   let rest ← walk extras pf.mvarId!
-  return (← instantiateMVars b, pf, rest)
+  let tw1 ← IO.monoMsNow
+  if basalt.walk.profile.get (← getOptions) then logInfo m!"walk itself: {tw1 - tw0} ms"
+  let ts ← walkTimes.get
+  let sorted := ts.toArray.qsort (fun a b => a.2.1 > b.2.1)
+  let line := sorted.toList.map fun (k, (ns, n)) => k ++ "=" ++ toString (ns / 1000000) ++ "ms/" ++ toString n
+  if basalt.walk.profile.get (← getOptions) then logInfo m!"walk ops: {line}"
+  let t0 ← IO.monoMsNow
+  let r ← instantiateMVars b
+  let t1 ← IO.monoMsNow
+  if basalt.walk.profile.get (← getOptions) then logInfo m!"walk final instantiateMVars of the bound: {t1 - t0} ms"
+  return (r, pf, rest)
 
 /-- `admissible fun g => ∀ ys, P ys (g ys)`, over the binders of `gTy`, from `leaf ys`, a proof of
 `admissible (P ys)`: one `admissible_pi_apply` per binder, each with its predicate given, since
@@ -161,11 +175,12 @@ def tidy (lctx : LocalContext) (goal : MVarId) : MetaM MVarId := goal.withContex
   goal.setTag .anonymous
   let mut goal := goal
   for d in ← getLCtx do
-    unless d.isImplementationDetail do
+    -- A hypothesis the walk began with is the caller's, and no draw of the walk is in it: only
+    -- those the walk introduced are tidied (and renamed).
+    unless d.isImplementationDetail || lctx.contains d.fvarId do
       let t ← tidyExpr d.type
       if t != d.type then goal ← goal.replaceLocalDeclDefEq d.fvarId t
-      unless lctx.contains d.fvarId do
-        goal ← goal.rename d.fvarId (← mkFreshUserName d.userName.eraseMacroScopes)
+      goal ← goal.rename d.fvarId (← mkFreshUserName d.userName.eraseMacroScopes)
   goal ← goal.withContext do goal.replaceTargetDefEq (← tidyExpr (← goal.getType))
   goal.withContext do
     let ty ← goal.getType
@@ -249,7 +264,17 @@ with its equations solved (`solveSplitEqs`); `none` when there is no such `match
 private def splitCtxMatch? (part : Expr → Expr) (g : MVarId) : MetaM (Option (List MVarId)) :=
   g.withContext do
   let ty ← instantiateMVars (← g.getType)
-  let some m ← findSplit? (part ty) .match | return none
+  -- the matches the caller decides itself (`basalt.walk.keepMatchesOn`)
+  let keep := ((basalt.walk.keepMatchesOn.get (← getOptions)).splitOn ",").filter (· ≠ "") |>.map String.toName
+  let mut except : ExprSet := {}
+  unless keep.isEmpty do
+    let found ← IO.mkRef (#[] : Array Expr)
+    Meta.forEachExpr (part ty) fun e => do
+      if let some m ← matchMatcherApp? e then
+        if m.discrs.any (fun d => (d.find? fun x => keep.any (x.isConstOf ·)).isSome) then
+          found.modify (·.push e)
+    for e in ← found.get do except := except.insert e
+  let some m ← findSplit? (part ty) .match except | return none
   let old ← getLCtx
   let some gs ← observing? (Split.splitMatch g m) | return none
   some <$> gs.filterMapM fun g => do
@@ -265,14 +290,19 @@ partial def splitBoundMatches (i : Nat) (g : MVarId) : MetaM (List MVarId) := do
 /-- One goal per path through a computed demonic precondition: its `∀` and `→` introduced, its `∧`,
 `if` and `match` split. Only a connective that is there syntactically is split, so that a
 postcondition defined as a conjunction stays folded. -/
-partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
-  let ty := (← reduceCtorProjs (← g.getType)).consumeMData
+partial def splitPaths (g : MVarId) (reduced : Bool := false) : MetaM (List MVarId) := g.withContext do
+  -- The projections out of constructors are reduced once, in the goal itself: an `intro` or a split
+  -- of `∧`, `if` or `dite` leaves subterms of an already reduced statement, and only unfolding a
+  -- `foldr` or splitting a `match` can make new ones. Reducing the whole remaining precondition at
+  -- every step is quadratic in its size.
+  let g ← if reduced then pure g else g.replaceTargetDefEq (← reduceCtorProjs (← g.getType))
+  let ty := (← instantiateMVars (← g.getType)).consumeMData
   if ty.isConstOf ``True then
     g.assign (mkConst ``True.intro)
     return []
   if ty.isForall then
     let (_, g) ← g.intro1P
-    return ← splitPaths g
+    return ← splitPaths g true
   if ty.isAppOf ``List.foldr then
     return ← splitPaths (← g.replaceTargetDefEq (← whnf ty))
   if (← matchMatcherApp? ty).isSome then
@@ -289,8 +319,81 @@ partial def splitPaths (g : MVarId) : MetaM (List MVarId) := g.withContext do
       (``ite, 5, ``ite_intro)] do
     if ty.isAppOfArity head arity then
       if let some gs ← observing? (applyExact g (← mkConstWithFreshMVarLevels lem)) then
-        return ← gs.flatMapM splitPaths
+        return ← gs.flatMapM (splitPaths · true)
   return [g]
+
+/-- Two terms that differ in a constructor or a literal where both have one: never equal. -/
+private partial def clashes (a b : Expr) : MetaM Bool := do
+  let a ← instantiateMVars a
+  let b ← instantiateMVars b
+  match a, b with
+  | .lit l₁, .lit l₂ => return l₁ != l₂
+  | _, _ =>
+    let env ← getEnv
+    let some f := a.getAppFn.constName? | return false
+    let some g := b.getAppFn.constName? | return false
+    let some (.ctorInfo c) := env.find? f | return false
+    let some (.ctorInfo _) := env.find? g | return false
+    if f != g then return true
+    let as := a.getAppArgs; let bs := b.getAppArgs
+    unless as.size == bs.size do return false
+    for i in [c.numParams:as.size] do
+      if ← clashes as[i]! bs[i]! then return true
+    return false
+
+/-- `e` with the disjuncts no choice can satisfy dropped (a conjunct equating clashing
+constructors, under any `∃`): `none` when none is left, else the smaller proposition and, unless it
+is `e` itself, a proof that it implies `e`. Dropping a disjunct only strengthens the goal. -/
+private partial def dropClashing (e : Expr) : MetaM (Option (Expr × Option Expr)) := do
+  let e ← instantiateMVars e
+  if e.isConstOf ``False then return none
+  if e.isAppOfArity ``Or 2 then
+    let a := e.getArg! 0; let b := e.getArg! 1
+    let ra ← dropClashing a
+    let rb ← dropClashing b
+    match ra, rb with
+    | none, none => return none
+    | some (a', pa), none =>
+      let inl ← withLocalDeclD `h a' fun h => do
+        let ha := match pa with | some p => mkApp p h | none => h
+        mkLambdaFVars #[h] (← mkAppOptM ``Or.inl #[a, b, ha])
+      return some (a', some inl)
+    | none, some (b', pb) =>
+      let inr ← withLocalDeclD `h b' fun h => do
+        let hb := match pb with | some p => mkApp p h | none => h
+        mkLambdaFVars #[h] (← mkAppOptM ``Or.inr #[a, b, hb])
+      return some (b', some inr)
+    | some (a', pa), some (b', pb) =>
+      if pa.isNone && pb.isNone then return some (e, none)
+      let pa := pa.getD (← withLocalDeclD `h a fun h => mkLambdaFVars #[h] h)
+      let pb := pb.getD (← withLocalDeclD `h b fun h => mkLambdaFVars #[h] h)
+      -- `Or.imp : (a' → a) → (b' → b) → a' ∨ b' → a ∨ b`
+      return some (← mkAppM ``Or #[a', b'], some (← mkAppM ``Or.imp #[pa, pb]))
+  if e.isAppOfArity ``And 2 then
+    let a := e.getArg! 0; let b := e.getArg! 1
+    let some (a', pa) ← dropClashing a | return none
+    let some (b', pb) ← dropClashing b | return none
+    if pa.isNone && pb.isNone then return some (e, none)
+    let pa := pa.getD (← withLocalDeclD `h a fun h => mkLambdaFVars #[h] h)
+    let pb := pb.getD (← withLocalDeclD `h b fun h => mkLambdaFVars #[h] h)
+    return some (← mkAppM ``And #[a', b'], some (← mkAppM ``And.imp #[pa, pb]))
+  if e.isAppOfArity ``Exists 2 then
+    let p := e.getArg! 1
+    let .lam n ty body bi := p | return some (e, none)
+    let r ← withLocalDecl n bi ty fun x => do
+      let some (b', pb) ← dropClashing (body.instantiate1 x) | return none
+      match pb with
+      | none => return some none
+      | some pb => return some (some (← mkLambdaFVars #[x] b', ← mkLambdaFVars #[x] pb))
+    match r with
+    | none => return none
+    | some none => return some (e, none)
+    | some (some (q, h)) =>
+      -- `Exists.imp : (∀ a, q a → p a) → (∃ a, q a) → ∃ a, p a`
+      return some (← mkAppM ``Exists #[q], some (← mkAppM ``Exists.imp #[h]))
+  if let some (_, a, b) := e.eq? then
+    if ← clashes a b then return none
+  return some (e, none)
 
 /-- The computed angelic precondition `g`, pruned: its `List.foldr Or False` and `List.map` over a
 literal list of branches reduced to a disjunction, a `match` of one value collapsed, then the
@@ -298,16 +401,47 @@ disjuncts that are refuted outright removed (a constructor clash, a closed weigh
 trivial conjuncts dropped, and a draw that is the value itself eliminated. It never picks between
 disjuncts that survive, and closes the goal when nothing is left to choose. -/
 private def prune (g : MVarId) : TermElabM (List MVarId) := g.withContext do
-  let ty ← Meta.transform (← instantiateMVars (← g.getType)) (pre := fun e => do
+  let ty ← timeIt "prune.transform" <| Meta.transform (← instantiateMVars (← g.getType)) (pre := fun e => do
     unless e.isAppOf ``List.foldr do return .continue
     let e' ← whnf e
     return if e' == e then .continue else .visit e')
-  let g ← g.replaceTargetDefEq (← tidyExpr (← Core.betaReduce ty))
-  let pruned ← observing? <| Lean.Elab.Tactic.run g <| evalTactic (← `(tactic|
-    simp only [reduceCtorEq, Nat.lt_irrefl, Nat.reduceLT, Int.reduceLT, Nat.cast_ofNat,
+  let g ← timeIt "prune.tidy" do g.replaceTargetDefEq (← tidyExpr (← Core.betaReduce ty))
+  -- the `match`es on constructors reduced, definitionally, before `simp` (whose reduction of them is
+  -- most of its time) goes through them (`basalt.walk.pruneReduceMatch`)
+  let g ← if !basalt.walk.pruneReduceMatch.get (← getOptions) then pure g else timeIt "prune.iota" do
+    let ty ← instantiateMVars (← g.getType)
+    let ty' ← Meta.transform ty (post := fun e => do
+      unless e.isApp do return .done e
+      -- (only a guard's `match`, to `true` or `false`: a branch's code is left as it is)
+      match ← Meta.reduceMatcher? e with
+      | Meta.ReduceMatcherResult.reduced e' =>
+        let r ← whnfR e'.headBeta
+        if r.isConstOf ``Bool.true || r.isConstOf ``Bool.false then return .done r
+        return .done e
+      | _ => return .done e)
+    if ty' == ty then pure g else g.replaceTargetDefEq ty'
+  -- the branches whose constructor clashes with the value, dropped before `simp` goes through them
+  -- (`basalt.walk.pruneDropClashing`)
+  let g ← if !basalt.walk.pruneDropClashing.get (← getOptions) then pure g else timeIt "prune.drop" do
+    let ty ← instantiateMVars (← g.getType)
+    match ← dropClashing ty with
+    | some (ty', some pf) =>
+      let g' ← mkFreshExprSyntheticOpaqueMVar ty' (← g.getTag)
+      g.assign (mkApp pf g')
+      pure g'.mvarId!
+    | _ => pure g
+  -- (`basalt.walk.pruneDischarge` false: no side conditions discharged)
+  let tac ← if !basalt.walk.pruneDischarge.get (← getOptions) then
+      `(tactic| simp (config := { maxDischargeDepth := 0 }) only [reduceCtorEq, Nat.lt_irrefl, Nat.reduceLT, Int.reduceLT, Nat.cast_ofNat,
       Pi.top_apply, Prop.top_eq_true, false_or, or_false, true_or, or_true, true_and, and_true,
       false_and, and_false, exists_false, exists_prop, exists_eq_right, ite_self,
-      Basalt.Walk.dite_const, Basalt.Walk.matchConst]))
+      Basalt.Walk.dite_const, Basalt.Walk.matchConst])
+    else
+      `(tactic| simp only [reduceCtorEq, Nat.lt_irrefl, Nat.reduceLT, Int.reduceLT, Nat.cast_ofNat,
+      Pi.top_apply, Prop.top_eq_true, false_or, or_false, true_or, or_true, true_and, and_true,
+      false_and, and_false, exists_false, exists_prop, exists_eq_right, ite_self,
+      Basalt.Walk.dite_const, Basalt.Walk.matchConst])
+  let pruned ← timeIt "prune.simp" <| observing? <| Lean.Elab.Tactic.run g <| evalTactic tac
   return pruned.getD [g]
 
 /-- The computed angelic precondition `g`, pruned (`prune`), then one goal per case of each `match`
@@ -315,7 +449,7 @@ in it on something in the context, each pruned again. A case split on the contex
 disjunct. -/
 partial def prunePaths (g : MVarId) : TermElabM (List MVarId) := do
   (← prune g).flatMapM fun g => do
-    let some gs ← splitCtxMatch? id g | return [g]
+    let some gs ← timeIt "prune.split" (splitCtxMatch? id g) | return [g]
     gs.flatMapM prunePaths
 
 /-- Prove `goal`, which is `O.spec g post` for `O` the observation `obs` into `Prop`, by the walk of
@@ -325,10 +459,17 @@ def preconditionBound (finish : LocalContext → MVarId → TermElabM (List MVar
     (extras : Array Term) (obs : Name) (g post : Expr) (goal : MVarId) :
     TermElabM (List MVarId) := do
   let lctx := (← goal.getDecl).lctx
+  let t0 ← IO.monoMsNow
   let (pre, structural, rest) ← computeBound extras obs true g post
+  let t1 ← IO.monoMsNow
   let paths ← mkFreshExprMVar pre
   goal.assign (mkApp structural paths)
-  return (← finish lctx paths.mvarId!) ++ (← rest.mapM fun g => tidy lctx g)
+  let fin ← finish lctx paths.mvarId!
+  let t2 ← IO.monoMsNow
+  let rest' ← rest.mapM fun g => tidy lctx g
+  let t3 ← IO.monoMsNow
+  if basalt.walk.profile.get (← getOptions) then logInfo m!"walk timing: computeBound {t1 - t0} ms, finish {t2 - t1} ms ({fin.length} goals), tidy rest {t3 - t2} ms ({rest.length} goals); precondition size {(← instantiateMVars pre).approxDepth}"
+  return fin ++ rest'
 
 /-- Prove `goal`, which is `other ≤ O.spec g post` when `lower` and `O.spec g post ≤ other`
 otherwise, for `O` the observation `obs`: the arithmetic goal relating `other` to the bound the walk
@@ -418,7 +559,14 @@ partial def walkGoal (extras : Array Term) (goal : MVarId) : TermElabM (List MVa
     let post ← etaPost sg.post
     if ← isAngelic sg.O then preconditionBound (fun _ => prunePaths) extras sg.obs sg.g post goal
     else
-      preconditionBound (fun lctx g => do (← splitPaths g).mapM (tidy lctx ·)) extras sg.obs sg.g
+      preconditionBound (fun lctx g => do
+          let t0 ← IO.monoMsNow
+          let gs ← splitPaths g
+          let t1 ← IO.monoMsNow
+          let gs ← gs.mapM (tidy lctx ·)
+          let t2 ← IO.monoMsNow
+          if basalt.walk.profile.get (← getOptions) then logInfo m!"walk timing: splitPaths {t1 - t0} ms ({gs.length} paths), tidy {t2 - t1} ms"
+          return gs) extras sg.obs sg.g
         post goal
 
 /-- The admissibility of `sg`'s statement, for fixpoint induction on its generator: `O.admissible`
@@ -485,6 +633,9 @@ syntax (name := walkTac) "walk" (&" fixpoint")? (walkFacts)? : tactic
 elab_rules : tactic
   | `(tactic| walk $[fixpoint%$fix]? $[$fs]?) => withMainContext do
     let facts := walkFacts.terms fs
+    -- this thread's entries only: other walks may be running
+    let tid ← (IO.getTID : BaseIO UInt64)
+    (← factConstsCache).modify fun m => m.filter fun k _ => k.1 != tid
     for t in facts do checkFact t
     let goal ← getMainGoal
     replaceMainGoal (← if fix.isSome then walkFixpoint facts goal else walkGoal facts goal)
