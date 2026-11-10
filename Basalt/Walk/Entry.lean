@@ -252,7 +252,17 @@ with its equations solved (`solveSplitEqs`); `none` when there is no such `match
 private def splitCtxMatch? (part : Expr → Expr) (g : MVarId) : MetaM (Option (List MVarId)) :=
   g.withContext do
   let ty ← instantiateMVars (← g.getType)
-  let some m ← findSplit? (part ty) .match | return none
+  let keep := ((basalt.walk.keepMatchesOn.get (← getOptions)).splitOn ",").filter (· ≠ "")
+    |>.map String.toName
+  let mut except : ExprSet := {}
+  unless keep.isEmpty do
+    let found ← IO.mkRef (#[] : Array Expr)
+    Meta.forEachExpr (part ty) fun e => do
+      if let some m ← matchMatcherApp? e then
+        if m.discrs.any (fun d => (d.find? fun x => keep.any (x.isConstOf ·)).isSome) then
+          found.modify (·.push e)
+    for e in ← found.get do except := except.insert e
+  let some m ← findSplit? (part ty) .match except | return none
   let old ← getLCtx
   let some gs ← observing? (Split.splitMatch g m) | return none
   some <$> gs.filterMapM fun g => do
@@ -311,8 +321,11 @@ private def prune (g : MVarId) : TermElabM (List MVarId) := g.withContext do
     let e' ← whnf e
     return if e' == e then .continue else .visit e')
   let g ← g.replaceTargetDefEq (← tidyExpr (← Core.betaReduce ty))
+  -- (`2` is `simp`'s default depth)
+  let depth := Syntax.mkNumLit (if basalt.walk.pruneDischarge.get (← getOptions) then "2" else "0")
   let pruned ← observing? <| Lean.Elab.Tactic.run g <| evalTactic (← `(tactic|
-    simp only [reduceCtorEq, Nat.lt_irrefl, Nat.reduceLT, Int.reduceLT, Nat.cast_ofNat,
+    simp (config := { maxDischargeDepth := $depth }) only [reduceCtorEq, Nat.lt_irrefl,
+      Nat.reduceLT, Int.reduceLT, Nat.cast_ofNat,
       Pi.top_apply, Prop.top_eq_true, false_or, or_false, true_or, or_true, true_and, and_true,
       false_and, and_false, exists_false, exists_prop, exists_eq_right, ite_self,
       Basalt.Walk.dite_const, Basalt.Walk.matchConst]))

@@ -282,6 +282,13 @@ def solveCast (goal : MVarId) : MetaM Unit := goal.withContext do
 
 /-! ## Side goals -/
 
+register_option basalt.walk.keepMatchesOn : String := {
+  defValue := ""
+  descr := "comma-separated constants: a `match` of a computed angelic precondition whose \
+    discriminant mentions one is left to the caller instead of being split on (a check's verdict, \
+    which the caller decides from a law)"
+}
+
 /-- Close `goal`, whose type is `ty`, when it is a side goal a rule or a bridge leaves, and report
 whether it did. -/
 def solveSideGoal (goal : MVarId) (ty : Expr) : MetaM Bool := goal.withContext do
@@ -642,8 +649,22 @@ private def tryFacts (leaves : Leaves) (extras : Array Term) (goal : MVarId) (g 
   let rec lamBody : Expr → Expr
     | .lam _ _ b _ => lamBody b
     | e => e
+  -- A predicate on a pair is a `match` on it (`fun (k, m) => …`), whose matcher each file has
+  -- its own of: the relation is read from the match's alternative.
+  let env ← getEnv
+  let headOf (b : Expr) : Option Name := match b.getAppFn with
+    | .const m _ =>
+      if Lean.Meta.isMatcherCore env m then
+        b.getAppArgs.findSome? fun alt =>
+          if alt.isLambda then
+            match (lamBody alt).getAppFn with
+            | .const m' _ => if Lean.Meta.isMatcherCore env m' then none else some m'
+            | _ => none
+          else none
+      else some m
+    | _ => none
   let predHeads : Array Name := (← instantiateMVars g).getAppArgs.filterMap fun a =>
-    if a.isLambda then (lamBody a).getAppFn.constName? else none
+    if a.isLambda then headOf (lamBody a) else none
   -- Two passes: first the facts that also mention the predicate's relation, then the rest. A law
   -- about the drawn predicate is usually the one that applies, and found first it spares the failed
   -- unifications against the others; the second pass keeps every fact the head admits.
@@ -738,6 +759,141 @@ def unfoldCounterpart (j : Judgment) (c : Name) (goal : MVarId) : MetaM MVarId :
     let v ← instantiateValueLevelParams (.defnInfo info) us
     goal.change (mkAppN ty.getAppFn (ty.getAppArgs.set! i ((renameLambdas v).beta other.getAppArgs)))
 
+register_option basalt.walk.pruneDischarge : Bool := {
+  defValue := true
+  descr := "the walk's pruning `simp` discharges side conditions (a `match` equation's overlap \
+    hypotheses, mostly: most of its time, and they never decide a branch the plain reduction of \
+    the `match` does not)"
+}
+
+register_option basalt.walk.dropUnreachable : Bool := {
+  defValue := false
+  descr := "a goal `?c ≤ O.spec g (· = t)`, `?c` a proposition, whose generator returns at every \
+    tail a value whose constructor clashes with `t`'s gets `False` for `?c`, without walking `g`; \
+    the tails are read through `basalt.walk.failHeads` and `basalt.walk.choiceHeads`"
+}
+
+register_option basalt.walk.failHeads : String := {
+  defValue := ""
+  descr := "comma-separated constants that return no value, for `basalt.walk.dropUnreachable`"
+}
+
+register_option basalt.walk.choiceHeads : String := {
+  defValue := ""
+  descr := "comma-separated constants that choose among a list of `(weight, thunk)` pairs, their \
+    last argument, for `basalt.walk.dropUnreachable`"
+}
+
+/-- Two terms that differ in a constructor or a literal where both have one: never equal. A term
+with a variable at a position is no evidence there. -/
+partial def valuesClash (a b : Expr) : MetaM Bool := do
+  match a, b with
+  | .lit l₁, .lit l₂ => return l₁ != l₂
+  | _, _ =>
+    let env ← getEnv
+    let some f := a.getAppFn.constName? | return false
+    let some g := b.getAppFn.constName? | return false
+    let some (.ctorInfo c) := env.find? f | return false
+    let some (.ctorInfo _) := env.find? g | return false
+    if f != g then return true
+    let as := a.getAppArgs; let bs := b.getAppArgs
+    unless as.size == bs.size do return false
+    for i in [c.numParams:as.size] do
+      if ← valuesClash as[i]! bs[i]! then return true
+    return false
+
+initialize tailValuesCache : IO.Ref (Std.HashMap (String × String × Expr) (Option (Array Expr))) ←
+  IO.mkRef {}
+
+private def headsOption (o : Lean.Option String) (opts : Options) : List Name :=
+  ((o.get opts).splitOn ",").filter (· ≠ "") |>.map String.toName
+
+/-- The values a generator returns, read off its tails (`pure v`; the continuation of a `bind`;
+each branch of a choice, an `ite`, a `match`; nothing from a failure): `none` where a tail is
+anything else (a call, which may return anything). -/
+partial def tailValues (e : Expr) (fuel : Nat := 200) : MetaM (Option (Array Expr)) := do
+  if fuel == 0 then return none
+  let e := e.consumeMData
+  let opts ← getOptions
+  let key := (basalt.walk.failHeads.get opts, basalt.walk.choiceHeads.get opts, e)
+  if let some r := (← tailValuesCache.get)[key]? then return r
+  let r ← tailValuesCore e fuel
+  tailValuesCache.modify fun m => (if m.size > 100000 then {} else m).insert key r
+  return r
+where tailValuesCore (e : Expr) (fuel : Nat) : MetaM (Option (Array Expr)) := do
+  let rec lamBody : Expr → Expr
+    | .lam _ _ b _ => lamBody b
+    | e => e
+  match e with
+  | .letE _ _ _ b _ => return ← tailValues b (fuel - 1)
+  | .lam _ _ b _ => return ← tailValues b (fuel - 1)
+  | _ => pure ()
+  let some c := e.getAppFn.constName? | return none
+  let args := e.getAppArgs
+  if c == ``Pure.pure && args.size == 4 then return some #[args[3]!]
+  if c == ``Bind.bind && args.size == 6 then return ← tailValues (lamBody args[5]!) (fuel - 1)
+  let opts ← getOptions
+  if (headsOption basalt.walk.failHeads opts).contains c then return some #[]
+  if (headsOption basalt.walk.choiceHeads opts).contains c then
+    let some (_, xs) := (args.back?.bind (·.listLit?)) | return none
+    let mut out := #[]
+    for x in xs do
+      unless x.isAppOfArity ``Prod.mk 4 do return none
+      let some vs ← tailValues (lamBody (x.getArg! 3)) (fuel - 1) | return none
+      out := out ++ vs
+    return some out
+  if (c == ``ite && args.size == 5) || (c == ``dite && args.size == 5) then
+    let some a ← tailValues (lamBody args[3]!) (fuel - 1) | return none
+    let some b ← tailValues (lamBody args[4]!) (fuel - 1) | return none
+    return some (a ++ b)
+  if let some info ← Lean.Meta.getMatcherInfo? c then
+    let alts := args.extract (info.getFirstAltPos) (info.getFirstAltPos + info.numAlts)
+    unless alts.size == info.numAlts do return none
+    let mut out := #[]
+    for alt in alts do
+      let some vs ← tailValues (lamBody alt) (fuel - 1) | return none
+      out := out ++ vs
+    return some out
+  return none
+
+/-- `goal`, `?c ≤ O.spec g (· = t)` (`basalt.walk.dropUnreachable`), closed with `False` for `?c`
+when every value `g` returns clashes with `t`: sound whatever the check says (`False` implies
+anything), complete since no run of `g` returns `t`. -/
+def dropUnreachable? (goal : MVarId) (g : Expr) : MetaM Bool := do
+  unless basalt.walk.dropUnreachable.get (← getOptions) do return false
+  goal.withContext do
+  let ty ← instantiateMVars (← goal.getType)
+  unless ty.isAppOfArity ``LE.le 4 && (ty.getArg! 0).isProp do return false
+  let c := ty.getArg! 2
+  -- Do not fold these two checks into one `&&`: do-notation lifts its `(← …)` out of the
+  -- condition, and `mvarId!` on a term that is not a metavariable panicked, every panic
+  -- serializing the threads.
+  unless c.isMVar do return false
+  if ← c.mvarId!.isAssigned then return false
+  let spec := ty.getArg! 3
+  let some t ← (do
+    unless (toString (spec.getAppFn.constName?.getD .anonymous)).endsWith "spec" do return none
+    let post := spec.appArg!
+    let .lam _ _ body _ := post | return none
+    let some (_, l, r) := body.eq? | return none
+    let t :=
+      if l.isBVar && l.bvarIdx! == 0 then r else if r.isBVar && r.bvarIdx! == 0 then l else body
+    if t.hasLooseBVars || (t.isApp && t.getAppFn.isConstOf ``Eq) then return none
+    return some t) | return false
+  let t ← whnfR (← instantiateMVars t)
+  let some th := t.getAppFn.constName? | return false
+  unless (← getEnv).find? th |>.any (·.isCtor) do return false
+  let some vs ← tailValues g | return false
+  for v in vs do
+    unless ← valuesClash v t do return false
+  unless ← isDefEq c (mkConst ``False) do return false
+  -- Do not build this with `mkAppOptM` or `mkLambdaFVars`: the first infers the type of `spec`, the
+  -- whole generator's, and the second instantiates its metavariables.
+  let pf := Expr.lam `h (mkConst ``False)
+    (mkApp2 (mkConst ``False.elim [Level.zero]) spec (.bvar 0)) .default
+  goal.assign pf
+  return true
+
 mutual
 
 /-- Prove `goal` by walking the generator, returning the goals no judgment recognizes. `extras` are
@@ -783,6 +939,7 @@ partial def bound (j : Judgment) (leaves : Leaves) (extras : Array Term) (goal :
   -- unification, and the side condition then survives as a goal.
   let g' ← whnfR g
   let goal ← if g' == g then pure goal else goal.change (restate g')
+  if ← dropUnreachable? goal g then return []
   let g := g'
   let rest := walkAll extras
   let obs? := (specObs? (← whnfR (← instantiateMVars (← goal.getType)))).map (·.1)
