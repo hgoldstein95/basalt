@@ -5,7 +5,6 @@ Authors: Harrison Goldstein
 -/
 module
 
-import Mathlib.Tactic.Basify
 public import Basalt
 
 /-!
@@ -121,7 +120,7 @@ example : SPMF.expect (genPred : SPMF Nat) (fun n => n) ≤ 2 := by
   walk
   trace_state
   norm_num [Finset.sum_Icc_succ_top]
-  basify
+  ennreal_to_real
   norm_num
 
 /-! Overlapping patterns: a later alternative knows the earlier ones did not match. -/

@@ -34,7 +34,7 @@ private theorem alphanumChars_eq_filter (c : Char) :
     have h2 : c.isAlphanum = false := by
       simp only [Char.toNat] at hc
       simp only [Char.isAlphanum, Char.isAlpha, Char.isDigit, Char.isUpper, Char.isLower]
-      grind
+      grind [UInt32.le_iff_toNat_le]
     simp [h1, h2]
 
 theorem Char.arbitrary.sound_complete :

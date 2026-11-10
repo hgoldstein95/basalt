@@ -209,7 +209,7 @@ definition, and the definition is right here to run.
   first ([Basalt/Order.lean](Basalt/Order.lean)).
 
 - **`ring`/`linarith` fail on an `ℝ≥0∞` goal** — they don't exist there; transfer with
-  Mathlib's `basify` and finish over `ℝ`.
+  `ennreal_to_real` ([Basalt/Tactic/ENNReal.lean](Basalt/Tactic/ENNReal.lean)) and finish over `ℝ`.
 
 ## Documentation rules
 

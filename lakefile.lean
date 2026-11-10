@@ -13,7 +13,7 @@ package basalt where
   leanOptions := #[⟨`backward.proofsInPublic, true⟩]
   buildDir := if fuzz then ".lake" / "build-fuzz" else defaultBuildDir
 
-require "leanprover-community" / mathlib @ git "v4.35.0"
+require "leanprover-community" / mathlib @ git "v4.34.0"
 
 require splitmix from git "https://github.com/hgoldstein95/splitmix" @ "splitmix-0.3.0"
 

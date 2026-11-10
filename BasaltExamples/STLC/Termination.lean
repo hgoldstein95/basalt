@@ -5,7 +5,6 @@ Authors: Harrison Goldstein & Ernest Ng
 -/
 module
 
-import Mathlib.Tactic.Basify
 public import Basalt
 public import BasaltExamples.STLC.GenTerm
 
@@ -34,7 +33,9 @@ theorem genTerm.terminates : IsAlmostSurelyTerminating (genTerm Γ τ) := by
     split
     all_goals
       norm_num only [List.sum_cons, List.sum_nil, List.length_cons, List.length_nil]
-      basify
-      nlinarith
+      ennreal_to_real
+      have hc1' : c.toReal ≤ 1 := ENNReal.toReal_le_of_le_ofReal zero_le_one (by simpa using hc1)
+      simp only [ENNReal.toReal_zero, add_zero]
+      nlinarith [mul_nonneg (sub_nonneg.mpr hc1') c.toReal_nonneg]
 
 end STLC

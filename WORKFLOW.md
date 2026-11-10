@@ -302,7 +302,7 @@ combinator). Of the generator, only its callees' laws are yours to supply:
 **The arithmetic** has your `F c` on the left, the computed bound on the right, and no generator in
 sight. Try `simp` (`ArbNat.lean`, `SortedList.lean`), then `simp` with the identities the goal needs
 (`simp [sq, ENNReal.div_eq_inv_mul, mul_add]` in `LeftistHeap.lean` and `AllTwoTree.lean`), then
-`basify` and `nlinarith`. If it looks *false*, your certificate is wrong, not your proof. A
+`ennreal_to_real` and `nlinarith`. If it looks *false*, your certificate is wrong, not your proof. A
 generator whose seed has an argument typed by another goes through
 `IsAlmostSurelyTerminating.of_lfpIsOne_uniform` on an explicit family.
 
