@@ -26,13 +26,12 @@ namespace NonEmptyList
 /-- A list sized by `n`, with elements in `[0, n]`: stopping with weight `1` against continuing with
 weight `n`. -/
 def genList [Gen G] (n : Nat) : G (List Nat) :=
-  frequency! [
-    (1, fun _ => pure []),
-    (n, fun _ => do
-      let x ← chooseNat 0 n
-      let xs ← genList n
-      return x :: xs)
-  ] (by simp)
+  frequency!
+  | 1 => pure []
+  | n => do
+    let x ← chooseNat 0 n
+    let xs ← genList n
+    return x :: xs
 partial_fixpoint
 
 /-- Draws from `genList` until the list drawn is not empty. -/

@@ -26,12 +26,12 @@ namespace ArbList
 
 /-- Generates an arbitrary `List Nat`: flip a coin to stop with `[]`, or draw a head and recurse. -/
 def List.arbitrary [Gen G] : G (List Nat) := do
-  oneOf! [
-    fun _ => pure [],
-    fun _ => do
-      let x ← Nat.arbitrary
-      let xs ← List.arbitrary
-      return x :: xs]
+  oneOf!
+  | pure []
+  | do
+    let x ← Nat.arbitrary
+    let xs ← List.arbitrary
+    return x :: xs
 partial_fixpoint
 
 /-- A variant of `List.arbitrary` using the `vectorOf` combinator: choose a length `n` at random,

@@ -185,7 +185,7 @@ example : IsSoundFor (genSub : SPMF Nat) (· ≤ 2) := by
 equation, which is solved (`some b = some (k + 1)` to `b = k + 1`, `some b = none` to no case). -/
 
 def genFuel [Gen G] (n : Nat) : G Nat := do
-  let o ← oneOf! [fun _ => pure none, fun _ => some <$> chooseNat 0 n]
+  let o ← oneOf! | pure none | some <$> chooseNat 0 n
   match o with
   | none => pure 0
   | some 0 => pure 0
@@ -228,6 +228,20 @@ theorem genPred.terminates : IsAlmostSurelyTerminating genPred := by
 
 example : IsFaithful genPred := by
   faithful_fixpoint [genPred.terminates]
+
+/-! A branch of a plain `oneOf` reaches the walk as `(fun _ => match …) ()` on both sides. -/
+
+def genBranch [Gen G] (n : Nat) : G Nat :=
+  oneOf [fun _ => pure 0, fun _ => match n with | 0 => pure 1 | k + 1 => pure k] (by simp)
+
+example (n : Nat) : IsFaithful (genBranch n) where
+  terminates := by
+    rw [IsAlmostSurelyTerminating.iff_obs]
+    unfold genBranch
+    walk
+    all_goals norm_num [ENNReal.div_self]
+  below _ _ _ := by unfold genBranch; walk
+  approx := by unfold genBranch; walk
 
 /-! A `match` applied to something further is not entered. -/
 

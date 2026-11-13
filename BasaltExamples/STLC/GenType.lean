@@ -24,12 +24,12 @@ namespace STLC
 
 /-- Generates an arbitrary type. -/
 def genType [Gen G] : G Ty :=
-  oneOf! [
-    fun _ => pure .Bool,
-    fun _ => do
-      let τ1 ← genType
-      let τ2 ← genType
-      return .Fun τ1 τ2]
+  oneOf!
+  | pure .Bool
+  | do
+    let τ1 ← genType
+    let τ2 ← genType
+    return .Fun τ1 τ2
 partial_fixpoint
 
 theorem genType.sound_complete : IsSoundAndComplete genType (fun _ => True) := by

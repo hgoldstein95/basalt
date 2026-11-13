@@ -133,14 +133,13 @@ def genBST [Gen G] (lo hi : Int) : G Tree := do
   if h : lo > hi then
     return .leaf
   else
-    frequency! [
-      (1, fun () => pure .leaf),
-      (1, fun () => do
-        let x ← chooseInt lo hi (by omega)
-        let l ← genBST lo (x - 1)
-        let r ← genBST (x + 1) hi
-        return .node l x r)
-    ] (by simp)
+    frequency!
+    | 1 => pure .leaf
+    | 1 => do
+      let x ← chooseInt lo hi (by omega)
+      let l ← genBST lo (x - 1)
+      let r ← genBST (x + 1) hi
+      return .node l x r
 partial_fixpoint
 
 /-! ### Properties
