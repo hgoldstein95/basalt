@@ -189,6 +189,14 @@ jobs:
           grep -q "unknown property 'long-6'" log-typo.txt || {
             echo "::error::an unknown property was not reported as such"; cat log-typo.txt; exit 1; }
 
+      - name: A flag the backend does not take must be refused
+        run: |
+          if fuzz-run/basalt-fuzz --backend=io bst-insert --truncate -runs=1 > log-flag.txt 2>&1; then
+            echo "::error::--backend=io ran with --truncate, which it would ignore"; cat log-flag.txt; exit 1
+          fi
+          grep -q "does not take --truncate" log-flag.txt || {
+            echo "::error::the stray flag was not reported as such"; cat log-flag.txt; exit 1; }
+
       # The one property where the backends are supposed to *disagree*: `chain-4` hides its bug behind
       # 4 nested guards, so coverage guidance finds it in ~1e3 runs while uniform sampling needs
       # ~256^4. Asserting both directions guards the claim in fuzz-run/README.md's comparison table —

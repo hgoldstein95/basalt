@@ -138,6 +138,7 @@ def withDefaults (argv : Array String) : Array String :=
 @[basalt_backend]
 def fuzzBackend : Backend where
   name := "fuzz"
+  flags := ours
   campaign T argv := do
     let f := splitFlags argv
     if !f.bad.isEmpty then usageError s!"malformed: {f.bad.toList}; --truncate takes no value"

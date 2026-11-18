@@ -214,8 +214,11 @@ corpus. The random backends read `-runs=N` from the same spelling, plus `-discar
 discard budget (`Basalt/PBT/Driver.lean`), and ignore the rest — under `fuzz`, libFuzzer owns the
 loop, so a discarded input is a `-1` return and neither budget applies.
 
-`--backend=` and `--truncate` are Basalt's own and are consumed before libFuzzer sees the command line;
-everything else is forwarded verbatim, and libFuzzer rejects a flag it does not know.
+`--backend=` and `--truncate` are Basalt's own and are consumed before libFuzzer sees the command
+line; everything else is forwarded verbatim, and libFuzzer rejects a flag it does not know. A `--`
+flag the chosen backend does not take is a usage error (`--backend=io --truncate` does not run as a
+plain random campaign); single-dash flags pass to every backend, which ignores those it does not
+read.
 
 ## Backends
 

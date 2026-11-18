@@ -32,6 +32,11 @@ structure Backend where
   campaign : Property → Array String → IO Unit
   /-- Reproduce one saved input, for a backend whose inputs are files (a fuzzer's artifacts). -/
   replay? : Option (Property → String → IO Unit) := none
+  /-- The Basalt flags the campaign reads, by bare name (`"--truncate"`), each given as `--name` or
+  `--name=value`. `dispatch` rejects any other `--` flag, which this backend would silently ignore;
+  single-dash flags (`-runs=`, libFuzzer's) are passed on unchecked, since one command line serves
+  every backend. -/
+  flags : List String := []
 
 meta section
 

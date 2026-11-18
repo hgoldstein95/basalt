@@ -58,6 +58,10 @@ def findBackend (backends : List Backend) : Option String → Option Backend
   | none => backends.head?
   | some n => backends.find? (·.name == n)
 
+/-- The arguments in `args` that are Basalt flags (`--…`) `backend` does not take. -/
+def strayFlags (backend : Backend) (args : List String) : List String :=
+  args.filter fun a => a.startsWith "--" && !backend.flags.any (isFlag · a)
+
 /-- A front end for an executable exposing several named properties:
 `<exe> [--backend=…] <property> [args...]` starts a campaign, and `<exe> replay <property> <file>`
 reproduces a saved input.
@@ -85,9 +89,12 @@ def dispatch (exe : String) (props : List (String × Property)) (args : List Str
     | _, none => usageError s!"unknown property '{name}'; known: {names}"
     | some replay, some T => replay T path
   | some backend, name :: rest =>
-    match props.lookup name with
-    | some T => backend.campaign T rest.toArray
-    | none => usageError s!"unknown property '{name}'; known: {names}"
+    match props.lookup name, strayFlags backend rest with
+    | none, _ => usageError s!"unknown property '{name}'; known: {names}"
+    | some _, a :: _ =>
+      let takes := if backend.flags.isEmpty then "none" else String.intercalate ", " backend.flags
+      usageError s!"backend '{backend.name}' does not take {a} (its flags: {takes})"
+    | some T, [] => backend.campaign T rest.toArray
   | some _, [] => usageError usage
 
 end Basalt.PBT

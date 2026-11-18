@@ -169,6 +169,11 @@ runs           : 0 (30 discarded)
 #guard (findBackend [ioBackend, plausibleBackend] (some "plausible")).map (·.name) == some "plausible"
 #guard (findBackend [ioBackend, plausibleBackend] (some "fuzz")).isNone
 
+/- A `--` flag the backend does not take is reported, so that `--backend=io --hybrid` cannot run as a
+plain random campaign; a single-dash flag is any backend's. -/
+#guard strayFlags ioBackend ["-runs=5", "corpus", "--hybrid"] == ["--hybrid"]
+#guard strayFlags { ioBackend with flags := ["--truncate"] } ["--truncate", "--truncate=1"] == []
+
 /- `@[basalt_backend]` registers in declaration order, and `dispatch` reads that list where it is
 called: everything Basalt itself offers, with `io` as the default. -/
 #guard ((registered_backends% : List Backend).map (·.name)) == ["io", "plausible"]
