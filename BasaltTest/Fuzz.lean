@@ -229,3 +229,9 @@ private def replayMismatches (n : Nat) (seed : UInt64) : Nat := Id.run do
 
 /-- info: 0 -/
 #guard_msgs in #eval IO.println (replayMismatches 500 2026)
+
+/-! ## `--hybrid=N` stays within the bridge's `UInt64` test count -/
+
+#guard (splitFlags #["--hybrid=18446744073709551615"]).bad.isEmpty
+#guard (splitFlags #["--hybrid=18446744073709551616"]).bad == #["--hybrid"]
+#guard (splitFlags #["--hybrid=0"]).bad == #["--hybrid"]

@@ -195,7 +195,8 @@ def splitFlags (argv : Array String) : FuzzFlags :=
     else match flagValue? argv "--hybrid=" with
     | none => .ok (some .stale)
     | some v => match v.toNat? with
-      | some n => if n > 0 then .ok (some (.fixed n)) else .error "--hybrid"
+      -- The bridge counts tests in a `UInt64`, which a larger `N` would wrap.
+      | some n => if 0 < n && n < UInt64.size then .ok (some (.fixed n)) else .error "--hybrid"
       | none => .error "--hybrid"
   let isOurs (a : String) := ours.any (isFlag · a)
   let f : FuzzFlags := { truncate := argv.contains "--truncate", rest := argv.filter (!isOurs ·),
@@ -223,7 +224,7 @@ def fuzzBackend : Backend where
     let f := splitFlags argv
     if !f.bad.isEmpty then
       usageError s!"malformed: {f.bad.toList}; --truncate takes no value, --hybrid nothing or a \
-        positive number of tests"
+        number of tests from 1 to 2^64 - 1"
     match f.hybrid with
     | some rule => goHybrid T rule (withDefaults f.rest) f.truncate
     | none => goFuzz (T FuzzGen) (withDefaults f.rest) f.truncate
