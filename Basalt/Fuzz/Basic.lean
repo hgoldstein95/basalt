@@ -13,9 +13,11 @@ public import Basalt.PBT.Property
 `FuzzGen` is an executable interpretation of `Gen` whose `choose` results are decided by an external
 coverage-guided fuzzer rather than by a PRNG: the fuzzer proposes a byte buffer, `choose` reads
 bytes from it to select each value, and coverage of the generator and the property guides its
-mutations ("parametric fuzzing"). Each `choose` is a *draw*: it reads the fewest bytes that cover
-its range, starting at the *cursor*, which so ends a run at the number of bytes the run read.
-Because `choose` is total, a whole fuzzer input is a pure function `ByteArray → FuzzResult` (`runOne`).
+mutations ("parametric fuzzing"). Each `choose` is a *draw*, which has a *range* `[lo, hi]`, the
+bytes it reads (the fewest that cover the range, starting at the *cursor*; read big-endian they are
+its `raw`), and the *value* it returns, `lo + raw % (hi - lo + 1)`. The cursor so ends a run at the
+number of bytes the run read. Because `choose` is total, a whole fuzzer input is a pure function
+`ByteArray → FuzzResult` (`runOne`).
 -/
 
 public section

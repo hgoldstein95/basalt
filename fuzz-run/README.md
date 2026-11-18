@@ -32,10 +32,11 @@ generators (`Basalt.PlausibleGen`/`GenStats` use the same recipe with `Except`).
 deliberately no fuel and no failure case: termination is the generator's own concern, with
 libFuzzer's `-timeout`/`-rss_limit_mb` as the backstop for a genuinely divergent one.
 
-`choose` reads the *smallest* number of bytes covering the range and reduces modulo it (crowbar's
-encoding), which keeps a tight, mutation-friendly map from corpus bytes to structural choices. Past
-the end of the buffer it reads `0`. Both properties matter: `choose` is total, and *bytes → execution*
-is deterministic, which is what coverage-guided mutation relies on.
+Each `choose` call is a *draw*: a range `[lo, hi]`, the bytes it reads, and the *value* they decode
+to. `choose` reads the *smallest* number of bytes covering the range and reduces modulo it
+(crowbar's encoding), which keeps a tight, mutation-friendly map from corpus bytes to structural
+choices. Past the end of the buffer it reads `0`. Both properties matter: `choose` is total, and
+*bytes → execution* is deterministic, which is what coverage-guided mutation relies on.
 
 The buffer is finite and a generator's appetite is not, so a run can outrun its bytes. The cursor is
 not clamped, so a run reports how many bytes it read (`FuzzResult.cursor`, past the end included) and
