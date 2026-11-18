@@ -82,9 +82,9 @@ def go (T : PropM FuzzGen Unit) (argv : Array String := #[]) (truncate : Bool :=
   IO.println s!"[basalt] starting libFuzzer campaign ({argv.toList})"
   -- libFuzzer announces that the linked custom mutator disables `-len_control`; a ramp asked for
   -- explicitly wins over that, so say so.
-  if let some lc := argv.find? (·.startsWith "-len_control=") then
-    if lc != "-len_control=0" then
-      IO.println s!"[basalt] {lc} is explicit and overrides libFuzzer's \
+  if let some lc := flagValue? argv "-len_control=" then
+    if lc != "0" then
+      IO.println s!"[basalt] -len_control={lc} is explicit and overrides libFuzzer's \
         \"Disabling -len_control by default\""
   let counters ← IO.mkRef (0, 0)
   -- Report nothing after `goImpl`: libFuzzer `exit()`s when `-runs` is exhausted, so a line placed
@@ -120,16 +120,16 @@ private def ours : List String := ["--truncate"]
 
 /-- Split Basalt's flags out of `argv`. -/
 def splitFlags (argv : Array String) : FuzzFlags :=
-  let isOurs (a : String) := ours.any fun f => a == f || a.startsWith (f ++ "=")
+  let isOurs (a : String) := ours.any (isFlag · a)
   { truncate := argv.contains "--truncate", rest := argv.filter (!isOurs ·),
-    bad := argv.filter (·.startsWith "--truncate=") }
+    bad := argv.filter fun a => (flagArg? "--truncate=" a).isSome }
 
 /-- Basalt's length regime, each flag only if `argv` does not set it: no `-len_control` ramp (as
 libFuzzer already has it once a custom mutator is linked) and a `-max_len` of 64 KB, so an input can
 grow as long as its generator reads (`fuzz-run/README.md`, "Truncation"). -/
 def withDefaults (argv : Array String) : Array String :=
   let set (flag value : String) (a : Array String) :=
-    if a.any (·.startsWith flag) then a else a.push (flag ++ value)
+    if (flagValue? a flag).isSome then a else a.push (flag ++ value)
   argv |> set "-len_control=" "0" |> set "-max_len=" "65536"
 
 /-- The coverage-guided backend, for `Basalt.PBT.dispatch`. `--truncate` is Basalt's own

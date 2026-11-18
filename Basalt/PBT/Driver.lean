@@ -17,12 +17,24 @@ public section
 
 namespace Basalt.PBT
 
+/-! Command-line flags. A flag with a value is named with its `=` (`"-runs="`); `isFlag` takes the
+bare name (`"--truncate"`), for a flag that may be given with or without one. -/
+
+/-- `a`'s value, if `a` is the flag `flag` given one: `flagArg? "-runs=" "-runs=5" = some "5"`. -/
+def flagArg? (flag a : String) : Option String :=
+  if a.startsWith flag then some (a.drop flag.length).toString else none
+
+/-- The value of the first `flag` in `argv`, if any. -/
+def flagValue? (argv : Array String) (flag : String) : Option String :=
+  argv.findSome? (flagArg? flag)
+
+/-- Whether `a` is the flag `name`, bare or with a value (`name=v`). -/
+def isFlag (name a : String) : Bool :=
+  a == name || (flagArg? (name ++ "=") a).isSome
+
 /-- The value of an `-flag=N` argument, or `default`. -/
 private def natFlag (argv : Array String) (flag : String) (default : Nat) : Nat :=
-  match argv.findSome? (fun a =>
-      if a.startsWith flag then (a.drop flag.length).toNat? else none) with
-  | some n => n
-  | none => default
+  ((flagValue? argv flag).bind String.toNat?).getD default
 
 /-- The run budget, read from `-runs=N`: libFuzzer's own flag spelling, so one command line drives
 every backend. -/
@@ -61,8 +73,8 @@ def dispatch (exe : String) (props : List (String × Property)) (args : List Str
         [-runs=N] [-discard_ratio=N] [backend args...]\n"
       ++ s!"       {exe} replay <property> <file>\n"
       ++ s!"known properties: {names}"
-  let (flags, rest) := args.partition (·.startsWith "--backend=")
-  let requested := flags.head?.map (fun f => (f.drop "--backend=".length).toString)
+  let (flags, rest) := args.partition (flagArg? "--backend=" · |>.isSome)
+  let requested := flags.head?.bind (flagArg? "--backend=")
   if backends.isEmpty then
     usageError "no backend is registered: import a module that tags one `@[basalt_backend]`"
   match findBackend backends requested, rest with
