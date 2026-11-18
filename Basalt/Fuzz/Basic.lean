@@ -17,7 +17,10 @@ mutations ("parametric fuzzing"). Each `choose` is a *draw*, which has a *range*
 bytes it reads (the fewest that cover the range, starting at the *cursor*; read big-endian they are
 its `raw`), and the *value* it returns, `lo + raw % (hi - lo + 1)`. The cursor so ends a run at the
 number of bytes the run read. Because `choose` is total, a whole fuzzer input is a pure function
-`ByteArray → FuzzResult` (`runOne`).
+`ByteArray → FuzzResult` (`runOne`). A hybrid campaign's random rounds run at a second
+interpretation, `RecordGen` (`Basalt/Fuzz/Record.lean`), which draws each value at random and writes
+bytes that this one decodes back to it, so that a random test can be handed to libFuzzer as an
+input.
 -/
 
 public section

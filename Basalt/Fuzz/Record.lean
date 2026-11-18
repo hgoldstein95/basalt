@@ -125,7 +125,7 @@ written as the `n` bytes `FuzzGen`'s `choose` reads, which decode to `raw % rang
 uniform, as at `IO`, since the interval holds whole copies of `range`. So `raw = d + range · k` for
 the value `d` and a random `k`, and a seed's bytes are about uniform. Writing the value itself
 (`k = 0`) was measured to be worse: libFuzzer's byte edits shift which bytes a draw reads, and bytes
-that all decode small hand every shifted draw a low choice. On the BasaltBench repository's two Cedar
+that all decode small hand every shifted draw a low value. On the BasaltBench repository's two Cedar
 generators (15 hybrid campaigns each) it cost about 25 edges in 1M tests; on `fuzz-run`'s own
 benchmarks it made no consistent difference. -/
 def recordDraw (s : RecordState) (range : Nat) : Nat × RecordState :=
