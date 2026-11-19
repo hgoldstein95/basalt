@@ -100,7 +100,7 @@ def goFuzz (T : PropM FuzzGen Unit) (argv : Array String := #[]) (truncate : Boo
 /-- Replay one saved input file against a property (no fuzzer): reproduces the outcome
 deterministically and prints it. This is how a saved artifact (`crash-…`) is consumed.
 
-The bytes alone are the whole reproduction: zero-extension is a property of `readByte`, not a
+The bytes alone are the whole reproduction: zero-extension is a property of `byteAt`, not a
 campaign setting, so an artifact means the same thing however it was produced. -/
 def replay (T : PropM FuzzGen Unit) (path : String) : IO Unit := do
   let bytes ← IO.FS.readBinFile path

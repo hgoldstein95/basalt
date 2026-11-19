@@ -19,7 +19,7 @@ supported platforms, and limitations.
 
 ## Design
 
-### The interpretation (`Basalt/Fuzz/Basic.lean`)
+### The interpretation (`Basalt/Fuzz/Basic.lean`, `Basalt/Fuzz/Encoding.lean`)
 
 `FuzzGen` is `StateT FuzzState Option` over the byte buffer and a read cursor — a *pure* state monad,
 so one fuzzer input is a pure function `ByteArray → TestOutcome` (`runOne`). That makes the C
@@ -301,7 +301,7 @@ than a rewrite.
 
 `--truncate` cuts an input to the bytes its run read before libFuzzer mutates it, so that the
 mutation lands on bytes the run used (`basalt_truncate`, in `native.c`'s custom mutator). The cut
-input runs exactly as the uncut one did, since `readByte` reads `0` past the end; the same idea is
+input runs exactly as the uncut one did, since `byteAt` reads `0` past the end; the same idea is
 Zest's `gc()`. Only the input just run is cut: `Fuzzer::MutateAndTestOne` mutates one buffer in
 place for up to `-mutate_depth` (5) steps, running each, so a mid-chain input is the run that just
 happened, while the input a chain starts from comes from the corpus with no run at hand. The run
@@ -478,7 +478,7 @@ This re-runs the property on those bytes (no fuzzer), re-deriving and re-printin
 counterexample — drop the `crash-<sha1>` file into a regression directory as a fixture.
 
 The bytes alone are the whole reproduction, and replay takes no flag: zero-extension is a property of
-`readByte`, not a campaign setting, so an artifact means the same thing however it was produced.
+`byteAt`, not a campaign setting, so an artifact means the same thing however it was produced.
 
 ## Writing a fuzz target: what coverage guidance can and cannot see
 

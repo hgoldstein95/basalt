@@ -5,6 +5,7 @@ Authors: Michael Hicks
 -/
 module
 
+public import Basalt.Fuzz.Encoding
 public import Basalt.PBT.Property
 
 /-!
@@ -16,11 +17,11 @@ bytes from it to select each value, and coverage of the generator and the proper
 mutations ("parametric fuzzing"). Each `choose` is a *draw*, which has a *range* `[lo, hi]`, the
 bytes it reads (the fewest that cover the range, starting at the *cursor*; read big-endian they are
 its `raw`), and the *value* it returns, `lo + raw % (hi - lo + 1)`. The cursor so ends a run at the
-number of bytes the run read. Because `choose` is total, a whole fuzzer input is a pure function
-`ByteArray → FuzzResult` (`runOne`). A hybrid campaign's random rounds run at a second
-interpretation, `RecordGen` (`Basalt/Fuzz/Record.lean`), which draws each value at random and writes
-bytes that this one decodes back to it, so that a random test can be handed to libFuzzer as an
-input.
+number of bytes the run read; the byte format, both ways, is `Basalt/Fuzz/Encoding.lean`'s. Because
+`choose` is total, a whole fuzzer input is a pure function `ByteArray → FuzzResult` (`runOne`). A
+hybrid campaign's random rounds run at a second interpretation, `RecordGen`
+(`Basalt/Fuzz/Record.lean`), which draws each value at random and writes bytes that this one decodes
+back to it, so that a random test can be handed to libFuzzer as an input.
 -/
 
 public section
@@ -47,28 +48,11 @@ abbrev FuzzGen (α : Type) := StateT FuzzState Option α
 instance : Inhabited (FuzzGen α) :=
   ⟨fun _ => none⟩
 
-/-- Bits needed to distinguish `k` outcomes (0 when `k ≤ 1`). -/
-@[expose] def bitsFor (k : Nat) : Nat :=
-  if k ≤ 1 then 0 else (k - 1).log2 + 1
-
-/-- Bytes needed to distinguish `k` outcomes: the smallest count covering `bitsFor k`. Reading the
-*fewest* bytes per range keeps a tight, mutation-friendly map from input bytes to choices. -/
-@[expose] def bytesFor (k : Nat) : Nat := (bitsFor k + 7) / 8
-
-/-- Read one byte, advancing the cursor. Past the end of the buffer, read `0`: the buffer is
-zero-extended rather than exhausted, which is what keeps `choose` total. The cursor still advances, so
-the overshoot survives as the run's `deficit`. -/
-@[expose] def readByte (s : FuzzState) : UInt8 × FuzzState :=
-  let b := if s.cursor < s.buffer.size then s.buffer.get! s.cursor else 0
-  (b, { s with cursor := s.cursor + 1 })
-
-/-- Read `n` more bytes big-endian onto `acc`, advancing the cursor. -/
-@[expose] def readNatFrom (acc : Nat) (s : FuzzState) : Nat → Nat × FuzzState
-  | 0 => (acc, s)
-  | n + 1 => let (b, s') := readByte s; readNatFrom (acc * 256 + b.toNat) s' n
-
-/-- Read `n` bytes big-endian as a `Nat`, advancing the cursor (zero-filling past end-of-buffer). -/
-@[expose] def readNat (s : FuzzState) (n : Nat) : Nat × FuzzState := readNatFrom 0 s n
+/-- Read `n` bytes big-endian as a `Nat` at the cursor, and advance it (`readBEFrom`, so `0` past the
+end of the buffer). The cursor advances past the end too, so the overshoot survives as the run's
+`deficit`. -/
+@[expose] def readNat (s : FuzzState) (n : Nat) : Nat × FuzzState :=
+  (readBEFrom s.buffer 0 s.cursor n, { s with cursor := s.cursor + n })
 
 /-- `choose` consumes `bytesFor (hi - lo + 1)` bytes and reduces them into `[lo, hi]`. Total. -/
 instance : RandomChoice FuzzGen where
