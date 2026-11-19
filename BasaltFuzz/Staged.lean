@@ -49,10 +49,9 @@ satisfies 128 positions at once — measured: `long-16` then failed in 4 runs. A
 def stopAt (i : Nat) : Nat := i * 40503 % 65536 * 3 / 65536 + 1
 
 /-- Build a run of elements, ending it at a terminator (`0` or `stopAt i`, so half the draws), and
-fail on reaching `n` of them. The benchmark for `--grow` (`fuzz-run/README.md`), and the mirror image
-of `propChain`: there a position needs one *specific* byte value out of 256, here it needs one of two
-out of four, so per-byte correctness is cheap and the cost that remains is *having* `n` bytes to draw
-from.
+fail on reaching `n` of them. The mirror image of `propChain`: there a position needs one *specific*
+byte value out of 256, here it needs one of two out of four, so per-byte correctness is cheap and the
+cost that remains is *having* `n` bytes to draw from.
 
 Zero-extension is what makes it a clean measurement of length, and why `0` terminates at every
 position rather than only where the hash says so. Past the end of the buffer every draw is `0`, so a

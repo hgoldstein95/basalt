@@ -37,7 +37,10 @@ fi
 
 # The C++ compiler that builds the runtime. libFuzzer is ordinary C++17 with no Lean involvement,
 # so the platform's own clang++ is the right tool — `leanc` is a C driver for Lean's emitted code.
-CXX="${FUZZ_CXX:-clang++}"
+# Fedora-family packages install it only versioned (`clang++-22`), so the newest of those stands in.
+# `compgen` fails when nothing matches, which `pipefail` would turn into a silent exit here.
+CXX="${FUZZ_CXX:-$(command -v clang++ || { compgen -c clang++- || true; } | sort -V | tail -1)}"
+[ -n "$CXX" ] || { echo "== no clang++ found: set FUZZ_CXX ==" >&2; exit 1; }
 
 echo "== fetching compiler-rt/lib/fuzzer ($LLVM_TAG) =="
 mkdir -p "$SRC"

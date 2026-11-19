@@ -15,16 +15,32 @@
 # present, is sourced first — that is the place for per-machine overrides (it is git-ignored).
 #
 # This is NOT part of `lake build`. Usage:  fuzz-run/build.sh   then   ./fuzz-run/basalt-fuzz <prop>
+#
+# Another package's fuzz executable (one that requires Basalt and has its own `lean_exe`, linking
+# `@fuzz-run/obj/link.rsp` as Basalt's does) is built by running this script with
+#   FUZZ_PKG       that package's root (default: this repository);
+#   FUZZ_EXE       its executable's name (default: basalt-fuzz);
+#   FUZZ_EXTRA_C   C sources of its own to link, relative to FUZZ_PKG;
+#   FUZZ_UNDER_TEST  the dependency packages that are code under test and so must be instrumented,
+#                  by flags in their own lakefiles (a package depending on Basalt names basalt, and
+#                  requires it with the option on: `with NameMap.empty.insert `fuzz "1"`).
 set -euo pipefail
-cd "$(dirname "$0")/.."
-ROOT=$(pwd)
+# `-P` resolves symlinks so the roots match the physical paths Lake writes into the link response file
+# (e.g. a `/home` → `/local/home` symlink would otherwise misclassify every object in the scope check).
+BASALT=$(cd "$(dirname "$0")/.." && pwd -P)
+ROOT=$(cd "${FUZZ_PKG:-$BASALT}" && pwd -P)
+FUZZ_EXE=${FUZZ_EXE:-basalt-fuzz}
+FUZZ_UNDER_TEST=${FUZZ_UNDER_TEST:-}
+cd "$ROOT"
 
 # shellcheck source=/dev/null   # optional and git-ignored; nothing to follow
-if [ -f fuzz-run/env.sh ]; then . fuzz-run/env.sh; fi
+if [ -f "$ROOT/fuzz-run/env.sh" ]; then . "$ROOT/fuzz-run/env.sh"
+elif [ -f "$BASALT/fuzz-run/env.sh" ]; then . "$BASALT/fuzz-run/env.sh"; fi
 
-IR="$ROOT/.lake/build-fuzz/ir"
 OUT="$ROOT/fuzz-run/obj"; mkdir -p "$OUT"
-EXE="$ROOT/.lake/build-fuzz/bin/basalt-fuzz"
+# Where the build lands: `.lake/build-fuzz` for Basalt's own (its lakefile moves a fuzz build there),
+# or the root package's build directory, which is its own lakefile's to choose. Found after the build.
+BUILD_DIRS=("$ROOT/.lake/build-fuzz" "$ROOT/.lake/build")
 
 die() { echo "== $* ==" >&2; exit 1; }
 
@@ -110,10 +126,10 @@ if [ -z "${FUZZER_LIB_FLAGS+x}" ]; then
 
   if [ -n "$matched" ]; then
     FUZZER_LIB_FLAGS="$matched"
-  elif [ -f fuzz-run/vendor/libFuzzerNoMain.a ] || FUZZ_LLVM_MAJOR="$instr_major" fuzz-run/get-libfuzzer.sh; then
+  elif [ -f "$BASALT/fuzz-run/vendor/libFuzzerNoMain.a" ] || FUZZ_LLVM_MAJOR="$instr_major" "$BASALT/fuzz-run/get-libfuzzer.sh"; then
     # No version-matched system runtime — build one from source (get-libfuzzer.sh targets Lean's clang
     # major, so the archive is matched and skew-free). Preferred over the mismatched `any_host`.
-    FUZZER_LIB_FLAGS="$ROOT/fuzz-run/vendor/libFuzzerNoMain.a"
+    FUZZER_LIB_FLAGS="$BASALT/fuzz-run/vendor/libFuzzerNoMain.a"
   elif [ -n "$any_host" ]; then
     echo "== WARNING: no libFuzzer runtime matches the instrumenting clang ${instr_major:-?} and none"
     echo "==          could be built from source; falling back to $any_host. If chain-n coverage is"
@@ -177,15 +193,21 @@ echo "== platform: $UNAME; cc: $CC; runtime: $FUZZER_LIB_FLAGS ${DRIVER_DEFINE:+
 # ---------------------------------------------------------------------------------------------
 echo "== compile the C bridge =="
 # shellcheck disable=SC2086   # flag strings: the split into words is the point
-$CC -O1 $BRIDGE_INCLUDES $DRIVER_DEFINE -c Basalt/Fuzz/native.c -o "$OUT/native.o"
+$CC -O1 $BRIDGE_INCLUDES $DRIVER_DEFINE -c "$BASALT/Basalt/Fuzz/native.c" -o "$OUT/native.o"
 EXTRA_OBJS=("$OUT/native.o")
+for c in ${FUZZ_EXTRA_C:-}; do
+  o="$OUT/$(basename "${c%.c}").o"
+  # shellcheck disable=SC2086   # a flag string: the split into words is the point
+  $CC -O1 $BRIDGE_INCLUDES -c "$c" -o "$o"
+  EXTRA_OBJS+=("$o")
+done
 
 # On glibc >= 2.38 (Ubuntu 24.04, etc.) the runtime references `__isoc23_strtol`/`_strtoul` that
 # leanc's older-baseline libc does not export; this shim supplies them (fuzz-run/isoc23_compat.c).
 # Linux-only: its `__asm__` symbol labels assume no leading underscore, and glibc's redirect is what
 # it targets. Inert where those symbols already resolve (its defs are weak).
 if [ "$UNAME" != "Darwin" ]; then
-  $CC -O1 -c fuzz-run/isoc23_compat.c -o "$OUT/isoc23_compat.o"
+  $CC -O1 -c "$BASALT/fuzz-run/isoc23_compat.c" -o "$OUT/isoc23_compat.o"
   EXTRA_OBJS+=("$OUT/isoc23_compat.o")
 fi
 
@@ -209,21 +231,27 @@ done
 # output is what forces the relink; a rebuild after switching `FUZZER_LIB_FLAGS` otherwise silently
 # keeps the old runtime.
 #
-# `-Kfuzz=1` turns the instrumentation on and moves the build to `.lake/build-fuzz` (lakefile.lean,
-# `fuzz`). Lake reads `-K` options only when it elaborates the lakefile, and otherwise reuses the
-# configuration it cached, so `-R` is what makes the option take effect, and the trap reconfigures
-# back out on exit: left in the cache, it would make every later `lake` command here, the editor's
-# included, a fuzz build.
-echo "== lake build basalt-fuzz =="
-rm -f "$EXE" fuzz-run/basalt-fuzz
+# `-Kfuzz=1` turns the instrumentation on, and for Basalt's own build moves it to `.lake/build-fuzz`
+# (lakefile.lean, `fuzz`). Lake reads `-K` options only when it elaborates the lakefile, and otherwise
+# reuses the configuration it cached, so `-R` is what makes the option take effect, and the trap
+# reconfigures back out on exit: left in the cache, it would make every later `lake` command here,
+# the editor's included, a fuzz build. `-K` options are the root package's alone, so another package's
+# executable (`FUZZ_PKG`) turns the option on for Basalt in its `require`.
+echo "== lake build $FUZZ_EXE =="
+for d in "${BUILD_DIRS[@]}"; do rm -f "$d/bin/$FUZZ_EXE"; done
+rm -f "fuzz-run/$FUZZ_EXE"
 trap 'lake -R env true >/dev/null 2>&1 || true' EXIT
 # shellcheck disable=SC2086   # a target list: the split into words is the point
-lake -R -Kfuzz=1 build basalt-fuzz ${EXTRA_LAKE_TARGETS:-} > "$OUT/link.log" 2>&1 || {
+lake -R -Kfuzz=1 build "$FUZZ_EXE" ${EXTRA_LAKE_TARGETS:-} > "$OUT/link.log" 2>&1 || {
   grep -viE 'unused|-Wl' "$OUT/link.log" >&2 || true
   die "lake build FAILED (runtime: $FUZZER_LIB_FLAGS; cxxlib: $CXXLIB_FLAGS)"
 }
 grep -viE 'unused|-Wl|^✔|^info:' "$OUT/link.log" || true
-[ -x "$EXE" ] || die "lake reported success but produced no binary"
+BUILD=
+for d in "${BUILD_DIRS[@]}"; do [ -x "$d/bin/$FUZZ_EXE" ] && { BUILD=$d; break; }; done
+[ -n "$BUILD" ] || die "lake reported success but produced no binary"
+EXE="$BUILD/bin/$FUZZ_EXE"
+IR="$BUILD/ir"
 
 # ---------------------------------------------------------------------------------------------
 # Post-conditions. Each of these three is a property whose violation leaves a *working* fuzzer that
@@ -233,7 +261,7 @@ grep -viE 'unused|-Wl|^✔|^info:' "$OUT/link.log" || true
 # The response file Lake writes for its own link names every object it linked, dependency packages
 # included, so it is the ground truth for what got in — both checks below read it rather than the
 # `ir/` tree, which also holds objects left behind by renamed modules that are in no link at all.
-LAKE_RSP="$ROOT/.lake/build-fuzz/bin/basalt-fuzz.rsp"
+LAKE_RSP="$BUILD/bin/$FUZZ_EXE.rsp"
 [ -f "$LAKE_RSP" ] || die "lake wrote no link response file: cannot verify the closure"
 
 # Mathlib in the link closure. Previously an accidental umbrella import failed the link and so
@@ -251,13 +279,20 @@ fi
 # shallow `bst-buggy-*` bugs; what it loses is measured in fuzz-run/README.md, and only a staged
 # benchmark would reveal it.
 instrumented() { [ "$(nm -u "$1" 2>/dev/null | grep -c __sanitizer_cov_8bit_counters_init || true)" -gt 0 ]; }
+under_test() {           # a dependency that is code under test: its lakefile carries the coverage flags
+  local p
+  for p in $FUZZ_UNDER_TEST; do case $1 in */.lake/packages/"$p"/*) return 0 ;; esac; done
+  return 1
+}
 first_party=0
-# The packages directory may be a symlink, and the response file names its resolved path.
-PKGS=$(cd "$ROOT/.lake/packages" && pwd -P)
 while IFS= read -r o; do
+  if under_test "$o"; then
+    instrumented "$o" || die "${o##*/ir/} is not instrumented: it is code under test"
+    continue
+  fi
   case $o in
-    "$ROOT/.lake/packages/"* | "$PKGS/"*)
-      ! instrumented "$o" || die "${o##*/.lake/build/ir/} is instrumented: coverage over a dependency's PRNG is noise" ;;
+    */.lake/packages/*)        # a dependency, wherever its packages directory physically is
+      ! instrumented "$o" || die "${o##*/ir/} is instrumented: coverage over a dependency's PRNG is noise" ;;
     *)
       instrumented "$o" || die "${o#"$IR"/} is not instrumented: check for overlapping library globs"
       first_party=$((first_party + 1)) ;;
@@ -266,15 +301,15 @@ done < <(grep -o '"[^"]*\.c\.o\.export"' "$LAKE_RSP" | tr -d '"')
 [ "$first_party" -gt 1 ] || die "only $first_party first-party object(s) linked: has the closure changed shape?"
 
 # libFuzzer finds the custom mutator with `dlsym(RTLD_DEFAULT, ...)`, and a lookup that fails is
-# silent: the campaign runs the default mutators and `--grow` does nothing. Lake's link adds
+# silent: the campaign runs the default mutators and `--truncate` does nothing. Lake's link adds
 # `-Wl,-dead_strip` on macOS, and nothing in the program references this symbol, so the export flag
 # in link.rsp is the only thing keeping it. (`nm -g` lists dynamic externals; a hidden symbol shows
 # as `private external`, which `grep` then misses.)
 # `grep -q` would stop at the first match and SIGPIPE `nm`, which `pipefail` reports as a failure.
 nm -g "$EXE" 2>/dev/null | grep 'T _\?LLVMFuzzerCustomMutator$' >/dev/null \
-  || die "LLVMFuzzerCustomMutator is not exported: --grow would silently do nothing"
+  || die "LLVMFuzzerCustomMutator is not exported: --truncate would silently do nothing"
 
-# The committed entry point stays `fuzz-run/basalt-fuzz`, which every caller (CI, compare-*.sh) uses.
-cp "$EXE" fuzz-run/basalt-fuzz
+# The committed entry point stays `fuzz-run/<exe>`, which every caller (CI, compare-*.sh) uses.
+cp "$EXE" "fuzz-run/$FUZZ_EXE"
 
-echo "== built: fuzz-run/basalt-fuzz =="
+echo "== built: fuzz-run/$FUZZ_EXE =="

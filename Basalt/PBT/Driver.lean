@@ -17,12 +17,24 @@ public section
 
 namespace Basalt.PBT
 
+/-! Command-line flags. A flag with a value is named with its `=` (`"-runs="`); `isFlag` takes the
+bare name (`"--truncate"`), for a flag that may be given with or without one. -/
+
+/-- `a`'s value, if `a` is the flag `flag` given one: `flagArg? "-runs=" "-runs=5" = some "5"`. -/
+def flagArg? (flag a : String) : Option String :=
+  if a.startsWith flag then some (a.drop flag.length).toString else none
+
+/-- The value of the first `flag` in `argv`, if any. -/
+def flagValue? (argv : Array String) (flag : String) : Option String :=
+  argv.findSome? (flagArg? flag)
+
+/-- Whether `a` is the flag `name`, bare or with a value (`name=v`). -/
+def isFlag (name a : String) : Bool :=
+  a == name || (flagArg? (name ++ "=") a).isSome
+
 /-- The value of an `-flag=N` argument, or `default`. -/
 private def natFlag (argv : Array String) (flag : String) (default : Nat) : Nat :=
-  match argv.findSome? (fun a =>
-      if a.startsWith flag then (a.drop flag.length).toNat? else none) with
-  | some n => n
-  | none => default
+  ((flagValue? argv flag).bind String.toNat?).getD default
 
 /-- The run budget, read from `-runs=N`: libFuzzer's own flag spelling, so one command line drives
 every backend. -/
@@ -46,6 +58,10 @@ def findBackend (backends : List Backend) : Option String → Option Backend
   | none => backends.head?
   | some n => backends.find? (·.name == n)
 
+/-- The arguments in `args` that are Basalt flags (`--…`) `backend` does not take. -/
+def strayFlags (backend : Backend) (args : List String) : List String :=
+  args.filter fun a => a.startsWith "--" && !backend.flags.any (isFlag · a)
+
 /-- A front end for an executable exposing several named properties:
 `<exe> [--backend=…] <property> [args...]` starts a campaign, and `<exe> replay <property> <file>`
 reproduces a saved input.
@@ -61,8 +77,8 @@ def dispatch (exe : String) (props : List (String × Property)) (args : List Str
         [-runs=N] [-discard_ratio=N] [backend args...]\n"
       ++ s!"       {exe} replay <property> <file>\n"
       ++ s!"known properties: {names}"
-  let (flags, rest) := args.partition (·.startsWith "--backend=")
-  let requested := flags.head?.map (fun f => (f.drop "--backend=".length).toString)
+  let (flags, rest) := args.partition (flagArg? "--backend=" · |>.isSome)
+  let requested := flags.head?.bind (flagArg? "--backend=")
   if backends.isEmpty then
     usageError "no backend is registered: import a module that tags one `@[basalt_backend]`"
   match findBackend backends requested, rest with
@@ -73,9 +89,12 @@ def dispatch (exe : String) (props : List (String × Property)) (args : List Str
     | _, none => usageError s!"unknown property '{name}'; known: {names}"
     | some replay, some T => replay T path
   | some backend, name :: rest =>
-    match props.lookup name with
-    | some T => backend.campaign T rest.toArray
-    | none => usageError s!"unknown property '{name}'; known: {names}"
+    match props.lookup name, strayFlags backend rest with
+    | none, _ => usageError s!"unknown property '{name}'; known: {names}"
+    | some _, a :: _ =>
+      let takes := if backend.flags.isEmpty then "none" else String.intercalate ", " backend.flags
+      usageError s!"backend '{backend.name}' does not take {a} (its flags: {takes})"
+    | some T, [] => backend.campaign T rest.toArray
   | some _, [] => usageError usage
 
 end Basalt.PBT
