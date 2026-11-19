@@ -462,7 +462,7 @@ LEAN_EXPORT lean_object *basalt_hybrid_config(lean_object *run_random, lean_obje
 
    Before libFuzzer mutates the input it has just run, the input is cut to the bytes its run read,
    so that the mutation lands on bytes the run used. The cut input runs exactly as before, since
-   `readByte` reads `0` past the end. Only the input just run is cut: an input libFuzzer picks from
+   `byteAt` reads `0` past the end. Only the input just run is cut: an input libFuzzer picks from
    its corpus to start a mutation chain has no run at hand to say how much of it was read.
    --------------------------------------------------------------------------------------------- */
 
