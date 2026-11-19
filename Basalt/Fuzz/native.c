@@ -11,10 +11,12 @@ Authors: Michael Hicks
 
    The sections, in order: libFuzzer's entry points, and helpers; the coverage counters
    (`BASALT_COV_OUT` and the `io-cov` backend); features, as libFuzzer counts them (an edge and its
-   hit-count bucket); hybrid campaigns (`--hybrid`), which alternate random *rounds* with fuzzing ones
-   and hand a random round's *finds*, the tests that reached a new feature, to libFuzzer as *seeds*
-   (`Basalt/Fuzz/Cover.lean`); truncation (`--truncate`); the run report; the custom mutator; running
-   a test; and starting a campaign. */
+   hit-count bucket); hybrid campaigns (`--hybrid`), which alternate random *rounds* with fuzzing
+   ones and hand a random round's *finds*, the tests that reached a new feature, to libFuzzer as
+   *seeds* (`Basalt/Fuzz/Cover.lean`); truncation (`--truncate`); traced draws and planting compared
+   values (`--cmp`), which writes a value the program compared, a *plant*, into a *draw*'s bytes
+   (the bytes one `choose` reads) of an input about to be mutated; the run report; the custom
+   mutator; running a test; and starting a campaign. */
 #include <lean/lean.h>
 #include <math.h>
 #include <stdint.h>
@@ -78,7 +80,8 @@ static void *basalt_grow_buf(void *p, size_t *cap, size_t need, size_t elt) {
 
    SanitizerCoverage's 8-bit counters and PC table are the linker-concatenated `__sancov_*`
    sections, in the same object order. libFuzzer resets the counters before every run, so after a
-   run they are that run's.
+   run they are that run's. The instrumentation's other output, the `trace-cmp` calls it makes at
+   each comparison, is not read here; `--cmp` wraps them ("Planting compared values").
    --------------------------------------------------------------------------------------------- */
 
 #ifdef __APPLE__
@@ -489,7 +492,7 @@ LEAN_EXPORT lean_object *basalt_fuzz_note_cursor(uint64_t cursor) {
   return lean_box(0);                               /* Unit */
 }
 
-/* After a run, under `--truncate`: remember it as the last run. */
+/* After a run, under `--truncate` or `--cmp`: remember it as the last run. */
 static void basalt_after_run(const uint8_t *Data, size_t Size) {
   g_last.buf = basalt_grow_buf(g_last.buf, &g_last.cap, Size ? Size : 1, 1);
   if (Size) memcpy(g_last.buf, Data, Size);
@@ -510,6 +513,353 @@ static size_t basalt_truncate(const uint8_t *Data, size_t Size) {
   g_stats.cut++;
   g_stats.cut_bytes += Size - cursor;
   return (size_t)cursor;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Traced draws (`--cmp`)
+
+   Under `--cmp` every run records its draws' ranges (`FuzzState.trace`) and hands the trace over
+   once, after the run; decoded against the input (`decode`, in `Basalt/Fuzz/Encoding.lean`, which
+   proves it agrees with the run), it gives each draw's bytes and value. This file keeps traces and
+   decides when to decode one. Planting into an input needs its run's draws: the last run's, when
+   libFuzzer mutates the input it just ran, or else a cache's, which keeps the trace of every input
+   that reached a feature new to libFuzzer — the inputs it puts in its corpus (it can also keep an
+   input that is smaller than another with the same features, which this misses). The cache holds at
+   most `BASALT_TRACE_CACHE_MB` megabytes; past that, inputs are planted into only when they start
+   no chain. A trace is decoded against its input only when a plant needs it, so a run pays only for
+   copying it.
+   --------------------------------------------------------------------------------------------- */
+
+#define BASALT_TRACE_CACHE_MB 256
+
+static int g_cmp;             /* `--cmp`                                                          */
+
+/* `decodeWords` and `plantWords` (`Basalt/Fuzz/Encoding.lean`), which own their array arguments. */
+extern lean_object *basalt_decode_draws(lean_object *trace, lean_object *buf);
+extern lean_object *basalt_plant_draw(lean_object *buf, uint64_t lo, uint64_t hi, uint64_t offset,
+                                      uint64_t v, uint64_t max_size);
+
+/* The last run's trace (its draws' ranges), a Lean `ByteArray`, and its draws decoded from it
+   (`basalt_decode`) once something needs them. */
+static lean_object *g_trace;
+static struct { uint64_t *w; size_t n, cap; int ok; } g_draws;
+
+/* Called from Lean after a traced run with its trace. */
+LEAN_EXPORT lean_object *basalt_fuzz_note_trace(b_lean_obj_arg arr) {
+  lean_inc(arr);
+  if (g_trace) lean_dec(g_trace);
+  g_trace = arr;
+  g_draws.ok = 0;
+  return lean_box(0);
+}
+
+/* A Lean `ByteArray` copy of `n` bytes. */
+static lean_object *basalt_bytes(const uint8_t *d, size_t n) {
+  lean_object *a = lean_alloc_sarray(1, n, n);
+  if (n) memcpy(lean_sarray_cptr(a), d, n);
+  return a;
+}
+
+/* The draws of a run, from its trace and its input (`decode`, in `Basalt/Fuzz/Encoding.lean`), into
+   four words per draw: `lo`, `hi`, the value, and the offset of the draw's bytes. The number of
+   words. */
+static size_t basalt_decode(lean_object *trace, const uint8_t *buf, size_t size, uint64_t **w,
+                            size_t *cap) {
+  lean_inc(trace);
+  lean_object *out = basalt_decode_draws(trace, basalt_bytes(buf, size));
+  size_t nw = lean_sarray_size(out) / 8;
+  *w = basalt_grow_buf(*w, cap, nw ? nw : 1, sizeof **w);
+  const uint8_t *p = lean_sarray_cptr(out);
+  for (size_t i = 0; i < nw; i++) {                 /* little-endian words, as `pushLE64` writes */
+    uint64_t x = 0;
+    for (int k = 7; k >= 0; k--) x = (x << 8) | p[8 * i + (size_t)k];
+    (*w)[i] = x;
+  }
+  lean_dec(out);
+  return nw;
+}
+
+/* The last run's draws, decoded. */
+static void basalt_last_decoded(void) {
+  if (g_draws.ok) return;
+  g_draws.n = g_trace ? basalt_decode(g_trace, g_last.buf, g_last.size, &g_draws.w, &g_draws.cap)
+                    : 0;
+  g_draws.ok = 1;
+}
+
+/* SplitMix64's finalizer, as a hash. */
+static inline uint64_t basalt_mix64(uint64_t z) {
+  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+  return z ^ (z >> 31);
+}
+
+static uint64_t basalt_hash_buf(const uint8_t *d, size_t n) {
+  uint64_t h = 0xcbf29ce484222325ULL;
+  for (size_t i = 0; i < n; i++) h = (h ^ d[i]) * 0x100000001b3ULL;
+  return basalt_mix64(h) | 1;           /* never 0, which marks an empty slot                       */
+}
+
+/* An open-addressed table of inputs, keyed by their bytes, with their runs' traces. */
+typedef struct {
+  uint64_t     key;
+  uint8_t     *buf;
+  size_t       size;
+  lean_object *trace;        /* its run's trace, a Lean `ByteArray` */
+} basalt_entry;
+
+static struct { basalt_entry *e; size_t cap, n, bytes; uint64_t full; } g_cache;
+
+/* Per counter, a bit per bucket that some run libFuzzer judged reached (`Features`). */
+static uint8_t *g_cmp_seen;
+
+static basalt_entry *basalt_cache_find(const uint8_t *d, size_t size) {
+  if (!g_cache.cap) return NULL;
+  uint64_t key = basalt_hash_buf(d, size);
+  for (size_t i = key & (g_cache.cap - 1);; i = (i + 1) & (g_cache.cap - 1)) {
+    basalt_entry *e = &g_cache.e[i];
+    if (!e->key) return NULL;
+    if (e->key == key && e->size == size && (!size || memcmp(e->buf, d, size) == 0)) return e;
+  }
+}
+
+/* Keep the last run's trace for its input `d`, unless the cache is full. */
+static void basalt_cache_put(const uint8_t *d, size_t size) {
+  if (!g_trace) return;
+  size_t need = size + lean_sarray_size(g_trace) + sizeof(basalt_entry);
+  if (g_cache.bytes + need > (size_t)BASALT_TRACE_CACHE_MB << 20) { g_cache.full++; return; }
+  if (basalt_cache_find(d, size)) return;
+  if (2 * (g_cache.n + 1) > g_cache.cap) {
+    size_t cap = g_cache.cap ? 2 * g_cache.cap : 4096;
+    basalt_entry *e = calloc(cap, sizeof *e);
+    if (!e) basalt_fuzz_die("out of memory caching draws");
+    for (size_t i = 0; i < g_cache.cap; i++)
+      if (g_cache.e[i].key) {
+        size_t j = g_cache.e[i].key & (cap - 1);
+        while (e[j].key) j = (j + 1) & (cap - 1);
+        e[j] = g_cache.e[i];
+      }
+    free(g_cache.e);
+    g_cache.e = e;
+    g_cache.cap = cap;
+  }
+  uint64_t key = basalt_hash_buf(d, size);
+  size_t j = key & (g_cache.cap - 1);
+  while (g_cache.e[j].key) j = (j + 1) & (g_cache.cap - 1);
+  basalt_entry *e = &g_cache.e[j];
+  e->buf = malloc(size ? size : 1);
+  if (!e->buf) basalt_fuzz_die("out of memory caching draws");
+  if (size) memcpy(e->buf, d, size);
+  lean_inc(g_trace);
+  e->trace = g_trace;
+  e->key = key; e->size = size;
+  g_cache.n++;
+  g_cache.bytes += need;
+}
+
+/* A cache entry's draws, decoded from its trace. */
+static struct { uint64_t *w; size_t cap; } g_dec;
+
+/* The decoded draws of `Data`'s run: the last run's, or the cache's; NULL if neither knows it. */
+static const uint64_t *basalt_trace_of(const uint8_t *Data, size_t Size, size_t *n) {
+  if (g_last.valid && Size == g_last.size && (!Size || memcmp(Data, g_last.buf, Size) == 0)) {
+    basalt_last_decoded();
+    *n = g_draws.n;
+    return g_draws.w;
+  }
+  basalt_entry *e = basalt_cache_find(Data, Size);
+  if (!e) return NULL;
+  *n = basalt_decode(e->trace, e->buf, e->size, &g_dec.w, &g_dec.cap);
+  return g_dec.w;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Planting compared values (`--cmp`)
+
+   libFuzzer's `Mutate_AddWordFromTORC`, at the level of draws: one more mutator beside libFuzzer's
+   thirteen, taking 1/14 of the custom mutator's calls. It takes a pair `(A, B)` the instrumented
+   code compared and, in a random direction, finds a traced draw whose *decoded* value is `A` and
+   writes `B + d` there, `d` in {-1, 0, +1} as libFuzzer's `Arg + Rand(-1, 1)`; with no such draw,
+   any draw whose range admits it, as libFuzzer falls back to a random position. libFuzzer's own
+   version writes the word into bytes, which `choose` then reduces modulo its range; writing `v`
+   into a draw overwrites exactly its `bytesFor (hi - lo + 1)` bytes with `v - lo`, big-endian,
+   which `drawStep` decodes back to `v` (`plant`, in `Basalt/Fuzz/Encoding.lean`, which proves it).
+   A harvested literal (`harvested_literals%`) is an unpaired constant and goes the second way. A
+   value whose plant reached a new feature is kept, and a third of the picks reuse one, as
+   libFuzzer's persistent auto-dictionary does.
+
+   The pairs come from SanitizerCoverage's `trace-cmp` hooks, wrapped at link time (`--wrap`, so the
+   runtime's own hooks still run), and from Lean `Nat` comparisons, which compare tagged pointers:
+   `nat_hook.h`, force-included into the targets' code, hands their untagged operands to
+   `basalt_nat_cmp` while `basalt_nat_hook_on` is set.
+   --------------------------------------------------------------------------------------------- */
+
+/* Read by `nat_hook.h`'s wrappers. */
+int basalt_nat_hook_on = 0;
+
+/* The mutator's PRNG, seeded from libFuzzer's `Seed` on every call, so `-seed` fixes it. */
+static uint64_t g_rng;
+static inline uint64_t basalt_rand(void) { g_rng += 0x9e3779b97f4a7c15ULL; return basalt_mix64(g_rng); }
+static inline uint64_t basalt_below(uint64_t n) { return n ? basalt_rand() % n : 0; }
+
+/* The comparison pairs, as libFuzzer's tables of recent compares keep them: a slot per `a ^ b`, later
+   pairs evicting earlier ones. A Lean scalar compared by the inlined fast path arrives tagged
+   (`2n+1`), so a pair of odd operands is also kept untagged. */
+#define BASALT_PAIRS 1024
+static struct { uint64_t a[BASALT_PAIRS], b[BASALT_PAIRS]; uint8_t used[BASALT_PAIRS]; size_t n; } g_pairs;
+
+static inline void basalt_pair_add(uint64_t a, uint64_t b) {
+  if (a == b) return;
+  size_t i = basalt_mix64(a ^ b) & (BASALT_PAIRS - 1);
+  if (!g_pairs.used[i]) { g_pairs.used[i] = 1; g_pairs.n++; }
+  g_pairs.a[i] = a; g_pairs.b[i] = b;
+}
+static inline void basalt_cmp_seen(uint64_t a, uint64_t b) {
+  if (!g_cmp) return;
+  basalt_pair_add(a, b);
+  if ((a & 1) && (b & 1)) basalt_pair_add(a >> 1, b >> 1);
+}
+
+#ifdef BASALT_CMP_WRAP
+extern void __real___sanitizer_cov_trace_cmp8(uint64_t, uint64_t);
+extern void __real___sanitizer_cov_trace_const_cmp8(uint64_t, uint64_t);
+extern void __real___sanitizer_cov_trace_cmp4(uint32_t, uint32_t);
+extern void __real___sanitizer_cov_trace_const_cmp4(uint32_t, uint32_t);
+void __wrap___sanitizer_cov_trace_cmp8(uint64_t a, uint64_t b) {
+  basalt_cmp_seen(a, b); __real___sanitizer_cov_trace_cmp8(a, b);
+}
+void __wrap___sanitizer_cov_trace_const_cmp8(uint64_t a, uint64_t b) {
+  basalt_cmp_seen(a, b); __real___sanitizer_cov_trace_const_cmp8(a, b);
+}
+void __wrap___sanitizer_cov_trace_cmp4(uint32_t a, uint32_t b) {
+  basalt_cmp_seen(a, b); __real___sanitizer_cov_trace_cmp4(a, b);
+}
+void __wrap___sanitizer_cov_trace_const_cmp4(uint32_t a, uint32_t b) {
+  basalt_cmp_seen(a, b); __real___sanitizer_cov_trace_const_cmp4(a, b);
+}
+#endif
+
+/* A Lean `Nat` comparison's untagged operands (`nat_hook.h`), for `--cmp` and for libFuzzer's own table
+   of recent compares. */
+#ifdef BASALT_CMP_WRAP
+void basalt_nat_cmp(uint64_t a, uint64_t b) { basalt_cmp_seen(a, b); __real___sanitizer_cov_trace_cmp8(a, b); }
+#else
+extern void __sanitizer_cov_trace_cmp8(uint64_t, uint64_t);
+void basalt_nat_cmp(uint64_t a, uint64_t b) { basalt_cmp_seen(a, b); __sanitizer_cov_trace_cmp8(a, b); }
+#endif
+
+/* The target's own literals. */
+static struct { uint64_t *v; size_t n, cap; int off; } g_lits;
+
+LEAN_EXPORT lean_object *basalt_cmp_literal(uint64_t n) {
+  g_lits.v = basalt_grow_buf(g_lits.v, &g_lits.cap, g_lits.n + 1, sizeof *g_lits.v);
+  g_lits.v[g_lits.n++] = n;
+  return lean_box(0);
+}
+
+LEAN_EXPORT lean_object *basalt_cmp_arm(uint8_t literals) {
+  g_cmp = 1;
+  basalt_nat_hook_on = 1;
+  g_lits.off = !literals;
+  return lean_io_result_mk_ok(lean_box(0));
+}
+
+/* Values whose plant reached a new feature, oldest overwritten first. */
+#define BASALT_KEPT 256
+static struct { uint64_t v[BASALT_KEPT]; size_t n, next; } g_kept;
+
+static struct {
+  uint64_t planted, matched, literals, kept, untraced;  /* `literals`: plants of a literal       */
+  uint64_t ok, bad, gone;                /* the next run decoded the plant, decoded otherwise, or
+                                            never reached the draw                                */
+  int pending; uint64_t at, v;           /* the plant the next run should decode                  */
+  uint64_t run; size_t fresh;            /* that run (`g_stats.runs`, 0: none yet), and its new
+                                            features, for `basalt_cmp_after`                       */
+} g_pl;
+
+/* Write `v` into draw `d` of the decoded draws `tw` (`plant`, in `Basalt/Fuzz/Encoding.lean`); the
+   new size, or 0 if `v` is the draw's value already, or does not fit. */
+static size_t basalt_write_draw(const uint64_t *tw, uint8_t *Data, size_t Size, size_t MaxSize,
+                                size_t d, uint64_t v) {
+  const uint64_t *w = tw + 4 * d;
+  if (w[1] <= w[0] || v == w[2]) return 0;     /* a draw of one outcome reads no byte to write */
+  lean_object *out = basalt_plant_draw(basalt_bytes(Data, Size), w[0], w[1], w[3], v, MaxSize);
+  size_t n = lean_sarray_size(out);            /* `plant_size`: at most `MaxSize`; 0 is `none` */
+  if (n) memcpy(Data, lean_sarray_cptr(out), n);
+  lean_dec(out);
+  if (!n) return 0;
+  g_pl.pending = 1; g_pl.at = w[3]; g_pl.v = v;
+  g_pl.planted++;
+  return n;
+}
+
+/* Plant a value into `Data`, whose run's trace is `tw` (`n` words); its new size, or 0 to leave the
+   call to libFuzzer's suite. Called on the 1 in 14 calls that plant (`LLVMFuzzerCustomMutator`). */
+static size_t basalt_cmp(const uint64_t *tw, size_t n, uint8_t *Data, size_t Size, size_t MaxSize) {
+  if (!tw) { g_pl.untraced++; return 0; }
+  size_t nd = n / 4;
+  if (!nd) return 0;
+  int64_t dl = (int64_t)basalt_below(3) - 1;
+  size_t nlits = g_lits.off ? 0 : g_lits.n;
+  uint64_t want, from = 0;
+  int paired = 0, lit = 0;
+  /* The value to plant: a third of the time one that paid off before, else a compared pair (in a
+     random direction: find one operand, write the other), else a literal. */
+  uint64_t r = basalt_below(3);
+  if (r == 0 && g_kept.n) want = g_kept.v[basalt_below(g_kept.n)];
+  else if ((r == 1 || !nlits) && g_pairs.n) {
+    size_t i = basalt_below(BASALT_PAIRS);
+    while (!g_pairs.used[i]) i = (i + 1) & (BASALT_PAIRS - 1);
+    int flip = basalt_rand() & 1;
+    from = flip ? g_pairs.b[i] : g_pairs.a[i];
+    want = flip ? g_pairs.a[i] : g_pairs.b[i];
+    paired = 1;
+  } else if (nlits) { want = g_lits.v[basalt_below(nlits)]; lit = 1; }
+  else return 0;
+  want += (uint64_t)dl;                   /* libFuzzer's `Arg + Rand(-1, 1)`                   */
+  if (paired) {                           /* where the compared value was, among up to 8 draws  */
+    size_t pos[8], np = 0, start = basalt_below(nd);
+    for (size_t q = 0; q < nd && np < 8; q++) {
+      size_t d = (start + q) % nd;
+      if (tw[4 * d + 2] == from) pos[np++] = d;
+    }
+    if (np) {
+      size_t got = basalt_write_draw(tw, Data, Size, MaxSize, pos[basalt_below(np)], want);
+      if (got) { g_pl.matched++; return got; }
+    }
+  }
+  for (int t = 0; t < 8; t++) {           /* else any draw whose range admits it                */
+    size_t got = basalt_write_draw(tw, Data, Size, MaxSize, basalt_below(nd), want);
+    if (got) { g_pl.literals += lit; return got; }
+  }
+  return 0;
+}
+
+/* After the run a plant went into: did the draw it wrote decode to the planted value? A changed
+   earlier draw can move control flow off it (`gone`), but a draw starting at the offset must hold
+   the value. And a plant that reached a new feature is kept for reuse. Called from the next mutator
+   call, not the run's callback: decoding runs Lean code, which is instrumented, and libFuzzer would
+   count its edges as the run's. */
+static void basalt_cmp_after(void) {
+  if (!g_pl.run) return;
+  uint64_t run = g_pl.run;
+  g_pl.run = 0;
+  if (run != g_stats.runs) return;       /* another run since: the last run is not the plant's     */
+  size_t fresh = g_pl.fresh;
+  /* Find the draw that starts where the plant wrote, in this run's draws. */
+  basalt_last_decoded();
+  size_t d = 0, nd = g_draws.n / 4;
+  while (d < nd && g_draws.w[4 * d + 3] != g_pl.at) d++;
+  if (d == nd) g_pl.gone++;
+  else if (g_draws.w[4 * d + 2] == g_pl.v) g_pl.ok++;
+  else g_pl.bad++;
+  /* Reached a new feature: keep the value for reuse, once. */
+  if (!fresh) return;
+  for (size_t i = 0; i < g_kept.n; i++) if (g_kept.v[i] == g_pl.v) return;
+  g_kept.v[g_kept.next] = g_pl.v;
+  g_kept.next = (g_kept.next + 1) % BASALT_KEPT;
+  if (g_kept.n < BASALT_KEPT) g_kept.n++;
+  g_pl.kept++;
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -534,6 +884,16 @@ static void basalt_fuzz_report_stats(void) {
             (unsigned long long)g_stats.cut,
             g_stats.cut ? (double)g_stats.cut_bytes / (double)g_stats.cut : 0.0);
   fprintf(stderr, "\n");
+  if (g_cmp)
+    fprintf(stderr, "[basalt] cmp: %llu planted (%llu where the compared value was, %llu of literals, "
+            "%llu kept); %zu pairs, %zu literals; %llu inputs with no draws known; the next run "
+            "decoded %llu as planted, %llu otherwise, and %llu never reached the draw; %zu inputs' draws "
+            "cached, %.1f MB (%llu not, the cache full)\n",
+            (unsigned long long)g_pl.planted, (unsigned long long)g_pl.matched,
+            (unsigned long long)g_pl.literals, (unsigned long long)g_pl.kept, g_pairs.n,
+            g_lits.off ? 0 : g_lits.n, (unsigned long long)g_pl.untraced,
+            (unsigned long long)g_pl.ok, (unsigned long long)g_pl.bad, (unsigned long long)g_pl.gone,
+            g_cache.n, (double)g_cache.bytes / 1e6, (unsigned long long)g_cache.full);
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -541,13 +901,14 @@ static void basalt_fuzz_report_stats(void) {
 
    libFuzzer calls `LLVMFuzzerCustomMutator` in place of its own mutations, before each test of a
    mutated input. Basalt's options act there; unless one supplies the input itself (a hybrid
-   campaign handing over a seed), the call ends in libFuzzer's default suite.
+   campaign handing over a seed, or `--cmp` a plant), the call ends in libFuzzer's default suite.
    --------------------------------------------------------------------------------------------- */
 
 /* This replaces libFuzzer's mutator: a hybrid campaign's share first (`basalt_hy_mutate`), then
-   truncation under `--truncate`, then libFuzzer's default suite.
+   truncation under `--truncate`, then under `--cmp` sometimes a planted value (`basalt_cmp`), and
+   otherwise libFuzzer's default suite.
 
-   `Seed` is libFuzzer's own PRNG output and is unused.
+   `Seed` is libFuzzer's own PRNG output; `--cmp` seeds its choices from it, so `-seed` fixes them.
 
    The visibility attribute is load-bearing: libFuzzer finds this by
    `dlsym(RTLD_DEFAULT, "LLVMFuzzerCustomMutator")`, so under the hidden-visibility default the
@@ -555,13 +916,27 @@ static void basalt_fuzz_report_stats(void) {
    mutators untruncated. `fuzz-run/build.sh` checks the linked binary exports it. */
 __attribute__((visibility("default")))
 size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize, unsigned Seed) {
-  (void)Seed;
+  if (g_cmp) basalt_cmp_after();
   /* A hybrid campaign may take the call: to idle in a random round, or to hand over a seed. */
   if (g_hy.cfg.on) {
     size_t hy = basalt_hy_mutate(Data, Size, MaxSize);
     if (hy) return hy;
   }
+  size_t n = 0;
+  const uint64_t *tw = NULL;
+  int plant = 0;
+  if (g_cmp) {
+    /* Decide first: finding an input's draws hashes and decodes in proportion to its length, and
+       only a plant needs them. */
+    g_rng = Seed;
+    plant = !basalt_below(14);
+    if (plant) tw = basalt_trace_of(Data, Size, &n);                  /* before cutting `Data` */
+  }
   if (g_trunc) Size = basalt_truncate(Data, Size);
+  if (plant) {
+    size_t planted = basalt_cmp(tw, n, Data, Size, MaxSize);
+    if (planted) return planted;
+  }
   return LLVMFuzzerMutate(Data, Size, MaxSize);
 }
 
@@ -629,15 +1004,23 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     g_stats.starved++;
     if (g_cursor - Size > g_stats.max_deficit) g_stats.max_deficit = g_cursor - Size;
   }
-  if (g_trunc) basalt_after_run(Data, Size);
-  if (g_hy.cfg.on && g_hy.round.started) {
-    size_t fresh = 0;
-    if (code != 2) {                      /* libFuzzer ignores a rejected run's features too  */
-      basalt_feat_read();
-      fresh = basalt_feat_mark(g_hy.map.seen);
-    }
-    basalt_hy_step(fresh != 0, g_cursor);
+  if (g_trunc || g_cmp) basalt_after_run(Data, Size);
+  int hy = g_hy.cfg.on && g_hy.round.started;
+  size_t new_lf = 0, new_hy = 0;
+  if ((g_cmp || hy) && code != 2) {       /* libFuzzer ignores a rejected run's features too  */
+    basalt_feat_read();
+    if (g_cmp) new_lf = basalt_feat_mark(g_cmp_seen);
+    if (hy) new_hy = basalt_feat_mark(g_hy.map.seen);
   }
+  if (g_cmp) {
+    if (new_lf) basalt_cache_put(Data, Size);
+    if (g_pl.pending) {                  /* checked at the next mutator call (`basalt_cmp_after`) */
+      g_pl.pending = 0;
+      g_pl.run = g_stats.runs;
+      g_pl.fresh = new_lf;
+    }
+  }
+  if (hy) basalt_hy_step(new_hy != 0, g_cursor);
 
   if (code == 1) {
     basalt_cov_dump();                                /* abort() skips the atexit handlers     */
@@ -662,8 +1045,9 @@ LEAN_EXPORT lean_object *basalt_fuzz_go(lean_object *run, lean_object *argv, uin
   g_run = run;
   g_trunc = truncate;
   atexit(basalt_fuzz_report_stats);                /* the `-runs`-exhausted path exits here */
+  if (g_hy.cfg.on || g_cmp) basalt_feat_init();
+  if (g_cmp && !(g_cmp_seen = calloc(g_feat.n, 1))) basalt_fuzz_die("out of memory for --cmp");
   if (g_hy.cfg.on) {
-    basalt_feat_init();
     g_hy.map.seen = calloc(g_feat.n, 1);
     g_hy.map.fresh = calloc(g_feat.n, 1);
     if (!g_hy.map.seen || !g_hy.map.fresh)

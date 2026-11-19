@@ -10,7 +10,9 @@ public import Basalt.Fuzz.Runner
 meta import Basalt.Fuzz.Runner
 public import BasaltExamples.BST
 meta import BasaltExamples.BST
+public import Basalt.Fuzz.Literals
 public import BasaltFuzz.BuggyBST
+public import BasaltFuzz.Staged
 
 /-!
 # `FuzzGen` regression tests
@@ -127,6 +129,65 @@ node, `genBST` recurses on both subtrees and each reads a `frequency` byte past 
 /-- info: pass (read 4, short 2) -/
 #guard_msgs in #eval IO.println (renderRead propBSTsizeNonneg (bytes [1, 5]))
 
+/-! ### Traced draws
+
+Under `--cmp` a run records its draws' ranges, and the bridge writes a value `v` into a draw by
+overwriting the draw's bytes with `v - lo`, big-endian. These pin the trace — `lo` and `hi - lo` as
+varints, the draw's offset and value left for `decode` to recover from the input — and that such a
+write decodes back to `v`. -/
+
+/- `[7, 3]`: two one-byte draws in `[0, 9]`. -/
+/-- info: [0, 9, 0, 9] -/
+#guard_msgs in #eval IO.println (runOne propTwo (bytes [7, 3]) (traced := true)).trace.toList
+
+/- `decode` recovers the two draws from that trace and the input: their ranges, offsets and
+values. -/
+#guard decode (runOne propTwo (bytes [7, 3]) (traced := true)).trace (bytes [7, 3]) ==
+  [⟨0, 9, 0, 7⟩, ⟨0, 9, 1, 3⟩]
+
+/- `plant` writes `5` into the second draw, and the first is untouched. -/
+#guard (plant (bytes [7, 3]) 0 9 1 5 64).map (·.toList) == some [7, 5]
+
+/- A draw of one outcome reads nothing and is not recorded; `300 - 2` takes two varint bytes. -/
+/-- info: [2, 170, 2] -/
+#guard_msgs in #eval IO.println
+  (runOne (do let _ ← generate (chooseNat 5 5); let _ ← generate (chooseNat 2 300)) (bytes [1])
+    (traced := true)).trace.toList
+
+/- A draw past `2^64` is recorded too, so that the offsets of the draws after it still add up; the
+bridge does not plant into it. -/
+/-- info: [0, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 1] -/
+#guard_msgs in #eval IO.println
+  (runOne (forAll (chooseNat 0 (2 ^ 70)) (fun _ => true)) (bytes [1]) (traced := true)).trace.toList
+
+/- A draw in `[3, 70000]` reads three bytes; `0xDEAD` written there as `0xDEAD - 3` decodes to it. -/
+private def propWide : PropM FuzzGen Unit := do
+  let x ← generate (chooseNat 3 70000)
+  check false s!"{x}"
+
+/-- info: fail: 57005 -/
+#guard_msgs in #eval IO.println (render (runOne propWide (bytes [0x00, 0xDE, 0xAA])))
+
+/- …and `plant` writes exactly those bytes, extending an empty input with them; a value outside the
+range, or bytes past `maxSize`, is refused. -/
+#guard (plant .empty 3 70000 0 0xDEAD 64).map (·.toList) == some [0x00, 0xDE, 0xAA]
+#guard (plant .empty 3 70000 0 70001 64).isNone
+#guard (plant .empty 3 70000 0 0xDEAD 2).isNone
+
+namespace LiteralPins
+theorem named : (40503 : Nat) * 1 = 40503 := Nat.mul_one 40503
+theorem proved : True := by have : (77777 : Nat) = 77777 := rfl; trivial
+end LiteralPins
+
+/- A theorem's statement contributes its literals; its proof, which never runs, does not. -/
+/-- info: (true, false) -/
+#guard_msgs in #eval IO.println
+  (((harvested_literals% LiteralPins).contains 40503, (harvested_literals% LiteralPins).contains 77777))
+
+/- The needle's constant is among `Staged`'s harvested literals. -/
+/-- info: true -/
+#guard_msgs in #eval IO.println ((harvested_literals% Staged).contains 0xDEADBEEF)
+
 /-! ### One property, every backend
 
 `basalt-fuzz --backend=` rests on one registry entry (a `Basalt.PBT.Property`) running at `FuzzGen`,
@@ -174,7 +235,7 @@ private def agreeOn (bs : List UInt8) : String :=
   let hi := BuggyBST.hiKey
   let orig : FuzzGen String := showOrig <$> BST.Tree.genBST lo hi
   let copy : FuzzGen String := showCopy <$> BuggyBST.genBST lo hi
-  let run (g : FuzzGen String) : Option String := (g.run ⟨⟨bs.toArray⟩, 0⟩).map (·.1)
+  let run (g : FuzzGen String) : Option String := (g.run { buffer := ⟨bs.toArray⟩, cursor := 0 }).map (·.1)
   match run orig, run copy with
   | some a, some b => if a == b then s!"agree: {a}" else s!"DIFFER: example={a} fuzz={b}"
   | _, _ => "one generator failed to produce a value"
