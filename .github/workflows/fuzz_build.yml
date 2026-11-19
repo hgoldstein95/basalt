@@ -177,6 +177,19 @@ jobs:
             echo "::error::no input was truncated: is LLVMFuzzerCustomMutator exported?"
             tail -5 log-trunc.txt; exit 1; }
 
+      # A hybrid campaign starts random, so a rule that never hands over to fuzzing still runs and
+      # still finds shallow bugs; only a bug random cannot reach shows that it switched.
+      - name: A hybrid campaign must reach the staged bug
+        run: |
+          mkdir -p art/hybrid
+          if fuzz-run/basalt-fuzz chain-4 --hybrid -runs=2000000 -max_len=32 \
+               -artifact_prefix=art/hybrid/ > log-hybrid.txt 2>&1; then
+            echo "::error::a hybrid campaign failed to find chain-4 in 2e6 runs"
+            tail -20 log-hybrid.txt; exit 1
+          fi
+          grep -q 'BASALT PROPERTY FAILED' log-hybrid.txt || {
+            echo "::error::chain-4 crashed without reporting a counterexample"; tail -20 log-hybrid.txt; exit 1; }
+
       # A campaign reports its verdict *only* through the exit status, so a property name the registry
       # does not know must not exit 0 (`usageError`, Basalt/PBT/Driver.lean): every "this must fail"
       # step above would otherwise read a typo as the property having survived.

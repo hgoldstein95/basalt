@@ -48,9 +48,9 @@ to its cursor before mutating it.
 
 ```
  ┌────────────────────── Lean executable (owns main) ───────────────────────┐
- │ main → PBT.dispatch → Fuzz.go T argv                                     │
+ │ main → PBT.dispatch → Fuzz.goFuzz T argv                                 │
  │   T : PropM G Unit          -- the property, polymorphic in the Gen G     │
- │   go builds  run : ByteArray → IO UInt8  and hands it to the bridge ──┐   │
+ │   goFuzz builds run : ByteArray → IO UInt8 for the bridge ────────────┐   │
  │                                                                      ▼   │
  │ RandomChoice FuzzGen          ┌──── C bridge (Basalt/Fuzz/native.c) ────┐ │
  │  choose reads bytes from      │ basalt_fuzz_go(run, argv, truncate):    │ │
@@ -81,12 +81,12 @@ dance. Two spellings of the driver entry exist: the stable C `LLVMFuzzerRunDrive
 the mangled `fuzzer::FuzzerDriver` for clang 11 and earlier. `build.sh` picks by `nm`-probing the
 runtime archive; `native.c` is C either way, since the mangled name is simply declared `extern`.
 
-Failure handling follows **bolero**: the Lean callback prints the counterexample and returns `1`, and
-the bridge `abort()`s, so libFuzzer's signal handler saves the crashing input under
-`-artifact_prefix` and exits with its error code (77). Consequences worth knowing: `go : IO Unit` —
-the campaign's result is the exit code plus the printed report, not a value returned to the Lean
-caller (see "Limitations"); and `go` must be called once per process, because libFuzzer's driver is
-not re-entrant.
+Failure handling follows **bolero**: the Lean callback prints the counterexample and returns `1`,
+and the bridge `abort()`s, so libFuzzer's signal handler saves the crashing input under
+`-artifact_prefix` and exits with its error code (77). Consequences worth knowing: `goFuzz` returns
+only `IO Unit` — the campaign's result is the exit code plus the printed report, not a value
+returned to the Lean caller (see "Limitations"); and `goFuzz` must be called once per process,
+because libFuzzer's driver is not re-entrant.
 
 ### Build and instrumentation (`fuzz-run/build.sh`)
 
@@ -191,6 +191,7 @@ seconds, once). Instrumentation itself needs nothing extra.
 ```bash
 fuzz-run/basalt-fuzz [--backend=fuzz|io|plausible|io-cov] <property> [-runs=N] [-discard_ratio=N] [libFuzzer args...]
 fuzz-run/basalt-fuzz <property> --truncate                 # fuzz backend only, see below
+fuzz-run/basalt-fuzz <property> --hybrid[=N]               # fuzz backend only: random first, see below
 fuzz-run/basalt-fuzz replay <property> <file>      # reproduce a saved input, no fuzzer
 ```
 
@@ -215,11 +216,11 @@ corpus. The random backends read `-runs=N` from the same spelling, plus `-discar
 discard budget (`Basalt/PBT/Driver.lean`), and ignore the rest — under `fuzz`, libFuzzer owns the
 loop, so a discarded input is a `-1` return and neither budget applies.
 
-`--backend=` and `--truncate` are Basalt's own and are consumed before libFuzzer sees the command
-line; everything else is forwarded verbatim, and libFuzzer rejects a flag it does not know. A `--`
-flag the chosen backend does not take is a usage error (`--backend=io --truncate` does not run as a
-plain random campaign); single-dash flags pass to every backend, which ignores those it does not
-read.
+`--backend=`, `--truncate` and the [hybrid](#hybrid-campaigns) flags are Basalt's own and are consumed
+before libFuzzer sees the command line; everything else is forwarded verbatim, and libFuzzer rejects
+a flag it does not know. A `--` flag the chosen backend does not take is a usage error
+(`--backend=io --truncate` does not run as a plain random campaign); single-dash flags pass to every
+backend, which ignores those it does not read.
 
 ## Backends
 
@@ -351,6 +352,86 @@ bytes end (a `frequency` with a recursive branch and no fuel) builds terms as la
 allows, and its tests slow by an order of magnitude. A fuel that bounds the depth, drawn or fixed,
 keeps what a run reads bounded however long the input grows; past that, extra bytes are a tail no
 run reads, which costs nothing.
+
+## Hybrid campaigns
+
+Random generation and coverage-guided mutation win at different budgets and on different bugs: random
+covers breadth cheaply and finds shallow bugs first, and the fuzzer gets behind guards random cannot
+stumble through. A *hybrid* campaign runs both in one libFuzzer loop: random first, then fuzzing seeded
+with the random tests that reached new coverage, and, under `--hybrid`, back and forth.
+
+| flag | meaning |
+|---|---|
+| `--hybrid` | switch in both directions by stale effort (below) |
+| `--hybrid=N` | switch once, to fuzzing, after `N` random tests: a fixed warm-up, for comparison |
+
+Every round's tests count against the one `-runs` budget, so a campaign is the same length either way.
+When a random round's finds are handed to libFuzzer they keep their full recorded length, since no
+campaign ramps the length ([Truncation](#truncation)). A ramp asked for with `-len_control`
+also cuts a seed longer than its limit as it is handed over; on the real targets the BasaltBench
+repository measures (Cedar, lean-mc, Strata), it made no significant difference to a hybrid
+campaign.
+
+**A random find has to become a libFuzzer input.** A random round samples each choice from SplitMix,
+as `IO` does, at `RecordGen` (`Basalt/Fuzz/Record.lean`), which also writes bytes that `FuzzGen`'s
+`choose` decodes back to that choice, picked at random among those that do, so that a seed's bytes
+look random to libFuzzer's mutations (`recordDraw`). The buffer is exactly as long as the run read.
+Running `FuzzGen` on random bytes instead would bias the choices (one byte modulo 200 makes `0..55`
+twice as likely as `56..199`), and it needs a length fixed in advance: a buffer too short reads as
+zeros, one too long carries a dead tail. `readNat_recordDraw` proves the decoding per draw; that a
+whole run replays is a free theorem of the generator's polymorphism, which `BasaltTest/Fuzz.lean`
+pins.
+
+**One loop, two modes.** In a random round the callback (`runOneRandom`, `Runner.lean`) ignores
+libFuzzer's buffer, runs the property at `RecordGen`, and returns `-1`, so libFuzzer neither keeps
+the input nor records its features (`basalt_hy_random_test`, `native.c`). The bridge checks the test
+for new coverage itself (`basalt_hybrid_judge`), by libFuzzer's notion of a feature: an edge and its
+hit-count bucket. A *find* is a test that reached a feature no earlier test of either mode did. On
+the switch to fuzzing (`basalt_hy_switch`) the round's finds are reduced by greedy set cover over
+the features that round discovered (`Basalt/Fuzz/Cover.lean`, which proves the cover reaches all of
+them; admission one test at a time cannot drop a seed a later one subsumes), and the custom mutator
+hands them to libFuzzer one per call (`basalt_hy_mutate`), so each enters the corpus by libFuzzer's
+own rule. When fuzzing hands back to random, libFuzzer's corpus stays in memory, and the next
+fuzzing round resumes from it with the new finds added (libFuzzer has no call to empty it).
+
+**The stale rule** (`basalt_hy_step`) ends a round, in either mode, once it has gone `E` tests
+without a find, and never before 256 tests (`BASALT_STALE_FLOOR`). `E = L̄ · ln L̄`
+(`basalt_stale_effort`), `L̄` the finds' mean length in bytes: libFuzzer's mutations land at random
+positions, so touching each of an input's `L̄` bytes once takes about `L̄ · ln L̄` of them (the
+coupon collector's bound). Fuzzing spends that on every corpus input, so its `E` is multiplied by
+the number of finds, which stands in for the corpus's size (libFuzzer exposes no corpus API; finds
+somewhat overstate it, which only makes fuzzing judged a little more patiently). Each mode is judged
+by its own effort since its round began, never by its rate against the other's, since each inherits
+most of its coverage from the other. Nothing in the rule depends on the budget, so it works the same
+without `-runs`. Its cost is the floor: on a target where random finds nothing, every random round
+still runs its 256 tests.
+
+**Measured.** `fuzz-run/compare-settings.sh`, 300 campaigns per cell, Amazon Linux 2023 x86_64,
+`-len_control=0 -max_len=65536` throughout:
+
+| property | budget | fuzzing only | `--hybrid` | `--hybrid=100` |
+|---|---|---|---|---|
+| `chain-3` | 1,000 runs | 46.3% ±2.9 | **83.3%** ±2.2 | 58.3% ±2.8 |
+| `chain-4` | 1,200 | 50.0% ±2.9 | **73.0%** ±2.6 | 63.3% ±2.8 |
+| `long-16` | 3,000 | 71.7% ±2.6 | 49.7% ±2.9 | **75.0%** ±2.5 |
+
+`chain-n`'s first guard is a uniform 1-in-256 byte, which random hits at exactly that rate while
+libFuzzer, starting from an empty input, must first insert a byte and get its value right: random banks
+the first stage and hands over a seed already past it. `long-16` is the cost of the floor: random never
+reaches a long run, and every random round still takes 256 tests, so the modes alternate and random
+takes a large share of a small budget. These benchmarks put one bug behind nested guards, so they
+measure depth, not the breadth a hybrid is for; the BasaltBench repository measures that, on proved
+generators driving Cedar, lean-mc and Strata.
+
+Three consequences. A counterexample found in a random round is written as `crash-random-<n>` under
+`-artifact_prefix` and replays like any other artifact, because it *is* a `FuzzGen` buffer; the
+bridge exits past libFuzzer's exit hook, which would otherwise save the buffer in hand — not that
+test's input — as the crash. Whether a random test reached new coverage is checked on the code that
+runs then, which includes the generator's `RecordGen` specialization rather than its `FuzzGen` one;
+libFuzzer checks each seed again when it is handed over, so the cost is keeping seeds a `FuzzGen`
+run would not have, never losing one it would, though those finds also count toward the stale rule's
+`E`. And the budget is in tests, not time: a random test is cheaper than a fuzzing one, which
+`-max_total_time` does not see.
 
 ## What a run looks like
 
@@ -491,7 +572,7 @@ it.
   encoding (bolero's Lemire scaling), but note the binding constraint measured above is *tagging*,
   not instrumentation scope: an encoding change alone will not help unless the compared value and the
   buffered bytes agree, e.g. by comparing on `UInt32`/`UInt8` before widening to `Nat`.
-- **No in-process campaign result.** A failure `abort()`s, so `go` cannot return a `TestOutcome`;
+- **No in-process campaign result.** A failure `abort()`s, so `goFuzz` cannot return a `TestOutcome`;
   FuzzChick shows the trade-off, which is that you can return a value only if you own the loop. The
   clean way to have both is a subprocess model: a Lean parent spawns a libFuzzer child that aborts
   like bolero, and reconstructs a `TestOutcome` from the child's exit code, artifact, and stderr.
