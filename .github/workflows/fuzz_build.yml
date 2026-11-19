@@ -190,6 +190,21 @@ jobs:
           grep -q 'BASALT PROPERTY FAILED' log-hybrid.txt || {
             echo "::error::chain-4 crashed without reporting a counterexample"; tail -20 log-hybrid.txt; exit 1; }
 
+      # `--cmp` reaches the needle only if comparisons reach its pair table: through the `--wrap`ped
+      # `trace-cmp` hooks, and for a Lean `Nat` through the force-included `nat_hook.h`. Either one
+      # silently missing leaves a campaign that runs and finds every other bug. Literals are off, so
+      # the find must come from a comparison at run time.
+      - name: --cmp must find the needle from run-time comparisons
+        run: |
+          mkdir -p art/needle
+          if fuzz-run/basalt-fuzz needle --cmp --no-literals -runs=1000000 -len_control=0 \
+               -max_len=64 -artifact_prefix=art/needle/ > log-needle.txt 2>&1; then
+            echo "::error::--cmp failed to find the needle in 1e6 runs"
+            tail -20 log-needle.txt; exit 1
+          fi
+          grep -q 'BASALT PROPERTY FAILED' log-needle.txt || {
+            echo "::error::needle crashed without reporting a counterexample"; tail -20 log-needle.txt; exit 1; }
+
       # A campaign reports its verdict *only* through the exit status, so a property name the registry
       # does not know must not exit 0 (`usageError`, Basalt/PBT/Driver.lean): every "this must fail"
       # step above would otherwise read a typo as the property having survived.

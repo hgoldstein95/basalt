@@ -29,6 +29,21 @@ asking for it: ``require basalt … with NameMap.empty.insert `fuzz "true"``. -/
 def fuzzLeancArgs : Array String :=
   if fuzz then #["-O1", "-fsanitize=fuzzer-no-link"] else #[]
 
+/-- `Basalt`'s own flags, without `trace-cmp`: its comparisons (cursors, ranges) are never a target's,
+and only crowd the tables of compared values that `--cmp` and libFuzzer plant from (measured,
+fuzz-run/README.md, "Planting compared values"). -/
+def basaltLeancArgs : Array String :=
+  if fuzzLeancArgs.isEmpty then #[] else fuzzLeancArgs.push "-fno-sanitize-coverage=trace-cmp"
+
+/-- The fuzz targets' and the executable root's flags: `-include` makes their Lean `Nat` comparisons
+visible to `--cmp` (`Basalt/Fuzz/nat_hook.h`, by its absolute path: the compiler runs in the root
+package's directory, which is not this one when Basalt is a dependency). Not in `Basalt`: its own
+comparisons (cursors, loop bounds) only crowd `--cmp`'s table, and leaving them out is 9% faster with
+the needles found no later. -/
+def targetLeancArgs : Array String :=
+  if fuzzLeancArgs.isEmpty then #[]
+  else fuzzLeancArgs ++ #["-include", (__dir__ / "Basalt" / "Fuzz" / "nat_hook.h").toString]
+
 /-
 Under `-Kfuzz`, `-fsanitize=fuzzer-no-link` here is *not* about fuzzing Basalt: it is about what
 libFuzzer can see of a generator's progress. Where a staged benchmark writes its guards itself
@@ -41,7 +56,7 @@ fixed budget and `long-64` nearly two thirds of its own (measured, fuzz-run/READ
 @[default_target]
 lean_lib Basalt where
   globs := #[.andSubmodules `Basalt]
-  moreLeancArgs := fuzzLeancArgs
+  moreLeancArgs := basaltLeancArgs
 
 @[default_target]
 lean_lib BasaltExamples where
@@ -68,7 +83,7 @@ targets would stop type-checking `Staged`, which nothing else imports.
 @[default_target]
 lean_lib BasaltFuzz where
   globs := #[.submodules `BasaltFuzz]
-  moreLeancArgs := fuzzLeancArgs
+  moreLeancArgs := targetLeancArgs
 
 /-
 The opt-in fuzzing executable, never built by `lake build` and reached only through
@@ -81,5 +96,5 @@ optimization level would make its halves incomparable.
 -/
 lean_exe «basalt-fuzz» where
   root := `BasaltFuzzMain
-  moreLeancArgs := fuzzLeancArgs
+  moreLeancArgs := targetLeancArgs
   moreLinkArgs := #["@fuzz-run/obj/link.rsp"]

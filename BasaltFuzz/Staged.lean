@@ -65,4 +65,13 @@ def propLong [Gen G] (n : Nat) : PropM G Unit := do
     if d == 0 || d == stopAt i then break else len := len + 1
   check (len < n) s!"length={len} of {n}"
 
+/-- A 32-bit magic value behind an equality, `n` of them in series: a blind sampler needs `2⁻³²` per
+stage, and coverage alone cannot help within one, since no branch separates a near miss. Only a
+fuzzer that plants the compared constant in a draw finds it (`--cmp`, `fuzz-run/README.md`). -/
+def propNeedle [Gen G] (n : Nat) : PropM G Unit := do
+  let mut ok := 0
+  for i in [0:n] do
+    if (← generate (chooseNat 0 4294967295)) == 0xDEADBEEF + i then ok := ok + 1 else break
+  check (ok < n) s!"stages={ok} of {n}"
+
 end Staged

@@ -192,6 +192,7 @@ seconds, once). Instrumentation itself needs nothing extra.
 fuzz-run/basalt-fuzz [--backend=fuzz|io|plausible|io-cov] <property> [-runs=N] [-discard_ratio=N] [libFuzzer args...]
 fuzz-run/basalt-fuzz <property> --truncate                 # fuzz backend only, see below
 fuzz-run/basalt-fuzz <property> --hybrid[=N]               # fuzz backend only: random first, see below
+fuzz-run/basalt-fuzz <property> --cmp [--no-literals]      # fuzz backend only: plant compared values
 fuzz-run/basalt-fuzz replay <property> <file>      # reproduce a saved input, no fuzzer
 ```
 
@@ -209,6 +210,7 @@ Properties (see `BasaltFuzzMain.lean` and `BasaltFuzz/`):
 | `bst-buggy-delete` | a `delete` that silently drops keys; the output is still a valid BST, so only the model comparison catches it |
 | `chain-2`/`-3`/`-4` | the staged microbenchmark — a bug behind `n` nested guards |
 | `long-16`/`-32`/`-64` | the mirror image: a run of `n` elements where each position accepts half the byte values, so what binds is the buffer's *length* |
+| `needle`/`-2` | `n` 32-bit constants behind equalities, which only [`--cmp`](#planting-compared-values) finds |
 
 Useful libFuzzer flags: `-runs=N` (bounded campaign), `-max_len=N` (input size),
 `-artifact_prefix=./` (where crashing inputs are written), a positional dir for a seed/growing
@@ -216,11 +218,12 @@ corpus. The random backends read `-runs=N` from the same spelling, plus `-discar
 discard budget (`Basalt/PBT/Driver.lean`), and ignore the rest — under `fuzz`, libFuzzer owns the
 loop, so a discarded input is a `-1` return and neither budget applies.
 
-`--backend=`, `--truncate` and the [hybrid](#hybrid-campaigns) flags are Basalt's own and are consumed
-before libFuzzer sees the command line; everything else is forwarded verbatim, and libFuzzer rejects
-a flag it does not know. A `--` flag the chosen backend does not take is a usage error
-(`--backend=io --truncate` does not run as a plain random campaign); single-dash flags pass to every
-backend, which ignores those it does not read.
+`--backend=`, `--truncate`, the [hybrid](#hybrid-campaigns) flags and
+[`--cmp`](#planting-compared-values) are Basalt's own and are consumed before libFuzzer sees the
+command line; everything else is forwarded verbatim, and libFuzzer rejects a flag it does not know. A
+`--` flag the chosen backend does not take is a usage error (`--backend=io --truncate` does not run
+as a plain random campaign); single-dash flags pass to every backend, which ignores those it does
+not read.
 
 ## Backends
 
@@ -409,11 +412,11 @@ still runs its 256 tests.
 **Measured.** `fuzz-run/compare-settings.sh`, 300 campaigns per cell, Amazon Linux 2023 x86_64,
 `-len_control=0 -max_len=65536` throughout:
 
-| property | budget | fuzzing only | `--hybrid` | `--hybrid=100` |
-|---|---|---|---|---|
-| `chain-3` | 1,000 runs | 46.3% ±2.9 | **83.3%** ±2.2 | 58.3% ±2.8 |
-| `chain-4` | 1,200 | 50.0% ±2.9 | **73.0%** ±2.6 | 63.3% ±2.8 |
-| `long-16` | 3,000 | 71.7% ±2.6 | 49.7% ±2.9 | **75.0%** ±2.5 |
+| property | budget | fuzzing only | `--cmp` | `--hybrid` | `--hybrid --cmp` | `--hybrid=100` |
+|---|---|---|---|---|---|---|
+| `chain-3` | 1,000 runs | 42.0% ±2.8 | **95.3%** ±1.2 | 82.3% ±2.2 | 86.3% ±2.0 | 53.7% ±2.9 |
+| `chain-4` | 1,200 | 52.7% ±2.9 | **96.0%** ±1.1 | 74.7% ±2.5 | 77.7% ±2.4 | 59.7% ±2.8 |
+| `long-16` | 3,000 | 67.0% ±2.7 | 64.0% ±2.8 | 49.7% ±2.9 | 38.7% ±2.8 | **75.7%** ±2.5 |
 
 `chain-n`'s first guard is a uniform 1-in-256 byte, which random hits at exactly that rate while
 libFuzzer, starting from an empty input, must first insert a byte and get its value right: random banks
@@ -432,6 +435,68 @@ libFuzzer checks each seed again when it is handed over, so the cost is keeping 
 run would not have, never losing one it would, though those finds also count toward the stale rule's
 `E`. And the budget is in tests, not time: a random test is cheaper than a fuzzing one, which
 `-max_total_time` does not see.
+
+## Planting compared values
+
+A guard `x == K` on a drawn value gives coverage nothing to climb: no branch separates a near miss,
+so a 32-bit `K` costs a blind search `2³²` tests. libFuzzer's answer is to watch the program's
+comparisons (`trace-cmp`) and write one operand where the other was (`Mutate_AddWordFromTORC`). That
+does not reach a Basalt generator unaided, for two reasons. libFuzzer writes the word into bytes, and
+`choose` reduces bytes modulo its range, so the bytes that hold `K` do not decode to `K`. And Lean's
+`lean_nat_eq`/`_lt`/`_le` compare *tagged* scalars (`2n+1`), so the compare libFuzzer sees is not
+against `K` at all (only boxed `Nat`s above the scalar range reach the uninstrumented
+`lean_nat_big_*`).
+
+`--cmp` is that mutation at the level of draws. Every run records its draws' ranges
+(`FuzzState.trace`), each as two *varints* (`lo` and `hi - lo`, seven bits to a byte with the high
+bit marking that another byte follows, as in LEB128), so two bytes for most draws; where a draw's
+bytes start and the value they decode to follow from the input (`decode`, in
+`Basalt/Fuzz/Encoding.lean`, which proves it agrees with the run). A plant needs the draws of the
+input being mutated: the last run's, when libFuzzer mutates the input it just ran, or else those a
+cache keeps for each input that reached a feature new to libFuzzer, which is what libFuzzer keeps in
+its corpus (`basalt_trace_of`; the cache stops growing at 256 MB, and the run report says how many
+it turned away). On 1 in 14 of the custom mutator's calls (`basalt_cmp`), beside libFuzzer's own 13
+mutations, it takes a pair `(A, B)` the program compared and writes `B` (or `B ± 1`, as libFuzzer
+does) into a draw whose decoded value is `A`, falling back to any draw whose range admits it. The
+write is exact: `v - lo` big-endian in the draw's own bytes, which `drawStep` decodes back to `v`
+(`plant`, proved in the same module), and the run report counts the plants the next run decoded as
+planted (`basalt_cmp_after`). The pairs come from:
+
+- the `trace-cmp` hooks of the instrumented code, wrapped at link time (`--wrap`; GNU ld only, so on
+  macOS this source is empty), a tagged pair also kept untagged. Basalt's own code is built without
+  them (`lakefile.lean`): a `bst-insert` test makes 1,561 comparisons with them and 630 without, and
+  leaving them out is both faster and better (below);
+- Lean `Nat` comparisons: `Basalt/Fuzz/nat_hook.h` is force-included into the fuzz targets
+  (`lakefile.lean`; not Basalt's own code, whose comparisons only crowd the table) and hands the
+  *untagged* operands of `lean_nat_eq` and its kin to the bridge, and on to libFuzzer's own table of
+  recent compares;
+- the target's own `Nat` literals (`harvested_literals%`, `Basalt/Fuzz/Literals.lean`), unpaired, so
+  they take the fallback. `--no-literals` drops them.
+
+A value whose plant reached a new feature is kept, and a third of the picks reuse one, as libFuzzer's
+persistent auto-dictionary does. A code-under-test dependency gets the `Nat` hook by adding
+`-include "$BASALT_NAT_HOOK"` to its own C flags when `build.sh` sets that variable.
+
+**Measured.** The needles, 20 trials each at up to 200,000 tests, `-len_control=0 -max_len=65536`,
+median tests to the find (every trial found it; without `--cmp`, none is found in 5M tests):
+
+| setting | `needle` | `needle-2` |
+|---|---|---|
+| `--cmp` | 160 | 2,047 |
+| `--cmp --no-literals` | 119 | 871 |
+| `--hybrid --cmp` | 483 | 4,600 |
+
+Built with `trace-cmp` in Basalt's own code too, `--cmp` needed a median of 451 and 4,723 tests for the
+needles (30 trials) and found `chain-3` and `chain-4` in 81% and 88% of campaigns, against 93% and 96%
+without; fuzzing alone found them as often either way.
+
+With the literals off, the needles are found from comparisons at run time alone, `needle-2`'s second
+constant `0xDEADBEEF + 1` included, which no literal states. On `chain-n`, whose guards compare
+against the literal `7`, `--cmp` raises the share of campaigns that find the bug, and on `long-16`,
+which has nothing to plant, it costs nothing ([Hybrid campaigns](#hybrid-campaigns) has the table).
+`--cmp` costs throughput in proportion to a test's draws against its other work, most of it the
+tracing and the feature read that decides whether to cache an input's trace: 27% on `bst-insert`
+and 28% on `bst-gen`, whose tests take microseconds, and less where a test does more per draw.
 
 ## What a run looks like
 
@@ -482,20 +547,12 @@ The bytes alone are the whole reproduction, and replay takes no flag: zero-exten
 
 ## Writing a fuzz target: what coverage guidance can and cannot see
 
-Coverage guidance is driven by **branch/structure** coverage, not by guessing wide scalars. Do not
-put a demo bug behind a magic-value `Nat` equality: a 32-bit needle (`x == 0xDEADBEEF` over
-`chooseNat 0 4294967295`) is not found in 5M runs, with or without `-use_cmp`. Design bugs to be
-reachable via new *branches* instead — like the equal-key arm of `insertBuggy`, or `chain-n`'s
-nesting — which the fuzzer explores well.
-
-The reason is worth stating precisely, because the obvious explanation is wrong. `lean_nat_eq`/`_le`
-are `LEAN_ALWAYS_INLINE` with a small-scalar fast path, so they *do* inline into instrumented code
-and *do* emit `-trace-cmp` hooks (`__sanitizer_cov_trace_const_cmp8` is present in the BST object
-file). But the value the hook observes is a **tagged** Lean scalar, `2*n+1` — comparing
-`0x1BD5B7DDF`, not `0xDEADBEEF` — so the literals libFuzzer harvests into its table of recent
-compares never match the bytes `choose` reads out of the input buffer. The signal fires and is
-useless. (Only boxed `Nat`s above the scalar range reach the genuinely uninstrumented
-`lean_nat_big_*` in `libleanshared`.)
+Coverage guidance is driven by **branch/structure** coverage, not by guessing wide scalars. A bug
+behind a magic-value equality (`x == 0xDEADBEEF` over `chooseNat 0 4294967295`) is not found in 5M
+runs by coverage alone, and libFuzzer's own `-use_cmp` does not help, for the reasons in [Planting
+compared values](#planting-compared-values); `--cmp` finds it in hundreds. Without `--cmp`, design bugs
+to be reachable via new *branches* — like the equal-key arm of `insertBuggy`, or `chain-n`'s nesting
+— which the fuzzer explores well.
 
 ## Platforms
 
@@ -568,10 +625,8 @@ it.
   values map to the same value (2²⁴ words per outcome over `chooseNat 0 255`), so most mutations of
   that word change nothing the property can see. Whatever replaces it must keep the tight
   bytes → choice map.
-- **A `trace-cmp`-friendly choice encoding.** Modulo reduction could give way to a comparison-exposing
-  encoding (bolero's Lemire scaling), but note the binding constraint measured above is *tagging*,
-  not instrumentation scope: an encoding change alone will not help unless the compared value and the
-  buffered bytes agree, e.g. by comparing on `UInt32`/`UInt8` before widening to `Nat`.
+- **`--cmp` sees 4- and 8-byte comparisons only.** The 1- and 2-byte, `switch` and `memcmp`/string
+  hooks are not wrapped, so a constant compared that way is planted only if it is a harvested literal.
 - **No in-process campaign result.** A failure `abort()`s, so `goFuzz` cannot return a `TestOutcome`;
   FuzzChick shows the trade-off, which is that you can return a value only if you own the loop. The
   clean way to have both is a subprocess model: a Lean parent spawns a libFuzzer child that aborts
@@ -591,6 +646,22 @@ it.
   first: the shared `Tree` must be monomorphic or the fuzz side must instantiate it, and `isBST` has
   to exist in both a `Prop` form for the proofs and a `Bool` form for the property (a `decide`
   bridging lemma is the tidy version).
+- **A hybrid's random rounds run inside libFuzzer's loop.** Each random test is a libFuzzer callback
+  that ignores its buffer, so it pays for the loop and the buffer copies that `io-cov` avoids: a
+  random-round test measured about 2.5× an `io-cov` test on `bst-insert`, and about 10% more on Cedar,
+  whose tests do more work. Only the first round could run outside the loop, in an `io-cov`-style
+  loop at `RecordGen` before `basalt_fuzz_go` starts the driver: libFuzzer's driver can be entered
+  only once per process, so every later round must be callbacks. That adds a second path for random
+  rounds and has to carry the stale rule's state into the loop.
+- **The novelty check duplicates libFuzzer.** A random round reads the counters into features and
+  marks them itself (`basalt_hybrid_judge`), because libFuzzer has no call that says whether an input
+  reached something new; that is about a quarter of a random-round test on `bst-insert`, and 1% on
+  Cedar. An engine whose state is open to the mutator (AFL++'s `afl_state_t`) would remove it.
+- **Fuzzing hands back to random with its corpus intact.** Flushing the corpus at the switch back, so
+  that the next fuzzing round starts from the random round's seeds alone, is untested: libFuzzer has
+  no call that empties its corpus, so it would need a different engine or a restart of the driver.
+- **`RecordGen`'s bytes are written with powers of 256.** Writing them with shifts measured about 6% faster
+  on `bst-insert`'s random rounds; `readNat_recordDraw` would need its `pushBE` lemmas restated.
 - **Narrower instrumentation, other engines.** The scope is per *library*, so the choice above is
   all-or-nothing for `Basalt`: a target that wanted its plumbing uninstrumented (for the 25% of
   throughput) while keeping it for a length-bound generator cannot have both from one `-Kfuzz`

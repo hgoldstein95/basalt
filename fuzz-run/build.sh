@@ -32,6 +32,10 @@ ROOT=$(cd "${FUZZ_PKG:-$BASALT}" && pwd -P)
 FUZZ_EXE=${FUZZ_EXE:-basalt-fuzz}
 FUZZ_UNDER_TEST=${FUZZ_UNDER_TEST:-}
 cd "$ROOT"
+# Basalt's targets force-include `nat_hook.h` (lakefile.lean), which makes Lean `Nat` comparisons reach
+# `--cmp`; another package's targets or code under test can add `-include "$BASALT_NAT_HOOK"` to their
+# own flags when the variable is set.
+export BASALT_NAT_HOOK="$BASALT/Basalt/Fuzz/nat_hook.h"
 
 # shellcheck source=/dev/null   # optional and git-ignored; nothing to follow
 if [ -f "$ROOT/fuzz-run/env.sh" ]; then . "$ROOT/fuzz-run/env.sh"
@@ -172,6 +176,19 @@ else
   EXPORT_FLAGS="-Wl,--export-dynamic"
 fi
 
+# `--cmp` reads the instrumented code's comparison operands by wrapping the runtime's `trace-cmp` hooks
+# (Basalt/Fuzz/native.c), which needs GNU ld's `--wrap`; without it (macOS) only the harvested
+# literals are planted.
+if [ "$UNAME" = "Darwin" ]; then
+  CMP_WRAP_DEFINE=""; WRAP_FLAGS=""
+else
+  CMP_WRAP_DEFINE="-DBASALT_CMP_WRAP"
+  WRAP_FLAGS=""
+  for h in cmp8 const_cmp8 cmp4 const_cmp4; do
+    WRAP_FLAGS="$WRAP_FLAGS -Wl,--wrap=__sanitizer_cov_trace_$h"
+  done
+fi
+
 # Which driver symbol the bridge calls. LLVM >= 12 has the stable C entry `LLVMFuzzerRunDriver`;
 # clang 11 and earlier expose only the mangled `fuzzer::FuzzerDriver`. Probe the archive rather
 # than parsing a version, since the archive is the thing that must contain the symbol.
@@ -193,7 +210,7 @@ echo "== platform: $UNAME; cc: $CC; runtime: $FUZZER_LIB_FLAGS ${DRIVER_DEFINE:+
 # ---------------------------------------------------------------------------------------------
 echo "== compile the C bridge =="
 # shellcheck disable=SC2086   # flag strings: the split into words is the point
-$CC -O1 $BRIDGE_INCLUDES $DRIVER_DEFINE -c "$BASALT/Basalt/Fuzz/native.c" -o "$OUT/native.o"
+$CC -O1 $BRIDGE_INCLUDES $DRIVER_DEFINE $CMP_WRAP_DEFINE -c "$BASALT/Basalt/Fuzz/native.c" -o "$OUT/native.o"
 EXTRA_OBJS=("$OUT/native.o")
 for c in ${FUZZ_EXTRA_C:-}; do
   o="$OUT/$(basename "${c%.c}").o"
@@ -222,7 +239,7 @@ fi
 echo "== write link.rsp =="
 : > "$OUT/link.rsp"
 # shellcheck disable=SC2086   # flag strings: the split into words is the point
-for a in "${EXTRA_OBJS[@]}" $FUZZER_LIB_FLAGS $CXXLIB_FLAGS $EXPORT_FLAGS; do
+for a in "${EXTRA_OBJS[@]}" $FUZZER_LIB_FLAGS $CXXLIB_FLAGS $EXPORT_FLAGS $WRAP_FLAGS; do
   printf '"%s"\n' "$a" >> "$OUT/link.rsp"
 done
 
