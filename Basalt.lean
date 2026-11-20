@@ -5,7 +5,12 @@ Authors: Harrison Goldstein
 -/
 module
 
+public import Basalt.Backtrack
+public import Basalt.BacktrackWith
 public import Basalt.Combinators
+public import Basalt.Enum
+public import Basalt.ExceptT
+public import Basalt.Fail
 public import Basalt.Gen
 public import Basalt.GenRel
 public import Basalt.GenRel.Basic
@@ -32,6 +37,7 @@ public import Basalt.PBT.Backend
 public import Basalt.PBT.Campaign
 public import Basalt.PBT.Driver
 public import Basalt.PBT.Property
+public import Basalt.Pick
 public import Basalt.PlausibleGen
 public import Basalt.PlausibleGen.Backend
 public import Basalt.Random

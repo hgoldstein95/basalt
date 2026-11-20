@@ -26,6 +26,7 @@ def myGen [Gen G] : G α := ...
 | `SPMF.Cost` | the same, plus a count of random choices |
 | `GenStats.StatGen` | seeded, fuel-guarded execution that counts choices (drives `#genstats`) |
 | `Fuzz.FuzzGen` | choices read from a byte buffer, so a coverage-guided fuzzer drives generation |
+| `Finite` / `WFinite` / `CostGraded G` | every value it can produce, one entry per path — with each path's probability, or tiered by number of choices (`Basalt/Enum.lean`) |
 
 `RandomChoice.choose` is the only source of randomness; every combinator (`elements`, `oneOf`,
 `frequency`, `listOf`, …) is built on it. Recursive generators are defined by
@@ -148,7 +149,11 @@ the failure model, the supported platforms, and how fast each backend finds a bu
     `Laws.lean`, the properties a generator may be proved to have;
   - *the interpretations*: `SPMF/` (the distribution semantics and its theory — support, mass,
     expectations, cost, almost-sure termination), `IO.lean` and `IO/` (with `IsFaithful`),
-    `PlausibleGen.lean` and `PlausibleGen/`, `OptionT.lean`, `GenStats/`, and the opt-in `Fuzz/`,
+    `PlausibleGen.lean` and `PlausibleGen/`, `OptionT.lean`, `GenStats/`, `Enum/` (enumeration,
+    with its laws; `Fail.lean` is the failure it reads as `∅`; `Backtrack.lean` and `Pick.lean` the
+    weighted choices, with and without retry, it reads as a union, or `backtrack` at `WFinite` as a
+    mixture, `Enum/WeightedBacktrack.lean`; and `ExceptT.lean` and `BacktrackWith.lean` the same over
+    failures that say why, `Enum/WeightedBacktrackWith.lean` at `WFinite`), and the opt-in `Fuzz/`,
     with `Random.lean` holding `stdChoose`, the exactly uniform draw from core's `StdGen` that
     `GenStats/` makes;
   - *the proof machinery*:
